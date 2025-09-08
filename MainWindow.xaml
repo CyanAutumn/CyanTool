@@ -1,0 +1,220 @@
+<Window x:Class="CyanTools.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CyanTools"
+        mc:Ignorable="d"
+        Title="Cyan Tools" Height="600" Width="900" WindowStartupLocation="CenterScreen"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent">
+
+    <Window.Resources>
+
+        <Storyboard x:Key="OpenMenuStoryboard">
+            <DoubleAnimation Storyboard.TargetName="MenuGrid" Storyboard.TargetProperty="Width" To="200" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <Storyboard x:Key="CloseMenuStoryboard">
+            <DoubleAnimation Storyboard.TargetName="MenuGrid" Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+
+        <Style x:Key="MenuButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="5">
+                            <StackPanel VerticalAlignment="Center">
+                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2"/>
+                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2"/>
+                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#FFEEEEEE"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WindowControlButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#FFEEEEEE"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WindowCloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#C42B1C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Window.Style>
+        <Style TargetType="Window">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Window">
+                        <Border BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10">
+                            <AdornerDecorator>
+                                <ContentPresenter/>
+                            </AdornerDecorator>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Style>
+
+
+    <Border CornerRadius="10" Background="#FFF5F5F5" BorderBrush="#FFCCCCCC" BorderThickness="1">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+
+            <Grid x:Name="MenuGrid" Grid.Column="0" Width="0" Background="White">
+                <ListView x:Name="MenuListView" Background="Transparent" BorderThickness="0"
+                          SelectionChanged="MenuListView_SelectionChanged"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Foreground" Value="Black"/>
+                            <Setter Property="FontSize" Value="16"/>
+                            <Setter Property="Padding" Value="20,15"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <Border x:Name="Bd" Padding="{TemplateBinding Padding}" Background="Transparent">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#FFEEEEEE"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#FFDDDDDD"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+
+                    <ListViewItem>
+                        <TextBlock Text="主页"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="Danbooru下载器"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="LLM分类"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片超分"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片处理"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="数据集管理器"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="Prompt管理器"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片分辨率归类"/>
+                    </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片三分法"/>
+                    </ListViewItem>
+                </ListView>
+            </Grid>
+
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+
+                <Border Grid.Row="0" Height="40" Background="White" MouseDown="Window_MouseDown">
+                    <Grid>
+
+                        <Button x:Name="MenuToggleButton" Click="MenuToggleButton_Click"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0"
+                                Style="{StaticResource MenuButtonStyle}"/>
+                        <TextBlock Text="Cyan Tools" Foreground="Black" FontSize="16"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="—" Click="Minimize_Click" Style="{StaticResource WindowControlButton}"/>
+                            <Button Content="☐" Click="Maximize_Click" Style="{StaticResource WindowControlButton}"/>
+                            <Button Content="✕" Click="Close_Click" Style="{StaticResource WindowCloseButton}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+
+                <ContentControl x:Name="MainContent" Grid.Row="1" Margin="10"/>
+
+            </Grid>
+        </Grid>
+    </Border>
+
+</Window>

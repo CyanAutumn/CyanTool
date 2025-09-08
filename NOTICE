@@ -1,0 +1,51 @@
+CyanTools
+Copyright (C) 2025-2026 CyanTools contributors
+Original project: https://github.com/CyanAutumn/CyanTools
+
+Project license
+---------------
+CyanTools' original code is licensed under the GNU General Public License,
+version 3 only (SPDX-License-Identifier: GPL-3.0-only). A complete, unmodified
+copy of the license is included in LICENSE.
+
+Historical revisions
+--------------------
+Historical revisions of CyanTools' original code distributed with this notice
+are also offered under GPL-3.0-only and the project attribution term below.
+This notice does not revoke permissions previously granted under another
+license and does not replace independently licensed third-party terms.
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See LICENSE for details.
+
+Project attribution — additional term under GPLv3 section 7(b)
+-------------------------------------------------------------
+When conveying this software or a covered work containing CyanTools code,
+preserve the following reasonable author attribution in the material or in
+the Appropriate Legal Notices displayed by the work:
+
+    This software includes code from CyanTools.
+    Original project: https://github.com/CyanAutumn/CyanTools
+    Copyright (C) 2025-2026 CyanTools contributors
+
+This attribution may appear in accompanying LICENSE/NOTICE or third-party
+notices. It does not require a logo, advertising, or a particular UI layout.
+Existing copyright, license, and modification notices must also be retained
+as required by the GPL.
+
+Third-party material
+--------------------
+Files, dependencies, and components with their own license notices retain
+those notices and their original licensing terms. Refer to their accompanying
+source headers and license/notice files for the applicable terms. Model
+weights, calibration data, external tools, and training backends are subject
+to their respective upstream licenses.
+
+The project attribution term applies to CyanTools' copyrightable original
+contributions; it does not replace or add restrictions to separately
+licensed third-party material used on its own.
