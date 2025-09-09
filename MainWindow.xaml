@@ -185,6 +185,9 @@
                     <ListViewItem>
                         <TextBlock Text="保留指定文件"/>
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="导出视频帧"/>
+                    </ListViewItem>
                 </ListView>
             </Grid>
 

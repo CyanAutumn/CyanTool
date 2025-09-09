@@ -18,6 +18,7 @@ namespace CyanTools
         private ImageBucketingView _imageBucketingView;
         private ThreeStageView _threeStageView;
         private KeepFilesView _keepFilesView;
+        private ExportVideoFrameView _exportVideoFrameView;
 
         public MainWindow()
         {
@@ -94,6 +95,10 @@ namespace CyanTools
                     case "保留指定文件":
                         if (_keepFilesView == null) _keepFilesView = new KeepFilesView();
                         MainContent.Content = _keepFilesView;
+                        break;
+                    case "导出视频帧":
+                        if (_exportVideoFrameView == null) _exportVideoFrameView = new ExportVideoFrameView();
+                        MainContent.Content = _exportVideoFrameView;
                         break;
                     
                 }
