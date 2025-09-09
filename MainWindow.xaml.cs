@@ -17,6 +17,7 @@ namespace CyanTools
         private PromptManagerView _promptManagerView;
         private ImageBucketingView _imageBucketingView;
         private ThreeStageView _threeStageView;
+        private KeepFilesView _keepFilesView;
 
         public MainWindow()
         {
@@ -89,6 +90,10 @@ namespace CyanTools
                     case "图片三分法":
                         if (_threeStageView == null) _threeStageView = new ThreeStageView();
                         MainContent.Content = _threeStageView;
+                        break;
+                    case "保留指定文件":
+                        if (_keepFilesView == null) _keepFilesView = new KeepFilesView();
+                        MainContent.Content = _keepFilesView;
                         break;
                     
                 }

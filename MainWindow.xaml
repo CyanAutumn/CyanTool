@@ -182,6 +182,9 @@
                     <ListViewItem>
                         <TextBlock Text="图片三分法"/>
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="保留指定文件"/>
+                    </ListViewItem>
                 </ListView>
             </Grid>
 

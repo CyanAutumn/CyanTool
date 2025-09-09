@@ -1,0 +1,39 @@
+<UserControl x:Class="CyanTools.KeepFilesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:CyanTools"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="选择文件夹:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+            <TextBox x:Name="FolderPathTextBox" Width="400" IsReadOnly="True" VerticalAlignment="Center"/>
+            <Button x:Name="SelectFolderButton" Content="选择..." Click="SelectFolderButton_Click" Margin="5,0,0,0"/>
+        </StackPanel>
+
+        <GroupBox Grid.Row="1" Header="保留的文件类型" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal">
+                <CheckBox x:Name="JpgCheckBox" Content="jpg" IsChecked="True" Margin="5"/>
+                <CheckBox x:Name="PngCheckBox" Content="png" IsChecked="True" Margin="5"/>
+                <CheckBox x:Name="WebpCheckBox" Content="webp" IsChecked="True" Margin="5"/>
+                <CheckBox x:Name="BmpCheckBox" Content="bmp" IsChecked="True" Margin="5"/>
+                <CheckBox x:Name="JpegCheckBox" Content="jpeg" IsChecked="True" Margin="5"/>
+                <CheckBox x:Name="NpzCheckBox" Content="npz" IsChecked="True" Margin="5"/>
+                <CheckBox x:Name="TxtCheckBox" Content="txt" IsChecked="True" Margin="5"/>
+            </StackPanel>
+        </GroupBox>
+
+        <Button x:Name="DeleteFilesButton" Grid.Row="2" Content="删除其他文件" Click="DeleteFilesButton_Click" HorizontalAlignment="Left" Width="150"/>
+
+        <TextBox x:Name="LogTextBox" Grid.Row="3" Margin="0,10,0,0" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
+    </Grid>
+</UserControl>
