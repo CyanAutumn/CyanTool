@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -7,7 +7,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using WpfMessageBox = System.Windows.MessageBox;
-using DrawingImage = System.Drawing.Image;
+using SixLabors.ImageSharp;
+using Image = SixLabors.ImageSharp.Image;
+using Size = SixLabors.ImageSharp.Size;
 
 namespace CyanTools
 {
@@ -35,27 +37,29 @@ namespace CyanTools
 
         private void BrowseInputFolder_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog
+            var dialog = new CommonOpenFileDialog
             {
-                Description = "选择包含图片的输入文件夹"
+                IsFolderPicker = true,
+                Title = "选择包含图片的输入文件夹"
             };
 
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                txtInputFolder.Text = dialog.SelectedPath;
+                txtInputFolder.Text = dialog.FileName;
             }
         }
 
         private void BrowseOutputFolder_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog
+            var dialog = new CommonOpenFileDialog
             {
-                Description = "选择分类后图片的输出文件夹"
+                IsFolderPicker = true,
+                Title = "选择分类后图片的输出文件夹"
             };
 
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                txtOutputFolder.Text = dialog.SelectedPath;
+                txtOutputFolder.Text = dialog.FileName;
             }
         }
 
@@ -161,7 +165,7 @@ namespace CyanTools
             {
                 worker.ReportProgress(10, "正在加载图片...");
 
-                var imageData = new Dictionary<string, System.Drawing.Size>();
+                var imageData = new Dictionary<string, Size>();
                 var dicFileName = new Dictionary<string, string>();
                 int fileIndex = 10000;
 
@@ -180,7 +184,7 @@ namespace CyanTools
 
                     try
                     {
-                        using (var image = DrawingImage.FromFile(filePath))
+                        using (var image = Image.Load(filePath))
                         {
                             var resolution = image.Size;
                             var fileName = Path.GetFileName(filePath);

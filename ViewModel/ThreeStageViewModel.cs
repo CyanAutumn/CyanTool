@@ -7,6 +7,7 @@ using CyanTools.Utils;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Windows;
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
@@ -206,27 +207,21 @@ namespace CyanTools.ViewModel
 
         private void BrowseInputFolder()
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog
+            var dialog = new CommonOpenFileDialog();
+            dialog.IsFolderPicker = true;
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                Description = "选择输入文件夹"
-            };
-
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                InputFolder = dialog.SelectedPath;
+                InputFolder = dialog.FileName;
             }
         }
 
         private void BrowseOutputFolder()
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog
+            var dialog = new CommonOpenFileDialog();
+            dialog.IsFolderPicker = true;
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                Description = "选择输出文件夹"
-            };
-
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                OutputFolder = dialog.SelectedPath;
+                OutputFolder = dialog.FileName;
             }
         }
 

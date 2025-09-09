@@ -1,3 +1,4 @@
+using Microsoft.WindowsAPICodePack.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,12 +17,11 @@ namespace CyanTools
 
         private void SelectFolderButton_Click(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
+            var dialog = new CommonOpenFileDialog();
+            dialog.IsFolderPicker = true;
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    FolderPathTextBox.Text = dialog.SelectedPath;
-                }
+                FolderPathTextBox.Text = dialog.FileName;
             }
         }
 

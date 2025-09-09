@@ -8,7 +8,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows.Input;
 using CyanTools.Utils;
 
@@ -96,13 +96,11 @@ namespace CyanTools.ViewModel
 
         private void BrowseForFolder(Action<string> setPathAction)
         {
-            using (var dialog = new FolderBrowserDialog())
+            var dialog = new CommonOpenFileDialog();
+            dialog.IsFolderPicker = true;
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                DialogResult result = dialog.ShowDialog();
-                if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
-                {
-                    setPathAction(dialog.SelectedPath);
-                }
+                setPathAction(dialog.FileName);
             }
         }
 

@@ -1,5 +1,7 @@
 using System;
-using System.Drawing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using Image = SixLabors.ImageSharp.Image;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -41,9 +43,9 @@ namespace CyanTools.Utils
 
                     try
                     {
-                        using (var originalImage = Image.FromFile(imagePath))
+                        using (var originalImage = Image.Load(imagePath))
                         {
-                            originalImage.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                            originalImage.Mutate(x => x.Flip(FlipMode.Horizontal));
 
                             var originalFileName = Path.GetFileNameWithoutExtension(imagePath);
                             var extension = Path.GetExtension(imagePath);

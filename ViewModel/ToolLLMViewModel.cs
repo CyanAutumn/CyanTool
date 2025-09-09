@@ -6,7 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows.Input;
 using CyanTools.Model;
 using CyanTools.Utils;
@@ -87,31 +87,30 @@ namespace CyanTools.ViewModel
 
         private void ExecuteSelectFolder(string propertyName)
         {
-            using (var dialog = new FolderBrowserDialog())
+            var dialog = new CommonOpenFileDialog();
+            dialog.IsFolderPicker = true;
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                if (dialog.ShowDialog() == DialogResult.OK)
+                switch (propertyName)
                 {
-                    switch (propertyName)
-                    {
-                        case "WorkingDirectory":
-                            WorkingDirectory = dialog.SelectedPath;
-                            break;
-                        case "Path1":
-                            Path1 = dialog.SelectedPath;
-                            break;
-                        case "Path2":
-                            Path2 = dialog.SelectedPath;
-                            break;
-                        case "Path3":
-                            Path3 = dialog.SelectedPath;
-                            break;
-                        case "Path4":
-                            Path4 = dialog.SelectedPath;
-                            break;
-                        case "Path5":
-                            Path5 = dialog.SelectedPath;
-                            break;
-                    }
+                    case "WorkingDirectory":
+                        WorkingDirectory = dialog.FileName;
+                        break;
+                    case "Path1":
+                        Path1 = dialog.FileName;
+                        break;
+                    case "Path2":
+                        Path2 = dialog.FileName;
+                        break;
+                    case "Path3":
+                        Path3 = dialog.FileName;
+                        break;
+                    case "Path4":
+                        Path4 = dialog.FileName;
+                        break;
+                    case "Path5":
+                        Path5 = dialog.FileName;
+                        break;
                 }
             }
         }

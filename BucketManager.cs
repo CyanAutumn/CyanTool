@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using SixLabors.ImageSharp;
+using Image = SixLabors.ImageSharp.Image;
+using Size = SixLabors.ImageSharp.Size;
 using System.IO;
 using System.Linq;
 
@@ -191,7 +193,7 @@ namespace CyanTools
                 {
                     try
                     {
-                        using (var image = Image.FromFile(filePath))
+                        using (var image = Image.Load(filePath))
                         {
                             var resolution = image.Size;
                             var fileName = Path.GetFileName(filePath);
