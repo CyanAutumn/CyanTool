@@ -19,6 +19,7 @@ namespace CyanTools
         private ThreeStageView _threeStageView;
         private KeepFilesView _keepFilesView;
         private ExportVideoFrameView _exportVideoFrameView;
+        private ImageMetadataView _imageMetadataView;
 
         public MainWindow()
         {
@@ -96,9 +97,13 @@ namespace CyanTools
                         if (_keepFilesView == null) _keepFilesView = new KeepFilesView();
                         MainContent.Content = _keepFilesView;
                         break;
-                    case "导出视频帧":
+                                        case "导出视频帧":
                         if (_exportVideoFrameView == null) _exportVideoFrameView = new ExportVideoFrameView();
                         MainContent.Content = _exportVideoFrameView;
+                        break;
+                    case "图片元数据":
+                        if (_imageMetadataView == null) _imageMetadataView = new ImageMetadataView();
+                        MainContent.Content = _imageMetadataView;
                         break;
                     
                 }

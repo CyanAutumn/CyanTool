@@ -1,0 +1,46 @@
+<UserControl x:Class="CyanTools.ImageMetadataView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+
+
+        <Border BorderBrush="LightGray" BorderThickness="1" Margin="5"
+                AllowDrop="True"
+                Drop="UserControl_Drop"
+                DragEnter="UserControl_DragEnter"
+                Background="Transparent">
+            <Image x:Name="DroppedImage" Stretch="Uniform"/>
+        </Border>
+
+
+        <Grid Grid.Column="1" Margin="5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <TextBox x:Name="JsonMetadataDisplay" 
+                     Grid.Row="0" 
+                     Margin="5"
+                     TextWrapping="Wrap" 
+                     VerticalScrollBarVisibility="Auto"
+                     AcceptsReturn="True"
+                     FontFamily="Consolas"
+                     IsReadOnly="False"/>
+
+            <Button Grid.Row="1" 
+                    Content="Update Metadata" 
+                    Click="UpdateMetadata_Click" 
+                    HorizontalAlignment="Right" 
+                    Margin="5"/>
+        </Grid>
+    </Grid>
+</UserControl>

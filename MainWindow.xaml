@@ -188,6 +188,9 @@
                     <ListViewItem>
                         <TextBlock Text="导出视频帧"/>
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片元数据"/>
+                    </ListViewItem>
                 </ListView>
             </Grid>
 
