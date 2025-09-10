@@ -29,28 +29,63 @@ namespace CyanTools.ViewModel
     {
         private string _inputDirectory;
         private string _outputDirectory;
-        private string _selectedModel;
+        private string _selectedRealEsrganModel;
         private int _selectedScale;
         private GpuInfo _selectedGpu;
         private int _tileSize;
         private bool _shouldOpenOutputDirectory = true;
         private string _logOutput;
         private bool _isIdle = true;
-        private readonly RealEsrganProcessor _processor;
+        private string _selectedTool;
+
+
+        private int _selectedWaifu2xNoiseLevel;
+        private bool _waifu2xUsePhotoModel;
+        private int _waifu2xCropSize;
+
+        private readonly RealEsrganProcessor _realEsrganProcessor;
+        private readonly Waifu2xProcessor _waifu2xProcessor;
 
         public string InputDirectory { get => _inputDirectory; set => SetField(ref _inputDirectory, value); }
         public string OutputDirectory { get => _outputDirectory; set => SetField(ref _outputDirectory, value); }
-        public string SelectedModel { get => _selectedModel; set => SetField(ref _selectedModel, value); }
+
+
+        public string SelectedRealEsrganModel { get => _selectedRealEsrganModel; set => SetField(ref _selectedRealEsrganModel, value); }
+        public ObservableCollection<string> RealEsrganModels { get; }
+
+
         public int SelectedScale { get => _selectedScale; set => SetField(ref _selectedScale, value); }
+        public ObservableCollection<int> Scales { get; }
         public GpuInfo SelectedGpu { get => _selectedGpu; set => SetField(ref _selectedGpu, value); }
+        public ObservableCollection<GpuInfo> Gpus { get; }
         public int TileSize { get => _tileSize; set => SetField(ref _tileSize, value); }
         public bool ShouldOpenOutputDirectory { get => _shouldOpenOutputDirectory; set => SetField(ref _shouldOpenOutputDirectory, value); }
         public string LogOutput { get => _logOutput; set => SetField(ref _logOutput, value); }
         public bool IsIdle { get => _isIdle; set => SetField(ref _isIdle, value); }
 
-        public ObservableCollection<string> Models { get; }
-        public ObservableCollection<int> Scales { get; }
-        public ObservableCollection<GpuInfo> Gpus { get; }
+
+        public ObservableCollection<string> AvailableTools { get; }
+        public string SelectedTool
+        {
+            get => _selectedTool;
+            set
+            {
+                if (SetField(ref _selectedTool, value))
+                {
+                    OnPropertyChanged(nameof(IsRealEsrganSelected));
+                    OnPropertyChanged(nameof(IsWaifu2xSelected));
+                }
+            }
+        }
+        public bool IsRealEsrganSelected => SelectedTool == "Real-ESRGAN";
+        public bool IsWaifu2xSelected => SelectedTool == "waifu2x";
+
+
+        public ObservableCollection<int> Waifu2xNoiseLevels { get; }
+        public int SelectedWaifu2xNoiseLevel { get => _selectedWaifu2xNoiseLevel; set => SetField(ref _selectedWaifu2xNoiseLevel, value); }
+        public bool Waifu2xUsePhotoModel { get => _waifu2xUsePhotoModel; set => SetField(ref _waifu2xUsePhotoModel, value); }
+        public int Waifu2xCropSize { get => _waifu2xCropSize; set => SetField(ref _waifu2xCropSize, value); }
+
 
         public ICommand BrowseInputCommand { get; }
         public ICommand BrowseOutputCommand { get; }
@@ -59,23 +94,27 @@ namespace CyanTools.ViewModel
 
         public RealEsrganViewModel()
         {
-            _processor = new RealEsrganProcessor();
-            Models = new ObservableCollection<string>();
+            _realEsrganProcessor = new RealEsrganProcessor();
+            _waifu2xProcessor = new Waifu2xProcessor();
+
+            AvailableTools = new ObservableCollection<string> { "Real-ESRGAN", "waifu2x" };
+            RealEsrganModels = new ObservableCollection<string>();
             Scales = new ObservableCollection<int> { 2, 3, 4 };
             Gpus = new ObservableCollection<GpuInfo>
             {
                 new GpuInfo { Id = 0, Name = "GPU 0: NVIDIA" },
                 new GpuInfo { Id = 1, Name = "GPU 1: AMD" }
             };
+            Waifu2xNoiseLevels = new ObservableCollection<int> { 0, 1, 2, 3 };
 
             try
             {
-                var models = _processor.GetAvailableModels();
-                foreach (var model in models) Models.Add(model);
+                var models = _realEsrganProcessor.GetAvailableModels();
+                foreach (var model in models) RealEsrganModels.Add(model);
             }
             catch (Exception ex)
             {
-                LogOutput += "加载模型失败: " + ex.Message + "\n";
+                LogOutput += "加载Real-ESRGAN模型失败: " + ex.Message + "\n";
             }
             
             RestoreDefaults();
@@ -88,10 +127,18 @@ namespace CyanTools.ViewModel
 
         private void RestoreDefaults()
         {
-            SelectedModel = Models.FirstOrDefault(m => m.Contains("anime")) ?? Models.FirstOrDefault();
+            SelectedTool = AvailableTools.FirstOrDefault();
+
+
+            SelectedRealEsrganModel = RealEsrganModels.FirstOrDefault(m => m.Contains("anime")) ?? RealEsrganModels.FirstOrDefault();
             SelectedScale = Scales.LastOrDefault();
             SelectedGpu = Gpus.FirstOrDefault();
             TileSize = 0;
+
+
+            SelectedWaifu2xNoiseLevel = Waifu2xNoiseLevels.FirstOrDefault();
+            Waifu2xUsePhotoModel = false;
+            Waifu2xCropSize = 0;
         }
 
         private void BrowseForFolder(Action<string> setPathAction)
@@ -121,7 +168,14 @@ namespace CyanTools.ViewModel
             bool success = false;
             try
             {
-                await _processor.RunAsync(InputDirectory, OutputDirectory, SelectedModel, SelectedScale, SelectedGpu.Id, TileSize, progress);
+                if (SelectedTool == "Real-ESRGAN")
+                {
+                    await _realEsrganProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedRealEsrganModel, SelectedScale, SelectedGpu.Id, TileSize, progress);
+                }
+                else if (SelectedTool == "waifu2x")
+                {
+                    await _waifu2xProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedWaifu2xNoiseLevel, Waifu2xUsePhotoModel, Waifu2xCropSize, SelectedScale, progress);
+                }
                 success = true;
             }
             catch (Exception ex)

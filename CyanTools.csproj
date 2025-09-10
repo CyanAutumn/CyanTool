@@ -39,6 +39,9 @@
     <Content Include="realesrgan-ncnn-vulkan-20220424-windows\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+        <Content Include="waifu2x-caffe\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
         <Content Include="Models\**" Exclude="Models\CSD\**;Models\CSD_Weights\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

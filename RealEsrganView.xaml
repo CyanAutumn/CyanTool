@@ -4,13 +4,18 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <UserControl.DataContext>
         <viewModel:RealEsrganViewModel/>
     </UserControl.DataContext>
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -32,43 +37,85 @@
         <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
         <Button Grid.Row="1" Grid.Column="2" Content="..." Command="{Binding BrowseOutputCommand}" Margin="5" Padding="10,2"/>
 
-        <Label Grid.Row="2" Grid.Column="0" Content="选择模型:" VerticalAlignment="Center"/>
-        <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" Margin="5"/>
+        <Label Grid.Row="2" Grid.Column="0" Content="选择工具:" VerticalAlignment="Center"/>
+        <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding AvailableTools}" SelectedItem="{Binding SelectedTool}" Margin="5"/>
 
 
-        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3">
+        <Grid x:Name="RealEsrganOptionsGrid" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Visibility="{Binding IsRealEsrganSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Content="选择模型:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding RealEsrganModels}" SelectedItem="{Binding SelectedRealEsrganModel}" Margin="5"/>
+
+
+            <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="1.5*"/>
+                </Grid.ColumnDefinitions>
+                <Label Grid.Column="0" Content="放大倍数:" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}" Margin="5"/>
+
+                <Label Grid.Column="2" Content="选择GPU:" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="3" ItemsSource="{Binding Gpus}" SelectedItem="{Binding SelectedGpu}" Margin="5"/>
+
+                <Label Grid.Column="4" Content="瓦片大小:" VerticalAlignment="Center"/>
+                <Grid Grid.Column="5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding TileSize, UpdateSourceTrigger=PropertyChanged}" Margin="5,5,0,5"/>
+                    <TextBlock Grid.Column="1" Text="(0为不分块)" Foreground="Gray" FontStyle="Italic" VerticalAlignment="Center" Margin="5,0,5,0"/>
+                </Grid>
+            </Grid>
+        </Grid>
+
+
+        <Grid x:Name="Waifu2xOptionsGrid" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Visibility="{Binding IsWaifu2xSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="1.5*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Content="降噪等级:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Waifu2xNoiseLevels}" SelectedItem="{Binding SelectedWaifu2xNoiseLevel}" Margin="5"/>
+
+            <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="使用照片模型" IsChecked="{Binding Waifu2xUsePhotoModel}" VerticalAlignment="Center" Margin="5"/>
+
+            <Label Grid.Row="2" Grid.Column="0" Content="裁剪大小:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Waifu2xCropSize, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        </Grid>
+
+        <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Label Grid.Column="0" Content="放大倍数:" VerticalAlignment="Center"/>
-            <ComboBox Grid.Column="1" ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}" Margin="5"/>
-
-            <Label Grid.Column="2" Content="选择GPU:" VerticalAlignment="Center"/>
-            <ComboBox Grid.Column="3" ItemsSource="{Binding Gpus}" SelectedItem="{Binding SelectedGpu}" Margin="5"/>
-
-            <Label Grid.Column="4" Content="瓦片大小:" VerticalAlignment="Center"/>
-            <Grid Grid.Column="5">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" Text="{Binding TileSize, UpdateSourceTrigger=PropertyChanged}" Margin="5,5,0,5"/>
-                <TextBlock Grid.Column="1" Text="(0为不分块)" Foreground="Gray" FontStyle="Italic" VerticalAlignment="Center" Margin="5,0,5,0"/>
-            </Grid>
-            
-            <CheckBox Grid.Column="6" Content="完成后打开目录" IsChecked="{Binding ShouldOpenOutputDirectory}" VerticalAlignment="Center" Margin="15,0,0,0"/>
-            <Button Grid.Column="7" Content="恢复默认设置" Command="{Binding RestoreDefaultsCommand}" Margin="15,0,0,0"/>
+            <CheckBox Grid.Column="1" Content="完成后打开目录" IsChecked="{Binding ShouldOpenOutputDirectory}" VerticalAlignment="Center" Margin="15,0,0,0"/>
+            <Button Grid.Column="2" Content="恢复默认设置" Command="{Binding RestoreDefaultsCommand}" Margin="15,0,0,0"/>
         </Grid>
 
-        <Button Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Content="开始超分" Command="{Binding StartCommand}" IsEnabled="{Binding IsIdle}" Margin="5" Padding="10,5" FontWeight="Bold"/>
+        <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Content="开始超分" Command="{Binding StartCommand}" IsEnabled="{Binding IsIdle}" Margin="5" Padding="10,5" FontWeight="Bold"/>
 
-        <TextBox Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding LogOutput}" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Margin="5" TextWrapping="Wrap" AcceptsReturn="True"/>
+        <TextBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding LogOutput}" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Margin="5" TextWrapping="Wrap" AcceptsReturn="True"/>
     </Grid>
 </UserControl>
