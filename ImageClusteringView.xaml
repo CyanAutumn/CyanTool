@@ -41,9 +41,64 @@
         </GroupBox>
 
         <GroupBox Header="参数设置" Grid.Row="1" Margin="5">
-            <StackPanel Orientation="Horizontal">
-                <Label Content="聚类数量 (K):" VerticalAlignment="Center"/>
-                <TextBox Text="{Binding NumClusters, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalAlignment="Center"/>
+            <StackPanel>
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="特征类型:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding FeatureTypes}" SelectedItem="{Binding SelectedFeatureType}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="聚类算法:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding Algorithms}" SelectedItem="{Binding SelectedAlgorithm}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="聚类数量 (K):" Grid.Column="0" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding NumClusters, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalAlignment="Center" Grid.Column="1">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsKMeansSelected}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="最小簇大小 (HDBSCAN):" Grid.Column="0" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding MinClusterSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalAlignment="Center" Grid.Column="1">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsHdbscanSelected}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                </Grid>
             </StackPanel>
         </GroupBox>
 

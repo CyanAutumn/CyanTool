@@ -4,6 +4,7 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Collections.Generic;
 
 namespace CyanTools.ViewModel
 {
@@ -44,6 +45,17 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private int _minClusterSize = 10;
+        public int MinClusterSize
+        {
+            get { return _minClusterSize; }
+            set
+            {
+                _minClusterSize = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(MinClusterSize)));
+            }
+        }
+
         private double _progress;
         public double Progress
         {
@@ -54,6 +66,35 @@ namespace CyanTools.ViewModel
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Progress)));
             }
         }
+
+        public List<string> FeatureTypes { get; } = new List<string> { "Style", "Content" };
+        private string _selectedFeatureType = "Style";
+        public string SelectedFeatureType
+        {
+            get { return _selectedFeatureType; }
+            set
+            {
+                _selectedFeatureType = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SelectedFeatureType)));
+            }
+        }
+
+        public List<string> Algorithms { get; } = new List<string> { "KMeans", "HDBSCAN" };
+        private string _selectedAlgorithm = "KMeans";
+        public string SelectedAlgorithm
+        {
+            get { return _selectedAlgorithm; }
+            set
+            {
+                _selectedAlgorithm = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SelectedAlgorithm)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsKMeansSelected)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsHdbscanSelected)));
+            }
+        }
+
+        public bool IsKMeansSelected => SelectedAlgorithm == "KMeans";
+        public bool IsHdbscanSelected => SelectedAlgorithm == "HDBSCAN";
 
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
@@ -100,7 +141,7 @@ namespace CyanTools.ViewModel
             {
                 var processor = new Utils.ImageClusteringProcessor(modelPath);
                 var imageResults = processor.ProcessFolder(InputPath, 
-                    p => Application.Current.Dispatcher.Invoke(() => Progress = p),
+                    p => Application.Current.Dispatcher.Invoke(() => Progress = p * 0.5),
                     error => Application.Current.Dispatcher.Invoke(() => MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning)));
 
                 if (imageResults.Count == 0)
@@ -109,8 +150,40 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                var dataPoints = imageResults.Select(r => r.StyleVector).ToList();
-                int[] assignments = Utils.KMeansClusterer.Cluster(dataPoints, NumClusters);
+                List<float[]> dataPoints;
+                if (SelectedFeatureType == "Style")
+                {
+                    dataPoints = imageResults.Select(r => r.StyleVector).ToList();
+                }
+                else
+                {
+                    dataPoints = imageResults.Select(r => r.ContentVector).ToList();
+                }
+
+                int[] assignments;
+                if (SelectedAlgorithm == "KMeans")
+                {
+                    assignments = Utils.KMeansClusterer.Cluster(dataPoints, NumClusters);
+                }
+                else
+                {
+                    assignments = Utils.HdbscanClusterer.Cluster(dataPoints, MinClusterSize);
+
+
+                    var distinctLabels = assignments.Distinct().OrderBy(x => x).ToList();
+                    var labelMap = new Dictionary<int, int>();
+                    for (int i = 0; i < distinctLabels.Count; i++)
+                    {
+                        labelMap[distinctLabels[i]] = i;
+                    }
+                    for (int i = 0; i < assignments.Length; i++)
+                    {
+                        assignments[i] = labelMap[assignments[i]];
+                    }
+                }
+
+
+                Application.Current.Dispatcher.Invoke(() => Progress = 50 + 25);
 
                 for (int i = 0; i < imageResults.Count; i++)
                 {
@@ -121,7 +194,7 @@ namespace CyanTools.ViewModel
                     Directory.CreateDirectory(targetSubFolder);
                     string targetFilePath = Path.Combine(targetSubFolder, Path.GetFileName(sourceFilePath));
                     File.Copy(sourceFilePath, targetFilePath, true);
-                    Application.Current.Dispatcher.Invoke(() => Progress = 50 + (double)(i + 1) / imageResults.Count * 50);
+                    Application.Current.Dispatcher.Invoke(() => Progress = 75 + (double)(i + 1) / imageResults.Count * 25);
                 }
 
                 Application.Current.Dispatcher.Invoke(() =>

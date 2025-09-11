@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
+using System.Windows.Navigation;
 
 namespace CyanTools
 {
@@ -31,13 +33,8 @@ namespace CyanTools
             _openMenuStoryboard = (Storyboard)FindResource("OpenMenuStoryboard");
             _closeMenuStoryboard = (Storyboard)FindResource("CloseMenuStoryboard");
 
-            MainContent.Content = new TextBlock
-            {
-                Text = "欢迎使用 Cyan Tools",
-                FontSize = 24,
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-                VerticalAlignment = System.Windows.VerticalAlignment.Center
-            };
+            HomePageGrid.Visibility = Visibility.Visible;
+            MainContent.Visibility = Visibility.Collapsed;
         }
 
         private void MenuToggleButton_Click(object sender, RoutedEventArgs e)
@@ -58,10 +55,13 @@ namespace CyanTools
             if (MenuListView.SelectedItem is System.Windows.Controls.ListViewItem selectedItem && selectedItem.Content is TextBlock textBlock)
             {
                 string selection = textBlock.Text;
+                HomePageGrid.Visibility = Visibility.Collapsed;
+                MainContent.Visibility = Visibility.Visible;
                 switch (selection)
                 {
                     case "主页":
-                        MainContent.Content = new TextBlock { Text = "主页内容", FontSize = 18, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = System.Windows.VerticalAlignment.Center };
+                        HomePageGrid.Visibility = Visibility.Visible;
+                        MainContent.Visibility = Visibility.Collapsed;
                         break;
                     case "LLM分类":
                         if (_toolLLMView == null) _toolLLMView = new ToolLLM();
@@ -118,6 +118,12 @@ namespace CyanTools
                     
                 }
             }
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+            e.Handled = true;
         }
 
         private void Window_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)

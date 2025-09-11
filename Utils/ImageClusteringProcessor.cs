@@ -19,14 +19,17 @@ namespace CyanTools.Utils
 
         private readonly InferenceSession _session;
         private readonly string _inputName;
-        private readonly string _outputName;
+        private readonly string _styleOutputName;
+        private readonly string _contentOutputName;
 
         public ImageClusteringProcessor(string modelPath)
         {
             var sessionOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
             _session = new InferenceSession(modelPath, sessionOptions);
             _inputName = _session.InputMetadata.Keys.First();
-            _outputName = _session.OutputMetadata.Keys.First();
+
+            _styleOutputName = "style_output";
+            _contentOutputName = "content_output";
         }
 
         public List<ImageStyleResult> ProcessFolder(string folderPath, Action<double> onProgress, Action<string> onError)
@@ -50,8 +53,8 @@ namespace CyanTools.Utils
                     try
                     {
                         var inputTensor = PreprocessImage(imagePath);
-                        var embedding = ExtractEmbedding(inputTensor);
-                        results.Add(new ImageStyleResult { FilePath = imagePath, StyleVector = embedding });
+                        var (styleVec, contentVec) = ExtractEmbeddings(inputTensor);
+                        results.Add(new ImageStyleResult { FilePath = imagePath, StyleVector = styleVec, ContentVector = contentVec });
                     }
                     catch (Exception ex)
                     {
@@ -95,17 +98,26 @@ namespace CyanTools.Utils
             return tensor;
         }
 
-        private float[] ExtractEmbedding(DenseTensor<Float16> inputTensor)
+        private (float[] styleVector, float[] contentVector) ExtractEmbeddings(DenseTensor<Float16> inputTensor)
         {
             var inputs = new NamedOnnxValue[] { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
             using var results = _session.Run(inputs);
-            var outputTensor = results.First(r => r.Name == _outputName).AsTensor<Float16>();
-            var floatList = new List<float>();
-            foreach (var val in outputTensor)
+
+            float[] styleVector = null;
+            float[] contentVector = null;
+
+            foreach (var r in results)
             {
-                floatList.Add((float)val);
+                if (r.Name == _styleOutputName)
+                {
+                    styleVector = r.AsTensor<Float16>().ToArray().Select(v => (float)v).ToArray();
+                }
+                else if (r.Name == _contentOutputName)
+                {
+                    contentVector = r.AsTensor<Float16>().ToArray().Select(v => (float)v).ToArray();
+                }
             }
-            return floatList.ToArray();
+            return (styleVector, contentVector);
         }
     }
 
@@ -113,6 +125,7 @@ namespace CyanTools.Utils
     {
         public string FilePath { get; set; } = string.Empty;
         public float[] StyleVector { get; set; } = Array.Empty<float>();
+        public float[] ContentVector { get; set; } = Array.Empty<float>();
     }
 
     public static class KMeansClusterer

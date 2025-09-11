@@ -226,7 +226,66 @@
                 </Border>
 
 
-                <ContentControl x:Name="MainContent" Grid.Row="1" Margin="10"/>
+                <Grid Grid.Row="1" Margin="10">
+                    <Grid x:Name="HomePageGrid">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="欢迎使用 Cyan Tools" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,20,0,30"/>
+
+                                <Border Background="White" CornerRadius="5" Padding="15" Margin="10,0">
+                                    <StackPanel>
+                                        <TextBlock Text="图片展示" FontSize="18" FontWeight="Medium" Margin="0,0,0,10"/>
+                                        <WrapPanel HorizontalAlignment="Left">
+
+                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180" Height="180" Margin="5" CornerRadius="3">
+                                                <Grid>
+
+                                                    <TextBlock Text="替换为图片" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="Gray"/>
+                                                </Grid>
+                                            </Border>
+                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180" Height="180" Margin="5" CornerRadius="3">
+                                                <Grid>
+                                                    <TextBlock Text="空白图片" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray"/>
+                                                </Grid>
+                                            </Border>
+                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180" Height="180" Margin="5" CornerRadius="3">
+                                                <Grid>
+                                                    <TextBlock Text="空白图片" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray"/>
+                                                </Grid>
+                                            </Border>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="White" CornerRadius="5" Padding="15" Margin="10,20">
+                                    <StackPanel>
+                                        <TextBlock Text="鸣谢" FontSize="18" FontWeight="Medium" Margin="0,0,0,10"/>
+
+                                        <TextBlock Margin="5">
+                                            <Hyperlink NavigateUri="https://github.com/some-library" RequestNavigate="Hyperlink_RequestNavigate">
+                                                Some Library 1
+                                            </Hyperlink>
+                                            <Run Text=" - Description of what it's used for." Foreground="Gray"/>
+                                        </TextBlock>
+                                        <TextBlock Margin="5">
+                                            <Hyperlink NavigateUri="https://github.com/another-library" RequestNavigate="Hyperlink_RequestNavigate">
+                                                Another Library 2
+                                            </Hyperlink>
+                                            <Run Text=" - Description of what it's used for." Foreground="Gray"/>
+                                        </TextBlock>
+                                        <TextBlock Margin="5">
+                                            <Hyperlink NavigateUri="https://github.com/example-library" RequestNavigate="Hyperlink_RequestNavigate">
+                                                Example Library 3
+                                            </Hyperlink>
+                                            <Run Text=" - Description of what it's used for." Foreground="Gray"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                    <ContentControl x:Name="MainContent" Grid.Row="1" Margin="10" Visibility="Collapsed"/>
+                </Grid>
 
             </Grid>
         </Grid>
