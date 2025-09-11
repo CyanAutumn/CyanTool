@@ -7,9 +7,33 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CyanTools.Model;
+using OpenCvSharp;
 
 namespace CyanTools.Utils {
     public class ImageProcessor {
+        public static void ApplyGaussianBlur(string inputPath, string outputPath, int blurRadius)
+        {
+            using (Mat src = Cv2.ImRead(inputPath, ImreadModes.Color))
+            {
+                if (src.Empty())
+                {
+                    throw new FileNotFoundException($"无法加载图片: {inputPath}");
+                }
+
+                using (Mat dst = new Mat())
+                {
+
+                    int kSize = blurRadius;
+                    if (kSize % 2 == 0)
+                    {
+                        kSize += 1;
+                    }
+                    Cv2.GaussianBlur(src, dst, new OpenCvSharp.Size(kSize, kSize), 0);
+                    Cv2.ImWrite(outputPath, dst);
+                }
+            }
+        }
+
         private static readonly HttpClient HttpClient = new HttpClient();
         private const string LmStudioApiUrl = "http://127.0.0.1:1234/v1";
 

@@ -20,6 +20,7 @@ namespace CyanTools
         private KeepFilesView _keepFilesView;
         private ExportVideoFrameView _exportVideoFrameView;
         private ImageMetadataView _imageMetadataView;
+        private GaussianBlurView _gaussianBlurView;
 
         public MainWindow()
         {
@@ -104,6 +105,10 @@ namespace CyanTools
                     case "图片元数据":
                         if (_imageMetadataView == null) _imageMetadataView = new ImageMetadataView();
                         MainContent.Content = _imageMetadataView;
+                        break;
+                    case "高斯模糊":
+                        if (_gaussianBlurView == null) _gaussianBlurView = new GaussianBlurView { DataContext = new ViewModel.GaussianBlurViewModel() };
+                        MainContent.Content = _gaussianBlurView;
                         break;
                     
                 }

@@ -191,6 +191,9 @@
                     <ListViewItem>
                         <TextBlock Text="图片元数据"/>
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="高斯模糊"/>
+                    </ListViewItem>
                 </ListView>
             </Grid>
 
