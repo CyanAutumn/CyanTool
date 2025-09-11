@@ -194,6 +194,9 @@
                     <ListViewItem>
                         <TextBlock Text="高斯模糊"/>
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片聚类"/>
+                    </ListViewItem>
                 </ListView>
             </Grid>
 

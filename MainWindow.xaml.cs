@@ -21,6 +21,7 @@ namespace CyanTools
         private ExportVideoFrameView _exportVideoFrameView;
         private ImageMetadataView _imageMetadataView;
         private GaussianBlurView _gaussianBlurView;
+        private ImageClusteringView _imageClusteringView;
 
         public MainWindow()
         {
@@ -109,6 +110,10 @@ namespace CyanTools
                     case "高斯模糊":
                         if (_gaussianBlurView == null) _gaussianBlurView = new GaussianBlurView { DataContext = new ViewModel.GaussianBlurViewModel() };
                         MainContent.Content = _gaussianBlurView;
+                        break;
+                    case "图片聚类":
+                        if (_imageClusteringView == null) _imageClusteringView = new ImageClusteringView { DataContext = new ViewModel.ImageClusteringViewModel() };
+                        MainContent.Content = _imageClusteringView;
                         break;
                     
                 }
