@@ -11,42 +11,44 @@
     <Window.Resources>
 
         <Storyboard x:Key="OpenMenuStoryboard">
-            <DoubleAnimation Storyboard.TargetName="MenuGrid" Storyboard.TargetProperty="Width" To="200" Duration="0:0:0.3">
+            <DoubleAnimation Storyboard.TargetName="MenuGrid" Storyboard.TargetProperty="Width" To="200"
+                             Duration="0:0:0.3">
                 <DoubleAnimation.EasingFunction>
-                    <CubicEase EasingMode="EaseOut"/>
+                    <CubicEase EasingMode="EaseOut" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
 
         <Storyboard x:Key="CloseMenuStoryboard">
-            <DoubleAnimation Storyboard.TargetName="MenuGrid" Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.3">
+            <DoubleAnimation Storyboard.TargetName="MenuGrid" Storyboard.TargetProperty="Width" To="0"
+                             Duration="0:0:0.3">
                 <DoubleAnimation.EasingFunction>
-                    <CubicEase EasingMode="EaseIn"/>
+                    <CubicEase EasingMode="EaseIn" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
 
 
         <Style x:Key="MenuButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="30"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="Black" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="5">
                             <StackPanel VerticalAlignment="Center">
-                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2"/>
-                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2"/>
-                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2"/>
+                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2" />
+                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2" />
+                                <Rectangle Fill="{TemplateBinding Foreground}" Height="2" Width="15" Margin="0,2" />
                             </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FFEEEEEE"/>
+                                <Setter Property="Background" Value="#FFEEEEEE" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -55,22 +57,23 @@
         </Style>
 
         <Style x:Key="WindowControlButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="40"/>
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="Black" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}">
-                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center"
+                                       HorizontalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FFEEEEEE"/>
+                                <Setter Property="Background" Value="#FFEEEEEE" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -83,12 +86,13 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}">
-                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center"
+                                       HorizontalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#C42B1C"/>
-                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="#C42B1C" />
+                                <Setter Property="Foreground" Value="White" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -102,12 +106,12 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Window">
-                        <Border BorderBrush="{TemplateBinding BorderBrush}" 
+                        <Border BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="10">
                             <AdornerDecorator>
-                                <ContentPresenter/>
+                                <ContentPresenter />
                             </AdornerDecorator>
                         </Border>
                     </ControlTemplate>
@@ -120,8 +124,8 @@
     <Border CornerRadius="10" Background="#FFF5F5F5" BorderBrush="#FFCCCCCC" BorderThickness="1">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
 
@@ -131,22 +135,23 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
-                            <Setter Property="Foreground" Value="Black"/>
-                            <Setter Property="FontSize" Value="16"/>
-                            <Setter Property="Padding" Value="20,15"/>
-                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="Foreground" Value="Black" />
+                            <Setter Property="FontSize" Value="16" />
+                            <Setter Property="Padding" Value="20,15" />
+                            <Setter Property="Cursor" Value="Hand" />
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListViewItem">
-                                        <Border x:Name="Bd" Padding="{TemplateBinding Padding}" Background="Transparent">
-                                            <ContentPresenter/>
+                                        <Border x:Name="Bd" Padding="{TemplateBinding Padding}"
+                                                Background="Transparent">
+                                            <ContentPresenter />
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#FFEEEEEE"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="#FFEEEEEE" />
                                             </Trigger>
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#FFDDDDDD"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="#FFDDDDDD" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -156,46 +161,46 @@
                     </ListView.ItemContainerStyle>
 
                     <ListViewItem>
-                        <TextBlock Text="主页"/>
+                        <TextBlock Text="主页" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="Danbooru下载器"/>
+                        <TextBlock Text="Danbooru下载器" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="LLM分类"/>
+                        <TextBlock Text="LLM分类" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="图片超分"/>
+                        <TextBlock Text="图片超分" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="图片处理"/>
+                        <TextBlock Text="图片处理" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="数据集管理器"/>
+                        <TextBlock Text="数据集管理器" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="Prompt管理器"/>
+                        <TextBlock Text="Prompt管理器" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="图片分辨率归类"/>
+                        <TextBlock Text="图片分辨率归类" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="图片三分法"/>
+                        <TextBlock Text="图片三分法" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="保留指定文件"/>
+                        <TextBlock Text="保留指定文件" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="导出视频帧"/>
+                        <TextBlock Text="导出视频帧" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="图片元数据"/>
+                        <TextBlock Text="图片元数据" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="高斯模糊"/>
+                        <TextBlock Text="高斯模糊" />
                     </ListViewItem>
                     <ListViewItem>
-                        <TextBlock Text="图片聚类"/>
+                        <TextBlock Text="图片聚类" />
                     </ListViewItem>
                 </ListView>
             </Grid>
@@ -203,8 +208,8 @@
 
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
 
@@ -213,14 +218,14 @@
 
                         <Button x:Name="MenuToggleButton" Click="MenuToggleButton_Click"
                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0"
-                                Style="{StaticResource MenuButtonStyle}"/>
+                                Style="{StaticResource MenuButtonStyle}" />
                         <TextBlock Text="Cyan Tools" Foreground="Black" FontSize="16"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="—" Click="Minimize_Click" Style="{StaticResource WindowControlButton}"/>
-                            <Button Content="☐" Click="Maximize_Click" Style="{StaticResource WindowControlButton}"/>
-                            <Button Content="✕" Click="Close_Click" Style="{StaticResource WindowCloseButton}"/>
+                            <Button Content="—" Click="Minimize_Click" Style="{StaticResource WindowControlButton}" />
+                            <Button Content="☐" Click="Maximize_Click" Style="{StaticResource WindowControlButton}" />
+                            <Button Content="✕" Click="Close_Click" Style="{StaticResource WindowCloseButton}" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -230,27 +235,17 @@
                     <Grid x:Name="HomePageGrid">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="欢迎使用 Cyan Tools" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,20,0,30"/>
+                                <TextBlock Text="Cyan Tools" FontSize="28" FontWeight="Bold"
+                                           HorizontalAlignment="Center" Margin="0,20,0,30" />
 
                                 <Border Background="White" CornerRadius="5" Padding="15" Margin="10,0">
                                     <StackPanel>
-                                        <TextBlock Text="图片展示" FontSize="18" FontWeight="Medium" Margin="0,0,0,10"/>
-                                        <WrapPanel HorizontalAlignment="Left">
+                                        <WrapPanel HorizontalAlignment="Center" VerticalAlignment="Center">
 
-                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180" Height="180" Margin="5" CornerRadius="3">
+                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180"
+                                                    Height="180" Margin="5" CornerRadius="3">
                                                 <Grid>
-
-                                                    <TextBlock Text="替换为图片" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="Gray"/>
-                                                </Grid>
-                                            </Border>
-                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180" Height="180" Margin="5" CornerRadius="3">
-                                                <Grid>
-                                                    <TextBlock Text="空白图片" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray"/>
-                                                </Grid>
-                                            </Border>
-                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" Width="180" Height="180" Margin="5" CornerRadius="3">
-                                                <Grid>
-                                                    <TextBlock Text="空白图片" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray"/>
+                                                    <Image Source="/1.png" Stretch="UniformToFill"/>
                                                 </Grid>
                                             </Border>
                                         </WrapPanel>
@@ -259,32 +254,59 @@
 
                                 <Border Background="White" CornerRadius="5" Padding="15" Margin="10,20">
                                     <StackPanel>
-                                        <TextBlock Text="鸣谢" FontSize="18" FontWeight="Medium" Margin="0,0,0,10"/>
+                                        <TextBlock Text="鸣谢" FontSize="18" FontWeight="Medium" Margin="0,0,0,10" />
 
                                         <TextBlock Margin="5">
-                                            <Hyperlink NavigateUri="https://github.com/some-library" RequestNavigate="Hyperlink_RequestNavigate">
-                                                Some Library 1
+                                            <Hyperlink NavigateUri="https://space.bilibili.com/14695635"
+                                                       RequestNavigate="Hyperlink_RequestNavigate">
+                                                今宵
                                             </Hyperlink>
-                                            <Run Text=" - Description of what it's used for." Foreground="Gray"/>
+                                            <Run Text=" - 进行的视频教程制作/提供的分辨率归类思路" Foreground="Gray" />
                                         </TextBlock>
                                         <TextBlock Margin="5">
-                                            <Hyperlink NavigateUri="https://github.com/another-library" RequestNavigate="Hyperlink_RequestNavigate">
-                                                Another Library 2
+                                            <Hyperlink NavigateUri="https://huggingface.co/deepghs"
+                                                       RequestNavigate="Hyperlink_RequestNavigate">
+                                                DeepGHS
                                             </Hyperlink>
-                                            <Run Text=" - Description of what it's used for." Foreground="Gray"/>
+                                            <Run Text=" - 本项目的图片三分法使用了该项目的模型" Foreground="Gray" />
                                         </TextBlock>
                                         <TextBlock Margin="5">
-                                            <Hyperlink NavigateUri="https://github.com/example-library" RequestNavigate="Hyperlink_RequestNavigate">
-                                                Example Library 3
+                                            <Hyperlink NavigateUri="https://github.com/lltcggie/waifu2x-caffe"
+                                                       RequestNavigate="Hyperlink_RequestNavigate">
+                                                lltcggie / waifu2x-caffe
                                             </Hyperlink>
-                                            <Run Text=" - Description of what it's used for." Foreground="Gray"/>
+                                            <Run Text=" - 本项目的图片放大所使用的项目" Foreground="Gray" />
                                         </TextBlock>
+                                        <TextBlock Margin="5">
+                                            <Hyperlink NavigateUri="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan"
+                                                       RequestNavigate="Hyperlink_RequestNavigate">
+                                                xinntao / Real-ESRGAN-ncnn-vulkan
+                                            </Hyperlink>
+                                            <Run Text=" - 本项目的图片放大所使用的项目" Foreground="Gray" />
+                                        </TextBlock>
+                                        <TextBlock Margin="5">
+                                            <Hyperlink
+                                                NavigateUri="https://huggingface.co/yuxi-liu-wired/CSD/tree/main/CSD"
+                                                RequestNavigate="Hyperlink_RequestNavigate">
+                                                yuxi-liu-wired / CSD
+                                            </Hyperlink>
+                                            <Run Text=" - 本项目的图片聚类使用了该项目的模型" Foreground="Gray" />
+                                        </TextBlock>
+                                        <TextBlock Margin="5">
+                                            <Hyperlink
+                                                NavigateUri="https://www.pixiv.net/users/84376185"
+                                                RequestNavigate="Hyperlink_RequestNavigate">
+                                                Rnglg2
+                                            </Hyperlink>
+                                            <Run Text=" - 提供的以高斯模糊进行反下毒思路" Foreground="Gray" />
+                                        </TextBlock>
+
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
-                    <ContentControl x:Name="MainContent" Grid.Row="1" Margin="10" Visibility="Collapsed"/>
+                    <ContentControl x:Name="MainContent" Grid.Row="1" Margin="10" Visibility="Collapsed" />
                 </Grid>
 
             </Grid>

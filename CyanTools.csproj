@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
     
   </PropertyGroup>
 
@@ -20,7 +21,9 @@
   
 
   <ItemGroup>
-    <PackageReference Include="HdbscanSharp" Version="3.0.1" />
+    
+    
+    
     <PackageReference Include="Microsoft.ML" Version="4.0.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="RestSharp" Version="112.1.0" />
@@ -49,6 +52,14 @@
         <Content Include="Models\**" Exclude="Models\CSD\**;Models\CSD_Weights\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="bitbug_favicon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="1.png" />
   </ItemGroup>
 
 </Project>

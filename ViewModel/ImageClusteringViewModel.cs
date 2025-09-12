@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Collections.Generic;
+using System;
 
 namespace CyanTools.ViewModel
 {
@@ -96,6 +97,17 @@ namespace CyanTools.ViewModel
         public bool IsKMeansSelected => SelectedAlgorithm == "KMeans";
         public bool IsHdbscanSelected => SelectedAlgorithm == "HDBSCAN";
 
+        private bool _isClustering;
+        public bool IsClustering
+        {
+            get { return _isClustering; }
+            set
+            {
+                _isClustering = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsClustering)));
+            }
+        }
+
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
         public ICommand StartCommand { get; }
@@ -104,7 +116,7 @@ namespace CyanTools.ViewModel
         { 
             SelectInputCommand = new Utils.RelayCommand(SelectInputFolder);
             SelectOutputCommand = new Utils.RelayCommand(SelectOutputFolder);
-            StartCommand = new Utils.RelayCommand(async () => await StartClustering(), () => !string.IsNullOrEmpty(InputPath) && !string.IsNullOrEmpty(OutputPath));
+            StartCommand = new Utils.RelayCommand(() => StartClustering(), () => !string.IsNullOrEmpty(InputPath) && !string.IsNullOrEmpty(OutputPath) && !IsClustering);
         }
 
         private void SelectInputFolder()
@@ -127,81 +139,95 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task StartClustering()
+        private void StartClustering()
         {
-            Progress = 0;
-            string modelPath = "Models/csd/csd_clip_model.onnx";
-            if (!File.Exists(modelPath))
+            IsClustering = true;
+            ((Utils.RelayCommand)StartCommand).RaiseCanExecuteChanged();
+
+            Task.Run(() =>
             {
-                MessageBox.Show($"模型文件不存在: {modelPath}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            await Task.Run(() =>
-            {
-                var processor = new Utils.ImageClusteringProcessor(modelPath);
-                var imageResults = processor.ProcessFolder(InputPath, 
-                    p => Application.Current.Dispatcher.Invoke(() => Progress = p * 0.5),
-                    error => Application.Current.Dispatcher.Invoke(() => MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning)));
-
-                if (imageResults.Count == 0)
+                try
                 {
-                    Application.Current.Dispatcher.Invoke(() => MessageBox.Show("未成功处理任何图片，请检查图片格式或模型是否正确。", "信息", MessageBoxButton.OK, MessageBoxImage.Information));
-                    return;
-                }
-
-                List<float[]> dataPoints;
-                if (SelectedFeatureType == "Style")
-                {
-                    dataPoints = imageResults.Select(r => r.StyleVector).ToList();
-                }
-                else
-                {
-                    dataPoints = imageResults.Select(r => r.ContentVector).ToList();
-                }
-
-                int[] assignments;
-                if (SelectedAlgorithm == "KMeans")
-                {
-                    assignments = Utils.KMeansClusterer.Cluster(dataPoints, NumClusters);
-                }
-                else
-                {
-                    assignments = Utils.HdbscanClusterer.Cluster(dataPoints, MinClusterSize);
-
-
-                    var distinctLabels = assignments.Distinct().OrderBy(x => x).ToList();
-                    var labelMap = new Dictionary<int, int>();
-                    for (int i = 0; i < distinctLabels.Count; i++)
+                    Application.Current.Dispatcher.Invoke(() => Progress = 0);
+                    string modelPath = "Models/csd/csd_clip_model.onnx";
+                    if (!File.Exists(modelPath))
                     {
-                        labelMap[distinctLabels[i]] = i;
+                        Application.Current.Dispatcher.Invoke(() => MessageBox.Show($"模型文件不存在: {modelPath}", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
+                        return;
                     }
-                    for (int i = 0; i < assignments.Length; i++)
+
+                    var processor = new Utils.ImageClusteringProcessor(modelPath);
+                    var imageResults = processor.ProcessFolder(InputPath,
+                        p => Application.Current.Dispatcher.Invoke(() => Progress = p * 0.5),
+                        error => Application.Current.Dispatcher.Invoke(() => MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning)));
+
+                    if (imageResults.Count == 0)
                     {
-                        assignments[i] = labelMap[assignments[i]];
+                        Application.Current.Dispatcher.Invoke(() => MessageBox.Show("未成功处理任何图片，请检查图片格式或模型是否正确。", "信息", MessageBoxButton.OK, MessageBoxImage.Information));
+                        return;
                     }
+
+                    List<float[]> dataPoints;
+                    if (SelectedFeatureType == "Style")
+                    {
+                        dataPoints = imageResults.Select(r => r.StyleVector).ToList();
+                    }
+                    else
+                    {
+                        dataPoints = imageResults.Select(r => r.ContentVector).ToList();
+                    }
+
+                    int[] assignments;
+                    if (SelectedAlgorithm == "KMeans")
+                    {
+                        assignments = Utils.MlNetClusterer.Cluster(dataPoints, NumClusters);
+                    }
+                    else if (SelectedAlgorithm == "HDBSCAN")
+                    {
+                        assignments = Utils.HdbscanClusterer.Cluster(dataPoints, MinClusterSize);
+                    }
+                    else
+                    {
+                        assignments = new int[dataPoints.Count];
+                    }
+
+                    Application.Current.Dispatcher.Invoke(() => Progress = 50 + 25);
+
+                    for (int i = 0; i < imageResults.Count; i++)
+                    {
+                        int clusterId = assignments[i];
+                        string sourceFilePath = imageResults[i].FilePath;
+                        string clusterFolderName = $"group_{clusterId}";
+                        string targetSubFolder = Path.Combine(OutputPath, clusterFolderName);
+                        Directory.CreateDirectory(targetSubFolder);
+
+                        string targetFilePath = Path.Combine(targetSubFolder, Path.GetFileName(sourceFilePath));
+                        File.Copy(sourceFilePath, targetFilePath, true);
+
+                        string txtFilePath = Path.ChangeExtension(sourceFilePath, ".txt");
+                        if (File.Exists(txtFilePath))
+                        {
+                            string targetTxtFilePath = Path.Combine(targetSubFolder, Path.GetFileName(txtFilePath));
+                            File.Copy(txtFilePath, targetTxtFilePath, true);
+                        }
+
+                        Application.Current.Dispatcher.Invoke(() => Progress = 75 + (double)(i + 1) / imageResults.Count * 25);
+                    }
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show("图片聚类完成！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                        Progress = 100;
+                    });
                 }
-
-
-                Application.Current.Dispatcher.Invoke(() => Progress = 50 + 25);
-
-                for (int i = 0; i < imageResults.Count; i++)
+                finally
                 {
-                    int clusterId = assignments[i];
-                    string sourceFilePath = imageResults[i].FilePath;
-                    string clusterFolderName = $"group_{clusterId}";
-                    string targetSubFolder = Path.Combine(OutputPath, clusterFolderName);
-                    Directory.CreateDirectory(targetSubFolder);
-                    string targetFilePath = Path.Combine(targetSubFolder, Path.GetFileName(sourceFilePath));
-                    File.Copy(sourceFilePath, targetFilePath, true);
-                    Application.Current.Dispatcher.Invoke(() => Progress = 75 + (double)(i + 1) / imageResults.Count * 25);
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        IsClustering = false;
+                        ((Utils.RelayCommand)StartCommand).RaiseCanExecuteChanged();
+                    });
                 }
-
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    MessageBox.Show("图片聚类完成！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
-                    Progress = 100;
-                });
             });
         }
     }
