@@ -1,12 +1,9 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -17,29 +14,45 @@ namespace CyanTools.ViewModel
     {
         private string _targetDirectory;
         private bool _isMirrorEnabled = true;
-        private string _logOutput;
         private bool _isIdle = true;
         private readonly AdvancedImageProcessor _processor;
+        
+        private const int MaxLogLines = 1000;
 
         public string TargetDirectory { get => _targetDirectory; set => SetField(ref _targetDirectory, value); }
         public bool IsMirrorEnabled { get => _isMirrorEnabled; set => SetField(ref _isMirrorEnabled, value); }
-        public string LogOutput { get => _logOutput; set => SetField(ref _logOutput, value); }
         public bool IsIdle { get => _isIdle; set => SetField(ref _isIdle, value); }
+        
+        public ObservableCollection<string> LogLines { get; }
 
         public ICommand BrowseDirectoryCommand { get; }
         public ICommand StartProcessingCommand { get; }
+        public ICommand ClearLogCommand { get; }
 
         public ImageProcessingViewModel()
         {
             _processor = new AdvancedImageProcessor();
+            LogLines = new ObservableCollection<string>();
             BrowseDirectoryCommand = new RelayCommand(_ => BrowseForFolder(path => TargetDirectory = path));
             StartProcessingCommand = new RelayCommand(async _ => await StartProcessing(), _ => IsIdle && (IsMirrorEnabled));
+            ClearLogCommand = new RelayCommand(_ => LogLines.Clear(), _ => IsIdle);
+        }
+
+        private void AddLog(string message)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                LogLines.Add(message);
+                if (LogLines.Count > MaxLogLines)
+                {
+                    LogLines.RemoveAt(0);
+                }
+            });
         }
 
         private void BrowseForFolder(Action<string> setPathAction)
         {
-            var dialog = new CommonOpenFileDialog();
-            dialog.IsFolderPicker = true;
+            var dialog = new CommonOpenFileDialog { IsFolderPicker = true };
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 setPathAction(dialog.FileName);
@@ -49,16 +62,9 @@ namespace CyanTools.ViewModel
         private async Task StartProcessing()
         {
             IsIdle = false;
-            var logBuilder = new StringBuilder();
-            LogOutput = "";
-            var progress = new Progress<string>(update =>
-            {
-                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                {
-                    logBuilder.AppendLine(update);
-                    LogOutput = logBuilder.ToString();
-                });
-            });
+            (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            LogLines.Clear();
+            var progress = new Progress<string>(AddLog);
 
             try
             {
@@ -67,14 +73,16 @@ namespace CyanTools.ViewModel
                     await _processor.MirrorImagesAsync(TargetDirectory, progress);
                 }
 
+                AddLog("Processing complete.");
             }
             catch (Exception ex)
             {
-                ((IProgress<string>)progress).Report($"发生严重错误: {ex.Message}");
+                AddLog($"An error occurred: {ex.Message}");
             }
             finally
             {
                 IsIdle = true;
+                (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -92,4 +100,3 @@ namespace CyanTools.ViewModel
         }
     }
 }
-

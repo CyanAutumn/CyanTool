@@ -4,12 +4,12 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using System.Windows;
 using System.Windows.Input;
 using CyanTools.Model;
 using CyanTools.Utils;
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
@@ -24,12 +24,13 @@ namespace CyanTools.ViewModel
         private string _path3 = "";
         private string _path4 = "";
         private string _path5 = "";
-        private string _logOutput = "";
         private bool _isRunEnabled = true;
         private string _newConfigName;
         private ConfigurationModel _selectedConfig;
         private string _workingDirectory = "";
         private ModelData _selectedModel;
+        
+        private const int MaxLogLines = 1000;
 
         public string MainInput { get => _mainInput; set => SetField(ref _mainInput, value); }
         public string WorkingDirectory { get => _workingDirectory; set => SetField(ref _workingDirectory, value); }
@@ -38,9 +39,9 @@ namespace CyanTools.ViewModel
         public string Path3 { get => _path3; set => SetField(ref _path3, value); }
         public string Path4 { get => _path4; set => SetField(ref _path4, value); }
         public string Path5 { get => _path5; set => SetField(ref _path5, value); }
-        public string LogOutput { get => _logOutput; set => SetField(ref _logOutput, value); }
         public bool IsRunEnabled { get => _isRunEnabled; set => SetField(ref _isRunEnabled, value); }
-
+        
+        public ObservableCollection<string> LogLines { get; }
         public ObservableCollection<ConfigurationModel> Configs { get; set; }
         public ObservableCollection<ModelData> ModelsList { get; set; }
 
@@ -67,6 +68,7 @@ namespace CyanTools.ViewModel
         public ICommand DeleteConfigCommand { get; }
         public ICommand RefreshModelsCommand { get; }
         public ICommand SelectFolderCommand { get; }
+        public ICommand ClearLogCommand { get; }
 
         public ToolLLMViewModel()
         {
@@ -74,50 +76,51 @@ namespace CyanTools.ViewModel
             _imageProcessor = new ImageProcessor();
             Configs = new ObservableCollection<ConfigurationModel>();
             ModelsList = new ObservableCollection<ModelData>();
+            LogLines = new ObservableCollection<string>();
 
             RunCommand = new RelayCommand(async _ => await ExecuteRunCommand(), _ => IsRunEnabled && !string.IsNullOrWhiteSpace(MainInput));
             SaveConfigCommand = new RelayCommand(_ => ExecuteSaveConfigCommand(), _ => !string.IsNullOrWhiteSpace(NewConfigName));
             DeleteConfigCommand = new RelayCommand(_ => ExecuteDeleteConfigCommand(), _ => SelectedConfig != null);
             RefreshModelsCommand = new RelayCommand(async _ => await ExecuteRefreshModelsCommand());
             SelectFolderCommand = new RelayCommand(param => ExecuteSelectFolder(param as string));
+            ClearLogCommand = new RelayCommand(_ => LogLines.Clear());
 
             LoadAllConfigs();
             ExecuteRefreshModelsCommand();
         }
+        
+        private void AddLog(string message)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                LogLines.Add(message);
+                if (LogLines.Count > MaxLogLines)
+                {
+                    LogLines.RemoveAt(0);
+                }
+            });
+        }
 
         private void ExecuteSelectFolder(string propertyName)
         {
-            var dialog = new CommonOpenFileDialog();
-            dialog.IsFolderPicker = true;
+            var dialog = new CommonOpenFileDialog { IsFolderPicker = true };
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 switch (propertyName)
                 {
-                    case "WorkingDirectory":
-                        WorkingDirectory = dialog.FileName;
-                        break;
-                    case "Path1":
-                        Path1 = dialog.FileName;
-                        break;
-                    case "Path2":
-                        Path2 = dialog.FileName;
-                        break;
-                    case "Path3":
-                        Path3 = dialog.FileName;
-                        break;
-                    case "Path4":
-                        Path4 = dialog.FileName;
-                        break;
-                    case "Path5":
-                        Path5 = dialog.FileName;
-                        break;
+                    case "WorkingDirectory": WorkingDirectory = dialog.FileName; break;
+                    case "Path1": Path1 = dialog.FileName; break;
+                    case "Path2": Path2 = dialog.FileName; break;
+                    case "Path3": Path3 = dialog.FileName; break;
+                    case "Path4": Path4 = dialog.FileName; break;
+                    case "Path5": Path5 = dialog.FileName; break;
                 }
             }
         }
 
         private async Task ExecuteRefreshModelsCommand()
         {
-            LogOutput += "\nRefreshing models list...";
+            AddLog("\nRefreshing models list...");
             ModelsList.Clear();
             var models = await _imageProcessor.GetLoadedModelsAsync();
             if (models.Any())
@@ -127,11 +130,11 @@ namespace CyanTools.ViewModel
                     ModelsList.Add(model);
                 }
                 SelectedModel = ModelsList.FirstOrDefault();
-                LogOutput += $"\nFound {models.Count} models.";
+                AddLog($"Found {models.Count} models.");
             }
             else
             {
-                LogOutput += "\nCould not find any loaded models. Make sure LM Studio is running.";
+                AddLog("Could not find any loaded models. Make sure LM Studio is running.");
             }
         }
 
@@ -172,10 +175,11 @@ namespace CyanTools.ViewModel
                 _configManager.SaveConfiguration(config);
                 LoadAllConfigs();
                 SelectedConfig = Configs.FirstOrDefault(c => c.Name == config.Name);
+                AddLog($"Configuration '{NewConfigName}' saved.");
             }
             catch (Exception ex)
             {
-                LogOutput += $"\nError saving configuration: {ex.Message}";
+                AddLog($"Error saving configuration: {ex.Message}");
             }
         }
 
@@ -188,33 +192,29 @@ namespace CyanTools.ViewModel
                 _configManager.DeleteConfiguration(SelectedConfig.Name);
                 var oldSelection = SelectedConfig.Name;
                 LoadAllConfigs();
-                LogOutput += $"\nDeleted configuration: {oldSelection}";
+                AddLog($"Deleted configuration: {oldSelection}");
             }
             catch (Exception ex)
             {
-                LogOutput += $"\nError deleting configuration: {ex.Message}";
+                AddLog($"Error deleting configuration: {ex.Message}");
             }
         }
 
         private async Task ExecuteRunCommand()
         {
             IsRunEnabled = false;
-            var logBuilder = new StringBuilder(LogOutput + "\n");
-            Action<string> reportAction = update =>
-            {
-                logBuilder.AppendLine(update);
-                LogOutput = logBuilder.ToString();
-            };
-            var progress = new Progress<string>(reportAction);
+            AddLog("\nStarting execution...");
+            var progress = new Progress<string>(AddLog);
 
             try
             {
                 var destPaths = new List<string> { Path1, Path2, Path3, Path4, Path5 };
                 await _imageProcessor.ProcessImagesAsync(MainInput, WorkingDirectory, destPaths, progress);
+                AddLog("Execution finished.");
             }
             catch (Exception ex)
             {
-                reportAction($"An unexpected error occurred: {ex.Message}");
+                AddLog($"An unexpected error occurred: {ex.Message}");
             }
             finally
             {

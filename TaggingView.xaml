@@ -47,9 +47,21 @@
             <TextBlock Text="Character Threshold:" VerticalAlignment="Center" Margin="15,0,0,0"/>
             <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
             <Button Content="Start Tagging" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+            <Button Content="Clear Log" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
         </StackPanel>
 
-        <TextBox Grid.Row="4" Text="{Binding LogOutput}" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Margin="0,10" TextWrapping="NoWrap" FontFamily="Consolas"/>
+        <ListBox Grid.Row="4" ItemsSource="{Binding LogLines}"
+                 VirtualizingStackPanel.IsVirtualizing="True"
+                 VirtualizingStackPanel.VirtualizationMode="Recycling"
+                 BorderThickness="1"
+                 HorizontalContentAlignment="Stretch"
+                 Margin="0,10">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="NoWrap" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
         <ProgressBar Grid.Row="5" Value="{Binding ProgressValue}" Minimum="0" Maximum="100" Height="20"/>
 

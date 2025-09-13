@@ -160,12 +160,42 @@
                       Background="#FFBCBCBC"/>
 
         <DockPanel Grid.Column="2" Margin="5,0,0,0">
-            <TextBlock Text="输出日志" DockPanel.Dock="Top" Margin="0,0,0,5" FontWeight="Bold"/>
-            <TextBox Text="{Binding LogOutput}" 
-                     TextWrapping="Wrap" 
-                     IsReadOnly="True" 
-                     VerticalScrollBarVisibility="Auto"
-                     Background="#FFEEEEEE"/>
+            <Grid DockPanel.Dock="Top">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="输出日志" Margin="0,0,0,5" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="清空日志" Command="{Binding ClearLogCommand}" Padding="5,2"/>
+            </Grid>
+            <ListBox ItemsSource="{Binding LogLines}"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                     BorderThickness="1"
+                     SelectionMode="Single"
+                     HorizontalContentAlignment="Stretch"
+                     Background="#FFEEEEEE">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Padding" Value="2"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
         </DockPanel>
     </Grid>
 </UserControl>
