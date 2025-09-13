@@ -12,128 +12,111 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
-
-        <Border Grid.Row="0" Background="#2d2d30" Padding="10" Margin="0,0,0,5">
-            <TextBlock Text="图片三分法处理" FontSize="18" Foreground="White" FontWeight="Bold"/>
+        <Border Grid.Row="0" Padding="10" Margin="0,0,0,5">
+            <TextBlock Text="图片三分法处理" FontSize="18" FontWeight="Bold"/>
         </Border>
         
-
         <Grid Grid.Row="1" Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             
-
-            <Border Grid.Column="0" Background="#3c3c3c" CornerRadius="5" Padding="10" Margin="0,0,10,0">
+            <Border Grid.Column="0" CornerRadius="5" Padding="10" Margin="0,0,10,0">
                 <StackPanel>
-                    <TextBlock Text="处理选项" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                    <TextBlock Text="处理选项" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
                     
-
                     <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="输入文件夹:" Foreground="White" Margin="0,0,0,5"/>
+                        <TextBlock Text="输入文件夹:" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Name="InputFolderTextBox" Background="#555555" Foreground="White" 
-                                     Text="{Binding InputFolder}" Height="25"/>
-                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" 
-                                    Command="{Binding BrowseInputFolderCommand}"/>
+                            <TextBox Grid.Column="0" Name="InputFolderTextBox" Text="{Binding InputFolder}" Height="25"/>
+                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" Command="{Binding BrowseInputFolderCommand}"/>
                         </Grid>
                     </StackPanel>
                     
-
                     <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="输出文件夹:" Foreground="White" Margin="0,0,0,5"/>
+                        <TextBlock Text="输出文件夹:" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Name="OutputFolderTextBox" Background="#555555" Foreground="White" 
-                                     Text="{Binding OutputFolder}" Height="25"/>
-                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" 
-                                    Command="{Binding BrowseOutputFolderCommand}"/>
+                            <TextBox Grid.Column="0" Name="OutputFolderTextBox" Text="{Binding OutputFolder}" Height="25"/>
+                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" Command="{Binding BrowseOutputFolderCommand}"/>
                         </Grid>
                     </StackPanel>
                     
-
-                    <GroupBox Header="人物检测" Foreground="White" Margin="0,0,0,10">
+                    <GroupBox Header="人物检测" Margin="0,0,0,10">
                         <StackPanel>
-                            <CheckBox Content="启用人物检测" IsChecked="{Binding SplitPerson}" Foreground="White" Margin="0,5"/>
+                            <CheckBox Content="启用人物检测" IsChecked="{Binding SplitPerson}" Margin="0,5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
-                                <TextBlock Text="置信度阈值:" Foreground="White" Width="80"/>
-                                <TextBox Text="{Binding PersonConfThreshold}" Width="60" Background="#555555" Foreground="White"/>
+                                <TextBlock Text="置信度阈值:" Width="80"/>
+                                <TextBox Text="{Binding PersonConfThreshold}" Width="60"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
                     
-
-                    <GroupBox Header="半身检测" Foreground="White" Margin="0,0,0,10">
+                    <GroupBox Header="半身检测" Margin="0,0,0,10">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
-                                <TextBlock Text="置信度阈值:" Foreground="White" Width="80"/>
-                                <TextBox Text="{Binding HalfbodyConfThreshold}" Width="60" Background="#555555" Foreground="White"/>
+                                <TextBlock Text="置信度阈值:" Width="80"/>
+                                <TextBox Text="{Binding HalfbodyConfThreshold}" Width="60"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
                     
-
-                    <GroupBox Header="头部检测" Foreground="White" Margin="0,0,0,10">
+                    <GroupBox Header="头部检测" Margin="0,0,0,10">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
-                                <TextBlock Text="置信度阈值:" Foreground="White" Width="80"/>
-                                <TextBox Text="{Binding HeadConfThreshold}" Width="60" Background="#555555" Foreground="White"/>
+                                <TextBlock Text="置信度阈值:" Width="80"/>
+                                <TextBox Text="{Binding HeadConfThreshold}" Width="60"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
-                                <TextBlock Text="头部缩放:" Foreground="White" Width="80"/>
-                                <TextBox Text="{Binding HeadScale}" Width="60" Background="#555555" Foreground="White"/>
+                                <TextBlock Text="头部缩放:" Width="80"/>
+                                <TextBox Text="{Binding HeadScale}" Width="60"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
                     
-
-                    <GroupBox Header="眼部检测" Foreground="White" Margin="0,0,0,10">
+                    <GroupBox Header="眼部检测" Margin="0,0,0,10">
                         <StackPanel>
-                            <CheckBox Content="启用眼部检测" IsChecked="{Binding SplitEyes}" Foreground="White" Margin="0,5"/>
+                            <CheckBox Content="启用眼部检测" IsChecked="{Binding SplitEyes}" Margin="0,5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
-                                <TextBlock Text="置信度阈值:" Foreground="White" Width="80"/>
-                                <TextBox Text="{Binding EyeConfThreshold}" Width="60" Background="#555555" Foreground="White"/>
+                                <TextBlock Text="置信度阈值:" Width="80"/>
+                                <TextBox Text="{Binding EyeConfThreshold}" Width="60"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
-                                <TextBlock Text="眼部缩放:" Foreground="White" Width="80"/>
-                                <TextBox Text="{Binding EyeScale}" Width="60" Background="#555555" Foreground="White"/>
+                                <TextBlock Text="眼部缩放:" Width="80"/>
+                                <TextBox Text="{Binding EyeScale}" Width="60"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
                     
-
-                    <GroupBox Header="其他选项" Foreground="White" Margin="0,0,0,10">
+                    <GroupBox Header="其他选项" Margin="0,0,0,10">
                         <StackPanel>
-                            <CheckBox Content="保留原始标签" IsChecked="{Binding KeepOriginTags}" Foreground="White" Margin="0,5"/>
+                            <CheckBox Content="保留原始标签" IsChecked="{Binding KeepOriginTags}" Margin="0,5"/>
                         </StackPanel>
                     </GroupBox>
                 </StackPanel>
             </Border>
             
-
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 
-
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="开始处理" Width="100" Height="30" Command="{Binding StartProcessingCommand}" Margin="0,0,10,0"/>
                     <Button Content="停止处理" Width="100" Height="30" Command="{Binding StopProcessingCommand}" Margin="0,0,10,0"/>
                     <Button Content="清空日志" Width="100" Height="30" Command="{Binding ClearLogCommand}"/>
                 </StackPanel>
                 
-
-                <Border Grid.Row="1" Background="#1e1e1e" CornerRadius="5" Padding="10">
+                <Border Grid.Row="1" CornerRadius="5" Padding="10" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" BorderThickness="1">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -141,18 +124,17 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
-                        <TextBlock Grid.Row="0" Text="处理日志" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                        <TextBlock Grid.Row="0" Text="处理日志" FontSize="12" FontWeight="Bold" Margin="0,0,0,5"/>
                         
                         <ListBox Grid.Row="1" ItemsSource="{Binding LogLines}"
                                  VirtualizingStackPanel.IsVirtualizing="True"
                                  VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                 Background="Transparent"
                                  BorderThickness="0"
                                  SelectionMode="Single"
                                  HorizontalContentAlignment="Stretch">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" FontFamily="Consolas" Foreground="#00FF00" />
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                             <ListBox.ItemContainerStyle>
@@ -170,9 +152,8 @@
                         </ListBox>
                         
                         <StackPanel Grid.Row="2" Margin="0,10,0,0">
-                            <TextBlock Text="{Binding ProgressText}" Foreground="White" Margin="0,0,0,5"/>
-                            <ProgressBar Height="20" Value="{Binding ProgressPercentage}" Maximum="100" 
-                                         Background="#555555" Foreground="#0078d4"/>
+                            <TextBlock Text="{Binding ProgressText}" Margin="0,0,0,5"/>
+                            <ProgressBar Height="20" Value="{Binding ProgressPercentage}" Maximum="100"/>
                         </StackPanel>
                     </Grid>
                 </Border>
