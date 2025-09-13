@@ -143,11 +143,31 @@
                         
                         <TextBlock Grid.Row="0" Text="处理日志" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
                         
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                            <TextBox Name="LogTextBox" Background="Transparent" Foreground="#00FF00" 
-                                     Text="{Binding LogText}" IsReadOnly="True" FontFamily="Consolas"
-                                     TextWrapping="Wrap" AcceptsReturn="True" BorderThickness="0"/>
-                        </ScrollViewer>
+                        <ListBox Grid.Row="1" ItemsSource="{Binding LogLines}"
+                                 VirtualizingStackPanel.IsVirtualizing="True"
+                                 VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 SelectionMode="Single"
+                                 HorizontalContentAlignment="Stretch">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" FontFamily="Consolas" Foreground="#00FF00" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
                         
                         <StackPanel Grid.Row="2" Margin="0,10,0,0">
                             <TextBlock Text="{Binding ProgressText}" Foreground="White" Margin="0,0,0,5"/>

@@ -1,0 +1,57 @@
+<UserControl x:Class="CyanTools.TaggingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:CyanTools"
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.DataContext>
+        <viewModel:TaggingViewModel/>
+    </UserControl.DataContext>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Image Tagging" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
+
+        <StackPanel Grid.Row="1" Orientation="Vertical">
+            <TextBlock Text="Input Directory:"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
+            </Grid>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,10,0,0">
+            <TextBlock Text="Tagger Model:"/>
+            <ComboBox ItemsSource="{Binding TaggerModels}" 
+                      SelectedItem="{Binding SelectedTaggerModel}"
+                      DisplayMemberPath="DisplayName"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="General Threshold:" VerticalAlignment="Center"/>
+            <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
+            <TextBlock Text="Character Threshold:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+            <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
+            <Button Content="Start Tagging" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <TextBox Grid.Row="4" Text="{Binding LogOutput}" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Margin="0,10" TextWrapping="NoWrap" FontFamily="Consolas"/>
+
+        <ProgressBar Grid.Row="5" Value="{Binding ProgressValue}" Minimum="0" Maximum="100" Height="20"/>
+
+    </Grid>
+</UserControl>

@@ -26,6 +26,7 @@ namespace CyanTools
         private GaussianBlurView _gaussianBlurView;
         private ImageClusteringView _imageClusteringView;
         private ConvertImageFormatView _convertImageFormatView;
+        private TaggingView _taggingView;
 
         public MainWindow()
         {
@@ -101,7 +102,7 @@ namespace CyanTools
                         if (_keepFilesView == null) _keepFilesView = new KeepFilesView();
                         MainContent.Content = _keepFilesView;
                         break;
-                                        case "导出视频帧":
+                    case "导出视频帧":
                         if (_exportVideoFrameView == null) _exportVideoFrameView = new ExportVideoFrameView();
                         MainContent.Content = _exportVideoFrameView;
                         break;
@@ -121,7 +122,10 @@ namespace CyanTools
                         if (_convertImageFormatView == null) _convertImageFormatView = new ConvertImageFormatView();
                         MainContent.Content = _convertImageFormatView;
                         break;
-                    
+                    case "图片打标":
+                        if (_taggingView == null) _taggingView = new TaggingView();
+                        MainContent.Content = _taggingView;
+                        break;
                 }
             }
         }

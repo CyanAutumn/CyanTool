@@ -121,7 +121,7 @@
     </Window.Style>
 
 
-    <Border CornerRadius="10" Background="#FFF5F5F5" BorderBrush="#FFCCCCCC" BorderThickness="1">
+    <Border CornerRadius="10" Background="#FFF5F5F5" BorderBrush="#FFCCCCCC" BorderThickness="1" Margin="0,0,0,-18">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -205,6 +205,9 @@
                     <ListViewItem>
                         <TextBlock Text="转换图片格式" />
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片打标" />
+                    </ListViewItem>
                 </ListView>
             </Grid>
 
@@ -267,11 +270,18 @@
                                             <Run Text=" - 进行的视频教程制作/提供的分辨率归类思路" Foreground="Gray" />
                                         </TextBlock>
                                         <TextBlock Margin="5">
+                                            <Hyperlink NavigateUri="https://huggingface.co/SmilingWolf"
+                                                       RequestNavigate="Hyperlink_RequestNavigate">
+                                                SmilingWolf
+                                            </Hyperlink>
+                                            <Run Text=" - 本项目的打标使用了该用户的模型" Foreground="Gray" />
+                                        </TextBlock>
+                                        <TextBlock Margin="5">
                                             <Hyperlink NavigateUri="https://huggingface.co/deepghs"
                                                        RequestNavigate="Hyperlink_RequestNavigate">
                                                 DeepGHS
                                             </Hyperlink>
-                                            <Run Text=" - 本项目的图片三分法使用了该项目的模型" Foreground="Gray" />
+                                            <Run Text=" - 本项目的图片三分法和打标使用了该组织的模型" Foreground="Gray" />
                                         </TextBlock>
                                         <TextBlock Margin="5">
                                             <Hyperlink NavigateUri="https://github.com/lltcggie/waifu2x-caffe"
