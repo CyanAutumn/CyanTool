@@ -25,6 +25,7 @@ namespace CyanTools
         private ImageMetadataView _imageMetadataView;
         private GaussianBlurView _gaussianBlurView;
         private ImageClusteringView _imageClusteringView;
+        private ConvertImageFormatView _convertImageFormatView;
 
         public MainWindow()
         {
@@ -115,6 +116,10 @@ namespace CyanTools
                     case "图片聚类":
                         if (_imageClusteringView == null) _imageClusteringView = new ImageClusteringView { DataContext = new ViewModel.ImageClusteringViewModel() };
                         MainContent.Content = _imageClusteringView;
+                        break;
+                    case "转换图片格式":
+                        if (_convertImageFormatView == null) _convertImageFormatView = new ConvertImageFormatView();
+                        MainContent.Content = _convertImageFormatView;
                         break;
                     
                 }

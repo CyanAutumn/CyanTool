@@ -202,6 +202,9 @@
                     <ListViewItem>
                         <TextBlock Text="图片聚类" />
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="转换图片格式" />
+                    </ListViewItem>
                 </ListView>
             </Grid>
 
