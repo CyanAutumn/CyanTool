@@ -215,5 +215,53 @@ namespace CyanTools
                 _currentFrame.Dispose();
             }
         }
+
+        private void ExportAsGifButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_videoCapture == null || !_videoCapture.IsOpened() || string.IsNullOrEmpty(OutputPathTextBox.Text))
+            {
+                MessageBox.Show("请先选择视频并确保已选择输出路径。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string outputPath = OutputPathTextBox.Text;
+            string fileName = Path.GetFileNameWithoutExtension(_videoPath) + ".gif";
+            string fullPath = Path.Combine(outputPath, fileName);
+
+            int frameInterval = GetFrameInterval();
+            int totalFrames = (int)_videoCapture.FrameCount;
+            double fps = _videoFps > 0 ? _videoFps : 30;
+            int delay = (int)(1000 / fps * frameInterval);
+
+
+            try
+            {
+                GifBitmapEncoder encoder = new GifBitmapEncoder();
+                _videoCapture.PosFrames = 0;
+
+                for (int i = 0; i < totalFrames; i += frameInterval)
+                {
+                    _videoCapture.PosFrames = i;
+                    Mat frame = _videoCapture.RetrieveMat();
+                    if (frame != null && !frame.Empty())
+                    {
+                        var bitmapSource = OpenCvSharp.WpfExtensions.BitmapSourceConverter.ToBitmapSource(frame);
+                        encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+                    }
+                    frame.Dispose();
+                }
+
+                using (FileStream fs = new FileStream(fullPath, FileMode.Create))
+                {
+                    encoder.Save(fs);
+                }
+
+                MessageBox.Show($"GIF 已保存到: {fullPath}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导出 GIF 失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 }

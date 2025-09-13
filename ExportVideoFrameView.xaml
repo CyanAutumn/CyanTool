@@ -50,6 +50,7 @@
         <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="5">
             <Button Content="输出当前帧" Click="OutputCurrentFrameButton_Click"/>
             <Button Content="输出所有帧" Margin="10,0,0,0" Click="OutputAllFramesButton_Click"/>
+            <Button Content="导出为GIF" Margin="10,0,0,0" Click="ExportAsGifButton_Click"/>
         </StackPanel>
     </Grid>
 </UserControl>
