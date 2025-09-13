@@ -22,26 +22,28 @@ namespace CyanTools.Utils
         public float[]? Distances { get; set; }
     }
 
-    public static class MlNetClusterer
-    {
-        public static int[] Cluster(List<float[]> data, int numClusters)
-        {
-            if (data == null || !data.Any() || data.Count < numClusters)
-            {
-
+    public static class MlNetClusterer {
+        public static int[] Cluster(List<float[]> data, int numClusters) {
+            if (data == null || !data.Any() || data.Count < numClusters) {
                 return Enumerable.Range(0, data?.Count ?? 0).ToArray();
             }
 
             var mlContext = new MLContext();
 
 
+            int vectorSize = data[0].Length;
+
+
+            var schemaDefinition = SchemaDefinition.Create(typeof(ImageData));
+            schemaDefinition["Features"].ColumnType = new VectorDataViewType(NumberDataViewType.Single, vectorSize);
+
+
             var imageData = data.Select(d => new ImageData { Features = d }).ToList();
-            var dataView = mlContext.Data.LoadFromEnumerable(imageData);
+            var dataView = mlContext.Data.LoadFromEnumerable(imageData, schemaDefinition);
 
 
             var pipeline = mlContext.Clustering.Trainers.KMeans(
-                new Microsoft.ML.Trainers.KMeansTrainer.Options
-                {
+                new Microsoft.ML.Trainers.KMeansTrainer.Options {
                     NumberOfClusters = numClusters,
                     FeatureColumnName = "Features"
                 });

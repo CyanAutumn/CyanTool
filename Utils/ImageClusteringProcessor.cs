@@ -71,11 +71,13 @@ namespace CyanTools.Utils
             }
         }
 
-        private DenseTensor<Float16> PreprocessImage(string imagePath)
-        {
-            using var image = Image.Load<Rgb24>(imagePath);
-            image.Mutate(x => x.Resize(new ResizeOptions
-            {
+        private DenseTensor<Float16> PreprocessImage(string imagePath) {
+
+            byte[] imageBytes = File.ReadAllBytes(imagePath);
+            using var ms = new MemoryStream(imageBytes);
+            using var image = Image.Load<Rgb24>(ms);
+
+            image.Mutate(x => x.Resize(new ResizeOptions {
                 Size = new SixLabors.ImageSharp.Size(ImageWidth, ImageHeight),
                 Sampler = KnownResamplers.Bicubic
             }));
@@ -83,11 +85,9 @@ namespace CyanTools.Utils
             var tensor = new DenseTensor<Float16>(new[] { 1, 3, ImageHeight, ImageWidth });
             image.ProcessPixelRows(accessor =>
             {
-                for (int y = 0; y < accessor.Height; y++)
-                {
+                for (int y = 0; y < accessor.Height; y++) {
                     Span<Rgb24> pixelRow = accessor.GetRowSpan(y);
-                    for (int x = 0; x < accessor.Width; x++)
-                    {
+                    for (int x = 0; x < accessor.Width; x++) {
                         Rgb24 pixel = pixelRow[x];
                         tensor[0, 0, y, x] = (Float16)((pixel.R / 255f - Mean[0]) / StdDev[0]);
                         tensor[0, 1, y, x] = (Float16)((pixel.G / 255f - Mean[1]) / StdDev[1]);
@@ -127,6 +127,4 @@ namespace CyanTools.Utils
         public float[] StyleVector { get; set; } = Array.Empty<float>();
         public float[] ContentVector { get; set; } = Array.Empty<float>();
     }
-
-    
 }
