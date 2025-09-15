@@ -1,0 +1,236 @@
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using CyanTools.Utils;
+using Microsoft.WindowsAPICodePack.Dialogs;
+
+namespace CyanTools
+{
+    public class TrainingSetBalancerViewModel : INotifyPropertyChanged
+    {
+        private string _selectedFolderPath;
+        public string SelectedFolderPath
+        {
+            get => _selectedFolderPath;
+            set => SetField(ref _selectedFolderPath, value);
+        }
+
+        public ObservableCollection<FolderInfo> FolderItems { get; } = new ObservableCollection<FolderInfo>();
+
+        public ICommand BrowseFolderCommand { get; }
+        public ICommand BalanceCommand { get; }
+        public ICommand ApplyRenamingCommand { get; }
+
+        public TrainingSetBalancerViewModel()
+        {
+            BrowseFolderCommand = new RelayCommand(_ => SelectFolder());
+            BalanceCommand = new RelayCommand(_ => BalanceRepetitions());
+            ApplyRenamingCommand = new RelayCommand(_ => ApplyRenaming());
+        }
+
+        private void ApplyRenaming()
+        {
+            if (string.IsNullOrEmpty(SelectedFolderPath) || !Directory.Exists(SelectedFolderPath) || !FolderItems.Any())
+            {
+                MessageBox.Show("请先选择一个包含子文件夹的有效目录。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var result = MessageBox.Show("您确定要根据表格中的重复次数重命名文件夹吗？\n此操作将直接修改您的文件系统，且不可逆。", "确认操作", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                int renamedCount = 0;
+                foreach (var item in FolderItems)
+                {
+                    var originalFolderName = item.FolderName;
+                    var parts = originalFolderName.Split('_');
+                    string baseName;
+
+                    if (parts.Length > 1 && int.TryParse(parts[0], out _))
+                    {
+                        baseName = string.Join("_", parts.Skip(1));
+                    }
+                    else
+                    {
+                        baseName = originalFolderName;
+                    }
+
+                    var newFolderName = $"{item.Repetitions}_{baseName}";
+
+                    if (originalFolderName.Equals(newFolderName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var originalFullPath = Path.Combine(SelectedFolderPath, originalFolderName);
+                    var newFullPath = Path.Combine(SelectedFolderPath, newFolderName);
+
+                    if (Directory.Exists(newFullPath))
+                    {
+                        MessageBox.Show($"无法重命名 '{originalFolderName}' 为 '{newFolderName}'，因为目标文件夹已存在。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        continue;
+                    }
+
+                    Directory.Move(originalFullPath, newFullPath);
+                    item.FolderName = newFolderName;
+                    renamedCount++;
+                }
+
+                MessageBox.Show($"操作完成！成功重命名 {renamedCount} 个文件夹。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"重命名过程中发生错误：\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BalanceRepetitions()
+        {
+            if (FolderItems == null || !FolderItems.Any()) return;
+
+            int maxImageCount = FolderItems.Max(item => item.ImageCount);
+            if (maxImageCount == 0) return;
+
+            foreach (var item in FolderItems)
+            {
+                if (item.ImageCount > 0)
+                {
+                    double idealRepetitions = (double)maxImageCount / item.ImageCount;
+                    item.Repetitions = Math.Max(1, (int)Math.Round(idealRepetitions));
+                }
+                else
+                {
+                    item.Repetitions = 1;
+                }
+            }
+        }
+
+        private void SelectFolder()
+        {
+            var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "请选择一个文件夹"
+            };
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                SelectedFolderPath = dialog.FileName;
+                LoadFolderData();
+            }
+        }
+
+        private void LoadFolderData()
+        {
+            FolderItems.Clear();
+            if (string.IsNullOrEmpty(SelectedFolderPath) || !Directory.Exists(SelectedFolderPath)) return;
+
+            var subDirectories = Directory.GetDirectories(SelectedFolderPath);
+            var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp" };
+
+            foreach (var dir in subDirectories)
+            {
+                var dirInfo = new DirectoryInfo(dir);
+                var parts = dirInfo.Name.Split('_');
+                int repetitions = 1;
+                if (parts.Length > 1 && int.TryParse(parts[0], out int parsedRepetitions))
+                {
+                    repetitions = parsedRepetitions;
+                }
+
+                var imageCount = Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly)
+                                          .Count(f => imageExtensions.Contains(Path.GetExtension(f).ToLower()));
+
+                var folderInfo = new FolderInfo
+                {
+                    FolderName = dirInfo.Name,
+                    ImageCount = imageCount,
+                    Repetitions = repetitions
+                };
+                folderInfo.PropertyChanged += (s, e) => RecalculatePercentages();
+                FolderItems.Add(folderInfo);
+            }
+            RecalculatePercentages();
+        }
+
+        private void RecalculatePercentages()
+        {
+            double totalSteps = FolderItems.Sum(item => (double)item.ImageCount * item.Repetitions);
+            if (totalSteps == 0) return;
+
+            foreach (var item in FolderItems)
+            {
+                item.StepPercentage = ((double)item.ImageCount * item.Repetitions / totalSteps) * 100;
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class FolderInfo : INotifyPropertyChanged
+    {
+        private string _folderName;
+        public string FolderName
+        {
+            get => _folderName;
+            set => SetField(ref _folderName, value);
+        }
+
+        private int _imageCount;
+        public int ImageCount
+        {
+            get => _imageCount;
+            set => SetField(ref _imageCount, value);
+        }
+
+        private int _repetitions;
+        public int Repetitions
+        {
+            get => _repetitions;
+            set => SetField(ref _repetitions, value);
+        }
+
+        private double _stepPercentage;
+        public double StepPercentage
+        {
+            get => _stepPercentage;
+            set => SetField(ref _stepPercentage, value);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}

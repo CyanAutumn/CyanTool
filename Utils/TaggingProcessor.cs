@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace CyanTools.Utils
@@ -18,10 +20,19 @@ namespace CyanTools.Utils
         public int Category { get; set; }
     }
 
+    public class JsonTag
+    {
+        [JsonPropertyName("tag")]
+        public string Tag { get; set; }
+
+        [JsonPropertyName("category")]
+        public string Category { get; set; }
+    }
+
     public class TaggingProcessor
     {
         private string _modelPath;
-        private string _csvPath;
+        private string _tagsPath;
 
         private static readonly HttpClient httpClient = new HttpClient();
         private InferenceSession _session;
@@ -31,39 +42,98 @@ namespace CyanTools.Utils
         {
         }
 
-        public async Task InitializeAsync(string modelUrl, string csvUrl, string modelDisplayName, IProgress<string> progress)
+        public async Task InitializeAsync(string modelUrl, string tagsUrl, string modelDisplayName, IProgress<string> progress)
         {
             string appDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TaggerModels");
             Directory.CreateDirectory(appDataPath);
 
             _modelPath = Path.Combine(appDataPath, modelDisplayName + ".onnx");
-            _csvPath = Path.Combine(appDataPath, modelDisplayName + ".csv");
+            string tagsExtension = Path.GetExtension(tagsUrl);
+            _tagsPath = Path.Combine(appDataPath, modelDisplayName + tagsExtension);
 
             await CheckAndDownloadFileAsync($"Model ({modelDisplayName})", modelUrl, _modelPath, progress);
-            await CheckAndDownloadFileAsync($"Tags ({modelDisplayName})", csvUrl, _csvPath, progress);
+            await CheckAndDownloadFileAsync($"Tags ({modelDisplayName})", tagsUrl, _tagsPath, progress);
 
             progress.Report("Loading model into memory...");
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 var sessionOptions = new SessionOptions();
                 sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
                 _session = new InferenceSession(_modelPath, sessionOptions);
-                _labels = File.ReadAllLines(_csvPath)
-                              .Skip(1)
-                              .Select(line =>
-                              {
-                                  var parts = line.Split(',');
-                                  return new TagData
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                if (tagsExtension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    _labels = File.ReadAllLines(_tagsPath)
+                                  .Skip(1)
+                                  .Select(line =>
                                   {
-                                      Name = parts[1].Replace("\"", "").Trim(),
-                                      Category = int.Parse(parts[2])
-                                  };
-                              })
-                              .ToArray();
+                                      var parts = line.Split(',');
+
+                                      if (parts.Length == 3) 
+                                      {
+                                           return new TagData
+                                           { Name = parts[0].Replace("\"", "").Trim(), Category = int.Parse(parts[1]) };
+                                      }
+                                      else
+                                      {
+                                           return new TagData
+                                           { Name = parts[1].Replace("\"", "").Trim(), Category = int.Parse(parts[2]) };
+                                      }
+                                  })
+                                  .ToArray();
+                }
+                else if (tagsExtension.Equals(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    await LoadTagsFromJsonAsync(_tagsPath);
+                }
             });
             progress.Report("Initialization complete. Ready to tag.");
         }
+        
+        private async Task LoadTagsFromJsonAsync(string jsonPath)
+        {
+            var jsonString = await File.ReadAllTextAsync(jsonPath);
+            var jsonTags = JsonSerializer.Deserialize<Dictionary<string, JsonTag>>(jsonString);
 
+            _labels = jsonTags.OrderBy(kvp => int.Parse(kvp.Key))
+                              .Select(kvp => kvp.Value)
+                              .Select(jsonTag => new TagData
+                              {
+                                  Name = jsonTag.Tag,
+                                  Category = ConvertCategory(jsonTag.Category)
+                              }).ToArray();
+        }
+
+        private int ConvertCategory(string category) {
+            return category switch {
+                "General" => 0,
+                "Artist" => 1,
+                "Copyright" => 3,
+                "Character" => 4,
+                "Meta" => 5,
+                "Quality" => 8,
+                "Rating" => 9,
+                "Model" => 10,
+                _ => -1 
+            };
+        }
         private async Task CheckAndDownloadFileAsync(string fileDescription, string url, string destinationPath, IProgress<string> progress)
         {
             if (File.Exists(destinationPath))
@@ -109,7 +179,7 @@ namespace CyanTools.Utils
             }
         }
 
-        public async Task ProcessDirectoryAsync(string inputPath, float generalThreshold, float characterThreshold, int inputSize, IProgress<string> progress)
+        public async Task ProcessDirectoryAsync(string inputPath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat, IProgress<string> progress)
         {
             var imageFiles = Directory.GetFiles(inputPath, "*.*", SearchOption.TopDirectoryOnly)
                                       .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
@@ -123,7 +193,7 @@ namespace CyanTools.Utils
             {
                 try
                 {
-                    var tags = await Task.Run(() => ProcessImage(imageFile, generalThreshold, characterThreshold, inputSize));
+                    var tags = await Task.Run(() => ProcessImage(imageFile, generalThreshold, characterThreshold, inputSize, inputFormat));
                     string txtFile = Path.ChangeExtension(imageFile, ".txt");
                     File.WriteAllText(txtFile, string.Join(", ", tags.Select(t => t.TagName)));
                     processedCount++;
@@ -137,10 +207,8 @@ namespace CyanTools.Utils
             progress.Report($"Tagging complete. Processed {processedCount} images.");
         }
 
-        private List<TagInfo> ProcessImage(string imagePath, float generalThreshold, float characterThreshold, int inputSize)
-        {
+        private List<TagInfo> ProcessImage(string imagePath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat) {
             using var image = SixLabors.ImageSharp.Image.Load<Rgb24>(imagePath);
-
 
             int size = Math.Max(image.Width, image.Height);
             using var squareImage = new Image<Rgb24>(size, size);
@@ -149,69 +217,115 @@ namespace CyanTools.Utils
             int padY = (size - image.Height) / 2;
             squareImage.Mutate(x => x.DrawImage(image, new Point(padX, padY), 1f));
 
-
-            squareImage.Mutate(x => x.Resize(inputSize, inputSize));
-
+            squareImage.Mutate(x => x.Resize(inputSize, inputSize, KnownResamplers.Bicubic));
 
             string inputName = _session.InputMetadata.Keys.First();
-            var inputTensor = new DenseTensor<float>(new[] { 1, inputSize, inputSize, 3 });
-            squareImage.ProcessPixelRows(accessor =>
-            {
-                for (int y = 0; y < inputSize; y++)
+            Tensor<float> inputTensor;
+
+            if (inputFormat == "NCHW") {
+                inputTensor = new DenseTensor<float>(new[] { 1, 3, inputSize, inputSize });
+                squareImage.ProcessPixelRows(accessor =>
                 {
-                    Span<Rgb24> pixelRow = accessor.GetRowSpan(y);
-                    for (int x = 0; x < inputSize; x++)
-                    {
+                    for (int y = 0; y < inputSize; y++) {
+                        Span<Rgb24> pixelRow = accessor.GetRowSpan(y);
+                        for (int x = 0; x < inputSize; x++) {
+                            float r = pixelRow[x].R / 255.0f;
+                            float g = pixelRow[x].G / 255.0f;
+                            float b = pixelRow[x].B / 255.0f;
 
-                        inputTensor[0, y, x, 0] = pixelRow[x].B;
-                        inputTensor[0, y, x, 1] = pixelRow[x].G;
-                        inputTensor[0, y, x, 2] = pixelRow[x].R;
+                            inputTensor[0, 0, y, x] = (b - 0.5f) / 0.5f;
+                            inputTensor[0, 1, y, x] = (g - 0.5f) / 0.5f;
+                            inputTensor[0, 2, y, x] = (r - 0.5f) / 0.5f;
+                        }
                     }
-                }
-            });
-
+                });
+            }
+            else
+            {
+                inputTensor = new DenseTensor<float>(new[] { 1, inputSize, inputSize, 3 });
+                squareImage.ProcessPixelRows(accessor =>
+                {
+                    for (int y = 0; y < inputSize; y++) {
+                        Span<Rgb24> pixelRow = accessor.GetRowSpan(y);
+                        for (int x = 0; x < inputSize; x++) {
+                            inputTensor[0, y, x, 0] = pixelRow[x].B;
+                            inputTensor[0, y, x, 1] = pixelRow[x].G;
+                            inputTensor[0, y, x, 2] = pixelRow[x].R;
+                        }
+                    }
+                });
+            }
 
             var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inputName, inputTensor) };
             using var results = _session.Run(inputs);
-            var outputTensor = results.First().AsTensor<float>();
-            var outputSpan = outputTensor.ToDenseTensor().Buffer.Span;
+            var outputSpan = results.First().AsTensor<float>().ToDenseTensor().Buffer.Span;
 
+            var probs = new float[outputSpan.Length];
+            for (int i = 0; i < outputSpan.Length; i++) {
+                probs[i] = (float)(1.0 / (1.0 + Math.Exp(-outputSpan[i])));
+            }
 
-            var allTags = new List<TagInfo>();
+            var ratingTags = new List<TagInfo>();
+            var qualityTags = new List<TagInfo>();
             var characterTags = new List<TagInfo>();
+            var copyrightTags = new List<TagInfo>();
+            var artistTags = new List<TagInfo>();
             var generalTags = new List<TagInfo>();
+            var metaTags = new List<TagInfo>();
+            var modelTags = new List<TagInfo>();
 
-            for (int i = 0; i < _labels.Length && i < outputSpan.Length; i++)
-            {
+            var ratingIndices = Enumerable.Range(0, _labels.Length).Where(i => _labels[i].Category == 9).ToArray();
+            if (ratingIndices.Any()) {
+                var maxIndex = ratingIndices.Aggregate((max, i) => probs[i] > probs[max] ? i : max);
+                ratingTags.Add(new TagInfo { TagName = _labels[maxIndex].Name.Replace('_', ' '), Confidence = probs[maxIndex] });
+            }
+
+            var qualityIndices = Enumerable.Range(0, _labels.Length).Where(i => _labels[i].Category == 8).ToArray();
+            if (qualityIndices.Any()) {
+                var maxIndex = qualityIndices.Aggregate((max, i) => probs[i] > probs[max] ? i : max);
+                qualityTags.Add(new TagInfo { TagName = _labels[maxIndex].Name.Replace('_', ' '), Confidence = probs[maxIndex] });
+            }
+
+            for (int i = 0; i < _labels.Length; i++) {
+                if (i >= probs.Length) continue;
+
+                float confidence = probs[i];
                 TagData label = _labels[i];
-                float confidence = outputSpan[i];
-
                 var tagName = label.Name.Replace('_', ' ');
 
-                if (label.Category == 4)
-                {
-                    if (confidence >= characterThreshold)
-                    {
-                        characterTags.Add(new TagInfo { TagName = tagName, Confidence = confidence });
-                    }
+                switch (label.Category) {
+                    case 0: if (confidence >= generalThreshold) generalTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 1: if (confidence >= characterThreshold) artistTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 3: if (confidence >= characterThreshold) copyrightTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 4: if (confidence >= characterThreshold) characterTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 5: if (confidence >= generalThreshold) metaTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
                 }
-                else if (label.Category == 0)
-                {
-                    if (confidence >= generalThreshold)
-                    {
-                        generalTags.Add(new TagInfo { TagName = tagName, Confidence = confidence });
-                    }
-                }
+            }
 
+            var modelCandidates = new List<TagInfo>();
+            var modelIndices = Enumerable.Range(0, _labels.Length).Where(i => _labels[i].Category == 10).ToArray();
+            foreach (var i in modelIndices) {
+                if (probs[i] >= generalThreshold) {
+                    modelCandidates.Add(new TagInfo { TagName = _labels[i].Name.Replace('_', ' '), Confidence = probs[i] });
+                }
+            }
+            if (modelCandidates.Any()) {
+                modelTags.Add(modelCandidates.OrderByDescending(t => t.Confidence).First());
             }
 
 
-            allTags.AddRange(characterTags.OrderByDescending(t => t.Confidence));
-            allTags.AddRange(generalTags.OrderByDescending(t => t.Confidence));
+            var allTags = new List<TagInfo>();
+            allTags.AddRange(ratingTags);
+            allTags.AddRange(qualityTags);
+            allTags.AddRange(characterTags);
+            allTags.AddRange(copyrightTags);
+            allTags.AddRange(artistTags);
+            allTags.AddRange(generalTags);
+            allTags.AddRange(metaTags);
+            allTags.AddRange(modelTags);
 
-            return allTags;
+            return allTags.OrderByDescending(t => t.Confidence).ToList();
         }
-
         public class TagInfo
         {
             public string TagName { get; set; }

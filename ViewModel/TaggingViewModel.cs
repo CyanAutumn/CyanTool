@@ -15,8 +15,9 @@ namespace CyanTools.ViewModel
     {
         public string DisplayName { get; set; }
         public string ModelUrl { get; set; }
-        public string CsvUrl { get; set; }
+        public string TagsUrl { get; set; }
         public int InputSize { get; set; }
+        public string InputFormat { get; set; } = "NHWC";
     }
 
     public class TaggingViewModel : INotifyPropertyChanged
@@ -51,18 +52,19 @@ namespace CyanTools.ViewModel
             LogLines = new ObservableCollection<string>();
             TaggerModels = new ObservableCollection<TaggerModel>
             {
-                new TaggerModel { DisplayName = "wd-v1-4-swinv2-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-v1-4-convnext-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-v1-4-moat-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-v1-4-convnextv2-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnextv2-tagger-v2/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnextv2-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-v1-4-vit-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-vit-tagger-v2/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-vit-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-swinv2-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-convnext-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-convnext-tagger-v3/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-convnext-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-vit-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-vit-large-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-vit-large-tagger-v3/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-vit-large-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "wd-eva02-large-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "idolsankaku-swinv2-tagger-v1", ModelUrl = "https://huggingface.co/deepghs/idolsankaku-swinv2-tagger-v1/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/deepghs/idolsankaku-swinv2-tagger-v1/resolve/main/selected_tags.csv", InputSize = 448 },
-                new TaggerModel { DisplayName = "idolsankaku-eva02-large-tagger-v1", ModelUrl = "https://huggingface.co/deepghs/idolsankaku-eva02-large-tagger-v1/resolve/main/model.onnx", CsvUrl = "https://huggingface.co/deepghs/idolsankaku-eva02-large-tagger-v1/resolve/main/selected_tags.csv", InputSize = 480 }
+                new TaggerModel { DisplayName = "wd-v1-4-swinv2-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-v1-4-convnext-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-v1-4-moat-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-v1-4-convnextv2-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnextv2-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnextv2-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-v1-4-vit-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-vit-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-vit-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-swinv2-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-convnext-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-convnext-tagger-v3/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-convnext-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-vit-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-vit-large-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-vit-large-tagger-v3/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-vit-large-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "wd-eva02-large-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "idolsankaku-swinv2-tagger-v1", ModelUrl = "https://huggingface.co/deepghs/idolsankaku-swinv2-tagger-v1/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/deepghs/idolsankaku-swinv2-tagger-v1/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "idolsankaku-eva02-large-tagger-v1", ModelUrl = "https://huggingface.co/deepghs/idolsankaku-eva02-large-tagger-v1/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/deepghs/idolsankaku-eva02-large-tagger-v1/resolve/main/selected_tags.csv", InputSize = 480, InputFormat = "NHWC" },
+                new TaggerModel { DisplayName = "cl_tagger_1_02", ModelUrl = "https://huggingface.co/cella110n/cl_tagger/resolve/main/cl_tagger_1_02/model.onnx", TagsUrl = "https://huggingface.co/cella110n/cl_tagger/raw/main/cl_tagger_1_02/tag_mapping.json", InputSize = 448, InputFormat = "NCHW" }
             };
             SelectedTaggerModel = TaggerModels.FirstOrDefault();
 
@@ -139,8 +141,8 @@ namespace CyanTools.ViewModel
             {
                 await Task.Run(async () =>
                 {
-                    await _taggingProcessor.InitializeAsync(SelectedTaggerModel.ModelUrl, SelectedTaggerModel.CsvUrl, SelectedTaggerModel.DisplayName, progress);
-                    await _taggingProcessor.ProcessDirectoryAsync(InputDirectory, GeneralThreshold, CharacterThreshold, SelectedTaggerModel.InputSize, progress);
+                    await _taggingProcessor.InitializeAsync(SelectedTaggerModel.ModelUrl, SelectedTaggerModel.TagsUrl, SelectedTaggerModel.DisplayName, progress);
+                    await _taggingProcessor.ProcessDirectoryAsync(InputDirectory, GeneralThreshold, CharacterThreshold, SelectedTaggerModel.InputSize, SelectedTaggerModel.InputFormat, progress);
                 });
                 AddLog("Tagging complete.");
             }

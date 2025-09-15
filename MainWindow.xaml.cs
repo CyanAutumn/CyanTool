@@ -27,6 +27,7 @@ namespace CyanTools
         private ImageClusteringView _imageClusteringView;
         private ConvertImageFormatView _convertImageFormatView;
         private TaggingView _taggingView;
+        private TrainingSetBalancerView _trainingSetBalancerView;
 
         public MainWindow()
         {
@@ -125,6 +126,10 @@ namespace CyanTools
                     case "图片打标":
                         if (_taggingView == null) _taggingView = new TaggingView();
                         MainContent.Content = _taggingView;
+                        break;
+                    case "训练集配平":
+                        if (_trainingSetBalancerView == null) _trainingSetBalancerView = new TrainingSetBalancerView();
+                        MainContent.Content = _trainingSetBalancerView;
                         break;
                 }
             }

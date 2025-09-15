@@ -127,81 +127,31 @@ namespace CyanTools.ViewModel
 
         public ICommand SelectFolderCommand { get; }
         public ICommand SaveAllCommand { get; }
-        public ICommand LoadImageCommand { get; }
-        public ICommand SaveCurrentImageCommand { get; }
+        
         public ICommand SetCategoryCommand { get; }
         public ICommand SelectCategoryFolderCommand { get; }
         public ICommand PreviousImageCommand { get; }
         public ICommand NextImageCommand { get; }
         public ICommand UndoOperationCommand { get; }
         public ICommand DeleteImageCommand { get; }
-        public ICommand ApplyChangesCommand { get; }
+        
 
         public DatasetManagerViewModel()
         {
             SelectFolderCommand = new RelayCommand(_ => SelectFolder());
             SaveAllCommand = new RelayCommand(_ => SaveAllChanges());
-            LoadImageCommand = new RelayCommand(_ => LoadSingleImage());
-            SaveCurrentImageCommand = new RelayCommand(_ => SaveCurrentImage());
+            
             SetCategoryCommand = new RelayCommand(param => SetImageCategory(param?.ToString()));
             SelectCategoryFolderCommand = new RelayCommand(param => SelectCategoryFolder(param?.ToString()));
             PreviousImageCommand = new RelayCommand(_ => PreviousImage());
             NextImageCommand = new RelayCommand(_ => NextImage());
             UndoOperationCommand = new RelayCommand(_ => UndoOperation());
-            DeleteImageCommand = new RelayCommand(_ => DeleteImage());
-            ApplyChangesCommand = new RelayCommand(_ => ApplyAllChanges());
+            
         }
 
         #region 文件加载与保存
 
-        private void LoadSingleImage()
-        {
-            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Title = "选择一个图像文件",
-                Filter = "图像文件|*.jpg;*.jpeg;*.png;*.bmp;*.gif|所有文件|*.*"
-            };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                SaveChangesToCache();
-                LoadImageFromFile(openFileDialog.FileName);
-            }
-        }
-
-        private void SaveCurrentImage()
-        {
-            if (string.IsNullOrEmpty(_currentFilePath) || _originalBitmap == null)
-            {
-                System.Windows.MessageBox.Show("请先加载一张图像。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-                return;
-            }
-
-            SaveChangesToCache();
-
-            if (_cachedEdits.TryGetValue(_currentFilePath, out List<Rect> rectsToSave) && rectsToSave.Any())
-            {
-                Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
-                {
-                    Title = "保存当前修改后的图像",
-                    Filter = "PNG 图像|*.png|JPEG 图像|*.jpg",
-                    FileName = $"{System.IO.Path.GetFileNameWithoutExtension(_currentFilePath)}_edited.png"
-                };
-
-                if (saveFileDialog.ShowDialog() == true)
-                {
-                    if (SaveImageWithRects(_currentFilePath, rectsToSave, saveFileDialog.FileName))
-                    {
-                        System.Windows.MessageBox.Show("图像已成功保存！", "成功", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-                        ProcessAssociatedTxtFile(_currentFilePath, saveFileDialog.FileName, true);
-                    }
-                }
-            }
-            else
-            {
-                System.Windows.MessageBox.Show("当前图像没有需要保存的更改。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-            }
-        }
+        
 
         private void SelectFolder()
         {
@@ -256,52 +206,111 @@ namespace CyanTools.ViewModel
         {
             SaveChangesToCache();
 
-            if (!ImageFiles.Any())
+            if (!ImageFilesWithOperations.Any())
             {
-                System.Windows.MessageBox.Show("请先选择一个包含图片的文件夹。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("没有需要处理的图片。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 return;
             }
 
-            var dialog = new CommonOpenFileDialog
+            try
             {
-                IsFolderPicker = true,
-                Title = "请选择一个用于保存所有图片的文件夹"
-            };
+                int processedCount = 0;
+                int errorCount = 0;
 
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                string outputDirectory = dialog.FileName;
-                if (string.IsNullOrEmpty(outputDirectory) || !Directory.Exists(outputDirectory))
+                foreach (var item in ImageFilesWithOperations.ToList())
                 {
-                    System.Windows.MessageBox.Show("选择的输出路径无效。", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                    return;
+                    if (string.IsNullOrEmpty(item.Operation)) continue;
+
+                    try
+                    {
+                        string sourcePath = item.FullPath;
+                        string txtPath = System.IO.Path.ChangeExtension(sourcePath, ".txt");
+
+                        if (item.Operation == "删")
+                        {
+
+                            if (CurrentImageSource != null && _currentFilePath == sourcePath)
+                            {
+                                CurrentImageSource = null;
+                            }
+                            File.Delete(sourcePath);
+                            if (File.Exists(txtPath))
+                            {
+                                File.Delete(txtPath);
+                            }
+                        }
+                        else
+                        {
+
+                            string targetFolder = GetCategoryFolder(item.Operation);
+                            if (!string.IsNullOrEmpty(targetFolder) && Directory.Exists(targetFolder))
+                            {
+                                _cachedEdits.TryGetValue(sourcePath, out List<Rect> rects);
+                                List<Rect> rectsToSave = rects ?? new List<Rect>();
+                                bool hasModifications = rectsToSave.Any();
+
+                                string targetImagePath = System.IO.Path.Combine(targetFolder, item.FileName);
+
+                                if (hasModifications)
+                                {
+
+                                    if (SaveImageWithRects(sourcePath, rectsToSave, targetImagePath))
+                                    {
+                                        ProcessAssociatedTxtFile(sourcePath, targetImagePath, true);
+                                        File.Delete(sourcePath);
+                                        if (File.Exists(txtPath))
+                                        {
+                                            File.Delete(txtPath);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        errorCount++;
+                                        continue;
+                                    }
+                                }
+                                else
+                                {
+
+                                    File.Move(sourcePath, targetImagePath);
+                                    if (File.Exists(txtPath))
+                                    {
+                                        string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.ChangeExtension(item.FileName, ".txt"));
+                                        File.Move(txtPath, targetTxtPath);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                System.Windows.MessageBox.Show($"分类{item.Operation}的目标文件夹未设置或不存在。", "警告", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                                continue;
+                            }
+                        }
+
+                        processedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        errorCount++;
+                        System.Windows.MessageBox.Show($"处理文件 {item.FileName} 时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    }
                 }
 
-                int savedCount = 0;
-                int failedCount = 0;
-                var allFiles = ImageFiles.ToList();
 
-                foreach (var originalPath in allFiles)
-                {
-                    _cachedEdits.TryGetValue(originalPath, out List<Rect> rects);
-                    List<Rect> rectsToSave = rects ?? new List<Rect>();
-                    bool hasModifications = rectsToSave.Any();
+                ImageFiles.Clear();
+                ImageFilesWithOperations.Clear();
+                CurrentImageSource = null;
+                _currentIndex = 0;
+                _currentFilePath = null;
+                _cachedEdits.Clear();
+                OnCanvasResetRequired?.Invoke();
 
-                    string newFileName = $"{System.IO.Path.GetFileNameWithoutExtension(originalPath)}_edited.png";
-                    string savePath = System.IO.Path.Combine(outputDirectory, newFileName);
 
-                    if (SaveImageWithRects(originalPath, rectsToSave, savePath))
-                    {
-                        savedCount++;
-                        ProcessAssociatedTxtFile(originalPath, savePath, hasModifications);
-                    }
-                    else
-                    {
-                        failedCount++;
-                    }
-                }
-                System.Windows.MessageBox.Show($"批量保存完成。\n\n成功: {savedCount}\n失败: {failedCount}\n\n文件已保存到:\n{outputDirectory}",
-                                "操作完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                System.Windows.MessageBox.Show($"处理完成！\n\n成功处理: {processedCount} 个文件\n错误: {errorCount} 个文件", "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"应用更改时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -387,86 +396,7 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void ApplyAllChanges()
-        {
-            if (!ImageFilesWithOperations.Any())
-            {
-                System.Windows.MessageBox.Show("没有需要处理的图片。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-                return;
-            }
-
-            try
-            {
-                int processedCount = 0;
-                int errorCount = 0;
-
-                foreach (var item in ImageFilesWithOperations.ToList())
-                {
-                    if (string.IsNullOrEmpty(item.Operation)) continue;
-
-                    try
-                    {
-                        string sourcePath = item.FullPath;
-                        string txtPath = System.IO.Path.ChangeExtension(sourcePath, ".txt");
-
-                        if (item.Operation == "删")
-                        {
-
-                            if (CurrentImageSource != null && _currentFilePath == sourcePath)
-                            {
-                                CurrentImageSource = null;
-                            }
-                            File.Delete(sourcePath);
-                            if (File.Exists(txtPath))
-                            {
-                                File.Delete(txtPath);
-                            }
-                        }
-                        else
-                        {
-
-                            string targetFolder = GetCategoryFolder(item.Operation);
-                            if (!string.IsNullOrEmpty(targetFolder) && Directory.Exists(targetFolder))
-                            {
-                                string targetImagePath = System.IO.Path.Combine(targetFolder, item.FileName);
-                                string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.ChangeExtension(item.FileName, ".txt"));
-
-                                File.Move(sourcePath, targetImagePath);
-                                if (File.Exists(txtPath))
-                                {
-                                    File.Move(txtPath, targetTxtPath);
-                                }
-                            }
-                            else
-                            {
-                                System.Windows.MessageBox.Show($"分类{item.Operation}的目标文件夹未设置或不存在。", "警告", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-                                continue;
-                            }
-                        }
-
-                        processedCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        errorCount++;
-                        System.Windows.MessageBox.Show($"处理文件 {item.FileName} 时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                    }
-                }
-
-
-                ImageFiles.Clear();
-                ImageFilesWithOperations.Clear();
-                CurrentImageSource = null;
-                _currentIndex = 0;
-                _currentFilePath = null;
-
-                System.Windows.MessageBox.Show($"处理完成！\n\n成功处理: {processedCount} 个文件\n错误: {errorCount} 个文件", "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show($"应用更改时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-            }
-        }
+        
 
         private string GetCategoryFolder(string category)
         {

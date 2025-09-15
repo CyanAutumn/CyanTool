@@ -69,4 +69,8 @@
     <Resource Include="1.png" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
 </Project>

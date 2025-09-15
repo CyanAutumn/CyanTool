@@ -63,8 +63,6 @@
 
             <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="#FFCCCCCC" Background="#FFF0F0F0">
                 <StackPanel Orientation="Horizontal" Margin="5">
-                    <Button Content="加载单个图像" Command="{Binding LoadImageCommand}" Margin="5" Padding="10,5"/>
-                    <Button Content="保存当前图像" Command="{Binding SaveCurrentImageCommand}" Margin="5" Padding="10,5"/>
                     <CheckBox Content="自动下一张" IsChecked="{Binding AutoNext}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
             </Border>
@@ -176,10 +174,8 @@
                     </Grid.ColumnDefinitions>
 
 
-                    <Button Grid.Row="0" Grid.Column="0" Content="读取" Command="{Binding SelectFolderCommand}" Margin="2" Padding="5"/>
                     <Button Grid.Row="0" Grid.Column="1" Content="W(上)" Command="{Binding PreviousImageCommand}" Margin="2" Padding="5"/>
-                    <Button Grid.Row="0" Grid.Column="2" Content="应用" Command="{Binding ApplyChangesCommand}" Margin="2" Padding="5"/>
-
+                    
 
                     <Button Grid.Row="1" Grid.Column="0" Content="A(撤销)" Command="{Binding UndoOperationCommand}" Margin="2" Padding="5"/>
                     <Button Grid.Row="1" Grid.Column="1" Content="S(下)" Command="{Binding NextImageCommand}" Margin="2" Padding="5"/>

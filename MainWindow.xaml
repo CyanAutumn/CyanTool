@@ -208,6 +208,9 @@
                     <ListViewItem>
                         <TextBlock Text="图片打标" />
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="训练集配平" />
+                    </ListViewItem>
                 </ListView>
             </Grid>
 

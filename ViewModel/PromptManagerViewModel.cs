@@ -188,7 +188,7 @@ namespace CyanTools.ViewModel
             SelectedPromptFile = PromptFiles[index];
             if(SelectedPromptFile != null)
             {
-                System.Windows.Clipboard.SetText(CurrentPromptContent);
+                                ClipboardHelper.SetTextWithRetry(CurrentPromptContent);
                 System.Windows.MessageBox.Show($"已随机抽取并复制: {CurrentFileName}");
             }
         }
