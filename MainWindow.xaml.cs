@@ -28,6 +28,7 @@ namespace CyanTools
         private ConvertImageFormatView _convertImageFormatView;
         private TaggingView _taggingView;
         private TrainingSetBalancerView _trainingSetBalancerView;
+        private ResolutionFilterView _resolutionFilterView;
 
         public MainWindow()
         {
@@ -98,6 +99,10 @@ namespace CyanTools
                     case "图片三分法":
                         if (_threeStageView == null) _threeStageView = new ThreeStageView();
                         MainContent.Content = _threeStageView;
+                        break;
+                    case "分辨率筛选":
+                        if (_resolutionFilterView == null) _resolutionFilterView = new ResolutionFilterView();
+                        MainContent.Content = _resolutionFilterView;
                         break;
                     case "保留指定文件":
                         if (_keepFilesView == null) _keepFilesView = new KeepFilesView();

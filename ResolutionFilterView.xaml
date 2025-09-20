@@ -1,0 +1,49 @@
+<UserControl x:Class="CyanTools.ResolutionFilterView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:CyanTools"
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.DataContext>
+        <viewModel:ResolutionFilterViewModel/>
+    </UserControl.DataContext>
+    <Grid>
+        <StackPanel Margin="10">
+            <TextBlock Text="图片文件夹路径:" />
+            <TextBox Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,10" />
+
+            <GroupBox Header="筛选条件" Margin="0,0,0,10">
+                <StackPanel>
+                    <CheckBox IsChecked="{Binding IsHeightFilterEnabled}" Content="删除指定高度以下的图片" />
+                    <StackPanel Orientation="Horizontal" Margin="20,5,0,5" IsEnabled="{Binding IsHeightFilterEnabled}">
+                        <TextBlock Text="最小高度:" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding MinHeight}" Width="80" Margin="5,0"/>
+                    </StackPanel>
+
+                    <CheckBox IsChecked="{Binding IsWidthFilterEnabled}" Content="删除指定宽度以下的图片" Margin="0,10,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="20,5,0,5" IsEnabled="{Binding IsWidthFilterEnabled}">
+                        <TextBlock Text="最小宽度:" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding MinWidth}" Width="80" Margin="5,0"/>
+                    </StackPanel>
+
+                    <CheckBox IsChecked="{Binding IsResolutionFilterEnabled}" Content="删除指定分辨率以下的图片" Margin="0,10,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="20,5,0,5" IsEnabled="{Binding IsResolutionFilterEnabled}">
+                        <TextBlock Text="最小分辨率:" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding MinResolutionWidth}" Width="60" Margin="5,0"/>
+                        <TextBlock Text="x" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding MinResolutionHeight}" Width="60" Margin="5,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+            <Button Content="开始筛选" Command="{Binding StartCommand}" IsEnabled="{Binding IsStartButtonEnabled}" HorizontalAlignment="Left" Width="120" Margin="0,10,0,5"/>
+            <ProgressBar Value="{Binding ProgressValue}" Height="20" Margin="0,5,0,0"/>
+
+            <TextBlock Text="日志:" Margin="0,10,0,5"/>
+            <ListView ItemsSource="{Binding Logs}" Height="150" Margin="0,0,0,10"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
