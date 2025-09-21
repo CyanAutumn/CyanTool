@@ -93,6 +93,15 @@ namespace CyanTools.ViewModel {
         public bool IsKMeansSelected => SelectedAlgorithm == "KMeans";
         public bool IsHdbscanSelected => SelectedAlgorithm == "HDBSCAN";
 
+        private string _log = "";
+        public string Log {
+            get { return _log; }
+            set {
+                _log = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Log)));
+            }
+        }
+
         private bool _isClustering;
 
         public bool IsClustering {
@@ -100,19 +109,102 @@ namespace CyanTools.ViewModel {
             set {
                 _isClustering = value;
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsClustering)));
+                Application.Current.Dispatcher.Invoke(() => {
+                    ((Utils.RelayCommand)StartCommand).RaiseCanExecuteChanged();
+                    ((Utils.RelayCommand)MoveFilesToTopLevelCommand).RaiseCanExecuteChanged();
+                });
             }
         }
 
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
         public ICommand StartCommand { get; }
+        public ICommand MoveFilesToTopLevelCommand { get; }
 
         public ImageClusteringViewModel() {
             SelectInputCommand = new Utils.RelayCommand(SelectInputFolder);
             SelectOutputCommand = new Utils.RelayCommand(SelectOutputFolder);
             StartCommand = new Utils.RelayCommand(() => StartClustering(),
                 () => !string.IsNullOrEmpty(InputPath) && !string.IsNullOrEmpty(OutputPath) && !IsClustering);
+            MoveFilesToTopLevelCommand = new Utils.RelayCommand(async () => await MoveFilesToTopLevelAsync(), () => !string.IsNullOrEmpty(InputPath) && !IsClustering);
         }
+
+        private async Task MoveFilesToTopLevelAsync() {
+            IsClustering = true;
+            Log = "开始移动文件...\n";
+            Progress = 0;
+
+            await Task.Run(() => {
+                try {
+                    var subDirectories = Directory.GetDirectories(InputPath, "*", SearchOption.AllDirectories);
+                    var filesToMove = new List<string>();
+                    foreach (var dir in subDirectories) {
+                        filesToMove.AddRange(Directory.GetFiles(dir));
+                    }
+
+                    if (filesToMove.Count == 0) {
+                        Application.Current.Dispatcher.Invoke(() => {
+                            Log += "没有在子文件夹中找到需要移动的文件。\n";
+                            MessageBox.Show("没有在子文件夹中找到需要移动的文件。", "操作完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                        });
+                        return;
+                    }
+
+                    int movedCount = 0;
+                    int skippedCount = 0;
+                    for (int i = 0; i < filesToMove.Count; i++) {
+                        string sourcePath = filesToMove[i];
+                        string fileName = Path.GetFileName(sourcePath);
+                        string destPath = Path.Combine(InputPath, fileName);
+
+                        if (File.Exists(destPath)) {
+                            skippedCount++;
+                            Application.Current.Dispatcher.Invoke(() => {
+                                Log += $"警告: 文件 {fileName} 已存在于目标文件夹，已跳过。\n";
+                            });
+                        } else {
+                            File.Move(sourcePath, destPath);
+                            movedCount++;
+                        }
+                        
+                        Application.Current.Dispatcher.Invoke(() => {
+                            Progress = (double)(i + 1) / filesToMove.Count * 100;
+                        });
+                    }
+
+                    Application.Current.Dispatcher.Invoke(() => {
+                        Log += "操作完成。成功移动 " + movedCount + " 个文件，跳过 " + skippedCount + " 个重复文件。\n";
+                        MessageBox.Show($"操作完成。\n成功移动 {movedCount} 个文件。\n跳过 {skippedCount} 个重复文件。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                        Progress = 100;
+                    });
+
+                } catch (Exception ex) {
+                    Application.Current.Dispatcher.Invoke(() => {
+                        Log += "发生错误: " + ex.Message + "\n";
+                        MessageBox.Show($"发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                } finally {
+
+                    try {
+                        var subDirectories = Directory.GetDirectories(InputPath);
+                        foreach (var dir in subDirectories) {
+                            if (!Directory.EnumerateFileSystemEntries(dir).Any()) {
+                                Directory.Delete(dir);
+                                Application.Current.Dispatcher.Invoke(() => {
+                                    Log += $"已删除空目录: {Path.GetFileName(dir)}\n";
+                                });
+                            }
+                        }
+                    } catch (Exception ex) {
+                        Application.Current.Dispatcher.Invoke(() => {
+                            Log += "清理空目录时发生错误: " + ex.Message + "\n";
+                        });
+                    }
+                }
+            });
+            IsClustering = false;
+        }
+
 
         private void SelectInputFolder() {
             var dialog = new CommonOpenFileDialog();

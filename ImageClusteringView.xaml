@@ -102,11 +102,26 @@
             </StackPanel>
         </GroupBox>
 
-        <Button Content="开始聚类" Command="{Binding StartCommand}" Grid.Row="2" Margin="5" Padding="5"/>
+        <StackPanel Grid.Row="2" Margin="5">
+            <Button Content="移动子文件夹文件到最上层" Command="{Binding MoveFilesToTopLevelCommand}" Margin="0,0,0,5" Padding="5">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Setter Property="IsEnabled" Value="True"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsClustering}" Value="True">
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="开始聚类" Command="{Binding StartCommand}" Padding="5"/>
+        </StackPanel>
 
-        <GroupBox Header="聚类结果" Grid.Row="3" Margin="5">
-
-            <TextBlock Text="聚类分析图将显示在这里" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <GroupBox Header="日志和结果" Grid.Row="3" Margin="5">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBox Text="{Binding Log}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="100"/>
+            </ScrollViewer>
         </GroupBox>
 
         <ProgressBar Value="{Binding Progress}" Maximum="100" Grid.Row="4" Margin="5" Height="20"/>
