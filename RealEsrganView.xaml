@@ -89,19 +89,23 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Label Grid.Row="0" Grid.Column="0" Content="降噪等级:" VerticalAlignment="Center"/>
-            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Waifu2xNoiseLevels}" SelectedItem="{Binding SelectedWaifu2xNoiseLevel}" Margin="5"/>
+            <Label Grid.Row="0" Grid.Column="0" Content="放大倍数:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}" Margin="5"/>
 
-            <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="使用照片模型" IsChecked="{Binding Waifu2xUsePhotoModel}" VerticalAlignment="Center" Margin="5"/>
+            <Label Grid.Row="1" Grid.Column="0" Content="降噪等级:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Waifu2xNoiseLevels}" SelectedItem="{Binding SelectedWaifu2xNoiseLevel}" Margin="5"/>
 
-            <Label Grid.Row="2" Grid.Column="0" Content="裁剪大小:" VerticalAlignment="Center"/>
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Waifu2xCropSize, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+            <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Content="使用照片模型" IsChecked="{Binding Waifu2xUsePhotoModel}" VerticalAlignment="Center" Margin="5"/>
+
+            <Label Grid.Row="3" Grid.Column="0" Content="裁剪大小:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Waifu2xCropSize, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
         </Grid>
 
         <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3">

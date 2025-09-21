@@ -9,13 +9,13 @@ namespace CyanTools.Utils
     public class Waifu2xProcessor
     {
         private static readonly string ToolDirectory = Path.Combine(AppContext.BaseDirectory, "waifu2x-caffe");
-        private static readonly string Waifu2xCuiExecutablePath = Path.Combine(ToolDirectory, "waifu2x-caffe-cui.exe");
+        private static readonly string ExecutablePath = Path.Combine(ToolDirectory, "waifu2x-caffe-cui.exe");
 
-        public async Task RunAsync(string inputDir, string outputDir, int noiseLevel, bool usePhotoModel, int cropSize, int scale, IProgress<string> progress)
+        public async Task RunAsync(string inputDir, string outputDir, int scale, int noiseLevel, bool usePhotoModel, int cropSize, IProgress<string> progress)
         {
-            if (!File.Exists(Waifu2xCuiExecutablePath))
+            if (!File.Exists(ExecutablePath))
             {
-                throw new FileNotFoundException($"找不到waifu2x-caffe-cui.exe，请确保 'waifu2x-caffe-cui.exe' 位于以下路径: {Waifu2xCuiExecutablePath}");
+                throw new FileNotFoundException($"找不到超分工具，请确保 'waifu2x-caffe-cui.exe' 位于以下路径: {ExecutablePath}");
             }
             if (!Directory.Exists(inputDir))
             {
@@ -28,46 +28,51 @@ namespace CyanTools.Utils
             }
             Directory.CreateDirectory(outputDir);
 
-            StringBuilder arguments = new StringBuilder();
-            arguments.Append($"-i \"{inputDir}\" ");
-            arguments.Append($"-o \"{outputDir}\" ");
+            var arguments = new StringBuilder();
+            arguments.Append($"-i \"{inputDir}\"");
+            arguments.Append($" -o \"{outputDir}\"");
+            
 
-            arguments.Append($"-m noise_scale ");
+            arguments.Append(noiseLevel > 0 ? " -m noise_scale" : " -m scale");
+            
+            arguments.Append($" -s {scale}.0");
 
-            arguments.Append($"-n {noiseLevel} ");
-            arguments.Append($"-s {scale}.0 ");
-
+            if (noiseLevel > 0)
+            {
+                arguments.Append($" -n {noiseLevel}");
+            }
             if (usePhotoModel)
             {
-                arguments.Append($"-y photo ");
+                arguments.Append(" -p photo");
             }
             if (cropSize > 0)
             {
-                arguments.Append($"-c {cropSize} ");
+                arguments.Append($" -c {cropSize}");
             }
 
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = Waifu2xCuiExecutablePath,
+                FileName = ExecutablePath,
                 Arguments = arguments.ToString(),
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
+                WorkingDirectory = ToolDirectory,
             };
 
             using (var process = new Process { StartInfo = processStartInfo })
             {
-                process.OutputDataReceived += (sender, args) =>
+                process.OutputDataReceived += (sender, args) => 
                 {
-                    if(args.Data != null)
+                    if(args.Data != null) 
                     {
                         progress.Report(args.Data);
                     }
                 };
-                process.ErrorDataReceived += (sender, args) =>
+                process.ErrorDataReceived += (sender, args) => 
                 {
-                    if (args.Data != null)
+                    if (args.Data != null) 
                     {
                         progress.Report($"ERROR: {args.Data}");
                     }
@@ -82,11 +87,11 @@ namespace CyanTools.Utils
 
                 if (process.ExitCode == 0)
                 {
-                    progress.Report("waifu2x任务成功完成。");
+                    progress.Report("任务成功完成。");
                 }
                 else
                 {
-                    progress.Report($"waifu2x进程异常退出，退出代码: {process.ExitCode}。");
+                    progress.Report($"进程异常退出，退出代码: {process.ExitCode}。");
                 }
             }
         }

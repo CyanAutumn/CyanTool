@@ -168,7 +168,7 @@ namespace CyanTools.ViewModel
                 }
                 else if (SelectedTool == "waifu2x")
                 {
-                    await _waifu2xProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedWaifu2xNoiseLevel, Waifu2xUsePhotoModel, Waifu2xCropSize, SelectedScale, progress);
+                    await _waifu2xProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedScale, SelectedWaifu2xNoiseLevel, Waifu2xUsePhotoModel, Waifu2xCropSize, progress);
                 }
                 success = true;
                 AddLog("处理完成。");
