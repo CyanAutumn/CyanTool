@@ -214,6 +214,9 @@
                     <ListViewItem>
                         <TextBlock Text="训练集配平" />
                     </ListViewItem>
+                    <ListViewItem>
+                        <TextBlock Text="图片重命名" />
+                    </ListViewItem>
                 </ListView>
             </Grid>
 

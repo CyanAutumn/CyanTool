@@ -29,6 +29,7 @@ namespace CyanTools
         private TaggingView _taggingView;
         private TrainingSetBalancerView _trainingSetBalancerView;
         private ResolutionFilterView _resolutionFilterView;
+        private ImageRenameView _imageRenameView;
 
         public MainWindow()
         {
@@ -135,6 +136,10 @@ namespace CyanTools
                     case "训练集配平":
                         if (_trainingSetBalancerView == null) _trainingSetBalancerView = new TrainingSetBalancerView();
                         MainContent.Content = _trainingSetBalancerView;
+                        break;
+                    case "图片重命名":
+                        if (_imageRenameView == null) _imageRenameView = new ImageRenameView();
+                        MainContent.Content = _imageRenameView;
                         break;
                 }
             }

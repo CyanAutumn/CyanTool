@@ -1,0 +1,119 @@
+<UserControl x:Class="CyanTools.ImageRenameView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.DataContext>
+        <viewModel:ImageRenameViewModel />
+    </UserControl.DataContext>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Header="路径选择" Grid.Row="0" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5" />
+                <TextBox Grid.Column="1" Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
+                <Button Grid.Column="2" Content="选择..." Command="{Binding SelectInputPathCommand}" Margin="5" Padding="12,4" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="命名规则" Grid.Row="1" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="名称前缀:" VerticalAlignment="Center" Margin="5" />
+                <TextBox Grid.Column="1" Text="{Binding NamePrefix, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
+                <TextBlock Grid.Column="2" Text="起始编号:" VerticalAlignment="Center" Margin="5" />
+                <TextBox Grid.Column="3" Text="{Binding StartIndex, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
+                <TextBlock Grid.Column="4" Text="编号位数:" VerticalAlignment="Center" Margin="5" />
+                <TextBox Grid.Column="5" Text="{Binding NumberPadding, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
+
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="6" Text="示例: {Binding SampleFileName}" Margin="5" Foreground="Gray" />
+            </Grid>
+        </GroupBox>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
+            <TextBlock Text="文件数: " VerticalAlignment="Center" Margin="0,0,5,0" />
+            <TextBlock Text="{Binding FileCount}" VerticalAlignment="Center" Margin="0,0,20,0" />
+            <Button Content="生成预览" Command="{Binding RefreshPreviewCommand}" Margin="0,0,10,0" Padding="12,4" />
+            <Button Content="开始重命名"
+                    Command="{Binding ExecuteRenameCommand}"
+                    Padding="12,4"
+                    Margin="0,0,10,0" />
+            <Button Content="开始打乱"
+                    Command="{Binding ShuffleRenameCommand}"
+                    Padding="12,4" />
+        </StackPanel>
+
+        <GroupBox Header="重命名预览" Grid.Row="3">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="存在命名冲突，请调整规则后重试。"
+                           Foreground="Red"
+                           Margin="5,0,5,5">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasConflicts}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <ListView Grid.Row="1" ItemsSource="{Binding PreviewItems}" Margin="5"
+                          VirtualizingStackPanel.IsVirtualizing="True"
+                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="序号" DisplayMemberBinding="{Binding SequenceNumber}" Width="60" />
+                            <GridViewColumn Header="原文件名" DisplayMemberBinding="{Binding OriginalName}" Width="220" />
+                            <GridViewColumn Header="新文件名" DisplayMemberBinding="{Binding NewName}" Width="220" />
+                            <GridViewColumn Header="状态" DisplayMemberBinding="{Binding Status}" Width="120" />
+                        </GridView>
+                    </ListView.View>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasConflict}" Value="True">
+                                    <Setter Property="Foreground" Value="Red" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                </ListView>
+            </Grid>
+        </GroupBox>
+    </Grid>
+</UserControl>
