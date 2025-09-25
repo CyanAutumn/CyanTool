@@ -20,34 +20,34 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Image Tagging" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
+        <TextBlock Grid.Row="0" Text="图片打标" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
 
         <StackPanel Grid.Row="1" Orientation="Vertical">
-            <TextBlock Text="Input Directory:"/>
+            <TextBlock Text="输入目录："/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox Grid.Column="0" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
-                <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
+                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
             </Grid>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,10,0,0">
-            <TextBlock Text="Tagger Model:"/>
+            <TextBlock Text="打标模型："/>
             <ComboBox ItemsSource="{Binding TaggerModels}" 
                       SelectedItem="{Binding SelectedTaggerModel}"
                       DisplayMemberPath="DisplayName"/>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock Text="General Threshold:" VerticalAlignment="Center"/>
+            <TextBlock Text="通用阈值：" VerticalAlignment="Center"/>
             <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
-            <TextBlock Text="Character Threshold:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+            <TextBlock Text="角色阈值：" VerticalAlignment="Center" Margin="15,0,0,0"/>
             <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
-            <Button Content="Start Tagging" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
-            <Button Content="Clear Log" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+            <Button Content="开始打标" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+            <Button Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
         </StackPanel>
 
         <ListBox Grid.Row="4" ItemsSource="{Binding LogLines}"
