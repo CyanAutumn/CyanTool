@@ -1,4 +1,4 @@
-<UserControl x:Class="CyanTools.TaggingView"
+﻿<UserControl x:Class="CyanTools.TaggingView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -20,8 +20,6 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="图片打标" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
-
         <StackPanel Grid.Row="1" Orientation="Vertical">
             <TextBlock Text="输入目录："/>
             <Grid>
@@ -41,13 +39,39 @@
                       DisplayMemberPath="DisplayName"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock Text="通用阈值：" VerticalAlignment="Center"/>
-            <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
-            <TextBlock Text="角色阈值：" VerticalAlignment="Center" Margin="15,0,0,0"/>
-            <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
-            <Button Content="开始打标" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
-            <Button Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+        <StackPanel Grid.Row="3" Orientation="Vertical" Margin="0,10,0,0">
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,10,0">
+                    <TextBlock Text="自定义标签（逗号分隔）：" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding CustomTags, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsIdle}" VerticalContentAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Vertical">
+                    <TextBlock Text="前置标签（逗号分隔）：" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding PriorityTags, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsIdle}" VerticalContentAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="通用阈值：" VerticalAlignment="Center"/>
+                <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
+                <TextBlock Text="角色阈值：" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
+                <Button Content="开始打标" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+                <Button Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+            </StackPanel>
+            <WrapPanel Margin="0,10,0,0" IsEnabled="{Binding IsIdle}">
+                <CheckBox Content="评级标签" IsChecked="{Binding IncludeRating}" Margin="0,0,10,5"/>
+                <CheckBox Content="质量标签" IsChecked="{Binding IncludeQuality}" Margin="0,0,10,5"/>
+                <CheckBox Content="通用标签" IsChecked="{Binding IncludeGeneral}" Margin="0,0,10,5"/>
+                <CheckBox Content="角色标签" IsChecked="{Binding IncludeCharacter}" Margin="0,0,10,5"/>
+                <CheckBox Content="作者标签" IsChecked="{Binding IncludeArtist}" Margin="0,0,10,5"/>
+                <CheckBox Content="版权标签" IsChecked="{Binding IncludeCopyright}" Margin="0,0,10,5"/>
+                <CheckBox Content="元信息标签" IsChecked="{Binding IncludeMeta}" Margin="0,0,10,5"/>
+                <CheckBox Content="模型标签" IsChecked="{Binding IncludeModel}" Margin="0,0,10,5"/>
+            </WrapPanel>
         </StackPanel>
 
         <ListBox Grid.Row="4" ItemsSource="{Binding LogLines}"
@@ -67,3 +91,5 @@
 
     </Grid>
 </UserControl>
+
+

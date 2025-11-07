@@ -29,6 +29,18 @@ namespace CyanTools.Utils
         public string Category { get; set; }
     }
 
+    public class TagCategoryOptions
+    {
+        public bool IncludeGeneral { get; set; } = true;
+        public bool IncludeArtist { get; set; } = false;
+        public bool IncludeCopyright { get; set; } = false;
+        public bool IncludeCharacter { get; set; } = true;
+        public bool IncludeMeta { get; set; } = false;
+        public bool IncludeQuality { get; set; } = false;
+        public bool IncludeRating { get; set; } = false;
+        public bool IncludeModel { get; set; } = false;
+    }
+
     public class TaggingProcessor
     {
         private string _modelPath;
@@ -179,7 +191,7 @@ namespace CyanTools.Utils
             }
         }
 
-        public async Task ProcessDirectoryAsync(string inputPath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat, IProgress<string> progress)
+        public async Task ProcessDirectoryAsync(string inputPath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat, TagCategoryOptions categoryOptions, IEnumerable<string> priorityTags, IEnumerable<string> customTags, IProgress<string> progress)
         {
             var imageFiles = Directory.GetFiles(inputPath, "*.*", SearchOption.TopDirectoryOnly)
                                       .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
@@ -188,14 +200,19 @@ namespace CyanTools.Utils
                                                   f.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase))
                                       .ToList();
 
+            categoryOptions ??= new TagCategoryOptions();
+            var priorityList = priorityTags?.Where(tag => !string.IsNullOrWhiteSpace(tag)).ToList() ?? new List<string>();
+            var customList = customTags?.Where(tag => !string.IsNullOrWhiteSpace(tag)).Select(tag => tag.Trim()).ToList() ?? new List<string>();
+
             int processedCount = 0;
             foreach (var imageFile in imageFiles)
             {
                 try
                 {
-                    var tags = await Task.Run(() => ProcessImage(imageFile, generalThreshold, characterThreshold, inputSize, inputFormat));
+                    var tags = await Task.Run(() => ProcessImage(imageFile, generalThreshold, characterThreshold, inputSize, inputFormat, categoryOptions, priorityList));
+                    var finalTags = MergeCustomTags(customList, tags);
                     string txtFile = Path.ChangeExtension(imageFile, ".txt");
-                    File.WriteAllText(txtFile, string.Join(", ", tags.Select(t => t.TagName)));
+                    File.WriteAllText(txtFile, string.Join(", ", finalTags));
                     processedCount++;
                     progress.Report($"Processed [{processedCount}/{imageFiles.Count}]: {Path.GetFileName(imageFile)}");
                 }
@@ -206,8 +223,10 @@ namespace CyanTools.Utils
             }
             progress.Report($"Tagging complete. Processed {processedCount} images.");
         }
+        
+        private List<TagInfo> ProcessImage(string imagePath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat, TagCategoryOptions categoryOptions, IReadOnlyList<string> priorityTags) {
+            categoryOptions ??= new TagCategoryOptions();
 
-        private List<TagInfo> ProcessImage(string imagePath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat) {
             using var image = SixLabors.ImageSharp.Image.Load<Rgb24>(imagePath);
 
             int size = Math.Max(image.Width, image.Height);
@@ -275,13 +294,13 @@ namespace CyanTools.Utils
             var modelTags = new List<TagInfo>();
 
             var ratingIndices = Enumerable.Range(0, _labels.Length).Where(i => _labels[i].Category == 9).ToArray();
-            if (ratingIndices.Any()) {
+            if (categoryOptions.IncludeRating && ratingIndices.Any()) {
                 var maxIndex = ratingIndices.Aggregate((max, i) => probs[i] > probs[max] ? i : max);
                 ratingTags.Add(new TagInfo { TagName = _labels[maxIndex].Name.Replace('_', ' '), Confidence = probs[maxIndex] });
             }
 
             var qualityIndices = Enumerable.Range(0, _labels.Length).Where(i => _labels[i].Category == 8).ToArray();
-            if (qualityIndices.Any()) {
+            if (categoryOptions.IncludeQuality && qualityIndices.Any()) {
                 var maxIndex = qualityIndices.Aggregate((max, i) => probs[i] > probs[max] ? i : max);
                 qualityTags.Add(new TagInfo { TagName = _labels[maxIndex].Name.Replace('_', ' '), Confidence = probs[maxIndex] });
             }
@@ -294,22 +313,24 @@ namespace CyanTools.Utils
                 var tagName = label.Name.Replace('_', ' ');
 
                 switch (label.Category) {
-                    case 0: if (confidence >= generalThreshold) generalTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
-                    case 1: if (confidence >= characterThreshold) artistTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
-                    case 3: if (confidence >= characterThreshold) copyrightTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
-                    case 4: if (confidence >= characterThreshold) characterTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
-                    case 5: if (confidence >= generalThreshold) metaTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 0: if (categoryOptions.IncludeGeneral && confidence >= generalThreshold) generalTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 1: if (categoryOptions.IncludeArtist && confidence >= characterThreshold) artistTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 3: if (categoryOptions.IncludeCopyright && confidence >= characterThreshold) copyrightTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 4: if (categoryOptions.IncludeCharacter && confidence >= characterThreshold) characterTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
+                    case 5: if (categoryOptions.IncludeMeta && confidence >= generalThreshold) metaTags.Add(new TagInfo { TagName = tagName, Confidence = confidence }); break;
                 }
             }
 
             var modelCandidates = new List<TagInfo>();
             var modelIndices = Enumerable.Range(0, _labels.Length).Where(i => _labels[i].Category == 10).ToArray();
-            foreach (var i in modelIndices) {
-                if (probs[i] >= generalThreshold) {
-                    modelCandidates.Add(new TagInfo { TagName = _labels[i].Name.Replace('_', ' '), Confidence = probs[i] });
+            if (categoryOptions.IncludeModel) {
+                foreach (var i in modelIndices) {
+                    if (probs[i] >= generalThreshold) {
+                        modelCandidates.Add(new TagInfo { TagName = _labels[i].Name.Replace('_', ' '), Confidence = probs[i] });
+                    }
                 }
             }
-            if (modelCandidates.Any()) {
+            if (categoryOptions.IncludeModel && modelCandidates.Any()) {
                 modelTags.Add(modelCandidates.OrderByDescending(t => t.Confidence).First());
             }
 
@@ -324,7 +345,114 @@ namespace CyanTools.Utils
             allTags.AddRange(metaTags);
             allTags.AddRange(modelTags);
 
-            return allTags.OrderByDescending(t => t.Confidence).ToList();
+            var orderedByConfidence = allTags.OrderByDescending(t => t.Confidence).ToList();
+            return ApplyPriorityOrdering(orderedByConfidence, priorityTags);
+        }
+
+        private static List<TagInfo> ApplyPriorityOrdering(List<TagInfo> tags, IReadOnlyList<string> priorityTags)
+        {
+            if (tags == null || tags.Count == 0 || priorityTags == null || priorityTags.Count == 0)
+            {
+                return tags;
+            }
+
+            var priorityMap = new Dictionary<string, int>();
+            for (int i = 0; i < priorityTags.Count; i++)
+            {
+                var key = NormalizeTag(priorityTags[i]);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                if (!priorityMap.ContainsKey(key))
+                {
+                    priorityMap[key] = i;
+                }
+            }
+
+            if (priorityMap.Count == 0)
+            {
+                return tags;
+            }
+
+            var front = new List<(int order, TagInfo tag)>();
+            var remaining = new List<TagInfo>();
+
+            foreach (var tag in tags)
+            {
+                var key = NormalizeTag(tag.TagName);
+                if (priorityMap.TryGetValue(key, out var order))
+                {
+                    front.Add((order, tag));
+                }
+                else
+                {
+                    remaining.Add(tag);
+                }
+            }
+
+            if (front.Count == 0)
+            {
+                return tags;
+            }
+
+            front.Sort((a, b) => a.order.CompareTo(b.order));
+            var ordered = front.Select(item => item.tag).ToList();
+            ordered.AddRange(remaining);
+            return ordered;
+        }
+
+        private static List<string> MergeCustomTags(IReadOnlyList<string> customTags, IEnumerable<TagInfo> orderedTags)
+        {
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (customTags != null)
+            {
+                foreach (var tag in customTags)
+                {
+                    if (string.IsNullOrWhiteSpace(tag))
+                    {
+                        continue;
+                    }
+
+                    var normalized = NormalizeTag(tag);
+                    if (seen.Add(normalized))
+                    {
+                        result.Add(tag.Trim());
+                    }
+                }
+            }
+
+            foreach (var tagInfo in orderedTags)
+            {
+                var tag = tagInfo.TagName;
+                if (string.IsNullOrWhiteSpace(tag))
+                {
+                    continue;
+                }
+
+                var normalized = NormalizeTag(tag);
+                if (seen.Add(normalized))
+                {
+                    result.Add(tag);
+                }
+            }
+
+            return result;
+        }
+
+        private static string NormalizeTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                return string.Empty;
+            }
+
+            var normalized = tag.Replace('_', ' ').Trim().ToLowerInvariant();
+            normalized = string.Concat(normalized.Where(c => !char.IsWhiteSpace(c)));
+            return normalized;
         }
         public class TagInfo
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -28,6 +29,16 @@ namespace CyanTools.ViewModel
         private bool _isIdle = true;
         private double _progressValue;
         private TaggerModel _selectedTaggerModel;
+        private string _priorityTags = string.Empty;
+        private string _customTags = string.Empty;
+        private bool _includeGeneral = true;
+        private bool _includeArtist = false;
+        private bool _includeCopyright = false;
+        private bool _includeCharacter = true;
+        private bool _includeMeta = false;
+        private bool _includeQuality = false;
+        private bool _includeRating = false;
+        private bool _includeModel = false;
 
         private readonly TaggingProcessor _taggingProcessor;
         private const int MaxLogLines = 1000;
@@ -41,6 +52,16 @@ namespace CyanTools.ViewModel
         public ObservableCollection<string> LogLines { get; }
         public ObservableCollection<TaggerModel> TaggerModels { get; }
         public TaggerModel SelectedTaggerModel { get => _selectedTaggerModel; set => SetField(ref _selectedTaggerModel, value); }
+        public string PriorityTags { get => _priorityTags; set => SetField(ref _priorityTags, value); }
+        public string CustomTags { get => _customTags; set => SetField(ref _customTags, value); }
+        public bool IncludeGeneral { get => _includeGeneral; set => SetField(ref _includeGeneral, value); }
+        public bool IncludeArtist { get => _includeArtist; set => SetField(ref _includeArtist, value); }
+        public bool IncludeCopyright { get => _includeCopyright; set => SetField(ref _includeCopyright, value); }
+        public bool IncludeCharacter { get => _includeCharacter; set => SetField(ref _includeCharacter, value); }
+        public bool IncludeMeta { get => _includeMeta; set => SetField(ref _includeMeta, value); }
+        public bool IncludeQuality { get => _includeQuality; set => SetField(ref _includeQuality, value); }
+        public bool IncludeRating { get => _includeRating; set => SetField(ref _includeRating, value); }
+        public bool IncludeModel { get => _includeModel; set => SetField(ref _includeModel, value); }
 
         public ICommand BrowseInputCommand { get; }
         public ICommand StartTaggingCommand { get; }
@@ -111,6 +132,74 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private List<string> ParsePriorityTags()
+        {
+            if (string.IsNullOrWhiteSpace(PriorityTags))
+            {
+                return new List<string>();
+            }
+
+            var separators = new[] { ',', ';', '\n', '\r', '\uFF1B', '\uFF0C' };
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tag in PriorityTags.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var cleaned = NormalizeInputTag(tag);
+                if (string.IsNullOrEmpty(cleaned))
+                {
+                    continue;
+                }
+
+                if (seen.Add(cleaned))
+                {
+                    result.Add(tag.Trim());
+                }
+            }
+
+            return result;
+        }
+
+        private List<string> ParseCustomTags()
+        {
+            if (string.IsNullOrWhiteSpace(CustomTags))
+            {
+                return new List<string>();
+            }
+
+            var separators = new[] { ',', ';', '\n', '\r', '\uFF1B', '\uFF0C' };
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tag in CustomTags.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var cleaned = NormalizeInputTag(tag);
+                if (string.IsNullOrEmpty(cleaned))
+                {
+                    continue;
+                }
+
+                if (seen.Add(cleaned))
+                {
+                    result.Add(tag.Trim());
+                }
+            }
+
+            return result;
+        }
+
+        private static string NormalizeInputTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                return string.Empty;
+            }
+
+            var normalized = tag.Replace('_', ' ').Trim().ToLowerInvariant();
+            normalized = string.Concat(normalized.Where(c => !char.IsWhiteSpace(c)));
+            return normalized;
+        }
+
         private async Task StartProcessing()
         {
             IsIdle = false;
@@ -137,12 +226,27 @@ namespace CyanTools.ViewModel
                 }
             });
 
+            var categoryOptions = new TagCategoryOptions
+            {
+                IncludeGeneral = IncludeGeneral,
+                IncludeArtist = IncludeArtist,
+                IncludeCopyright = IncludeCopyright,
+                IncludeCharacter = IncludeCharacter,
+                IncludeMeta = IncludeMeta,
+                IncludeQuality = IncludeQuality,
+                IncludeRating = IncludeRating,
+                IncludeModel = IncludeModel
+            };
+
             try
             {
+                var priorityTags = ParsePriorityTags();
+                var customTags = ParseCustomTags();
+
                 await Task.Run(async () =>
                 {
                     await _taggingProcessor.InitializeAsync(SelectedTaggerModel.ModelUrl, SelectedTaggerModel.TagsUrl, SelectedTaggerModel.DisplayName, progress);
-                    await _taggingProcessor.ProcessDirectoryAsync(InputDirectory, GeneralThreshold, CharacterThreshold, SelectedTaggerModel.InputSize, SelectedTaggerModel.InputFormat, progress);
+                    await _taggingProcessor.ProcessDirectoryAsync(InputDirectory, GeneralThreshold, CharacterThreshold, SelectedTaggerModel.InputSize, SelectedTaggerModel.InputFormat, categoryOptions, priorityTags, customTags, progress);
                 });
                 AddLog("Tagging complete.");
             }

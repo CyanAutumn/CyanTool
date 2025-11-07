@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
 
-    <Version>1.0.0.2</Version>
-    <AssemblyVersion>1.0.0.2</AssemblyVersion>
-    <FileVersion>1.0.0.2</FileVersion>
+    <Version>1.0.0.3</Version>
+    <AssemblyVersion>1.0.0.3</AssemblyVersion>
+    <FileVersion>1.0.0.3</FileVersion>
   </PropertyGroup>
 
   
@@ -67,6 +67,7 @@
 
   <ItemGroup>
     <Resource Include="1.png" />
+    <Resource Include="da715a4e-51a3-4430-833b-a4e5f2a804a9.png" />
   </ItemGroup>
 
   <PropertyGroup>

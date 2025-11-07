@@ -61,6 +61,12 @@ namespace CyanTools.Utils
                     if (shouldDelete)
                     {
                         File.Delete(file);
+                        var txtFile = Path.ChangeExtension(file, ".txt");
+                        if (!string.IsNullOrEmpty(txtFile) && File.Exists(txtFile))
+                        {
+                            File.Delete(txtFile);
+                            logAction($"已删除: {txtFile} (与图像同名)");
+                        }
                         logAction($"已删除: {file} (原因: {reason})");
                         deletedCount++;
                     }

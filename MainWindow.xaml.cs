@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Security.Policy;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 
 namespace CyanTools
@@ -30,6 +33,9 @@ namespace CyanTools
         private TrainingSetBalancerView _trainingSetBalancerView;
         private ResolutionFilterView _resolutionFilterView;
         private ImageRenameView _imageRenameView;
+        private KemonoDownloaderView _kemonoDownloaderView;
+        private bool _downloadersUnlocked;
+        private int _secretImageClickCount;
 
         public MainWindow()
         {
@@ -76,6 +82,10 @@ namespace CyanTools
                     case "Danbooru下载器":
                         if (_danbooruCrawlerView == null) _danbooruCrawlerView = new DanbooruCrawlerView();
                         MainContent.Content = _danbooruCrawlerView;
+                        break;
+                    case "Kemono下载器":
+                        if (_kemonoDownloaderView == null) _kemonoDownloaderView = new KemonoDownloaderView();
+                        MainContent.Content = _kemonoDownloaderView;
                         break;
                     case "图片超分":
                         if (_realEsrganView == null) _realEsrganView = new RealEsrganView();
@@ -145,6 +155,32 @@ namespace CyanTools
             }
         }
 
+        private void SecretImage_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed || _downloadersUnlocked)
+            {
+                return;
+            }
+
+            _secretImageClickCount++;
+            if (_secretImageClickCount >= 5)
+            {
+                _downloadersUnlocked = true;
+                DanbooruMenuItem.Visibility = Visibility.Visible;
+                KemonoMenuItem.Visibility = Visibility.Visible;
+                try
+                {
+                    SecretImage.Source = new BitmapImage(new Uri("/da715a4e-51a3-4430-833b-a4e5f2a804a9.png", UriKind.Relative));
+                }
+                catch
+                {
+
+                }
+                MenuListView.UpdateLayout();
+                MessageBox.Show("再敲咬你啊", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
             Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true } );
@@ -181,3 +217,4 @@ namespace CyanTools
         }
     }
 }
+
