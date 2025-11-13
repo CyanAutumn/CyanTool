@@ -3,8 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d" 
              d:DesignHeight="500" d:DesignWidth="800">
+    <UserControl.DataContext>
+        <viewModel:ImageBucketingViewModel />
+    </UserControl.DataContext>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <Grid Margin="20">
             <Grid.RowDefinitions>
@@ -34,13 +38,17 @@
 
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="输入文件夹:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtInputFolder" Height="25" Margin="0,0,10,0"/>
-                    <Button Grid.Row="0" Grid.Column="2" Content="浏览..." Width="80" Height="25" Click="BrowseInputFolder_Click"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Height="25" Margin="0,0,10,0"
+                             Text="{Binding InputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Grid.Row="0" Grid.Column="2" Content="浏览..." Width="80" Height="25"
+                            Command="{Binding BrowseInputFolderCommand}"/>
 
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="输出文件夹:" VerticalAlignment="Center" Margin="0,10,10,0"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtOutputFolder" Height="25" Margin="0,10,10,0"/>
-                    <Button Grid.Row="1" Grid.Column="2" Content="浏览..." Width="80" Height="25" Margin="0,10,0,0" Click="BrowseOutputFolder_Click"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Height="25" Margin="0,10,10,0"
+                             Text="{Binding OutputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Grid.Row="1" Grid.Column="2" Content="浏览..." Width="80" Height="25" Margin="0,10,0,0"
+                            Command="{Binding BrowseOutputFolderCommand}"/>
                 </Grid>
             </GroupBox>
 
@@ -62,18 +70,22 @@
 
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="分辨率步长:" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtDivisible" Text="64" Height="25" VerticalContentAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DivisibleText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Height="25" VerticalContentAlignment="Center"/>
 
 
                     <TextBlock Grid.Row="0" Grid.Column="2" Text="最大宽高比误差:" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="0" Grid.Column="3" x:Name="txtMaxArError" Text="1.0" Height="25" VerticalContentAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding MaxArErrorText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Height="25" VerticalContentAlignment="Center"/>
 
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="最大尺寸限制:" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtDimLimit" Text="2048" Height="25" Margin="0,10,0,0" VerticalContentAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DimLimitText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Height="25" Margin="0,10,0,0" VerticalContentAlignment="Center"/>
 
 
-                    <CheckBox Grid.Row="1" Grid.Column="2" x:Name="chkDebug" Content="启用调试输出" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                    <CheckBox Grid.Row="1" Grid.Column="2" Content="启用调试输出" VerticalAlignment="Center" Margin="0,10,0,0"
+                              IsChecked="{Binding IsDebugEnabled}"/>
 
 
                     <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Margin="0,15,0,0" TextWrapping="Wrap" Foreground="Gray">
@@ -95,15 +107,21 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <ProgressBar Grid.Column="0" x:Name="progressBar" Height="30" Margin="0,0,10,0"/>
-                <Button Grid.Column="1" x:Name="btnStart" Content="开始分类" Width="100" Height="30" 
-                        Click="StartClassification_Click"   FontWeight="Bold"/>
+                <ProgressBar Grid.Column="0" Height="30" Margin="0,0,10,0"
+                             Value="{Binding ProgressValue}"
+                             Minimum="0"
+                             Maximum="100"
+                             IsIndeterminate="{Binding IsProgressIndeterminate}"/>
+                <Button Grid.Column="1" Content="开始分类" Width="100" Height="30"
+                        FontWeight="Bold"
+                        Command="{Binding StartClassificationCommand}"/>
             </Grid>
 
 
             <GroupBox Grid.Row="4" Header="操作日志">
-                <TextBox x:Name="txtLog" Margin="5" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" 
-                         IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+                <TextBox Margin="5" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" 
+                         IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
+                         Text="{Binding LogText}"/>
             </GroupBox>
         </Grid>
     </ScrollViewer>

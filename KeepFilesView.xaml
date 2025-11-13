@@ -3,9 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:CyanTools"
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.DataContext>
+        <viewModel:KeepFilesViewModel />
+    </UserControl.DataContext>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -16,24 +19,27 @@
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
             <TextBlock Text="选择文件夹:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox x:Name="FolderPathTextBox" Width="400" IsReadOnly="False" VerticalAlignment="Center"/>
-            <Button x:Name="SelectFolderButton" Content="选择..." Click="SelectFolderButton_Click" Margin="5,0,0,0"/>
+            <TextBox Width="400" VerticalAlignment="Center"
+                     Text="{Binding FolderPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <Button Content="选择..." Command="{Binding SelectFolderCommand}" Margin="5,0,0,0"/>
         </StackPanel>
 
         <GroupBox Grid.Row="1" Header="保留的文件类型" Margin="0,0,0,10">
             <StackPanel Orientation="Horizontal">
-                <CheckBox x:Name="JpgCheckBox" Content="jpg" IsChecked="True" Margin="5"/>
-                <CheckBox x:Name="PngCheckBox" Content="png" IsChecked="True" Margin="5"/>
-                <CheckBox x:Name="WebpCheckBox" Content="webp" IsChecked="True" Margin="5"/>
-                <CheckBox x:Name="BmpCheckBox" Content="bmp" IsChecked="True" Margin="5"/>
-                <CheckBox x:Name="JpegCheckBox" Content="jpeg" IsChecked="True" Margin="5"/>
-                <CheckBox x:Name="NpzCheckBox" Content="npz" IsChecked="True" Margin="5"/>
-                <CheckBox x:Name="TxtCheckBox" Content="txt" IsChecked="True" Margin="5"/>
+                <CheckBox Content="jpg" Margin="5" IsChecked="{Binding KeepJpg}"/>
+                <CheckBox Content="png" Margin="5" IsChecked="{Binding KeepPng}"/>
+                <CheckBox Content="webp" Margin="5" IsChecked="{Binding KeepWebp}"/>
+                <CheckBox Content="bmp" Margin="5" IsChecked="{Binding KeepBmp}"/>
+                <CheckBox Content="jpeg" Margin="5" IsChecked="{Binding KeepJpeg}"/>
+                <CheckBox Content="npz" Margin="5" IsChecked="{Binding KeepNpz}"/>
+                <CheckBox Content="txt" Margin="5" IsChecked="{Binding KeepTxt}"/>
             </StackPanel>
         </GroupBox>
 
-        <Button x:Name="DeleteFilesButton" Grid.Row="2" Content="删除其他文件" Click="DeleteFilesButton_Click" HorizontalAlignment="Left" Width="150"/>
+        <Button Grid.Row="2" Content="删除其他文件" Command="{Binding DeleteFilesCommand}"
+                HorizontalAlignment="Left" Width="150"/>
 
-        <TextBox x:Name="LogTextBox" Grid.Row="3" Margin="0,10,0,0" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
+        <TextBox Grid.Row="3" Margin="0,10,0,0" TextWrapping="Wrap" IsReadOnly="True"
+                 VerticalScrollBarVisibility="Auto" Text="{Binding LogText}" AcceptsReturn="True"/>
     </Grid>
 </UserControl>

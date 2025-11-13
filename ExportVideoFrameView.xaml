@@ -3,9 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:CyanTools"
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             Unloaded="UserControl_Unloaded">
+    <UserControl.DataContext>
+        <viewModel:ExportVideoFrameViewModel />
+    </UserControl.DataContext>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,38 +23,44 @@
 
         <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="5">
             <TextBlock Text="视频路径:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox x:Name="VideoPathTextBox" Width="400" IsReadOnly="True"/>
-            <Button Content="选择视频" Margin="5,0,0,0" Click="SelectVideoButton_Click"/>
+            <TextBox Width="400" IsReadOnly="True" Text="{Binding VideoPath}" Margin="0,0,5,0"/>
+            <Button Content="选择视频" Margin="5,0,0,0" Command="{Binding SelectVideoCommand}"/>
         </StackPanel>
 
 
         <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="5">
             <TextBlock Text="输出路径:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox x:Name="OutputPathTextBox" Width="400" IsReadOnly="True"/>
-            <Button Content="选择输出目录" Margin="5,0,0,0" Click="SelectOutputFolderButton_Click"/>
+            <TextBox Width="400" IsReadOnly="True" Text="{Binding OutputFolder}" Margin="0,0,5,0"/>
+            <Button Content="选择输出目录" Margin="5,0,0,0" Command="{Binding SelectOutputCommand}"/>
         </StackPanel>
 
 
         <Border Grid.Row="2" BorderBrush="LightGray" BorderThickness="1" Margin="5">
-            <Image x:Name="FrameImage" Stretch="Uniform"/>
+            <Image Stretch="Uniform" Source="{Binding CurrentFrame}"/>
         </Border>
 
 
-        <Slider x:Name="FrameSlider" Grid.Row="3" Margin="5" Minimum="0" ValueChanged="FrameSlider_ValueChanged"/>
+        <Slider Grid.Row="3" Margin="5"
+                Minimum="0"
+                Maximum="{Binding MaxFrameIndex}"
+                Value="{Binding CurrentFrameIndex, Mode=TwoWay}"
+                IsEnabled="{Binding IsVideoLoaded}"/>
 
 
         <StackPanel Orientation="Horizontal" Grid.Row="4" Margin="5">
             <TextBlock Text="帧间隔 (毫秒):" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox x:Name="FrameIntervalTextBox" Width="50" Text="1" TextAlignment="Center" PreviewTextInput="FrameIntervalTextBox_PreviewTextInput"/>
-            <Button Content="上一帧" Margin="10,0,0,0" Click="PreviousFrameButton_Click"/>
-            <Button Content="下一帧" Margin="5,0,0,0" Click="NextFrameButton_Click"/>
+            <TextBox Width="70" TextAlignment="Center"
+                     Text="{Binding FrameIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PreviewTextInput="FrameIntervalTextBox_PreviewTextInput"/>
+            <Button Content="上一帧" Margin="10,0,0,0" Command="{Binding PreviousFrameCommand}"/>
+            <Button Content="下一帧" Margin="5,0,0,0" Command="{Binding NextFrameCommand}"/>
         </StackPanel>
 
 
         <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="5">
-            <Button Content="输出当前帧" Click="OutputCurrentFrameButton_Click"/>
-            <Button Content="输出所有帧" Margin="10,0,0,0" Click="OutputAllFramesButton_Click"/>
-            <Button Content="导出为GIF" Margin="10,0,0,0" Click="ExportAsGifButton_Click"/>
+            <Button Content="输出当前帧" Command="{Binding ExportCurrentFrameCommand}"/>
+            <Button Content="输出所有帧" Margin="10,0,0,0" Command="{Binding ExportAllFramesCommand}"/>
+            <Button Content="导出为GIF" Margin="10,0,0,0" Command="{Binding ExportGifCommand}"/>
         </StackPanel>
     </Grid>
 </UserControl>

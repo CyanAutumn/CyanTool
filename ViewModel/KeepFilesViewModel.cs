@@ -1,0 +1,243 @@
+using Microsoft.WindowsAPICodePack.Dialogs;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Text;
+using System.Windows;
+using System.Windows.Input;
+using CyanTools.Utils;
+
+namespace CyanTools.ViewModel
+{
+    public class KeepFilesViewModel : INotifyPropertyChanged
+    {
+        private string _folderPath;
+        private string _logText = string.Empty;
+        private readonly StringBuilder _logBuilder = new StringBuilder();
+
+        public KeepFilesViewModel()
+        {
+            KeepJpg = true;
+            KeepPng = true;
+            KeepWebp = true;
+            KeepBmp = true;
+            KeepJpeg = true;
+            KeepNpz = true;
+            KeepTxt = true;
+
+            SelectFolderCommand = new RelayCommand(SelectFolder);
+            DeleteFilesCommand = new RelayCommand(DeleteFiles);
+        }
+
+        public string FolderPath
+        {
+            get => _folderPath;
+            set
+            {
+                if (_folderPath != value)
+                {
+                    _folderPath = value;
+                    OnPropertyChanged(nameof(FolderPath));
+                }
+            }
+        }
+
+        public string LogText
+        {
+            get => _logText;
+            private set
+            {
+                if (_logText != value)
+                {
+                    _logText = value;
+                    OnPropertyChanged(nameof(LogText));
+                }
+            }
+        }
+
+        private bool _keepJpg = true;
+        private bool _keepPng = true;
+        private bool _keepWebp = true;
+        private bool _keepBmp = true;
+        private bool _keepJpeg = true;
+        private bool _keepNpz = true;
+        private bool _keepTxt = true;
+
+        public bool KeepJpg
+        {
+            get => _keepJpg;
+            set
+            {
+                if (_keepJpg != value)
+                {
+                    _keepJpg = value;
+                    OnPropertyChanged(nameof(KeepJpg));
+                }
+            }
+        }
+
+        public bool KeepPng
+        {
+            get => _keepPng;
+            set
+            {
+                if (_keepPng != value)
+                {
+                    _keepPng = value;
+                    OnPropertyChanged(nameof(KeepPng));
+                }
+            }
+        }
+
+        public bool KeepWebp
+        {
+            get => _keepWebp;
+            set
+            {
+                if (_keepWebp != value)
+                {
+                    _keepWebp = value;
+                    OnPropertyChanged(nameof(KeepWebp));
+                }
+            }
+        }
+
+        public bool KeepBmp
+        {
+            get => _keepBmp;
+            set
+            {
+                if (_keepBmp != value)
+                {
+                    _keepBmp = value;
+                    OnPropertyChanged(nameof(KeepBmp));
+                }
+            }
+        }
+
+        public bool KeepJpeg
+        {
+            get => _keepJpeg;
+            set
+            {
+                if (_keepJpeg != value)
+                {
+                    _keepJpeg = value;
+                    OnPropertyChanged(nameof(KeepJpeg));
+                }
+            }
+        }
+
+        public bool KeepNpz
+        {
+            get => _keepNpz;
+            set
+            {
+                if (_keepNpz != value)
+                {
+                    _keepNpz = value;
+                    OnPropertyChanged(nameof(KeepNpz));
+                }
+            }
+        }
+
+        public bool KeepTxt
+        {
+            get => _keepTxt;
+            set
+            {
+                if (_keepTxt != value)
+                {
+                    _keepTxt = value;
+                    OnPropertyChanged(nameof(KeepTxt));
+                }
+            }
+        }
+
+        public ICommand SelectFolderCommand { get; }
+        public ICommand DeleteFilesCommand { get; }
+
+        private void SelectFolder()
+        {
+            var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true
+            };
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                FolderPath = dialog.FileName;
+            }
+        }
+
+        private void DeleteFiles()
+        {
+            if (string.IsNullOrWhiteSpace(FolderPath) || !Directory.Exists(FolderPath))
+            {
+                MessageBox.Show("请先选择一个有效的文件夹。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var extensionsToKeep = BuildExtensionsToKeep();
+            if (extensionsToKeep.Count == 0)
+            {
+                MessageBox.Show("请至少保留一种文件类型。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                var files = Directory.GetFiles(FolderPath);
+                int deletedCount = 0;
+                _logBuilder.Clear();
+                AppendLog($"开始处理文件夹: {FolderPath}");
+
+                foreach (var file in files)
+                {
+                    var extension = Path.GetExtension(file);
+                    if (!extensionsToKeep.Contains(extension))
+                    {
+                        File.Delete(file);
+                        AppendLog($"已删除: {file}");
+                        deletedCount++;
+                    }
+                }
+
+                AppendLog($"操作完成。共删除了 {deletedCount} 个文件。");
+                MessageBox.Show($"操作完成。共删除了 {deletedCount} 个文件。", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"错误: {ex.Message}");
+                MessageBox.Show($"处理文件时发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private HashSet<string> BuildExtensionsToKeep()
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (KeepJpg) set.Add(".jpg");
+            if (KeepPng) set.Add(".png");
+            if (KeepWebp) set.Add(".webp");
+            if (KeepBmp) set.Add(".bmp");
+            if (KeepJpeg) set.Add(".jpeg");
+            if (KeepNpz) set.Add(".npz");
+            if (KeepTxt) set.Add(".txt");
+            return set;
+        }
+
+        private void AppendLog(string message)
+        {
+            _logBuilder.AppendLine(message);
+            LogText = _logBuilder.ToString();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}
