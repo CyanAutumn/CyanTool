@@ -2,10 +2,12 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using CyanTools.Navigation;
 using CyanTools.ViewModel;
 
 namespace CyanTools
 {
+    [ToolPage("图片元数据", 220)]
     public partial class ImageMetadataView : UserControl
     {
         public ImageMetadataView()

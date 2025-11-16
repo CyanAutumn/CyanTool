@@ -1,6 +1,10 @@
+using System.Windows.Controls;
+using CyanTools.Navigation;
+
 namespace CyanTools
 {
-    public partial class ImageBucketingView : System.Windows.Controls.UserControl
+    [ToolPage("图片分辨率归类", 170)]
+    public partial class ImageBucketingView : UserControl
     {
         public ImageBucketingView()
         {

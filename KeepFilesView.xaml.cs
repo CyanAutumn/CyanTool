@@ -1,6 +1,10 @@
+using System.Windows.Controls;
+using CyanTools.Navigation;
+
 namespace CyanTools
 {
-    public partial class KeepFilesView : System.Windows.Controls.UserControl
+    [ToolPage("保留指定文件", 200)]
+    public partial class KeepFilesView : UserControl
     {
         public KeepFilesView()
         {

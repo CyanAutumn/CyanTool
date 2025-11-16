@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using CyanTools.Navigation;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -10,7 +11,8 @@ using CyanTools.ViewModel;
 
 namespace CyanTools
 {
-    public partial class DatasetManagerView : System.Windows.Controls.UserControl
+    [ToolPage("数据集管理器", 130)]
+    public partial class DatasetManagerView : UserControl
     {
         private DatasetManagerViewModel ViewModel => DataContext as DatasetManagerViewModel;
         

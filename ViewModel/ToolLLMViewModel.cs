@@ -23,7 +23,7 @@ namespace CyanTools.ViewModel
         private string _path2 = "";
         private string _path3 = "";
         private string _path4 = "";
-        private string _path5 = "";
+            private string _path5 = "";
         private bool _isRunEnabled = true;
         private string _newConfigName;
         private ConfigurationModel _selectedConfig;

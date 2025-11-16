@@ -1,10 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
-using CyanTools.ViewModel;
+using CyanTools.Navigation;
 
 namespace CyanTools
 {
-    public partial class ToolLLM : System.Windows.Controls.UserControl
+    [ToolPage("LLM分类", 100)]
+    public partial class ToolLLM : UserControl
     {
         public ToolLLM()
         {

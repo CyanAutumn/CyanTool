@@ -132,7 +132,8 @@
             <Grid x:Name="MenuGrid" Grid.Column="0" Width="0" Background="White">
                 <ListView x:Name="MenuListView" Background="Transparent" BorderThickness="0"
                           SelectionChanged="MenuListView_SelectionChanged"
-                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          DisplayMemberPath="DisplayName">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Foreground" Value="Black" />
@@ -160,66 +161,6 @@
                         </Style>
                     </ListView.ItemContainerStyle>
 
-                    <ListViewItem>
-                        <TextBlock Text="主页" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="LLM分类" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片超分" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片处理" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="数据集管理器" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="Prompt管理器" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片分辨率归类" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片三分法" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="分辨率筛选" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="保留指定文件" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="导出视频帧" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片元数据" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="高斯模糊" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片聚类" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="转换图片格式" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片打标" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="训练集配平" />
-                    </ListViewItem>
-                    <ListViewItem>
-                        <TextBlock Text="图片重命名" />
-                    </ListViewItem>
-                    <ListViewItem x:Name="DanbooruMenuItem" Visibility="Collapsed">
-                        <TextBlock Text="Danbooru下载器" />
-                    </ListViewItem>
-                    <ListViewItem x:Name="KemonoMenuItem" Visibility="Collapsed">
-                        <TextBlock Text="Kemono下载器" />
-                    </ListViewItem>
                 </ListView>
             </Grid>
 

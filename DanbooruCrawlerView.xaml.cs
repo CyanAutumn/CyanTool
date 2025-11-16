@@ -1,11 +1,10 @@
 using System.Windows.Controls;
+using CyanTools.Navigation;
 
 namespace CyanTools
 {
-
-
-
-    public partial class DanbooruCrawlerView : System.Windows.Controls.UserControl
+    [ToolPage("Danbooru下载器", 290, true)]
+    public partial class DanbooruCrawlerView : UserControl
     {
         public DanbooruCrawlerView()
         {
