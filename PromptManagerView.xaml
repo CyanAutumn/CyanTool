@@ -57,6 +57,7 @@
                     <Button Content="新建/修改" Command="{Binding CreateOrEditCommand}" Margin="0,0,5,0" Padding="10,5" MinWidth="80"/>
                     <Button Content="删除" Command="{Binding DeleteCommand}" Margin="0,0,5,0" Padding="10,5" MinWidth="60"/>
                     <Button Content="随机复制" Command="{Binding GetRandomPromptCommand}" Margin="0,0,5,0" Padding="10,5" MinWidth="80"/>
+                    <Button Content="自增添加" Command="{Binding AutoIncrementAddCommand}" Padding="10,5" MinWidth="80"/>
                 </StackPanel>
             </Grid>
         </Grid>

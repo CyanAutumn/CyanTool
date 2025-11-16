@@ -19,6 +19,7 @@ namespace CyanTools.ViewModel
         private string _currentFileName;
         private string _currentPromptContent;
         private readonly Random _random = new Random();
+        private static readonly string[] _imageExtensions = { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tiff" };
 
         public ObservableCollection<string> PromptFiles { get; } = new ObservableCollection<string>();
 
@@ -58,6 +59,7 @@ namespace CyanTools.ViewModel
         public ICommand CreateOrEditCommand { get; }
         public ICommand DeleteCommand { get; }
         public ICommand GetRandomPromptCommand { get; }
+        public ICommand AutoIncrementAddCommand { get; }
 
         public PromptManagerViewModel()
         {
@@ -65,6 +67,7 @@ namespace CyanTools.ViewModel
             CreateOrEditCommand = new RelayCommand(_ => CreateOrEdit(), _ => !string.IsNullOrEmpty(_currentFolderPath) && !string.IsNullOrEmpty(CurrentFileName));
             DeleteCommand = new RelayCommand(_ => DeleteFile(), _ => !string.IsNullOrEmpty(SelectedPromptFile));
             GetRandomPromptCommand = new RelayCommand(_ => GetRandomPrompt(), _ => PromptFiles.Any());
+            AutoIncrementAddCommand = new RelayCommand(_ => AutoIncrementAdd(), _ => !string.IsNullOrEmpty(_currentFolderPath) && !string.IsNullOrWhiteSpace(CurrentPromptContent));
         }
 
         private void OpenFolder()
@@ -162,6 +165,25 @@ namespace CyanTools.ViewModel
                 try
                 {
                     File.Delete(fullPath);
+
+
+                    string baseName = Path.GetFileNameWithoutExtension(SelectedPromptFile);
+                    foreach (var ext in _imageExtensions)
+                    {
+                        string imagePath = Path.Combine(_currentFolderPath, baseName + ext);
+                        if (File.Exists(imagePath))
+                        {
+                            try
+                            {
+                                File.Delete(imagePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Windows.MessageBox.Show($"删除关联图片文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
+                    }
+
                     int currentIndex = PromptFiles.IndexOf(SelectedPromptFile);
                     PromptFiles.Remove(SelectedPromptFile);
                     if (PromptFiles.Any())
@@ -181,15 +203,58 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void GetRandomPrompt()
+        private async void GetRandomPrompt()
         {
             if (!PromptFiles.Any()) return;
             int index = _random.Next(PromptFiles.Count);
             SelectedPromptFile = PromptFiles[index];
-            if(SelectedPromptFile != null)
+            if (SelectedPromptFile != null)
             {
-                                ClipboardHelper.SetTextWithRetry(CurrentPromptContent);
-                System.Windows.MessageBox.Show($"已随机抽取并复制: {CurrentFileName}");
+                await ClipboardHelper.TrySetTextAsync(CurrentPromptContent ?? string.Empty);
+            }
+        }
+
+        private void AutoIncrementAdd()
+        {
+            if (string.IsNullOrEmpty(_currentFolderPath) || string.IsNullOrWhiteSpace(CurrentPromptContent))
+            {
+                return;
+            }
+
+            string existingFile = FindFileWithSameContent(CurrentPromptContent);
+            if (!string.IsNullOrEmpty(existingFile))
+            {
+                System.Windows.MessageBox.Show($"该内容已存在于文件: {existingFile}", "内容重复", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (PromptFiles.Contains(existingFile))
+                {
+                    SelectedPromptFile = existingFile;
+                }
+                return;
+            }
+
+            string newFileName;
+            int index = 1;
+            do
+            {
+                newFileName = $"{index}.txt";
+                index++;
+            } while (File.Exists(Path.Combine(_currentFolderPath, newFileName)));
+
+            string fullPath = Path.Combine(_currentFolderPath, newFileName);
+            try
+            {
+                File.WriteAllText(fullPath, CurrentPromptContent);
+                if (!PromptFiles.Contains(newFileName))
+                {
+                    PromptFiles.Add(newFileName);
+                }
+                CurrentFileName = newFileName;
+                SelectedPromptFile = newFileName;
+                System.Windows.MessageBox.Show($"已创建文件: {newFileName}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"保存文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
