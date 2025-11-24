@@ -40,6 +40,6 @@
                 HorizontalAlignment="Left" Width="150"/>
 
         <TextBox Grid.Row="3" Margin="0,10,0,0" TextWrapping="Wrap" IsReadOnly="True"
-                 VerticalScrollBarVisibility="Auto" Text="{Binding LogText}" AcceptsReturn="True"/>
+                 VerticalScrollBarVisibility="Auto" Text="{Binding LogText, Mode=OneWay}" AcceptsReturn="True"/>
     </Grid>
 </UserControl>

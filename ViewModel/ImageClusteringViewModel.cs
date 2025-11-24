@@ -249,21 +249,21 @@ namespace CyanTools.ViewModel {
                         return;
                     }
 
-                    List<float[]> dataPoints;
-                    if (SelectedFeatureType == "Style") {
-                        dataPoints = imageResults.Select(r => r.StyleVector).ToList();
-                    }
-                    else
-                    {
-                        dataPoints = imageResults.Select(r => r.ContentVector).ToList();
+                    List<float[]> dataPoints = SelectedFeatureType == "Style"
+                        ? imageResults.Select(r => r.StyleVector).ToList()
+                        : imageResults.Select(r => r.ContentVector).ToList();
+
+                    var featureSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensions(dataPoints);
+                    if (featureSpace.Count != dataPoints.Count) {
+                        featureSpace = dataPoints;
                     }
 
                     int[] assignments;
                     if (SelectedAlgorithm == "KMeans") {
-                        assignments = Utils.MlNetClusterer.Cluster(dataPoints, NumClusters);
+                        assignments = Utils.MlNetClusterer.Cluster(featureSpace, NumClusters);
                     }
                     else if (SelectedAlgorithm == "HDBSCAN") {
-                        assignments = Utils.HdbscanClusterer.Cluster(dataPoints, MinClusterSize);
+                        assignments = Utils.HdbscanClusterer.Cluster(featureSpace, MinClusterSize);
                     }
                     else {
                         assignments = new int[dataPoints.Count];

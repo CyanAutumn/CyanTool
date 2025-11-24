@@ -108,10 +108,10 @@
                 </Grid.ColumnDefinitions>
 
                 <ProgressBar Grid.Column="0" Height="30" Margin="0,0,10,0"
-                             Value="{Binding ProgressValue}"
+                             Value="{Binding ProgressValue, Mode=OneWay}"
                              Minimum="0"
                              Maximum="100"
-                             IsIndeterminate="{Binding IsProgressIndeterminate}"/>
+                             IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"/>
                 <Button Grid.Column="1" Content="开始分类" Width="100" Height="30"
                         FontWeight="Bold"
                         Command="{Binding StartClassificationCommand}"/>
@@ -121,7 +121,7 @@
             <GroupBox Grid.Row="4" Header="操作日志">
                 <TextBox Margin="5" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" 
                          IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
-                         Text="{Binding LogText}"/>
+                         Text="{Binding LogText, Mode=OneWay}"/>
             </GroupBox>
         </Grid>
     </ScrollViewer>

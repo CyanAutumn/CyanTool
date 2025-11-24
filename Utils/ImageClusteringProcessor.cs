@@ -3,6 +3,7 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Drawing.Processing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,8 +13,8 @@ namespace CyanTools.Utils
 {
     public class ImageClusteringProcessor
     {
-        private const int ImageWidth = 224;
-        private const int ImageHeight = 224;
+        private const int ProcessorResize = 336;
+        private const int ModelInputSize = 224;
         private static readonly float[] Mean = { 0.48145466f, 0.4578275f, 0.40821073f };
         private static readonly float[] StdDev = { 0.26862954f, 0.26130258f, 0.27577711f };
 
@@ -72,19 +73,25 @@ namespace CyanTools.Utils
         }
 
         private DenseTensor<Float16> PreprocessImage(string imagePath) {
-
             byte[] imageBytes = File.ReadAllBytes(imagePath);
             using var ms = new MemoryStream(imageBytes);
-            using var image = Image.Load<Rgb24>(ms);
+            using var original = Image.Load<Rgb24>(ms);
 
-            image.Mutate(x => x.Resize(new ResizeOptions {
-                Size = new SixLabors.ImageSharp.Size(ImageWidth, ImageHeight),
+            int canvasSize = Math.Max(original.Width, original.Height);
+            using var canvas = new Image<Rgb24>(canvasSize, canvasSize, new Rgb24(255, 255, 255));
+            canvas.Mutate(ctx => ctx.DrawImage(original, new Point((canvasSize - original.Width) / 2, (canvasSize - original.Height) / 2), 1f));
+
+
+            canvas.Mutate(ctx => ctx.Resize(new ResizeOptions {
+                Size = new SixLabors.ImageSharp.Size(ProcessorResize, ProcessorResize),
+                Sampler = KnownResamplers.Lanczos3
+            }).Resize(new ResizeOptions {
+                Size = new SixLabors.ImageSharp.Size(ModelInputSize, ModelInputSize),
                 Sampler = KnownResamplers.Bicubic
             }));
 
-            var tensor = new DenseTensor<Float16>(new[] { 1, 3, ImageHeight, ImageWidth });
-            image.ProcessPixelRows(accessor =>
-            {
+            var tensor = new DenseTensor<Float16>(new[] { 1, 3, ModelInputSize, ModelInputSize });
+            canvas.ProcessPixelRows(accessor => {
                 for (int y = 0; y < accessor.Height; y++) {
                     Span<Rgb24> pixelRow = accessor.GetRowSpan(y);
                     for (int x = 0; x < accessor.Width; x++) {
