@@ -45,6 +45,17 @@
 
         <GroupBox Header="参数设置" Grid.Row="1" Margin="5">
             <StackPanel>
+                <Grid Margin="0,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="计算设备:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding ComputeDevices}"
+                              SelectedItem="{Binding SelectedComputeDevice}"
+                              Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                </Grid>
+
                 <Grid Margin="0,5,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>

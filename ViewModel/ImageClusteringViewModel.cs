@@ -93,12 +93,34 @@ namespace CyanTools.ViewModel {
         public bool IsKMeansSelected => SelectedAlgorithm == "KMeans";
         public bool IsHdbscanSelected => SelectedAlgorithm == "HDBSCAN";
 
+        public List<string> ComputeDevices { get; } = new List<string> { "CPU", "GPU" };
+        private string _selectedComputeDevice = "GPU";
+
+        public string SelectedComputeDevice {
+            get { return _selectedComputeDevice; }
+            set {
+                _selectedComputeDevice = value;
+                PropertyChanged?.Invoke(this,
+                    new System.ComponentModel.PropertyChangedEventArgs(nameof(SelectedComputeDevice)));
+            }
+        }
+
         private string _log = "";
         public string Log {
             get { return _log; }
             set {
                 _log = value;
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Log)));
+            }
+        }
+
+        private void AppendLog(string message) {
+            void update() => Log += $"{DateTime.Now:HH:mm:ss} {message}\n";
+            if (Application.Current.Dispatcher.CheckAccess()) {
+                update();
+            }
+            else {
+                Application.Current.Dispatcher.Invoke(update);
             }
         }
 
@@ -228,22 +250,33 @@ namespace CyanTools.ViewModel {
 
             Task.Run(() => {
                 try {
-                    Application.Current.Dispatcher.Invoke(() => Progress = 0);
+                    Application.Current.Dispatcher.Invoke(() => {
+                        Progress = 0;
+                        Log = string.Empty;
+                    });
+                    AppendLog("开始聚类");
                     string modelPath = "Models/csd/csd_clip_model.onnx";
                     if (!File.Exists(modelPath)) {
+                        AppendLog($"模型文件不存在: {modelPath}");
                         Application.Current.Dispatcher.Invoke(() =>
                             MessageBox.Show($"模型文件不存在: {modelPath}", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
                         return;
                     }
 
-                    var processor = new Utils.ImageClusteringProcessor(modelPath);
+                    bool useGpu = SelectedComputeDevice.Equals("GPU", StringComparison.OrdinalIgnoreCase);
+                    AppendLog($"选择计算设备: {SelectedComputeDevice}");
+                    var processor = new Utils.ImageClusteringProcessor(modelPath, useGpu, msg => AppendLog(msg));
                     var imageResults = processor.ProcessFolder(InputPath,
                         p => Application.Current.Dispatcher.Invoke(() =>
                             Progress = p * 0.5),
-                        error => Application.Current.Dispatcher.Invoke(() =>
-                            MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning)));
+                        error => {
+                            AppendLog(error);
+                            Application.Current.Dispatcher.Invoke(() =>
+                                MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning));
+                        });
 
                     if (imageResults.Count == 0) {
+                        AppendLog("未成功处理任何图片");
                         Application.Current.Dispatcher.Invoke(() => MessageBox.Show("未成功处理任何图片，请检查图片格式或模型是否正确。", "信息",
                             MessageBoxButton.OK, MessageBoxImage.Information));
                         return;
@@ -298,6 +331,7 @@ namespace CyanTools.ViewModel {
                     }
 
                     Application.Current.Dispatcher.Invoke(() => {
+                        AppendLog("图片聚类完成");
                         MessageBox.Show("图片聚类完成！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                         Progress = 100;
                     });

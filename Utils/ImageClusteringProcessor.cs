@@ -19,18 +19,51 @@ namespace CyanTools.Utils
         private static readonly float[] StdDev = { 0.26862954f, 0.26130258f, 0.27577711f };
 
         private readonly InferenceSession _session;
+        private readonly Action<string> _log;
         private readonly string _inputName;
         private readonly string _styleOutputName;
         private readonly string _contentOutputName;
 
-        public ImageClusteringProcessor(string modelPath)
+        public ImageClusteringProcessor(string modelPath, bool useGpu, Action<string>? logAction = null)
         {
-            var sessionOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
-            _session = new InferenceSession(modelPath, sessionOptions);
+            _log = logAction ?? (_ => { });
+            _session = CreateSession(modelPath, useGpu);
             _inputName = _session.InputMetadata.Keys.First();
 
             _styleOutputName = "style_output";
             _contentOutputName = "content_output";
+        }
+
+        private InferenceSession CreateSession(string modelPath, bool useGpu) {
+
+            if (useGpu) {
+                var gpuOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
+                _log("请求使用 GPU (CUDA) 执行提供器");
+                try {
+                    gpuOptions.AppendExecutionProvider_CUDA();
+                    gpuOptions.AppendExecutionProvider_CPU();
+                    _log("开始创建 GPU 会话");
+                    var gpuSession = new InferenceSession(modelPath, gpuOptions);
+                    _log("GPU 会话创建成功");
+                    return gpuSession;
+                }
+                catch (DllNotFoundException ex) {
+                    _log($"CUDA 依赖缺失，回退到 CPU。原因: {ex.Message}");
+                }
+                catch (OnnxRuntimeException ex) {
+                    _log($"CUDA 执行提供器不可用，回退到 CPU。原因: {ex.Message}");
+                }
+                catch (Exception ex) {
+                    _log($"GPU 会话创建失败，回退到 CPU。原因: {ex.Message}");
+                }
+            }
+
+            var cpuOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
+            cpuOptions.AppendExecutionProvider_CPU();
+            _log("创建 CPU 会话");
+            var cpuSession = new InferenceSession(modelPath, cpuOptions);
+            _log("CPU 会话创建成功");
+            return cpuSession;
         }
 
         public List<ImageStyleResult> ProcessFolder(string folderPath, Action<double> onProgress, Action<string> onError)
