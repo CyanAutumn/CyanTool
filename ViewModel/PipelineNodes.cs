@@ -1,8 +1,35 @@
+using System.Linq;
 namespace CyanTools.ViewModel
 {
     public sealed class RealEsrganPipelineNode : CyanTools.Pipeline.SimplePipelineNode<RealEsrganViewModel>
     {
         public RealEsrganPipelineNode() : base("图片超分") { }
+
+        public override System.Collections.Generic.Dictionary<string, object?> CaptureSnapshot()
+        {
+            var snapshot = base.CaptureSnapshot();
+            if (Inner.SelectedGpu != null)
+            {
+                snapshot["SelectedGpuId"] = Inner.SelectedGpu.Id;
+            }
+            return snapshot;
+        }
+
+        public override void ApplySnapshot(System.Collections.Generic.Dictionary<string, object?> snapshot)
+        {
+            base.ApplySnapshot(snapshot);
+            if (snapshot != null && snapshot.TryGetValue("SelectedGpuId", out var idObj) && idObj != null)
+            {
+                if (int.TryParse(idObj.ToString(), out var gpuId))
+                {
+                    var target = Inner.Gpus.FirstOrDefault(g => g.Id == gpuId);
+                    if (target != null)
+                    {
+                        Inner.SelectedGpu = target;
+                    }
+                }
+            }
+        }
     }
 
     public sealed class ImageBucketingPipelineNode : CyanTools.Pipeline.SimplePipelineNode<ImageBucketingViewModel>

@@ -7,7 +7,7 @@ namespace CyanTools.Pipeline
 
 
 
-    public abstract class SimplePipelineNode<TViewModel> : PipelineNodeViewModelBase where TViewModel : class, new()
+    public abstract class SimplePipelineNode<TViewModel> : PipelineNodeViewModelBase, IPipelineSnapshotProvider where TViewModel : class, new()
     {
         private readonly string _displayName;
 
@@ -31,6 +31,16 @@ namespace CyanTools.Pipeline
         {
 
             return (PipelineNodeViewModelBase)Activator.CreateInstance(GetType())!;
+        }
+
+        public virtual Dictionary<string, object?> CaptureSnapshot()
+        {
+            return PipelineSnapshotHelper.CaptureSimpleProperties(Inner);
+        }
+
+        public virtual void ApplySnapshot(Dictionary<string, object?> snapshot)
+        {
+            PipelineSnapshotHelper.ApplySimpleProperties(Inner, snapshot);
         }
     }
 }

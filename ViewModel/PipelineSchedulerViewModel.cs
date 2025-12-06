@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -19,6 +20,9 @@ namespace CyanTools.ViewModel
         private bool _isRunning;
         private CancellationTokenSource? _cts;
         private readonly PipelineRunner _runner = new();
+        private bool _downloadersUnlocked;
+        private bool _isLoadingWorkflow;
+        private string? _selectedWorkflowName;
 
         public PipelineSchedulerViewModel()
         {
@@ -27,6 +31,7 @@ namespace CyanTools.ViewModel
             AvailableNodes = new ObservableCollection<PipelineNodeDescriptor>();
             PipelineNodes = new ObservableCollection<PipelineNodeViewModelBase>();
             LogLines = new ObservableCollection<string>();
+            Workflows = new ObservableCollection<string>(Pipeline.WorkflowStorage.ListWorkflows());
 
             AddNodeCommand = new RelayCommand(AddNode, () => SelectedAvailableNode != null && !IsRunning);
             RemoveNodeCommand = new RelayCommand(RemoveSelectedNode, () => SelectedPipelineNode != null && !IsRunning);
@@ -35,6 +40,8 @@ namespace CyanTools.ViewModel
             StartCommand = new RelayCommand(async () => await RunAsync(), () => PipelineNodes.Any() && !IsRunning);
             CancelCommand = new RelayCommand(CancelRun, () => IsRunning);
             ClearLogCommand = new RelayCommand(() => LogLines.Clear(), () => !IsRunning);
+            SaveWorkflowCommand = new RelayCommand(SaveWorkflow, () => !IsRunning && !string.IsNullOrWhiteSpace(SelectedWorkflowName));
+            DeleteWorkflowCommand = new RelayCommand(DeleteWorkflow, () => !IsRunning && !string.IsNullOrWhiteSpace(SelectedWorkflowName));
 
             ReloadAvailableNodes();
             Utils.UnlockState.DownloadersUnlockedChanged += OnDownloadersUnlockedChanged;
@@ -43,6 +50,7 @@ namespace CyanTools.ViewModel
         public ObservableCollection<PipelineNodeDescriptor> AvailableNodes { get; }
         public ObservableCollection<PipelineNodeViewModelBase> PipelineNodes { get; }
         public ObservableCollection<string> LogLines { get; }
+        public ObservableCollection<string> Workflows { get; }
 
         public PipelineNodeDescriptor? SelectedAvailableNode
         {
@@ -87,8 +95,23 @@ namespace CyanTools.ViewModel
         public ICommand StartCommand { get; }
         public ICommand CancelCommand { get; }
         public ICommand ClearLogCommand { get; }
+        public ICommand SaveWorkflowCommand { get; }
+        public ICommand DeleteWorkflowCommand { get; }
 
         private bool _downloadersUnlocked;
+
+        public string? SelectedWorkflowName
+        {
+            get => _selectedWorkflowName;
+            set
+            {
+                if (SetField(ref _selectedWorkflowName, value))
+                {
+                    RaiseCommandStates();
+                    TryLoadWorkflow();
+                }
+            }
+        }
 
         private void AddNode()
         {
@@ -199,6 +222,85 @@ namespace CyanTools.ViewModel
             else
             {
                 Application.Current?.Dispatcher?.Invoke(Append);
+            }
+        }
+
+        private void SaveWorkflow()
+        {
+            if (string.IsNullOrWhiteSpace(SelectedWorkflowName))
+            {
+                return;
+            }
+
+            Pipeline.WorkflowStorage.Save(SelectedWorkflowName.Trim(), PipelineNodes);
+            RefreshWorkflowList();
+            AppendLog($"已保存工作流: {SelectedWorkflowName.Trim()}");
+        }
+
+        private void DeleteWorkflow()
+        {
+            var name = SelectedWorkflowName?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            var folder = Pipeline.WorkflowStorage.EnsureFolder();
+            var path = System.IO.Path.Combine(folder, $"{name}.json");
+            if (System.IO.File.Exists(path))
+            {
+                System.IO.File.Delete(path);
+                AppendLog($"已删除工作流: {name}");
+            }
+
+            RefreshWorkflowList();
+            SelectedWorkflowName = Workflows.FirstOrDefault();
+        }
+
+        private void RefreshWorkflowList()
+        {
+            var current = SelectedWorkflowName;
+            Workflows.Clear();
+            foreach (var wf in Pipeline.WorkflowStorage.ListWorkflows())
+            {
+                Workflows.Add(wf);
+            }
+
+            if (!string.IsNullOrWhiteSpace(current))
+            {
+                SelectedWorkflowName = current;
+            }
+        }
+
+        private void TryLoadWorkflow()
+        {
+            if (_isLoadingWorkflow || string.IsNullOrWhiteSpace(SelectedWorkflowName))
+            {
+                return;
+            }
+
+            var name = SelectedWorkflowName.Trim();
+            if (!Workflows.Contains(name))
+            {
+                return;
+            }
+
+            _isLoadingWorkflow = true;
+            try
+            {
+                var nodes = Pipeline.WorkflowStorage.Load(name, _downloadersUnlocked);
+                PipelineNodes.Clear();
+                foreach (var node in nodes)
+                {
+                    PipelineNodes.Add(node);
+                }
+
+                SelectedPipelineNode = PipelineNodes.FirstOrDefault();
+                AppendLog($"已载入工作流: {name}");
+            }
+            finally
+            {
+                _isLoadingWorkflow = false;
             }
         }
 
