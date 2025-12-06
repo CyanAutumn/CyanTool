@@ -7,9 +7,6 @@
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <UserControl.DataContext>
-        <viewModel:TaggingViewModel/>
-    </UserControl.DataContext>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

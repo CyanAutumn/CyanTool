@@ -12,6 +12,7 @@ namespace CyanTools
         public ExportVideoFrameView()
         {
             InitializeComponent();
+            Loaded += OnLoaded;
         }
 
         private void FrameIntervalTextBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
@@ -25,6 +26,14 @@ namespace CyanTools
             if (DataContext is ExportVideoFrameViewModel viewModel)
             {
                 viewModel.Dispose();
+            }
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext == null)
+            {
+                DataContext = new ExportVideoFrameViewModel();
             }
         }
     }

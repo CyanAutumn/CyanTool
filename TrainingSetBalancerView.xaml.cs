@@ -10,6 +10,15 @@ namespace CyanTools
         public TrainingSetBalancerView()
         {
             InitializeComponent();
+            Loaded += OnLoaded;
+        }
+
+        private void OnLoaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (DataContext == null)
+            {
+                DataContext = new TrainingSetBalancerViewModel();
+            }
         }
     }
 }

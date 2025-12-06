@@ -8,6 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using CyanTools.Navigation;
+using CyanTools.Utils;
 
 namespace CyanTools
 {
@@ -95,6 +96,7 @@ namespace CyanTools
             if (_secretImageClickCount >= 5)
             {
                 _downloadersUnlocked = true;
+                UnlockState.DownloadersUnlocked = true;
                 RefreshMenuItems();
                 try
                 {

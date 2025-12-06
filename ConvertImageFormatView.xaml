@@ -10,9 +10,6 @@
     <UserControl.Resources>
         <utils:BooleanToInverseBooleanConverter x:Key="BooleanToInverseBooleanConverter" />
     </UserControl.Resources>
-    <UserControl.DataContext>
-        <viewModel:ConvertImageFormatViewModel />
-    </UserControl.DataContext>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

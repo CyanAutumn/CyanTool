@@ -9,6 +9,15 @@ namespace CyanTools
         public ConvertImageFormatView()
         {
             InitializeComponent();
+            Loaded += OnLoaded;
+        }
+
+        private void OnLoaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (DataContext == null)
+            {
+                DataContext = new ViewModel.ConvertImageFormatViewModel();
+            }
         }
     }
 }

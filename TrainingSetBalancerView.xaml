@@ -6,9 +6,6 @@
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel.TrainingSet"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <UserControl.DataContext>
-        <viewModel:TrainingSetBalancerViewModel />
-    </UserControl.DataContext>
     <Grid>
         <DockPanel>
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">

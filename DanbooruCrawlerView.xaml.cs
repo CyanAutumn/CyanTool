@@ -9,6 +9,15 @@ namespace CyanTools
         public DanbooruCrawlerView()
         {
             InitializeComponent();
+            Loaded += OnLoaded;
+        }
+
+        private void OnLoaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (DataContext == null)
+            {
+                DataContext = new ViewModel.DanbooruCrawlerViewModel();
+            }
         }
     }
 }

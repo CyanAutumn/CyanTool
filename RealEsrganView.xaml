@@ -10,9 +10,6 @@
     <UserControl.Resources>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
-    <UserControl.DataContext>
-        <viewModel:RealEsrganViewModel/>
-    </UserControl.DataContext>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
