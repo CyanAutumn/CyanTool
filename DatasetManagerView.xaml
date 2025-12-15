@@ -30,10 +30,10 @@
                 <Button Grid.Column="1" Content="保存所有更改" Command="{Binding SaveAllCommand}" Margin="2,5,0,0" Padding="5"/>
             </Grid>
 
-            <TextBlock DockPanel.Dock="Top" Text="图片列表" FontWeight="Bold" Margin="0,0,0,5"/>
+            <TextBlock DockPanel.Dock="Top" Text="数据列表" FontWeight="Bold" Margin="0,0,0,5"/>
             <DataGrid x:Name="ImageFilesDataGrid" 
-                      ItemsSource="{Binding ImageFilesWithOperations}" 
-                      SelectedItem="{Binding SelectedImageItem}"
+                      ItemsSource="{Binding DataItemsWithOperations}" 
+                      SelectedItem="{Binding SelectedDataItem}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
@@ -43,10 +43,10 @@
                       HeadersVisibility="Column"
                       GridLinesVisibility="All"
                       SelectionMode="Single">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="操作" Binding="{Binding Operation}" Width="50" IsReadOnly="True"/>
-                    <DataGridTextColumn Header="文件名" Binding="{Binding FileName}" Width="*" IsReadOnly="True"/>
-                </DataGrid.Columns>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="操作" Binding="{Binding Operation}" Width="50" IsReadOnly="True"/>
+                <DataGridTextColumn Header="文件名" Binding="{Binding DisplayName}" Width="*" IsReadOnly="True"/>
+            </DataGrid.Columns>
             </DataGrid>
         </DockPanel>
 
@@ -92,6 +92,7 @@
 
         <Grid Grid.Column="4" Margin="5">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -160,28 +161,38 @@
             </GroupBox>
 
 
-            <GroupBox Grid.Row="1" Header="控制" Margin="0,5,0,0">
+            <GroupBox Grid.Row="1" Header="内容" Margin="0,0,0,5">
+                <TextBox Text="{Binding CurrentTextContent}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            </GroupBox>
+
+
+            <GroupBox Grid.Row="2" Header="控制" Margin="0,5,0,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+	                    <Grid.ColumnDefinitions>
+	                        <ColumnDefinition Width="*"/>
+	                        <ColumnDefinition Width="*"/>
+	                        <ColumnDefinition Width="*"/>
+	                    </Grid.ColumnDefinitions>
+	
+
+	                    <Button Grid.Row="0" Grid.Column="0" Content="Q(随机复制)" Command="{Binding RandomCopyCommand}" Margin="2" Padding="5"/>
+	                    <Button Grid.Row="0" Grid.Column="1" Content="W(上)" Command="{Binding PreviousImageCommand}" Margin="2" Padding="5"/>
+	                    <Button Grid.Row="0" Grid.Column="2" Content="E(复制下一张)" Command="{Binding CopyNextDataCommand}" Margin="2" Padding="5"/>
+	                    
+
+	                    <Button Grid.Row="1" Grid.Column="0" Content="A(撤销)" Command="{Binding UndoOperationCommand}" Margin="2" Padding="5"/>
+	                    <Button Grid.Row="1" Grid.Column="1" Content="S(下)" Command="{Binding NextImageCommand}" Margin="2" Padding="5"/>
+	                    <Button Grid.Row="1" Grid.Column="2" Content="D(删除)" Command="{Binding DeleteImageCommand}" Margin="2" Padding="5"/>
 
 
-                    <Button Grid.Row="0" Grid.Column="1" Content="W(上)" Command="{Binding PreviousImageCommand}" Margin="2" Padding="5"/>
-                    
-
-                    <Button Grid.Row="1" Grid.Column="0" Content="A(撤销)" Command="{Binding UndoOperationCommand}" Margin="2" Padding="5"/>
-                    <Button Grid.Row="1" Grid.Column="1" Content="S(下)" Command="{Binding NextImageCommand}" Margin="2" Padding="5"/>
-                    <Button Grid.Row="1" Grid.Column="2" Content="D(删除)" Command="{Binding DeleteImageCommand}" Margin="2" Padding="5"/>
-                </Grid>
-            </GroupBox>
-        </Grid>
-    </Grid>
+	                    <Button Grid.Row="2" Grid.Column="0" Content="Z(保存Prompt)" Command="{Binding SavePromptCommand}" Margin="2" Padding="5"/>
+	                </Grid>
+	            </GroupBox>
+	        </Grid>
+	    </Grid>
 </UserControl>

@@ -21,27 +21,28 @@ namespace CyanTools.ViewModel
     public class DatasetManagerViewModel : INotifyPropertyChanged
     {
 
-        public event Action OnCanvasResetRequired;
+        public event Action? OnCanvasResetRequired;
 
         private readonly Dictionary<string, List<Rect>> _cachedEdits = new Dictionary<string, List<Rect>>();
-        private string _currentFilePath;
+        private string? _currentFilePath;
 
 
-        private BitmapImage _originalBitmap;
+        private BitmapImage? _originalBitmap;
         private bool _isPanning = false;
         private System.Windows.Point _panStartPoint;
         private bool _isDrawing = false;
         private System.Windows.Point _rectStartPoint;
-        private System.Windows.Shapes.Rectangle _currentDrawingRectangle;
+        private System.Windows.Shapes.Rectangle? _currentDrawingRectangle;
         private readonly List<System.Windows.Shapes.Rectangle> _drawnRectangles = new List<System.Windows.Shapes.Rectangle>();
         private readonly List<Rect> _finalRects = new List<Rect>();
 
 
-        private string _selectedImageFile;
-        private BitmapImage _currentImageSource;
-        private ImageFileItem _selectedImageItem;
+        private BitmapImage? _currentImageSource;
+        private DatasetDataItem? _selectedDataItem;
+        private string _currentTextContent = "";
         private bool _autoNext = true;
         private int _currentIndex = 0;
+        private readonly Random _random = new Random();
 
 
         private string _category1Path = "";
@@ -51,41 +52,36 @@ namespace CyanTools.ViewModel
         private string _category5Path = "";
 
 
-        public ObservableCollection<string> ImageFiles { get; } = new ObservableCollection<string>();
-        public ObservableCollection<ImageFileItem> ImageFilesWithOperations { get; } = new ObservableCollection<ImageFileItem>();
+        public ObservableCollection<DatasetDataItem> DataItemsWithOperations { get; } = new ObservableCollection<DatasetDataItem>();
 
 
-        public string SelectedImageFile
+        public DatasetDataItem? SelectedDataItem
         {
-            get => _selectedImageFile;
+            get => _selectedDataItem;
             set
             {
-                if (SetField(ref _selectedImageFile, value) && _selectedImageFile != null)
+                if (SetField(ref _selectedDataItem, value))
                 {
                     SaveChangesToCache();
-                    LoadImageFromFile(_selectedImageFile);
+                    LoadSelectedData();
+                    if (_selectedDataItem != null)
+                    {
+                        _currentIndex = DataItemsWithOperations.IndexOf(_selectedDataItem);
+                    }
                 }
             }
         }
 
-        public ImageFileItem SelectedImageItem
-        {
-            get => _selectedImageItem;
-            set
-            {
-                if (SetField(ref _selectedImageItem, value) && _selectedImageItem != null)
-                {
-                    SaveChangesToCache();
-                    LoadImageFromFile(_selectedImageItem.FullPath);
-                    _currentIndex = ImageFilesWithOperations.IndexOf(_selectedImageItem);
-                }
-            }
-        }
-
-        public BitmapImage CurrentImageSource
+        public BitmapImage? CurrentImageSource
         {
             get => _currentImageSource;
             private set => SetField(ref _currentImageSource, value);
+        }
+
+        public string CurrentTextContent
+        {
+            get => _currentTextContent;
+            set => SetField(ref _currentTextContent, value);
         }
 
         public bool AutoNext
@@ -134,6 +130,9 @@ namespace CyanTools.ViewModel
         public ICommand NextImageCommand { get; }
         public ICommand UndoOperationCommand { get; }
         public ICommand DeleteImageCommand { get; }
+        public ICommand RandomCopyCommand { get; }
+        public ICommand CopyNextDataCommand { get; }
+        public ICommand SavePromptCommand { get; }
         
 
         public DatasetManagerViewModel()
@@ -146,6 +145,10 @@ namespace CyanTools.ViewModel
             PreviousImageCommand = new RelayCommand(_ => PreviousImage());
             NextImageCommand = new RelayCommand(_ => NextImage());
             UndoOperationCommand = new RelayCommand(_ => UndoOperation());
+            DeleteImageCommand = new RelayCommand(_ => DeleteImage());
+            RandomCopyCommand = new RelayCommand(_ => RandomCopy(), _ => DataItemsWithOperations.Any());
+            CopyNextDataCommand = new RelayCommand(_ => CopyNextData(), _ => DataItemsWithOperations.Any());
+            SavePromptCommand = new RelayCommand(_ => SavePrompt(), _ => SelectedDataItem != null);
             
         }
 
@@ -168,30 +171,71 @@ namespace CyanTools.ViewModel
                 {
                     try
                     {
+                        SaveChangesToCache();
+
                         _cachedEdits.Clear();
+                        _currentFilePath = null;
+                        ResetState();
+                        CurrentImageSource = null;
+                        CurrentTextContent = "";
+                        OnCanvasResetRequired?.Invoke();
+
                         var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-                        var files = Directory.GetFiles(folderPath)
-                                             .Where(f => imageExtensions.Contains(System.IO.Path.GetExtension(f)))
-                                             .ToList();
-                        
-                        ImageFiles.Clear();
-                        ImageFilesWithOperations.Clear();
-                        
-                        foreach (var file in files)
+                        var itemsByBaseName = new Dictionary<string, DatasetDataItem>(StringComparer.OrdinalIgnoreCase);
+
+                        foreach (var file in Directory.GetFiles(folderPath))
                         {
-                            ImageFiles.Add(file);
-                            ImageFilesWithOperations.Add(new ImageFileItem
+                            string extension = System.IO.Path.GetExtension(file);
+                            if (extension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
                             {
-                                FileName = System.IO.Path.GetFileName(file),
-                                FullPath = file,
-                                Operation = ""
-                            });
+                                string baseName = System.IO.Path.GetFileNameWithoutExtension(file);
+                                if (!itemsByBaseName.TryGetValue(baseName, out var item))
+                                {
+                                    item = new DatasetDataItem { BaseName = baseName };
+                                    itemsByBaseName.Add(baseName, item);
+                                }
+                                item.TextPath = file;
+                                continue;
+                            }
+
+                            if (imageExtensions.Contains(extension))
+                            {
+                                string baseName = System.IO.Path.GetFileNameWithoutExtension(file);
+                                if (!itemsByBaseName.TryGetValue(baseName, out var item))
+                                {
+                                    item = new DatasetDataItem { BaseName = baseName };
+                                    itemsByBaseName.Add(baseName, item);
+                                }
+
+                                if (string.IsNullOrEmpty(item.ImagePath))
+                                {
+                                    item.ImagePath = file;
+                                }
+                                else
+                                {
+                                    string uniqueKey = System.IO.Path.GetFileName(file);
+                                    if (!itemsByBaseName.ContainsKey(uniqueKey))
+                                    {
+                                        itemsByBaseName.Add(uniqueKey, new DatasetDataItem { BaseName = uniqueKey, ImagePath = file });
+                                    }
+                                }
+                            }
                         }
 
-                        if (ImageFilesWithOperations.Any())
+                        DataItemsWithOperations.Clear();
+                        foreach (var item in itemsByBaseName.Values.OrderBy(i => i.BaseName, StringComparer.OrdinalIgnoreCase))
+                        {
+                            DataItemsWithOperations.Add(item);
+                        }
+
+                        if (DataItemsWithOperations.Any())
                         {
                             _currentIndex = 0;
-                            SelectedImageItem = ImageFilesWithOperations.First();
+                            SelectedDataItem = DataItemsWithOperations.First();
+                        }
+                        else
+                        {
+                            SelectedDataItem = null;
                         }
                     }
                     catch (Exception ex)
@@ -206,9 +250,9 @@ namespace CyanTools.ViewModel
         {
             SaveChangesToCache();
 
-            if (!ImageFilesWithOperations.Any())
+            if (!DataItemsWithOperations.Any())
             {
-                System.Windows.MessageBox.Show("没有需要处理的图片。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("没有需要处理的数据。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 return;
             }
 
@@ -217,68 +261,22 @@ namespace CyanTools.ViewModel
                 int processedCount = 0;
                 int errorCount = 0;
 
-                foreach (var item in ImageFilesWithOperations.ToList())
+                foreach (var item in DataItemsWithOperations.ToList())
                 {
                     if (string.IsNullOrEmpty(item.Operation)) continue;
 
                     try
                     {
-                        string sourcePath = item.FullPath;
-                        string txtPath = System.IO.Path.ChangeExtension(sourcePath, ".txt");
-
                         if (item.Operation == "删")
                         {
-
-                            if (CurrentImageSource != null && _currentFilePath == sourcePath)
-                            {
-                                CurrentImageSource = null;
-                            }
-                            File.Delete(sourcePath);
-                            if (File.Exists(txtPath))
-                            {
-                                File.Delete(txtPath);
-                            }
+                            DeleteDataItemFiles(item);
                         }
                         else
                         {
-
                             string targetFolder = GetCategoryFolder(item.Operation);
                             if (!string.IsNullOrEmpty(targetFolder) && Directory.Exists(targetFolder))
                             {
-                                _cachedEdits.TryGetValue(sourcePath, out List<Rect> rects);
-                                List<Rect> rectsToSave = rects ?? new List<Rect>();
-                                bool hasModifications = rectsToSave.Any();
-
-                                string targetImagePath = System.IO.Path.Combine(targetFolder, item.FileName);
-
-                                if (hasModifications)
-                                {
-
-                                    if (SaveImageWithRects(sourcePath, rectsToSave, targetImagePath))
-                                    {
-                                        ProcessAssociatedTxtFile(sourcePath, targetImagePath, true);
-                                        File.Delete(sourcePath);
-                                        if (File.Exists(txtPath))
-                                        {
-                                            File.Delete(txtPath);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        errorCount++;
-                                        continue;
-                                    }
-                                }
-                                else
-                                {
-
-                                    File.Move(sourcePath, targetImagePath);
-                                    if (File.Exists(txtPath))
-                                    {
-                                        string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.ChangeExtension(item.FileName, ".txt"));
-                                        File.Move(txtPath, targetTxtPath);
-                                    }
-                                }
+                                MoveDataItemFiles(item, targetFolder);
                             }
                             else
                             {
@@ -292,25 +290,217 @@ namespace CyanTools.ViewModel
                     catch (Exception ex)
                     {
                         errorCount++;
-                        System.Windows.MessageBox.Show($"处理文件 {item.FileName} 时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                        System.Windows.MessageBox.Show($"处理文件 {item.DisplayName} 时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                     }
                 }
 
 
-                ImageFiles.Clear();
-                ImageFilesWithOperations.Clear();
+                DataItemsWithOperations.Clear();
+                SelectedDataItem = null;
                 CurrentImageSource = null;
+                CurrentTextContent = "";
                 _currentIndex = 0;
                 _currentFilePath = null;
                 _cachedEdits.Clear();
+                ResetState();
                 OnCanvasResetRequired?.Invoke();
 
 
-                System.Windows.MessageBox.Show($"处理完成！\n\n成功处理: {processedCount} 个文件\n错误: {errorCount} 个文件", "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                System.Windows.MessageBox.Show($"处理完成！\n\n成功处理: {processedCount} 条数据\n错误: {errorCount} 条数据", "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show($"应用更改时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadSelectedData()
+        {
+            if (SelectedDataItem == null)
+            {
+                ClearCurrentImagePreview();
+                CurrentTextContent = "";
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(SelectedDataItem.ImagePath) && File.Exists(SelectedDataItem.ImagePath))
+            {
+                LoadImageFromFile(SelectedDataItem.ImagePath);
+            }
+            else
+            {
+                ClearCurrentImagePreview();
+            }
+
+            LoadTextFromFile(SelectedDataItem.TextPath);
+        }
+
+        private void ClearCurrentImagePreview()
+        {
+            CurrentImageSource = null;
+            _currentFilePath = null;
+            ResetState();
+            OnCanvasResetRequired?.Invoke();
+        }
+
+        private void LoadTextFromFile(string? filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                CurrentTextContent = "";
+                return;
+            }
+
+            try
+            {
+                CurrentTextContent = File.ReadAllText(filePath);
+            }
+            catch (Exception ex)
+            {
+                CurrentTextContent = "";
+                System.Windows.MessageBox.Show($"读取文本失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private void DeleteDataItemFiles(DatasetDataItem item)
+        {
+            if (!string.IsNullOrEmpty(item.ImagePath) && File.Exists(item.ImagePath))
+            {
+                if (CurrentImageSource != null && _currentFilePath == item.ImagePath)
+                {
+                    ClearCurrentImagePreview();
+                }
+                File.Delete(item.ImagePath);
+            }
+
+            if (!string.IsNullOrEmpty(item.TextPath) && File.Exists(item.TextPath))
+            {
+                File.Delete(item.TextPath);
+            }
+            else if (!string.IsNullOrEmpty(item.ImagePath))
+            {
+                string associatedTxtPath = System.IO.Path.ChangeExtension(item.ImagePath, ".txt");
+                if (File.Exists(associatedTxtPath))
+                {
+                    File.Delete(associatedTxtPath);
+                }
+            }
+        }
+
+        private void MoveDataItemFiles(DatasetDataItem item, string targetFolder)
+        {
+            if (!string.IsNullOrEmpty(item.ImagePath) && File.Exists(item.ImagePath))
+            {
+                string sourceImagePath = item.ImagePath;
+                _cachedEdits.TryGetValue(sourceImagePath, out List<Rect>? rects);
+                List<Rect> rectsToSave = rects ?? new List<Rect>();
+                bool hasModifications = rectsToSave.Any();
+
+                string targetImagePath = System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(sourceImagePath));
+
+                if (hasModifications)
+                {
+                    if (!SaveImageWithRects(sourceImagePath, rectsToSave, targetImagePath))
+                    {
+                        throw new IOException($"保存修改后的图片失败: {System.IO.Path.GetFileName(sourceImagePath)}");
+                    }
+
+                    ProcessAssociatedTxtFile(sourceImagePath, targetImagePath, true);
+                    File.Delete(sourceImagePath);
+
+                    string sourceTxtPath = System.IO.Path.ChangeExtension(sourceImagePath, ".txt");
+                    if (File.Exists(sourceTxtPath))
+                    {
+                        File.Delete(sourceTxtPath);
+                    }
+
+                    return;
+                }
+
+                File.Move(sourceImagePath, targetImagePath);
+
+                string? sourceTxtToMove = item.TextPath;
+                if (string.IsNullOrEmpty(sourceTxtToMove))
+                {
+                    string sourceTxtPath = System.IO.Path.ChangeExtension(sourceImagePath, ".txt");
+                    if (File.Exists(sourceTxtPath))
+                    {
+                        sourceTxtToMove = sourceTxtPath;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(sourceTxtToMove) && File.Exists(sourceTxtToMove))
+                {
+                    string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(sourceTxtToMove));
+                    File.Move(sourceTxtToMove, targetTxtPath);
+                }
+
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(item.TextPath) && File.Exists(item.TextPath))
+            {
+                string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(item.TextPath));
+                File.Move(item.TextPath, targetTxtPath);
+            }
+        }
+
+        private async void RandomCopy()
+        {
+            if (!DataItemsWithOperations.Any()) return;
+
+            int index = _random.Next(DataItemsWithOperations.Count);
+            SelectedDataItem = DataItemsWithOperations[index];
+
+            await ClipboardHelper.TrySetTextAsync(CurrentTextContent ?? string.Empty);
+        }
+
+        private async void CopyNextData()
+        {
+            if (!DataItemsWithOperations.Any()) return;
+
+            int currentIndex = SelectedDataItem != null ? DataItemsWithOperations.IndexOf(SelectedDataItem) : -1;
+            int nextIndex = (currentIndex + 1) % DataItemsWithOperations.Count;
+            SelectedDataItem = DataItemsWithOperations[nextIndex];
+
+            await ClipboardHelper.TrySetTextAsync(CurrentTextContent ?? string.Empty);
+        }
+
+        private void SavePrompt()
+        {
+            if (SelectedDataItem == null)
+            {
+                return;
+            }
+
+            string? targetPath = SelectedDataItem.TextPath;
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                if (!string.IsNullOrEmpty(SelectedDataItem.ImagePath))
+                {
+                    targetPath = System.IO.Path.ChangeExtension(SelectedDataItem.ImagePath, ".txt");
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show("当前数据没有可保存的 Prompt 文件。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            try
+            {
+                File.WriteAllText(targetPath, CurrentTextContent ?? string.Empty);
+
+                if (string.IsNullOrEmpty(SelectedDataItem.TextPath))
+                {
+                    SelectedDataItem.TextPath = targetPath;
+                }
+
+                System.Windows.MessageBox.Show("Prompt 已保存！", "成功", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"保存 Prompt 失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -320,9 +510,9 @@ namespace CyanTools.ViewModel
 
         private void SetImageCategory(string category)
         {
-            if (SelectedImageItem != null && !string.IsNullOrEmpty(category))
+            if (SelectedDataItem != null && !string.IsNullOrEmpty(category))
             {
-                SelectedImageItem.Operation = category;
+                SelectedDataItem.Operation = category;
                 
                 if (AutoNext)
                 {
@@ -354,27 +544,27 @@ namespace CyanTools.ViewModel
 
         private void PreviousImage()
         {
-            if (ImageFilesWithOperations.Any() && _currentIndex > 0)
+            if (DataItemsWithOperations.Any() && _currentIndex > 0)
             {
                 _currentIndex--;
-                SelectedImageItem = ImageFilesWithOperations[_currentIndex];
+                SelectedDataItem = DataItemsWithOperations[_currentIndex];
             }
         }
 
         private void NextImage()
         {
-            if (ImageFilesWithOperations.Any() && _currentIndex < ImageFilesWithOperations.Count - 1)
+            if (DataItemsWithOperations.Any() && _currentIndex < DataItemsWithOperations.Count - 1)
             {
                 _currentIndex++;
-                SelectedImageItem = ImageFilesWithOperations[_currentIndex];
+                SelectedDataItem = DataItemsWithOperations[_currentIndex];
             }
         }
 
         private void UndoOperation()
         {
-            if (SelectedImageItem != null)
+            if (SelectedDataItem != null)
             {
-                SelectedImageItem.Operation = "";
+                SelectedDataItem.Operation = "";
                 
                 if (AutoNext)
                 {
@@ -385,9 +575,9 @@ namespace CyanTools.ViewModel
 
         private void DeleteImage()
         {
-            if (SelectedImageItem != null)
+            if (SelectedDataItem != null)
             {
-                SelectedImageItem.Operation = "删";
+                SelectedDataItem.Operation = "删";
                 
                 if (AutoNext)
                 {
@@ -434,8 +624,17 @@ namespace CyanTools.ViewModel
                 case Key.D5:
                     SetImageCategory("5");
                     break;
+                case Key.Q:
+                    RandomCopy();
+                    break;
                 case Key.W:
                     PreviousImage();
+                    break;
+                case Key.E:
+                    CopyNextData();
+                    break;
+                case Key.Z:
+                    SavePrompt();
                     break;
                 case Key.S:
                     NextImage();

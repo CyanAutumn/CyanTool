@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using CyanTools.ViewModel;
+using System.Windows.Controls.Primitives;
 
 namespace CyanTools
 {
@@ -87,6 +88,10 @@ namespace CyanTools
 
         private void DatasetManagerView_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            if (Keyboard.FocusedElement is TextBoxBase tb && !tb.IsReadOnly)
+            {
+                return;
+            }
             ViewModel?.HandleKeyDown(e.Key);
         }
 

@@ -98,8 +98,6 @@ namespace CyanTools.ViewModel
         public ICommand SaveWorkflowCommand { get; }
         public ICommand DeleteWorkflowCommand { get; }
 
-        private bool _downloadersUnlocked;
-
         public string? SelectedWorkflowName
         {
             get => _selectedWorkflowName;
