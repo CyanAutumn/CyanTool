@@ -15,6 +15,70 @@ namespace CyanTools.Model
 
         [JsonPropertyName("temperature")]
         public double Temperature { get; set; } = 0.2;
+
+        [JsonPropertyName("stream")]
+        public bool Stream { get; set; } = false;
+
+        [JsonPropertyName("response_format")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ResponseFormat ResponseFormat { get; set; }
+    }
+
+    public class ResponseFormat
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("json_schema")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ResponseJsonSchema JsonSchema { get; set; }
+    }
+
+    public class ResponseJsonSchema
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("schema")]
+        public JsonSchemaDefinition Schema { get; set; }
+
+        [JsonPropertyName("strict")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool Strict { get; set; }
+    }
+
+    public class JsonSchemaDefinition
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("properties")]
+        public Dictionary<string, JsonSchemaProperty> Properties { get; set; }
+
+        [JsonPropertyName("required")]
+        public List<string> Required { get; set; }
+
+        [JsonPropertyName("additionalProperties")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool AdditionalProperties { get; set; }
+    }
+
+    public class JsonSchemaProperty
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("minimum")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Minimum { get; set; }
+
+        [JsonPropertyName("maximum")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Maximum { get; set; }
+
+        [JsonPropertyName("maxLength")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? MaxLength { get; set; }
     }
 
     public class Message

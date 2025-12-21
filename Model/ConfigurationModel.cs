@@ -9,5 +9,6 @@ namespace CyanTools.Model
         public string Prompt { get; set; }
         public string WorkingDirectory { get; set; }
         public List<string> Paths { get; set; }
+        public bool IsReasoning { get; set; }
     }
 }

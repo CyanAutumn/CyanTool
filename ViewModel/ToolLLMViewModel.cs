@@ -25,6 +25,7 @@ namespace CyanTools.ViewModel
         private string _path4 = "";
             private string _path5 = "";
         private bool _isRunEnabled = true;
+        private bool _isReasoning;
         private string _newConfigName;
         private ConfigurationModel _selectedConfig;
         private string _workingDirectory = "";
@@ -40,10 +41,12 @@ namespace CyanTools.ViewModel
         public string Path4 { get => _path4; set => SetField(ref _path4, value); }
         public string Path5 { get => _path5; set => SetField(ref _path5, value); }
         public bool IsRunEnabled { get => _isRunEnabled; set => SetField(ref _isRunEnabled, value); }
+        public bool IsReasoning { get => _isReasoning; set => SetField(ref _isReasoning, value); }
         
         public ObservableCollection<string> LogLines { get; }
         public ObservableCollection<ConfigurationModel> Configs { get; set; }
         public ObservableCollection<ModelData> ModelsList { get; set; }
+        public string LogText => string.Join(Environment.NewLine, LogLines);
 
         public string NewConfigName { get => _newConfigName; set => SetField(ref _newConfigName, value); }
 
@@ -77,6 +80,7 @@ namespace CyanTools.ViewModel
             Configs = new ObservableCollection<ConfigurationModel>();
             ModelsList = new ObservableCollection<ModelData>();
             LogLines = new ObservableCollection<string>();
+            LogLines.CollectionChanged += (_, __) => OnPropertyChanged(nameof(LogText));
 
             RunCommand = new RelayCommand(async _ => await ExecuteRunCommand(), _ => IsRunEnabled && !string.IsNullOrWhiteSpace(MainInput));
             SaveConfigCommand = new RelayCommand(_ => ExecuteSaveConfigCommand(), _ => !string.IsNullOrWhiteSpace(NewConfigName));
@@ -157,6 +161,7 @@ namespace CyanTools.ViewModel
             Path3 = config.Paths.Count > 2 ? config.Paths[2] : "";
             Path4 = config.Paths.Count > 3 ? config.Paths[3] : "";
             Path5 = config.Paths.Count > 4 ? config.Paths[4] : "";
+            IsReasoning = config.IsReasoning;
             NewConfigName = config.Name;
         }
 
@@ -167,7 +172,8 @@ namespace CyanTools.ViewModel
                 Name = NewConfigName,
                 Prompt = MainInput,
                 WorkingDirectory = WorkingDirectory,
-                Paths = new List<string> { Path1, Path2, Path3, Path4, Path5 }
+                Paths = new List<string> { Path1, Path2, Path3, Path4, Path5 },
+                IsReasoning = IsReasoning
             };
 
             try
@@ -209,7 +215,7 @@ namespace CyanTools.ViewModel
             try
             {
                 var destPaths = new List<string> { Path1, Path2, Path3, Path4, Path5 };
-                await _imageProcessor.ProcessImagesAsync(MainInput, WorkingDirectory, destPaths, progress);
+                await _imageProcessor.ProcessImagesAsync(MainInput, WorkingDirectory, destPaths, IsReasoning, progress);
                 AddLog("Execution finished.");
             }
             catch (Exception ex)

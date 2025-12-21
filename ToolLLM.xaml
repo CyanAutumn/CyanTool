@@ -37,6 +37,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <ComboBox Grid.Column="0" 
                           ItemsSource="{Binding ModelsList}"
@@ -49,6 +50,11 @@
                         Content="刷新"
                         Width="75" 
                         Margin="5,0,0,0"/>
+                <CheckBox Grid.Column="2"
+                          Content="Reasoning"
+                          IsChecked="{Binding IsReasoning}"
+                          Margin="10,0,0,0"
+                          VerticalAlignment="Center"/>
             </Grid>
 
             <TextBlock Grid.Row="2" Text="主输入:" Margin="0,10,0,5" FontWeight="Bold"/>
@@ -168,34 +174,14 @@
                 <TextBlock Text="输出日志" Margin="0,0,0,5" FontWeight="Bold" VerticalAlignment="Center"/>
                 <Button Grid.Column="1" Content="清空日志" Command="{Binding ClearLogCommand}" Padding="5,2"/>
             </Grid>
-            <ListBox ItemsSource="{Binding LogLines}"
-                     VirtualizingStackPanel.IsVirtualizing="True"
-                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+            <TextBox Text="{Binding LogText, Mode=OneWay}"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     IsReadOnly="True"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled"
                      BorderThickness="1"
-                     SelectionMode="Single"
-                     HorizontalContentAlignment="Stretch"
-                     Background="#FFEEEEEE">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Padding" Value="2"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter />
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </ListBox.ItemContainerStyle>
-            </ListBox>
+                     Background="#FFEEEEEE"/>
         </DockPanel>
     </Grid>
 </UserControl>
