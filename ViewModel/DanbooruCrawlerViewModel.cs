@@ -154,7 +154,7 @@ namespace CyanTools.ViewModel
                     foreach (var post in posts)
                     {
                         token.ThrowIfCancellationRequested();
-                        if (post.file_url != null)
+                        if (!string.IsNullOrWhiteSpace(GetBestFileUrl(post)))
                         {
                             await DownloadFileAsync(post, token);
                             await Task.Delay(5000, token);
@@ -187,7 +187,7 @@ namespace CyanTools.ViewModel
                 if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
                 {
                     var post = JsonConvert.DeserializeObject<Danbooru.Post>(response.Content);
-                    if (post?.file_url != null)
+                    if (post != null && !string.IsNullOrWhiteSpace(GetBestFileUrl(post)))
                     {
                         await DownloadFileAsync(post, CancellationToken.None);
                     }
@@ -216,8 +216,8 @@ namespace CyanTools.ViewModel
         {
             try
             {
-                var url = post.large_file_url ?? post.file_url;
-                if (url == null) return;
+                var url = GetBestFileUrl(post);
+                if (string.IsNullOrWhiteSpace(url)) return;
 
                 var fileName = Path.GetFileName(new Uri(url).LocalPath);
                 Directory.CreateDirectory(OutputDirectory);
@@ -259,6 +259,28 @@ namespace CyanTools.ViewModel
             {
                 LogText += $"{DateTime.Now:HH:mm:ss} - {text}\n";
             });
+        }
+
+        private static string? GetBestFileUrl(Danbooru.Post post)
+        {
+            if (!string.IsNullOrWhiteSpace(post.file_url))
+            {
+                return post.file_url;
+            }
+
+            var originalVariant = post.media_asset?.variants?
+                .FirstOrDefault(variant => string.Equals(variant.type, "original", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(originalVariant?.url))
+            {
+                return originalVariant.url;
+            }
+
+            if (!string.IsNullOrWhiteSpace(post.large_file_url))
+            {
+                return post.large_file_url;
+            }
+
+            return null;
         }
 
         public void LoadCookies()
