@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using CyanTools.Model;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using CyanTools;
 using Newtonsoft.Json;
@@ -63,6 +64,7 @@ namespace CyanTools.ViewModel
         private bool _isDownloading;
         private bool _hasShownCancelMessage;
         private string? _accessToken;
+        private Action<string>? _pipelineLogger;
 
         public string ArtistId
         {
@@ -240,6 +242,27 @@ namespace CyanTools.ViewModel
             catch (Exception ex)
             {
                 AppendLog($"获取刷新令牌失败: {ex.Message}");
+            }
+        }
+
+        public async Task RunPipelineAsync(PipelineContext context, CancellationToken token)
+        {
+            if (IsDownloading)
+            {
+                context.AppendLog("Pixiv下载器正在运行，已跳过管道执行。");
+                return;
+            }
+
+            _pipelineLogger = context.AppendLog;
+            IsDownloading = true;
+            try
+            {
+                await DownloadAsync(token);
+            }
+            finally
+            {
+                IsDownloading = false;
+                _pipelineLogger = null;
             }
         }
 
@@ -620,6 +643,7 @@ namespace CyanTools.ViewModel
             {
                 LogText += $"{DateTime.Now:HH:mm:ss} - {message}\n";
             });
+            _pipelineLogger?.Invoke($"[Pixiv] {message}");
         }
 
         private static string ComputeClientHash(string clientTime)

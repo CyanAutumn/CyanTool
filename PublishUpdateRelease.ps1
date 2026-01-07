@@ -23,6 +23,10 @@ param(
     [string]$OutDir = "dist",
     [string]$TagPrefix = "",
     [string]$Version = "",
+    [string]$ReleaseNotes = "",
+    [string]$ReleaseNotesFile = "",
+    [switch]$SkipReleaseNotesPrompt,
+    [string]$ChangelogPath = "changelog.txt",
     [string]$SevenZipPath = "",
     [string]$VersionXmlPath = "version.xml",
     [string]$VersionXmlBranch = "main",
@@ -301,16 +305,32 @@ function Build-VersionXml {
 "@
 }
 
+function Get-RawGitHubUrl {
+    param(
+        [string]$Repo,
+        [string]$Branch,
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ""
+    }
+
+    $normalizedPath = ($Path -replace "\\", "/").TrimStart("/")
+    return "https://raw.githubusercontent.com/$Repo/$Branch/$normalizedPath"
+}
+
 function Update-VersionXml {
     param(
         [string]$Repo,
         [string]$Path,
         [string]$Branch,
         [string]$Version,
-        [string]$DownloadUrl
+        [string]$DownloadUrl,
+        [string]$ChangelogUrl
     )
 
-    $defaultChangelog = "https://github.com/$Repo/releases/latest"
+    $defaultChangelog = if ([string]::IsNullOrWhiteSpace($ChangelogUrl)) { "https://github.com/$Repo/releases/latest" } else { $ChangelogUrl }
     $defaultMandatory = "false"
 
     $existing = Get-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch
@@ -321,7 +341,7 @@ function Update-VersionXml {
     if ($null -ne $existing -and -not [string]::IsNullOrWhiteSpace($existing.Content)) {
         try {
             [xml]$xml = $existing.Content
-            if ($xml.item.changelog) { $changelog = $xml.item.changelog }
+            if ([string]::IsNullOrWhiteSpace($ChangelogUrl) -and $xml.item.changelog) { $changelog = $xml.item.changelog }
             if ($xml.item.mandatory) { $mandatory = $xml.item.mandatory }
         }
         catch {
@@ -334,6 +354,60 @@ function Update-VersionXml {
     $sha = if ($null -ne $existing) { $existing.Sha } else { "" }
 
     Put-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch -Message "Update version.xml to $Version" -Content $newContent -Sha $sha
+}
+
+function Update-RepoTextFile {
+    param(
+        [string]$Repo,
+        [string]$Path,
+        [string]$Branch,
+        [string]$Message,
+        [string]$Content
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+
+    $existing = Get-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch
+    $sha = if ($null -ne $existing) { $existing.Sha } else { "" }
+
+    Put-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch -Message $Message -Content $Content -Sha $sha
+}
+
+function Read-ReleaseNotes {
+    param(
+        [string]$ReleaseNotes,
+        [string]$ReleaseNotesFile,
+        [switch]$SkipPrompt
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
+        if (-not (Test-Path -LiteralPath $ReleaseNotesFile -PathType Leaf)) {
+            throw "找不到 ReleaseNotes 文件：$ReleaseNotesFile"
+        }
+        return [System.IO.File]::ReadAllText($ReleaseNotesFile)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseNotes)) {
+        return $ReleaseNotes
+    }
+
+    if ($SkipPrompt) {
+        return ""
+    }
+
+    Write-Host "请输入更新说明（空行结束，直接回车跳过）"
+    $lines = @()
+    while ($true) {
+        $line = Read-Host
+        if ([string]::IsNullOrEmpty($line)) {
+            break
+        }
+        $lines += $line
+    }
+
+    return ($lines -join "`r`n")
 }
 
 $sevenZip = $null
@@ -425,13 +499,23 @@ Write-Host "输出文件: $zipArchivePath"
 
 Push-Location $BuildDir
 try {
+    $items = @()
     $files = Get-ChildItem -File | Select-Object -ExpandProperty Name
-    if ($null -eq $files -or $files.Count -eq 0) {
-        throw "目标目录下没有可打包的顶层文件：$BuildDir"
+    if ($null -ne $files) {
+        $items += $files
+    }
+
+    $runtimesDir = Join-Path $BuildDir "runtimes"
+    if (Test-Path -LiteralPath $runtimesDir -PathType Container) {
+        $items += "runtimes"
+    }
+
+    if ($items.Count -eq 0) {
+        throw "目标目录下没有可打包的顶层文件或 runtimes 目录：$BuildDir"
     }
 
     if ($null -ne $sevenZip) {
-        & $sevenZip a -tzip -mx=9 $zipArchivePath @files | Out-Host
+        & $sevenZip a -tzip -mx=9 $zipArchivePath @items | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "打包 zip 失败（7z exit code: $LASTEXITCODE）"
         }
@@ -441,12 +525,16 @@ try {
         if (-not $compress) {
             throw "未检测到 7z.exe 且当前 PowerShell 不支持 Compress-Archive。请安装 7-Zip，或升级 PowerShell。"
         }
-        Compress-Archive -Path $files -DestinationPath $zipArchivePath -Force
+        Compress-Archive -Path $items -DestinationPath $zipArchivePath -Force
     }
 }
 finally {
     Pop-Location
 }
+
+$releaseNotes = Read-ReleaseNotes -ReleaseNotes $ReleaseNotes -ReleaseNotesFile $ReleaseNotesFile -SkipPrompt:$SkipReleaseNotesPrompt
+$hasReleaseNotes = -not [string]::IsNullOrWhiteSpace($releaseNotes)
+$changelogUrl = Get-RawGitHubUrl -Repo $Repo -Branch $VersionXmlBranch -Path $ChangelogPath
 
 $releaseExists = $false
 $prevErrorActionPreference = $ErrorActionPreference
@@ -461,12 +549,21 @@ finally {
 
 if (-not $releaseExists) {
     Write-Host "创建 Release: $Repo $tag"
-    & gh release create $tag $zipArchivePath --repo $Repo --title $tag --notes "Auto upload $tag" | Out-Host
+    $notesToUse = if ($hasReleaseNotes) { $releaseNotes } else { "Auto upload $tag" }
+    & gh release create $tag $zipArchivePath --repo $Repo --title $tag --notes $notesToUse | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "创建 Release 失败（gh exit code: $LASTEXITCODE）"
     }
 }
 else {
+    if ($hasReleaseNotes) {
+        Write-Host "更新 Release 说明: $Repo $tag"
+        & gh release edit $tag --repo $Repo --notes $releaseNotes | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "更新 Release 说明失败（gh exit code: $LASTEXITCODE）"
+        }
+    }
+
     Write-Host "更新 Release 资产: $Repo $tag"
     & gh release upload $tag $zipArchivePath --repo $Repo --clobber | Out-Host
     if ($LASTEXITCODE -ne 0) {
@@ -474,10 +571,16 @@ else {
     }
 }
 
+if (-not [string]::IsNullOrWhiteSpace($ChangelogPath)) {
+    $changelogContent = if ($hasReleaseNotes) { $releaseNotes } else { "No release notes provided." }
+    Write-Host "更新更新日志: $Repo $VersionXmlBranch/$ChangelogPath"
+    Update-RepoTextFile -Repo $Repo -Path $ChangelogPath -Branch $VersionXmlBranch -Message "Update changelog to $Version" -Content $changelogContent
+}
+
 if (-not $SkipVersionXmlUpdate) {
     $downloadUrl = "https://github.com/$Repo/releases/download/$tag/$zipAssetName"
     Write-Host "更新 version.xml: $Repo $VersionXmlBranch/$VersionXmlPath"
-    Update-VersionXml -Repo $Repo -Path $VersionXmlPath -Branch $VersionXmlBranch -Version $Version -DownloadUrl $downloadUrl
+    Update-VersionXml -Repo $Repo -Path $VersionXmlPath -Branch $VersionXmlBranch -Version $Version -DownloadUrl $downloadUrl -ChangelogUrl $changelogUrl
 }
 
 $viewJson = & gh release view $tag --repo $Repo --json url 2>$null

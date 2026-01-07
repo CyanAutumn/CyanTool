@@ -1,0 +1,133 @@
+<UserControl x:Class="CyanTools.HandIntegrityFilterView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="输入目录:"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
+            </Grid>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+            <TextBlock Text="坏图输出目录:"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseOutputCommand}" Padding="10,5"/>
+            </Grid>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,10">
+            <TextBlock Text="好图输出目录:"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding GoodOutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseGoodOutputCommand}" Padding="10,5"/>
+            </Grid>
+            <TextBlock Text="留空则不输出好图" Foreground="Gray" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <GroupBox Grid.Row="3" Header="模型设置" Margin="0,0,0,10">
+            <StackPanel Margin="10">
+                <TextBlock Text="首次使用会自动下载模型（需联网）" Foreground="Gray" Margin="0,0,0,5"/>
+                <TextBlock Text="手部检测模型:"/>
+                <ComboBox ItemsSource="{Binding DetectorModels}"
+                          SelectedItem="{Binding SelectedDetectorModel}"
+                          DisplayMemberPath="DisplayName"
+                          Margin="0,5,0,10"/>
+
+                <TextBlock Text="手指关键点模型:"/>
+                <ComboBox ItemsSource="{Binding LandmarkModels}"
+                          SelectedItem="{Binding SelectedLandmarkModel}"
+                          DisplayMemberPath="DisplayName"
+                          Margin="0,5,0,10"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                    <TextBlock Text="检测输入尺寸:" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding DetectorInputSize}" Width="60" Margin="5,0"/>
+                    <TextBlock Text="置信度:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding DetectorConfidence}" Width="60" Margin="5,0"/>
+                    <TextBlock Text="IOU:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding DetectorIouThreshold}" Width="60" Margin="5,0"/>
+                    <TextBlock Text="手类ID:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding HandClassId}" Width="50" Margin="5,0"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                    <TextBlock Text="关键点输入尺寸:" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding LandmarkInputSize}" Width="60" Margin="5,0"/>
+                    <TextBlock Text="输入格式:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <ComboBox ItemsSource="{Binding LandmarkInputFormats}" SelectedItem="{Binding SelectedLandmarkInputFormat}" Width="80" Margin="5,0"/>
+                    <TextBlock Text="手存在阈值:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding MinPresenceScore}" Width="60" Margin="5,0"/>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Row="4" Header="筛选设置" Margin="0,0,0,10">
+            <StackPanel Margin="10">
+                <WrapPanel>
+                    <CheckBox Content="包含子目录" IsChecked="{Binding IncludeSubfolders}" Margin="0,0,20,5"/>
+                    <CheckBox Content="同时处理同名txt" IsChecked="{Binding CopyCompanionText}" Margin="0,0,20,5"/>
+                    <CheckBox Content="关键点缺失视为坏图" IsChecked="{Binding FailOnLandmarkMissing}" Margin="0,0,20,5"/>
+                </WrapPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                    <TextBlock Text="输出方式(好/坏共用):" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding OutputModes}" SelectedItem="{Binding SelectedOutputMode}" Width="80" Margin="5,0"/>
+                    <TextBlock Text="裁剪缩放:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding CropScale}" Width="60" Margin="5,0"/>
+                    <TextBlock Text="最小指长比例:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding MinFingerLengthRatio}" Width="60" Margin="5,0"/>
+                    <TextBlock Text="指尖伸展比:" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBox Text="{Binding MinTipToMcpRatio}" Width="60" Margin="5,0"/>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="开始筛选" Command="{Binding StartCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5"/>
+            <Button Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+            <ProgressBar Value="{Binding ProgressValue}" Minimum="0" Maximum="100" Height="20" Width="200" Margin="15,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <ListBox Grid.Row="6" ItemsSource="{Binding LogLines}"
+                 VirtualizingStackPanel.IsVirtualizing="True"
+                 VirtualizingStackPanel.VirtualizationMode="Recycling"
+                 BorderThickness="1"
+                 HorizontalContentAlignment="Stretch">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="NoWrap" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

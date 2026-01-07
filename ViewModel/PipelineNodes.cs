@@ -1,4 +1,7 @@
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using CyanTools.Pipeline;
 namespace CyanTools.ViewModel
 {
     public sealed class RealEsrganPipelineNode : CyanTools.Pipeline.SimplePipelineNode<RealEsrganViewModel>
@@ -90,5 +93,15 @@ namespace CyanTools.ViewModel
     public sealed class KemonoDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<KemonoDownloaderViewModel>
     {
         public KemonoDownloaderPipelineNode() : base("Kemono下载器") { }
+    }
+
+    public sealed class PixivDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<PixivDownloaderViewModel>
+    {
+        public PixivDownloaderPipelineNode() : base("Pixiv下载器") { }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token)
+        {
+            return Inner.RunPipelineAsync(context, token);
+        }
     }
 }

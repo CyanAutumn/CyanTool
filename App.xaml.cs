@@ -1,6 +1,8 @@
 ﻿using System.Configuration;
 using System.Data;
+using System.Net.Http;
 using System.Windows;
+using System.Threading.Tasks;
 using AutoUpdaterDotNET;
 
 namespace CyanTools
@@ -10,6 +12,11 @@ namespace CyanTools
 
     public partial class App : System.Windows.Application
     {
+        private static readonly HttpClient UpdateHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(10)
+        };
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -17,21 +24,40 @@ namespace CyanTools
             AutoUpdater.Start("https://raw.githubusercontent.com/CyanAutumn/CyanToolsUpdate/main/version.xml");
         }
 
-        private void AutoUpdaterOnCheckForUpdateEvent(UpdateInfoEventArgs args)
+        private async void AutoUpdaterOnCheckForUpdateEvent(UpdateInfoEventArgs args)
         {
-            if (args.IsUpdateAvailable)
+            if (args == null)
             {
-                var dialogResult = MessageBox.Show(
-                    $"发现新版本 {args.CurrentVersion} (当前版本: {args.InstalledVersion})。是否立即下载并安装？",
-                    "发现新版本",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
+                return;
+            }
 
-                if (dialogResult == MessageBoxResult.Yes)
+            if (args.Error != null)
+            {
+                MessageBox.Show(args.Error.Message, "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (!args.IsUpdateAvailable)
+            {
+                return;
+            }
+
+            var releaseNotes = await TryFetchReleaseNotesAsync(args.ChangelogURL);
+            var isMandatory = args.Mandatory != null && args.Mandatory.Value;
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var window = new UpdateWindow(
+                    args.CurrentVersion?.ToString() ?? string.Empty,
+                    args.InstalledVersion?.ToString() ?? string.Empty,
+                    releaseNotes,
+                    isMandatory);
+
+                var result = window.ShowDialog();
+                if (result == true)
                 {
                     try
                     {
-
                         if (AutoUpdater.DownloadUpdate(args))
                         {
                             Application.Current.Shutdown();
@@ -42,6 +68,29 @@ namespace CyanTools
                         MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
+            });
+        }
+
+        private static async Task<string> TryFetchReleaseNotesAsync(string changelogUrl)
+        {
+            if (string.IsNullOrWhiteSpace(changelogUrl))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                using var response = await UpdateHttpClient.GetAsync(changelogUrl);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return string.Empty;
+                }
+
+                return await response.Content.ReadAsStringAsync();
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
     }

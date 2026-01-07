@@ -11,6 +11,7 @@
 * [图片分辨率归类](170-image-bucketing.md)
 * [图片三分法](180-three-stage.md)
 * [分辨率筛选](190-resolution-filter.md)
+* [手指完整性筛选](195-hand-integrity-filter.md)
 * [保留指定文件](200-keep-files.md)
 * [导出视频帧](210-export-video-frames.md)
 * [图片元数据](220-image-metadata.md)
@@ -23,4 +24,3 @@
 * [Danbooru下载器](290-danbooru-downloader.md)
 * [Kemono下载器](300-kemono-downloader.md)
 * [Gemini图像生成](310-gemini-image-generation.md)
-
