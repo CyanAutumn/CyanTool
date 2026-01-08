@@ -309,9 +309,38 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                        <TextBlock Text="{Binding TagTokens.Count, StringFormat=标签数: {0}}"
-                                   Foreground="Gray"
-                                   VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="{Binding TagTokens.Count, StringFormat=标签数: {0}}"
+                                       Foreground="Gray"
+                                       Margin="0,0,0,4"/>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="tag" VerticalAlignment="Center" Margin="0,0,6,2"/>
+                                <TextBox Grid.Column="1"
+                                         MinWidth="120"
+                                         Text="{Binding ManualTagInput, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,6,2"/>
+                                <Button Grid.Column="2"
+                                        Grid.RowSpan="2"
+                                        Content="确认"
+                                        Padding="8,2"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding UpsertTagTranslationCommand}"/>
+                                <TextBlock Grid.Row="1" Text="翻译" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBox Grid.Row="1"
+                                         Grid.Column="1"
+                                         Text="{Binding ManualTagTranslation, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,6,0"/>
+                            </Grid>
+                        </StackPanel>
                     </DockPanel>
                     <Border Grid.Row="1" BorderBrush="#FFCCCCCC" BorderThickness="1" Padding="4" Background="White">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">

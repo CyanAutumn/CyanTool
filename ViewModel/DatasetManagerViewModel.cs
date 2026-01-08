@@ -53,6 +53,8 @@ namespace CyanTools.ViewModel
         private int _suggestionRequestId;
         private int _suppressSuggestionRefresh;
         private string _pendingTagText = string.Empty;
+        private string _manualTagInput = string.Empty;
+        private string _manualTagTranslation = string.Empty;
         private bool _isSuggestionOpen = false;
         private static readonly char[] TagSeparators = { ',', '，', '\r', '\n' };
 
@@ -110,6 +112,24 @@ namespace CyanTools.ViewModel
             set => SetField(ref _pendingTagText, value);
         }
 
+        public string ManualTagInput
+        {
+            get => _manualTagInput;
+            set
+            {
+                if (SetField(ref _manualTagInput, value))
+                {
+                    CommandManager.InvalidateRequerySuggested();
+                }
+            }
+        }
+
+        public string ManualTagTranslation
+        {
+            get => _manualTagTranslation;
+            set => SetField(ref _manualTagTranslation, value);
+        }
+
         public bool IsSuggestionOpen
         {
             get => _isSuggestionOpen;
@@ -161,6 +181,7 @@ namespace CyanTools.ViewModel
         public ICommand CopyNextDataCommand { get; }
         public ICommand SavePromptCommand { get; }
         public ICommand RemoveTagCommand { get; }
+        public ICommand UpsertTagTranslationCommand { get; }
         
 
         public DatasetManagerViewModel()
@@ -181,6 +202,8 @@ namespace CyanTools.ViewModel
             CopyNextDataCommand = new RelayCommand(_ => CopyNextData(), _ => DataItemsWithOperations.Any());
             SavePromptCommand = new RelayCommand(_ => SavePrompt(), _ => SelectedDataItem != null);
             RemoveTagCommand = new RelayCommand(param => RemoveTag(param as TagTokenViewModel));
+            UpsertTagTranslationCommand = new RelayCommand(async _ => await UpsertTagTranslationAsync(),
+                _ => !string.IsNullOrWhiteSpace(ManualTagInput));
 
             TagTokens.CollectionChanged += TagTokens_CollectionChanged;
             
@@ -851,6 +874,36 @@ namespace CyanTools.ViewModel
             else
             {
                 token.EditingText = suggestion.Tag;
+            }
+        }
+
+        private async Task UpsertTagTranslationAsync()
+        {
+            var normalized = TagDictionaryService.NormalizeTag(ManualTagInput);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return;
+            }
+
+            var translation = (ManualTagTranslation ?? string.Empty).Trim();
+
+            try
+            {
+                await _tagDictionaryService.UpsertTagTranslationAsync(normalized, translation, "custom", _tagCancellation.Token);
+                foreach (var token in TagTokens)
+                {
+                    if (string.Equals(token.Text, normalized, StringComparison.OrdinalIgnoreCase))
+                    {
+                        token.Translation = translation;
+                    }
+                }
+
+                ManualTagInput = string.Empty;
+                ManualTagTranslation = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"保存标签翻译失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 

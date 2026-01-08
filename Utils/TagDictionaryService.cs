@@ -228,6 +228,29 @@ namespace CyanTools.Utils
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task UpsertTagTranslationAsync(string tag, string translation, string? category, CancellationToken cancellationToken)
+        {
+            var normalized = NormalizeTag(tag);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return;
+            }
+
+            await using var connection = new SqliteConnection(GetConnectionString());
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "INSERT INTO tag_catalog(tag, category, count, translation) " +
+                "VALUES ($tag, $category, 0, $translation) " +
+                "ON CONFLICT(tag) DO UPDATE SET " +
+                "translation = excluded.translation, " +
+                "category = COALESCE(tag_catalog.category, excluded.category);";
+            command.Parameters.AddWithValue("$tag", normalized);
+            command.Parameters.AddWithValue("$category", category ?? "custom");
+            command.Parameters.AddWithValue("$translation", translation ?? string.Empty);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         public Task<string?> TranslateAndCacheAsync(string tag, CancellationToken cancellationToken)
         {
             if (!_enableTranslation)
