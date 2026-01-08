@@ -50,9 +50,9 @@ namespace CyanTools.ViewModel
         private readonly CancellationTokenSource _tagCancellation = new CancellationTokenSource();
         private CancellationTokenSource? _suggestionCancellation;
         private CancellationTokenSource? _translationCancellation;
+        private int _suggestionRequestId;
+        private int _suppressSuggestionRefresh;
         private string _pendingTagText = string.Empty;
-        private string _tagCatalogStatus = "标签库未初始化";
-        private bool _isTagCatalogBusy = false;
         private bool _isSuggestionOpen = false;
         private static readonly char[] TagSeparators = { ',', '，', '\r', '\n' };
 
@@ -110,24 +110,6 @@ namespace CyanTools.ViewModel
             set => SetField(ref _pendingTagText, value);
         }
 
-        public string TagCatalogStatus
-        {
-            get => _tagCatalogStatus;
-            set => SetField(ref _tagCatalogStatus, value);
-        }
-
-        public bool IsTagCatalogBusy
-        {
-            get => _isTagCatalogBusy;
-            set
-            {
-                if (SetField(ref _isTagCatalogBusy, value))
-                {
-                    CommandManager.InvalidateRequerySuggested();
-                }
-            }
-        }
-
         public bool IsSuggestionOpen
         {
             get => _isSuggestionOpen;
@@ -178,7 +160,6 @@ namespace CyanTools.ViewModel
         public ICommand RandomCopyCommand { get; }
         public ICommand CopyNextDataCommand { get; }
         public ICommand SavePromptCommand { get; }
-        public ICommand InitializeTagCatalogCommand { get; }
         public ICommand RemoveTagCommand { get; }
         
 
@@ -199,11 +180,9 @@ namespace CyanTools.ViewModel
             RandomCopyCommand = new RelayCommand(_ => RandomCopy(), _ => DataItemsWithOperations.Any());
             CopyNextDataCommand = new RelayCommand(_ => CopyNextData(), _ => DataItemsWithOperations.Any());
             SavePromptCommand = new RelayCommand(_ => SavePrompt(), _ => SelectedDataItem != null);
-            InitializeTagCatalogCommand = new RelayCommand(async _ => await InitializeTagCatalogAsync(), _ => !IsTagCatalogBusy);
             RemoveTagCommand = new RelayCommand(param => RemoveTag(param as TagTokenViewModel));
 
             TagTokens.CollectionChanged += TagTokens_CollectionChanged;
-            InitializeTagCatalogState();
             
         }
 
@@ -783,12 +762,20 @@ namespace CyanTools.ViewModel
 
         public void ClearSuggestions()
         {
+            _suggestionCancellation?.Cancel();
+            _suggestionCancellation = null;
+            Interlocked.Increment(ref _suggestionRequestId);
             TagSuggestions.Clear();
             IsSuggestionOpen = false;
         }
 
         public async Task RefreshSuggestionsAsync(string input)
         {
+            if (Interlocked.Exchange(ref _suppressSuggestionRefresh, 0) != 0)
+            {
+                return;
+            }
+
             var normalized = TagDictionaryService.NormalizeTag(input);
             if (string.IsNullOrWhiteSpace(normalized))
             {
@@ -799,6 +786,7 @@ namespace CyanTools.ViewModel
             _suggestionCancellation?.Cancel();
             _suggestionCancellation = new CancellationTokenSource();
             var cancellationToken = _suggestionCancellation.Token;
+            var requestId = Interlocked.Increment(ref _suggestionRequestId);
 
             try
             {
@@ -822,10 +810,20 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
+                if (requestId != _suggestionRequestId)
+                {
+                    return;
+                }
+
                 TagSuggestions.Clear();
                 foreach (var suggestion in results)
                 {
                     TagSuggestions.Add(suggestion);
+                }
+
+                if (requestId != _suggestionRequestId)
+                {
+                    return;
                 }
 
                 IsSuggestionOpen = TagSuggestions.Count > 0;
@@ -856,6 +854,11 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public void SuppressSuggestionRefresh()
+        {
+            Interlocked.Exchange(ref _suppressSuggestionRefresh, 1);
+        }
+
         private async Task EnsureTranslationAsync(TagTokenViewModel token)
         {
             if (token == null || string.IsNullOrWhiteSpace(token.Text))
@@ -878,46 +881,6 @@ namespace CyanTools.ViewModel
             finally
             {
                 token.IsTranslating = false;
-            }
-        }
-
-        private async void InitializeTagCatalogState()
-        {
-            try
-            {
-                var count = await _tagDictionaryService.GetCatalogCountAsync(_tagCancellation.Token);
-                TagCatalogStatus = count > 0 ? $"标签库已就绪 ({count} 条)" : "标签库未初始化";
-            }
-            catch
-            {
-                TagCatalogStatus = "标签库不可用";
-            }
-        }
-
-        private async Task InitializeTagCatalogAsync()
-        {
-            if (IsTagCatalogBusy)
-            {
-                return;
-            }
-
-            IsTagCatalogBusy = true;
-            TagCatalogStatus = "标签库初始化中...";
-
-            try
-            {
-                var progress = new Progress<string>(message => TagCatalogStatus = message);
-                var count = await _tagDictionaryService.DownloadAndImportCatalogAsync(progress, _tagCancellation.Token);
-                TagCatalogStatus = $"标签库已就绪 ({count} 条)";
-            }
-            catch (Exception ex)
-            {
-                TagCatalogStatus = "标签库初始化失败";
-                System.Windows.MessageBox.Show($"初始化标签库失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-            }
-            finally
-            {
-                IsTagCatalogBusy = false;
             }
         }
 

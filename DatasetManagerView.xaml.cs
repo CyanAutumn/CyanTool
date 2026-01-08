@@ -10,6 +10,7 @@ using System.Windows.Shapes;
 using CyanTools.ViewModel;
 using System.Windows.Controls.Primitives;
 using CyanTools.Model;
+using System.Windows.Threading;
 
 namespace CyanTools
 {
@@ -20,6 +21,7 @@ namespace CyanTools
         private TextBox? _activeTagTextBox;
         private TagTokenViewModel? _activeEditingToken;
         private bool _suppressTagInputTextChange;
+        private bool _suppressTagTextHandling;
         
         public DatasetManagerView()
         {
@@ -303,6 +305,12 @@ namespace CyanTools
             }
         }
 
+        private void SuppressTagTextHandlingOnce()
+        {
+            _suppressTagTextHandling = true;
+            Dispatcher.BeginInvoke(new Action(() => _suppressTagTextHandling = false), DispatcherPriority.Input);
+        }
+
         private void MoveSuggestionSelection(int delta)
         {
             if (!TagSuggestionPopup.IsOpen || TagSuggestionList.Items.Count == 0)
@@ -379,6 +387,11 @@ namespace CyanTools
                 return;
             }
 
+            if (_suppressTagTextHandling)
+            {
+                return;
+            }
+
             if (textBox.Text.IndexOfAny(new[] { ',', '，', '\r', '\n' }) >= 0)
             {
                 _suppressTagInputTextChange = true;
@@ -402,6 +415,11 @@ namespace CyanTools
         private async void TagEditBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (ViewModel == null || sender is not TextBox textBox)
+            {
+                return;
+            }
+
+            if (_suppressTagTextHandling)
             {
                 return;
             }
@@ -452,8 +470,11 @@ namespace CyanTools
                     return;
                 }
 
+                SuppressTagTextHandlingOnce();
+
                 if (TagSuggestionPopup.IsOpen)
                 {
+                    ViewModel.SuppressSuggestionRefresh();
                     TryApplySelectedSuggestion();
                 }
 
@@ -517,8 +538,11 @@ namespace CyanTools
                     return;
                 }
 
+                SuppressTagTextHandlingOnce();
+
                 if (TagSuggestionPopup.IsOpen)
                 {
+                    ViewModel.SuppressSuggestionRefresh();
                     TryApplySelectedSuggestion();
                 }
 
@@ -618,6 +642,7 @@ namespace CyanTools
                 return;
             }
 
+            ViewModel.SuppressSuggestionRefresh();
             if (TryApplySelectedSuggestion() && _activeTagTextBox != null)
             {
                 _activeTagTextBox.Focus();

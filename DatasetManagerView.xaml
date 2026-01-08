@@ -309,15 +309,9 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                        <TextBlock Text="{Binding TagCatalogStatus}" Foreground="Gray" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding TagTokens.Count, StringFormat=标签数: {0}}"
                                    Foreground="Gray"
-                                   Margin="12,0,0,0"
                                    VerticalAlignment="Center"/>
-                        <Button Content="初始化标签库"
-                                Command="{Binding InitializeTagCatalogCommand}"
-                                Margin="6,0,0,0"
-                                Padding="8,2"/>
                     </DockPanel>
                     <Border Grid.Row="1" BorderBrush="#FFCCCCCC" BorderThickness="1" Padding="4" Background="White">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
