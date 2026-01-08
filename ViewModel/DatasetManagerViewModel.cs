@@ -1,11 +1,14 @@
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -43,6 +46,15 @@ namespace CyanTools.ViewModel
         private bool _autoNext = true;
         private int _currentIndex = 0;
         private readonly Random _random = new Random();
+        private readonly TagDictionaryService _tagDictionaryService;
+        private readonly CancellationTokenSource _tagCancellation = new CancellationTokenSource();
+        private CancellationTokenSource? _suggestionCancellation;
+        private CancellationTokenSource? _translationCancellation;
+        private string _pendingTagText = string.Empty;
+        private string _tagCatalogStatus = "标签库未初始化";
+        private bool _isTagCatalogBusy = false;
+        private bool _isSuggestionOpen = false;
+        private static readonly char[] TagSeparators = { ',', '，', '\r', '\n' };
 
 
         private string _category1Path = "";
@@ -53,6 +65,8 @@ namespace CyanTools.ViewModel
 
 
         public ObservableCollection<DatasetDataItem> DataItemsWithOperations { get; } = new ObservableCollection<DatasetDataItem>();
+        public ObservableCollection<TagTokenViewModel> TagTokens { get; } = new ObservableCollection<TagTokenViewModel>();
+        public ObservableCollection<TagSuggestion> TagSuggestions { get; } = new ObservableCollection<TagSuggestion>();
 
 
         public DatasetDataItem? SelectedDataItem
@@ -88,6 +102,36 @@ namespace CyanTools.ViewModel
         {
             get => _autoNext;
             set => SetField(ref _autoNext, value);
+        }
+
+        public string PendingTagText
+        {
+            get => _pendingTagText;
+            set => SetField(ref _pendingTagText, value);
+        }
+
+        public string TagCatalogStatus
+        {
+            get => _tagCatalogStatus;
+            set => SetField(ref _tagCatalogStatus, value);
+        }
+
+        public bool IsTagCatalogBusy
+        {
+            get => _isTagCatalogBusy;
+            set
+            {
+                if (SetField(ref _isTagCatalogBusy, value))
+                {
+                    CommandManager.InvalidateRequerySuggested();
+                }
+            }
+        }
+
+        public bool IsSuggestionOpen
+        {
+            get => _isSuggestionOpen;
+            set => SetField(ref _isSuggestionOpen, value);
         }
 
         public string Category1Path
@@ -134,10 +178,14 @@ namespace CyanTools.ViewModel
         public ICommand RandomCopyCommand { get; }
         public ICommand CopyNextDataCommand { get; }
         public ICommand SavePromptCommand { get; }
+        public ICommand InitializeTagCatalogCommand { get; }
+        public ICommand RemoveTagCommand { get; }
         
 
         public DatasetManagerViewModel()
         {
+            _tagDictionaryService = new TagDictionaryService(enableTranslation: true);
+
             SelectFolderCommand = new RelayCommand(_ => SelectFolder());
             SaveAllCommand = new RelayCommand(_ => SaveAllChanges());
             SelectDataItemCommand = new RelayCommand(param => SelectDataItem(param as DatasetDataItem));
@@ -151,6 +199,11 @@ namespace CyanTools.ViewModel
             RandomCopyCommand = new RelayCommand(_ => RandomCopy(), _ => DataItemsWithOperations.Any());
             CopyNextDataCommand = new RelayCommand(_ => CopyNextData(), _ => DataItemsWithOperations.Any());
             SavePromptCommand = new RelayCommand(_ => SavePrompt(), _ => SelectedDataItem != null);
+            InitializeTagCatalogCommand = new RelayCommand(async _ => await InitializeTagCatalogAsync(), _ => !IsTagCatalogBusy);
+            RemoveTagCommand = new RelayCommand(param => RemoveTag(param as TagTokenViewModel));
+
+            TagTokens.CollectionChanged += TagTokens_CollectionChanged;
+            InitializeTagCatalogState();
             
         }
 
@@ -249,6 +302,8 @@ namespace CyanTools.ViewModel
                         {
                             SelectedDataItem = null;
                         }
+
+                        StartDatasetTagTranslation(DataItemsWithOperations.ToList());
                     }
                     catch (Exception ex)
                     {
@@ -360,17 +415,416 @@ namespace CyanTools.ViewModel
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
                 CurrentTextContent = "";
+                ResetTagEditor();
                 return;
             }
 
             try
             {
-                CurrentTextContent = File.ReadAllText(filePath);
+                var content = File.ReadAllText(filePath);
+                LoadTagsFromText(content);
             }
             catch (Exception ex)
             {
                 CurrentTextContent = "";
+                ResetTagEditor();
                 System.Windows.MessageBox.Show($"读取文本失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private void StartDatasetTagTranslation(IReadOnlyList<DatasetDataItem> items)
+        {
+            _translationCancellation?.Cancel();
+            _translationCancellation?.Dispose();
+            _translationCancellation = new CancellationTokenSource();
+            var cancellationToken = _translationCancellation.Token;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var tags = CollectTagsFromItems(items, cancellationToken);
+                    if (tags.Count == 0)
+                    {
+                        return;
+                    }
+
+                    var toTranslate = await _tagDictionaryService.GetTagsNeedingTranslationAsync(tags, cancellationToken).ConfigureAwait(false);
+                    foreach (var tag in toTranslate)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await _tagDictionaryService.TranslateAndCacheAsync(tag, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch
+                {
+                }
+            }, cancellationToken);
+        }
+
+        private static HashSet<string> CollectTagsFromItems(IEnumerable<DatasetDataItem> items, CancellationToken cancellationToken)
+        {
+            var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(item.TextPath) || !File.Exists(item.TextPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var content = File.ReadAllText(item.TextPath);
+                    foreach (var tag in SplitTags(content))
+                    {
+                        tags.Add(tag);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return tags;
+        }
+
+        private void LoadTagsFromText(string text)
+        {
+            ResetTagEditor();
+
+            foreach (var tag in SplitTags(text))
+            {
+                AddTagToken(tag);
+            }
+
+            UpdateCurrentTextContentFromTokens();
+        }
+
+        private void ResetTagEditor()
+        {
+            TagTokens.Clear();
+            PendingTagText = string.Empty;
+            ClearSuggestions();
+        }
+
+        private void TagTokens_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateCurrentTextContentFromTokens();
+        }
+
+        private void UpdateCurrentTextContentFromTokens()
+        {
+            CurrentTextContent = string.Join(", ", TagTokens.Select(token => token.Text).Where(text => !string.IsNullOrWhiteSpace(text)));
+        }
+
+        private bool AddTagToken(string rawTag)
+        {
+            var normalized = TagDictionaryService.NormalizeTag(rawTag);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return false;
+            }
+
+            var token = new TagTokenViewModel
+            {
+                Text = normalized,
+                EditingText = normalized
+            };
+
+            TagTokens.Add(token);
+            _ = _tagDictionaryService.UpsertCatalogTagAsync(normalized, "custom", _tagCancellation.Token);
+            return true;
+        }
+
+        private static IEnumerable<string> SplitTags(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                yield break;
+            }
+
+            var parts = text.Split(TagSeparators, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                var normalized = TagDictionaryService.NormalizeTag(part);
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    yield return normalized;
+                }
+            }
+        }
+
+        public void BeginEditTag(TagTokenViewModel? token)
+        {
+            if (token == null)
+            {
+                return;
+            }
+
+            foreach (var item in TagTokens)
+            {
+                if (item != token && item.IsEditing)
+                {
+                    item.IsEditing = false;
+                    item.EditingText = item.Text;
+                }
+            }
+
+            token.EditingText = token.Text;
+            token.IsEditing = true;
+        }
+
+        public void CommitEditTag(TagTokenViewModel? token)
+        {
+            if (token == null)
+            {
+                return;
+            }
+
+            var normalized = TagDictionaryService.NormalizeTag(token.EditingText);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                TagTokens.Remove(token);
+                return;
+            }
+
+            token.Text = normalized;
+            token.EditingText = normalized;
+            token.IsEditing = false;
+            UpdateCurrentTextContentFromTokens();
+            _ = _tagDictionaryService.UpsertCatalogTagAsync(normalized, "custom", _tagCancellation.Token);
+        }
+
+        public void CancelEditTag(TagTokenViewModel? token)
+        {
+            if (token == null)
+            {
+                return;
+            }
+
+            token.EditingText = token.Text;
+            token.IsEditing = false;
+        }
+
+        private void RemoveTag(TagTokenViewModel? token)
+        {
+            if (token == null)
+            {
+                return;
+            }
+
+            TagTokens.Remove(token);
+        }
+
+        public void CommitPendingTags(bool flushAll)
+        {
+            var text = PendingTagText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                PendingTagText = string.Empty;
+                ClearSuggestions();
+                return;
+            }
+
+            var parts = text.Split(TagSeparators, StringSplitOptions.None);
+            var lastIndex = parts.Length - 1;
+            var endIndex = flushAll ? parts.Length : Math.Max(0, lastIndex);
+
+            for (int i = 0; i < endIndex; i++)
+            {
+                AddTagToken(parts[i]);
+            }
+
+            if (flushAll)
+            {
+                PendingTagText = string.Empty;
+            }
+            else
+            {
+                PendingTagText = lastIndex >= 0 ? TagDictionaryService.NormalizeTag(parts[lastIndex]) : string.Empty;
+            }
+
+            ClearSuggestions();
+        }
+
+        public (string Remainder, int AddedCount) CommitPendingTagsFromInput(string input, bool flushAll)
+        {
+            var text = input ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                PendingTagText = string.Empty;
+                ClearSuggestions();
+                return (PendingTagText, 0);
+            }
+
+            var parts = text.Split(TagSeparators, StringSplitOptions.None);
+            var lastIndex = parts.Length - 1;
+            var endIndex = flushAll ? parts.Length : Math.Max(0, lastIndex);
+            int addedCount = 0;
+
+            for (int i = 0; i < endIndex; i++)
+            {
+                if (AddTagToken(parts[i]))
+                {
+                    addedCount++;
+                }
+            }
+
+            string remainder;
+            if (flushAll)
+            {
+                remainder = string.Empty;
+            }
+            else
+            {
+                remainder = lastIndex >= 0 ? TagDictionaryService.NormalizeTag(parts[lastIndex]) : string.Empty;
+            }
+
+            if (addedCount == 0)
+            {
+                bool hasTokenChars = text.Any(ch => !char.IsWhiteSpace(ch) && Array.IndexOf(TagSeparators, ch) < 0);
+                if (hasTokenChars)
+                {
+                    remainder = text;
+                }
+            }
+
+            PendingTagText = remainder;
+            ClearSuggestions();
+            return (PendingTagText, addedCount);
+        }
+
+        public void ClearSuggestions()
+        {
+            TagSuggestions.Clear();
+            IsSuggestionOpen = false;
+        }
+
+        public async Task RefreshSuggestionsAsync(string input)
+        {
+            var normalized = TagDictionaryService.NormalizeTag(input);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                ClearSuggestions();
+                return;
+            }
+
+            _suggestionCancellation?.Cancel();
+            _suggestionCancellation = new CancellationTokenSource();
+            var cancellationToken = _suggestionCancellation.Token;
+
+            try
+            {
+                var results = await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, "general", cancellationToken);
+                if (results.Count == 0)
+                {
+                    results = await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, null, cancellationToken);
+                }
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                TagSuggestions.Clear();
+                foreach (var suggestion in results)
+                {
+                    TagSuggestions.Add(suggestion);
+                }
+
+                IsSuggestionOpen = TagSuggestions.Count > 0;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch
+            {
+                IsSuggestionOpen = false;
+            }
+        }
+
+        public void ApplySuggestion(TagSuggestion suggestion, TagTokenViewModel? token)
+        {
+            if (suggestion == null)
+            {
+                return;
+            }
+
+            if (token == null)
+            {
+                PendingTagText = suggestion.Tag;
+            }
+            else
+            {
+                token.EditingText = suggestion.Tag;
+            }
+        }
+
+        private async Task EnsureTranslationAsync(TagTokenViewModel token)
+        {
+            if (token == null || string.IsNullOrWhiteSpace(token.Text))
+            {
+                return;
+            }
+
+            try
+            {
+                token.IsTranslating = true;
+                var translation = await _tagDictionaryService.TranslateAndCacheAsync(token.Text, _tagCancellation.Token);
+                if (!string.IsNullOrWhiteSpace(translation))
+                {
+                    token.Translation = translation;
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                token.IsTranslating = false;
+            }
+        }
+
+        private async void InitializeTagCatalogState()
+        {
+            try
+            {
+                var count = await _tagDictionaryService.GetCatalogCountAsync(_tagCancellation.Token);
+                TagCatalogStatus = count > 0 ? $"标签库已就绪 ({count} 条)" : "标签库未初始化";
+            }
+            catch
+            {
+                TagCatalogStatus = "标签库不可用";
+            }
+        }
+
+        private async Task InitializeTagCatalogAsync()
+        {
+            if (IsTagCatalogBusy)
+            {
+                return;
+            }
+
+            IsTagCatalogBusy = true;
+            TagCatalogStatus = "标签库初始化中...";
+
+            try
+            {
+                var progress = new Progress<string>(message => TagCatalogStatus = message);
+                var count = await _tagDictionaryService.DownloadAndImportCatalogAsync(progress, _tagCancellation.Token);
+                TagCatalogStatus = $"标签库已就绪 ({count} 条)";
+            }
+            catch (Exception ex)
+            {
+                TagCatalogStatus = "标签库初始化失败";
+                System.Windows.MessageBox.Show($"初始化标签库失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsTagCatalogBusy = false;
             }
         }
 
@@ -484,6 +938,9 @@ namespace CyanTools.ViewModel
             {
                 return;
             }
+
+            CommitPendingTags(true);
+            UpdateCurrentTextContentFromTokens();
 
             string? targetPath = SelectedDataItem.TextPath;
             if (string.IsNullOrEmpty(targetPath))

@@ -76,7 +76,20 @@ namespace CyanTools
                 return;
             }
 
-            var control = _navigationService.GetOrCreateControl(page);
+            UserControl? control = null;
+            try
+            {
+                control = _navigationService.GetOrCreateControl(page);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"页面加载失败: {page.DisplayName}\n{page.ControlType.FullName}\n\n{ex}",
+                    "错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+
             if (control != null)
             {
                 HomePageGrid.Visibility = Visibility.Collapsed;
@@ -168,4 +181,3 @@ namespace CyanTools
         }
     }
 }
-

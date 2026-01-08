@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using CyanTools.ViewModel;
 using System.Windows.Controls.Primitives;
+using CyanTools.Model;
 
 namespace CyanTools
 {
@@ -16,6 +17,9 @@ namespace CyanTools
     public partial class DatasetManagerView : UserControl
     {
         private DatasetManagerViewModel ViewModel => DataContext as DatasetManagerViewModel;
+        private TextBox? _activeTagTextBox;
+        private TagTokenViewModel? _activeEditingToken;
+        private bool _suppressTagInputTextChange;
         
         public DatasetManagerView()
         {
@@ -287,6 +291,302 @@ namespace CyanTools
             Down,
             Left,
             Right
+        }
+
+        private void SetActiveSuggestionTarget(TextBox? textBox)
+        {
+            _activeTagTextBox = textBox;
+            _activeEditingToken = textBox?.DataContext as TagTokenViewModel;
+            if (textBox != null)
+            {
+                TagSuggestionPopup.PlacementTarget = textBox;
+            }
+        }
+
+        private void MoveSuggestionSelection(int delta)
+        {
+            if (!TagSuggestionPopup.IsOpen || TagSuggestionList.Items.Count == 0)
+            {
+                return;
+            }
+
+            int nextIndex = TagSuggestionList.SelectedIndex + delta;
+            nextIndex = Math.Max(0, Math.Min(TagSuggestionList.Items.Count - 1, nextIndex));
+            TagSuggestionList.SelectedIndex = nextIndex;
+            TagSuggestionList.ScrollIntoView(TagSuggestionList.SelectedItem);
+        }
+
+        private bool TryApplySelectedSuggestion()
+        {
+            if (ViewModel == null || TagSuggestionList.Items.Count == 0)
+            {
+                return false;
+            }
+
+            var suggestion = TagSuggestionList.SelectedItem as TagSuggestion
+                             ?? TagSuggestionList.Items[0] as TagSuggestion;
+            if (suggestion == null)
+            {
+                return false;
+            }
+
+            ViewModel.ApplySuggestion(suggestion, _activeEditingToken);
+            return true;
+        }
+
+        private void TagChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is TagTokenViewModel token)
+            {
+                ViewModel?.BeginEditTag(token);
+                e.Handled = true;
+            }
+        }
+
+        private void TagDeleteButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private async void TagInputBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (ViewModel == null || sender is not TextBox textBox)
+            {
+                return;
+            }
+
+            if (_suppressTagInputTextChange)
+            {
+                return;
+            }
+
+            if (textBox.Text.IndexOfAny(new[] { ',', '，', '\r', '\n' }) >= 0)
+            {
+                _suppressTagInputTextChange = true;
+                bool flushAll = textBox.Text.IndexOfAny(new[] { '\r', '\n' }) >= 0;
+                var result = ViewModel.CommitPendingTagsFromInput(textBox.Text, flushAll);
+                if (result.AddedCount > 0 && !string.Equals(textBox.Text, result.Remainder, StringComparison.Ordinal))
+                {
+                    textBox.Text = result.Remainder;
+                    textBox.CaretIndex = textBox.Text.Length;
+                }
+                _suppressTagInputTextChange = false;
+            }
+            else
+            {
+                ViewModel.PendingTagText = textBox.Text;
+            }
+
+            await ViewModel.RefreshSuggestionsAsync(ViewModel.PendingTagText);
+        }
+
+        private async void TagEditBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (ViewModel == null || sender is not TextBox textBox)
+            {
+                return;
+            }
+
+            var token = textBox.DataContext as TagTokenViewModel;
+            if (token != null)
+            {
+                int separatorIndex = textBox.Text.IndexOfAny(new[] { ',', '，', '\r', '\n' });
+                if (separatorIndex >= 0)
+                {
+                    var trimmed = textBox.Text.Substring(0, separatorIndex);
+                    textBox.Text = trimmed;
+                    textBox.CaretIndex = textBox.Text.Length;
+                    ViewModel.CommitEditTag(token);
+                    return;
+                }
+            }
+
+            await ViewModel.RefreshSuggestionsAsync(textBox.Text);
+        }
+
+        private void TagInputBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (ViewModel == null)
+            {
+                return;
+            }
+
+            if (e.Key == Key.Down)
+            {
+                MoveSuggestionSelection(1);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Up)
+            {
+                MoveSuggestionSelection(-1);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter || e.Key == Key.Tab)
+            {
+                bool allowCommit = e.Key == Key.Tab || e.ImeProcessedKey == Key.None;
+                if (!allowCommit)
+                {
+                    return;
+                }
+
+                if (TagSuggestionPopup.IsOpen)
+                {
+                    TryApplySelectedSuggestion();
+                }
+
+                if (sender is TextBox textBox)
+                {
+                    _suppressTagInputTextChange = true;
+                    var result = ViewModel.CommitPendingTagsFromInput(textBox.Text, true);
+                    if (result.AddedCount > 0)
+                    {
+                        textBox.Text = string.Empty;
+                    }
+                    _suppressTagInputTextChange = false;
+                }
+                else
+                {
+                    ViewModel.CommitPendingTags(true);
+                }
+
+                e.Handled = true;
+                return;
+            }
+        }
+
+        private void TagEditBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (ViewModel == null || sender is not TextBox textBox)
+            {
+                return;
+            }
+
+            if (e.Key == Key.Down)
+            {
+                MoveSuggestionSelection(1);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Up)
+            {
+                MoveSuggestionSelection(-1);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter || e.Key == Key.Tab)
+            {
+                bool allowCommit = e.Key == Key.Tab || e.ImeProcessedKey == Key.None;
+                if (!allowCommit)
+                {
+                    return;
+                }
+
+                if (TagSuggestionPopup.IsOpen)
+                {
+                    TryApplySelectedSuggestion();
+                }
+
+                ViewModel.CommitEditTag(textBox.DataContext as TagTokenViewModel);
+                ViewModel.ClearSuggestions();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape)
+            {
+                ViewModel.CancelEditTag(textBox.DataContext as TagTokenViewModel);
+                ViewModel.ClearSuggestions();
+                e.Handled = true;
+            }
+        }
+
+        private void TagInputBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (ViewModel == null)
+            {
+                return;
+            }
+
+            if (TagSuggestionPopup.IsOpen && TagSuggestionPopup.IsMouseOver)
+            {
+                return;
+            }
+
+            if (sender is TextBox textBox)
+            {
+                _suppressTagInputTextChange = true;
+                var result = ViewModel.CommitPendingTagsFromInput(textBox.Text, true);
+                if (result.AddedCount > 0)
+                {
+                    textBox.Text = string.Empty;
+                }
+                _suppressTagInputTextChange = false;
+            }
+            else
+            {
+                ViewModel.CommitPendingTags(true);
+            }
+        }
+
+        private void TagEditBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (ViewModel == null || sender is not TextBox textBox)
+            {
+                return;
+            }
+
+            if (TagSuggestionPopup.IsOpen && TagSuggestionPopup.IsMouseOver)
+            {
+                return;
+            }
+
+            ViewModel.CommitEditTag(textBox.DataContext as TagTokenViewModel);
+            ViewModel.ClearSuggestions();
+        }
+
+        private void TagInputBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is TextBox textBox)
+            {
+                SetActiveSuggestionTarget(textBox);
+                _ = ViewModel?.RefreshSuggestionsAsync(textBox.Text);
+            }
+        }
+
+        private void TagEditBox_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox)
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+                SetActiveSuggestionTarget(textBox);
+                _ = ViewModel?.RefreshSuggestionsAsync(textBox.Text);
+            }
+        }
+
+        private void TagSuggestionList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (ViewModel == null)
+            {
+                return;
+            }
+
+            if (TryApplySelectedSuggestion() && _activeTagTextBox != null)
+            {
+                _activeTagTextBox.Focus();
+                _activeTagTextBox.CaretIndex = _activeTagTextBox.Text.Length;
+            }
+        }
+
+        private void TagSuggestionPopup_Closed(object sender, EventArgs e)
+        {
+            ViewModel?.ClearSuggestions();
         }
 
         private void MainCanvas_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
