@@ -42,8 +42,7 @@
                             BorderThickness="0"
                             Foreground="#FF666666"
                             Command="{Binding DataContext.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding}"
-                            PreviewMouseLeftButtonDown="TagDeleteButton_PreviewMouseLeftButtonDown"/>
+                            CommandParameter="{Binding}"/>
                     <TextBox x:Name="TagEditBox"
                              Grid.ColumnSpan="3"
                              Text="{Binding EditingText, UpdateSourceTrigger=PropertyChanged}"

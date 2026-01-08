@@ -453,7 +453,11 @@ namespace CyanTools.ViewModel
                     foreach (var tag in toTranslate)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        await _tagDictionaryService.TranslateAndCacheAsync(tag, cancellationToken).ConfigureAwait(false);
+                        var translated = await _tagDictionaryService.TranslateAndCacheAsync(tag, cancellationToken).ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            UpdateTokenTranslation(tag, translated);
+                        }
                     }
                 }
                 catch (OperationCanceledException)
@@ -492,6 +496,82 @@ namespace CyanTools.ViewModel
             return tags;
         }
 
+        private async Task RefreshTokenTranslationsAsync()
+        {
+            try
+            {
+                if (TagTokens.Count == 0)
+                {
+                    return;
+                }
+
+                var tags = TagTokens.Select(token => token.Text).Where(text => !string.IsNullOrWhiteSpace(text)).ToList();
+                if (tags.Count == 0)
+                {
+                    return;
+                }
+
+                var translations = await _tagDictionaryService.GetTranslationsAsync(tags, _tagCancellation.Token).ConfigureAwait(false);
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    foreach (var token in TagTokens)
+                    {
+                        if (translations.TryGetValue(token.Text, out var translation))
+                        {
+                            token.Translation = translation;
+                        }
+                        else
+                        {
+                            token.Translation = null;
+                        }
+                    }
+                });
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task LoadTokenTranslationAsync(TagTokenViewModel token)
+        {
+            if (token == null || string.IsNullOrWhiteSpace(token.Text))
+            {
+                return;
+            }
+
+            try
+            {
+                var translation = await _tagDictionaryService.GetTranslationAsync(token.Text, _tagCancellation.Token).ConfigureAwait(false);
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    token.Translation = translation;
+                });
+            }
+            catch
+            {
+            }
+        }
+
+        private void UpdateTokenTranslation(string tag, string translation)
+        {
+            if (string.IsNullOrWhiteSpace(tag) || string.IsNullOrWhiteSpace(translation))
+            {
+                return;
+            }
+
+            var normalized = TagDictionaryService.NormalizeTag(tag);
+            _ = Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                foreach (var token in TagTokens)
+                {
+                    if (string.Equals(token.Text, normalized, StringComparison.OrdinalIgnoreCase))
+                    {
+                        token.Translation = translation;
+                    }
+                }
+            });
+        }
+
         private void LoadTagsFromText(string text)
         {
             ResetTagEditor();
@@ -502,6 +582,7 @@ namespace CyanTools.ViewModel
             }
 
             UpdateCurrentTextContentFromTokens();
+            _ = RefreshTokenTranslationsAsync();
         }
 
         private void ResetTagEditor()
@@ -537,6 +618,7 @@ namespace CyanTools.ViewModel
 
             TagTokens.Add(token);
             _ = _tagDictionaryService.UpsertCatalogTagAsync(normalized, "custom", _tagCancellation.Token);
+            _ = LoadTokenTranslationAsync(token);
             return true;
         }
 
@@ -597,6 +679,7 @@ namespace CyanTools.ViewModel
             token.IsEditing = false;
             UpdateCurrentTextContentFromTokens();
             _ = _tagDictionaryService.UpsertCatalogTagAsync(normalized, "custom", _tagCancellation.Token);
+            _ = LoadTokenTranslationAsync(token);
         }
 
         public void CancelEditTag(TagTokenViewModel? token)
@@ -719,10 +802,20 @@ namespace CyanTools.ViewModel
 
             try
             {
-                var results = await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, "general", cancellationToken);
+                bool searchTranslation = TagDictionaryService.ContainsCjk(input);
+                var translationQuery = searchTranslation ? TagDictionaryService.ExtractCjkQuery(input) : normalized;
+                if (searchTranslation && string.IsNullOrWhiteSpace(translationQuery))
+                {
+                    translationQuery = normalized;
+                }
+                var results = searchTranslation
+                    ? await _tagDictionaryService.GetSuggestionsByTranslationAsync(translationQuery, 20, "general", cancellationToken)
+                    : await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, "general", cancellationToken);
                 if (results.Count == 0)
                 {
-                    results = await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, null, cancellationToken);
+                    results = searchTranslation
+                        ? await _tagDictionaryService.GetSuggestionsByTranslationAsync(translationQuery, 20, null, cancellationToken)
+                        : await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, null, cancellationToken);
                 }
                 if (cancellationToken.IsCancellationRequested)
                 {

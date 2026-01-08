@@ -336,16 +336,35 @@ namespace CyanTools
 
         private void TagChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.OriginalSource is DependencyObject source)
+            {
+                var deleteButton = FindAncestor<Button>(source);
+                if (deleteButton?.Name == "TagDeleteButton")
+                {
+                    return;
+                }
+            }
+
             if (sender is FrameworkElement element && element.DataContext is TagTokenViewModel token)
             {
                 ViewModel?.BeginEditTag(token);
                 e.Handled = true;
             }
         }
-
-        private void TagDeleteButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        
+        private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
         {
-            e.Handled = true;
+            while (node != null)
+            {
+                if (node is T match)
+                {
+                    return match;
+                }
+
+                node = VisualTreeHelper.GetParent(node);
+            }
+
+            return null;
         }
 
         private async void TagInputBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -440,8 +459,19 @@ namespace CyanTools
 
                 if (sender is TextBox textBox)
                 {
+                    var inputText = ViewModel.PendingTagText;
+                    if (string.IsNullOrWhiteSpace(inputText))
+                    {
+                        inputText = textBox.Text;
+                    }
+
                     _suppressTagInputTextChange = true;
-                    var result = ViewModel.CommitPendingTagsFromInput(textBox.Text, true);
+                    var result = ViewModel.CommitPendingTagsFromInput(inputText ?? string.Empty, true);
+                    if (!string.Equals(textBox.Text, result.Remainder, StringComparison.Ordinal))
+                    {
+                        textBox.Text = result.Remainder;
+                        textBox.CaretIndex = textBox.Text.Length;
+                    }
                     if (result.AddedCount > 0)
                     {
                         textBox.Text = string.Empty;
@@ -520,8 +550,19 @@ namespace CyanTools
 
             if (sender is TextBox textBox)
             {
+                var inputText = ViewModel.PendingTagText;
+                if (string.IsNullOrWhiteSpace(inputText))
+                {
+                    inputText = textBox.Text;
+                }
+
                 _suppressTagInputTextChange = true;
-                var result = ViewModel.CommitPendingTagsFromInput(textBox.Text, true);
+                var result = ViewModel.CommitPendingTagsFromInput(inputText ?? string.Empty, true);
+                if (!string.Equals(textBox.Text, result.Remainder, StringComparison.Ordinal))
+                {
+                    textBox.Text = result.Remainder;
+                    textBox.CaretIndex = textBox.Text.Length;
+                }
                 if (result.AddedCount > 0)
                 {
                     textBox.Text = string.Empty;

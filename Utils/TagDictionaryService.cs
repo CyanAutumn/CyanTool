@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CyanTools.Model;
@@ -91,6 +92,49 @@ namespace CyanTools.Utils
             return suggestions;
         }
 
+        public async Task<IReadOnlyList<TagSuggestion>> GetSuggestionsByTranslationAsync(string prefix, int limit, string? category, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(prefix))
+            {
+                return Array.Empty<Model.TagSuggestion>();
+            }
+
+            var normalized = NormalizeTag(prefix);
+            var suggestions = new List<TagSuggestion>();
+
+            await using var connection = new SqliteConnection(GetConnectionString());
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "SELECT t.tag, t.translation " +
+                "FROM tag_catalog t " +
+                "WHERE t.translation IS NOT NULL " +
+                "AND t.translation LIKE '%' || $prefix || '%' COLLATE NOCASE " +
+                (string.IsNullOrWhiteSpace(category) ? string.Empty : "AND t.category = $category ") +
+                "ORDER BY t.count DESC, t.tag " +
+                "LIMIT $limit";
+
+            command.Parameters.AddWithValue("$prefix", normalized);
+            command.Parameters.AddWithValue("$limit", limit);
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                command.Parameters.AddWithValue("$category", category);
+            }
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                suggestions.Add(new TagSuggestion
+                {
+                    Tag = reader.GetString(0),
+                    Translation = reader.IsDBNull(1) ? null : reader.GetString(1)
+                });
+            }
+
+            return suggestions;
+        }
+
         public async Task<string?> GetTranslationAsync(string tag, CancellationToken cancellationToken)
         {
             var normalized = NormalizeTag(tag);
@@ -106,6 +150,61 @@ namespace CyanTools.Utils
             command.Parameters.AddWithValue("$tag", normalized);
             var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             return result as string;
+        }
+
+        public async Task<IReadOnlyDictionary<string, string>> GetTranslationsAsync(IEnumerable<string> tags, CancellationToken cancellationToken)
+        {
+            if (tags == null)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var normalizedTags = tags
+                .Select(NormalizeTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (normalizedTags.Count == 0)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            await using var connection = new SqliteConnection(GetConnectionString());
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            const int batchSize = 400;
+            for (int offset = 0; offset < normalizedTags.Count; offset += batchSize)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var batch = normalizedTags.Skip(offset).Take(batchSize).ToList();
+                await using var command = connection.CreateCommand();
+                var parameterNames = new List<string>(batch.Count);
+                for (int i = 0; i < batch.Count; i++)
+                {
+                    var paramName = "$t" + i;
+                    command.Parameters.AddWithValue(paramName, batch[i]);
+                    parameterNames.Add(paramName);
+                }
+
+                command.CommandText =
+                    $"SELECT tag, translation FROM tag_catalog WHERE tag IN ({string.Join(", ", parameterNames)}) " +
+                    "AND translation IS NOT NULL AND translation <> ''";
+
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var tag = reader.GetString(0);
+                    var translation = reader.GetString(1);
+                    if (!string.IsNullOrWhiteSpace(translation))
+                    {
+                        result[tag] = translation;
+                    }
+                }
+            }
+
+            return result;
         }
 
         public async Task UpsertCatalogTagAsync(string tag, string? category, CancellationToken cancellationToken)
@@ -174,6 +273,43 @@ namespace CyanTools.Utils
             }
 
             return trimmed;
+        }
+
+        public static bool ContainsCjk(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            foreach (var ch in value)
+            {
+                if (IsCjkChar(ch))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static string ExtractCjkQuery(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder();
+            foreach (var ch in value)
+            {
+                if (IsCjkChar(ch))
+                {
+                    builder.Append(ch);
+                }
+            }
+
+            return builder.ToString();
         }
 
         public void Dispose()
@@ -591,6 +727,26 @@ namespace CyanTools.Utils
                 ") " +
                 "WHERE translation IS NULL OR translation = '';";
             migrateCommand.ExecuteNonQuery();
+        }
+
+        private static bool IsCjkChar(char ch)
+        {
+            if (ch >= 0x4E00 && ch <= 0x9FFF)
+            {
+                return true;
+            }
+
+            if (ch >= 0x3400 && ch <= 0x4DBF)
+            {
+                return true;
+            }
+
+            if (ch >= 0xF900 && ch <= 0xFAFF)
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }
