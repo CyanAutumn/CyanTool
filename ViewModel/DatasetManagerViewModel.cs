@@ -123,6 +123,7 @@ namespace CyanTools.ViewModel
 
         public ICommand SelectFolderCommand { get; }
         public ICommand SaveAllCommand { get; }
+        public ICommand SelectDataItemCommand { get; }
         
         public ICommand SetCategoryCommand { get; }
         public ICommand SelectCategoryFolderCommand { get; }
@@ -139,6 +140,7 @@ namespace CyanTools.ViewModel
         {
             SelectFolderCommand = new RelayCommand(_ => SelectFolder());
             SaveAllCommand = new RelayCommand(_ => SaveAllChanges());
+            SelectDataItemCommand = new RelayCommand(param => SelectDataItem(param as DatasetDataItem));
             
             SetCategoryCommand = new RelayCommand(param => SetImageCategory(param?.ToString()));
             SelectCategoryFolderCommand = new RelayCommand(param => SelectCategoryFolder(param?.ToString()));
@@ -150,6 +152,16 @@ namespace CyanTools.ViewModel
             CopyNextDataCommand = new RelayCommand(_ => CopyNextData(), _ => DataItemsWithOperations.Any());
             SavePromptCommand = new RelayCommand(_ => SavePrompt(), _ => SelectedDataItem != null);
             
+        }
+
+        private void SelectDataItem(DatasetDataItem? item)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            SelectedDataItem = item;
         }
 
         #region 文件加载与保存
@@ -627,22 +639,16 @@ namespace CyanTools.ViewModel
                 case Key.Q:
                     RandomCopy();
                     break;
-                case Key.W:
-                    PreviousImage();
-                    break;
                 case Key.E:
                     CopyNextData();
                     break;
                 case Key.Z:
-                    SavePrompt();
-                    break;
-                case Key.S:
-                    NextImage();
-                    break;
-                case Key.A:
                     UndoOperation();
                     break;
-                case Key.D:
+                case Key.X:
+                    SavePrompt();
+                    break;
+                case Key.C:
                     DeleteImage();
                     break;
             }

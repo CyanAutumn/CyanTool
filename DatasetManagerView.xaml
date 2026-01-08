@@ -5,11 +5,16 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:CyanTools"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
     <UserControl.DataContext>
         <viewModel:DatasetManagerViewModel/>
     </UserControl.DataContext>
+    <UserControl.Resources>
+        <utils:ReferenceEqualsMultiConverter x:Key="ReferenceEqualsMultiConverter"/>
+        <utils:ImagePathThumbnailConverter x:Key="ImagePathThumbnailConverter"/>
+    </UserControl.Resources>
     <Grid KeyDown="DatasetManagerView_KeyDown" Focusable="True">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" MinWidth="150"/>
@@ -31,23 +36,88 @@
             </Grid>
 
             <TextBlock DockPanel.Dock="Top" Text="数据列表" FontWeight="Bold" Margin="0,0,0,5"/>
-            <DataGrid x:Name="ImageFilesDataGrid" 
-                      ItemsSource="{Binding DataItemsWithOperations}" 
-                      SelectedItem="{Binding SelectedDataItem}"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      CanUserDeleteRows="False"
-                      CanUserReorderColumns="False"
-                      CanUserResizeRows="False"
-                      CanUserSortColumns="False"
-                      HeadersVisibility="Column"
-                      GridLinesVisibility="All"
-                      SelectionMode="Single">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="操作" Binding="{Binding Operation}" Width="50" IsReadOnly="True"/>
-                <DataGridTextColumn Header="文件名" Binding="{Binding DisplayName}" Width="*" IsReadOnly="True"/>
-            </DataGrid.Columns>
-            </DataGrid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="DataItemsList" ItemsSource="{Binding DataItemsWithOperations}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel IsItemsHost="True" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.SelectDataItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Width="100"
+                                    Height="130"
+                                    Margin="4"
+                                    Padding="0"
+                                    BorderThickness="0"
+                                    Background="Transparent"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch"
+                                    Focusable="False">
+                                <Border>
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
+                                            <Setter Property="Background" Value="White"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
+                                            <Setter Property="CornerRadius" Value="4"/>
+                                            <Setter Property="Padding" Value="4"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Value="True">
+                                                    <DataTrigger.Binding>
+                                                        <MultiBinding Converter="{StaticResource ReferenceEqualsMultiConverter}">
+                                                            <Binding />
+                                                            <Binding Path="DataContext.SelectedDataItem" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                        </MultiBinding>
+                                                    </DataTrigger.Binding>
+                                                    <Setter Property="BorderBrush" Value="#FF409EFF"/>
+                                                    <Setter Property="Background" Value="#FFEAF3FF"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid>
+                                            <Border Background="#FFEFEFEF" CornerRadius="3">
+                                                <Image Width="80"
+                                                       Height="80"
+                                                       Stretch="UniformToFill"
+                                                       Source="{Binding ImagePath, Converter={StaticResource ImagePathThumbnailConverter}, ConverterParameter=96}"/>
+                                            </Border>
+                                            <Border x:Name="OperationBadge"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Top"
+                                                    Margin="2"
+                                                    Background="#CC333333"
+                                                    CornerRadius="2"
+                                                    Padding="2">
+                                                <TextBlock Text="{Binding Operation}" Foreground="White" FontSize="10"/>
+                                            </Border>
+                                        </Grid>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding ImageDisplayName}"
+                                                   FontSize="11"
+                                                   Margin="0,4,0,0"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding ImageDisplayName}"/>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Operation}" Value="">
+                                    <Setter TargetName="OperationBadge" Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </DockPanel>
 
 
@@ -180,19 +250,21 @@
 	                    </Grid.ColumnDefinitions>
 	
 
-	                    <Button Grid.Row="0" Grid.Column="0" Content="Q(随机复制)" Command="{Binding RandomCopyCommand}" Margin="2" Padding="5"/>
-	                    <Button Grid.Row="0" Grid.Column="1" Content="W(上)" Command="{Binding PreviousImageCommand}" Margin="2" Padding="5"/>
-	                    <Button Grid.Row="0" Grid.Column="2" Content="E(复制下一张)" Command="{Binding CopyNextDataCommand}" Margin="2" Padding="5"/>
-	                    
+                    <Button Grid.Row="0" Grid.Column="0" Content="Q(随机复制)" Command="{Binding RandomCopyCommand}" Margin="2" Padding="5"/>
+                    <Button Grid.Row="0" Grid.Column="1" Content="W(上)" Click="ThumbnailMoveButton_Click" Tag="Up" Margin="2" Padding="5"/>
+                    <Button Grid.Row="0" Grid.Column="2" Content="E(复制下一张)" Command="{Binding CopyNextDataCommand}" Margin="2" Padding="5"/>
+                    
 
-	                    <Button Grid.Row="1" Grid.Column="0" Content="A(撤销)" Command="{Binding UndoOperationCommand}" Margin="2" Padding="5"/>
-	                    <Button Grid.Row="1" Grid.Column="1" Content="S(下)" Command="{Binding NextImageCommand}" Margin="2" Padding="5"/>
-	                    <Button Grid.Row="1" Grid.Column="2" Content="D(删除)" Command="{Binding DeleteImageCommand}" Margin="2" Padding="5"/>
+                    <Button Grid.Row="1" Grid.Column="0" Content="A(左)" Click="ThumbnailMoveButton_Click" Tag="Left" Margin="2" Padding="5"/>
+                    <Button Grid.Row="1" Grid.Column="1" Content="S(下)" Click="ThumbnailMoveButton_Click" Tag="Down" Margin="2" Padding="5"/>
+                    <Button Grid.Row="1" Grid.Column="2" Content="D(右)" Click="ThumbnailMoveButton_Click" Tag="Right" Margin="2" Padding="5"/>
 
 
-	                    <Button Grid.Row="2" Grid.Column="0" Content="Z(保存Prompt)" Command="{Binding SavePromptCommand}" Margin="2" Padding="5"/>
-	                </Grid>
-	            </GroupBox>
-	        </Grid>
+                    <Button Grid.Row="2" Grid.Column="0" Content="Z(撤销)" Command="{Binding UndoOperationCommand}" Margin="2" Padding="5"/>
+                    <Button Grid.Row="2" Grid.Column="1" Content="X(保存Prompt)" Command="{Binding SavePromptCommand}" Margin="2" Padding="5"/>
+                    <Button Grid.Row="2" Grid.Column="2" Content="C(删除)" Command="{Binding DeleteImageCommand}" Margin="2" Padding="5"/>
+                </Grid>
+            </GroupBox>
+        </Grid>
 	    </Grid>
 </UserControl>

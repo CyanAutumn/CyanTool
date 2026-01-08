@@ -25,6 +25,7 @@ namespace CyanTools.Model
                 if (SetField(ref _baseName, value))
                 {
                     OnPropertyChanged(nameof(DisplayName));
+                    OnPropertyChanged(nameof(ImageDisplayName));
                 }
             }
         }
@@ -37,6 +38,7 @@ namespace CyanTools.Model
                 if (SetField(ref _imagePath, value))
                 {
                     OnPropertyChanged(nameof(DisplayName));
+                    OnPropertyChanged(nameof(ImageDisplayName));
                 }
             }
         }
@@ -49,6 +51,7 @@ namespace CyanTools.Model
                 if (SetField(ref _textPath, value))
                 {
                     OnPropertyChanged(nameof(DisplayName));
+                    OnPropertyChanged(nameof(ImageDisplayName));
                 }
             }
         }
@@ -73,6 +76,24 @@ namespace CyanTools.Model
                 if (!string.IsNullOrEmpty(txtName))
                 {
                     return txtName;
+                }
+
+                return BaseName;
+            }
+        }
+
+        public string ImageDisplayName
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(ImagePath))
+                {
+                    return Path.GetFileName(ImagePath);
+                }
+
+                if (!string.IsNullOrEmpty(TextPath))
+                {
+                    return Path.GetFileName(TextPath);
                 }
 
                 return BaseName;
