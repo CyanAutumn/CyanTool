@@ -55,6 +55,9 @@ namespace CyanTools.ViewModel
         private string _pendingTagText = string.Empty;
         private string _manualTagInput = string.Empty;
         private string _manualTagTranslation = string.Empty;
+        private int _translatedTagCount;
+        private int _untranslatedTagCount;
+        private bool _isTranslatingAllTags;
         private bool _isSuggestionOpen = false;
         private static readonly char[] TagSeparators = { ',', '，', '\r', '\n' };
 
@@ -130,6 +133,44 @@ namespace CyanTools.ViewModel
             set => SetField(ref _manualTagTranslation, value);
         }
 
+        public int TranslatedTagCount
+        {
+            get => _translatedTagCount;
+            private set
+            {
+                if (SetField(ref _translatedTagCount, value))
+                {
+                    OnPropertyChanged(nameof(TagTranslationCountDisplay));
+                }
+            }
+        }
+
+        public int UntranslatedTagCount
+        {
+            get => _untranslatedTagCount;
+            private set
+            {
+                if (SetField(ref _untranslatedTagCount, value))
+                {
+                    OnPropertyChanged(nameof(TagTranslationCountDisplay));
+                }
+            }
+        }
+
+        public string TagTranslationCountDisplay => $"已翻译: {TranslatedTagCount} / 未翻译: {UntranslatedTagCount}";
+
+        public bool IsTranslatingAllTags
+        {
+            get => _isTranslatingAllTags;
+            set
+            {
+                if (SetField(ref _isTranslatingAllTags, value))
+                {
+                    CommandManager.InvalidateRequerySuggested();
+                }
+            }
+        }
+
         public bool IsSuggestionOpen
         {
             get => _isSuggestionOpen;
@@ -182,6 +223,7 @@ namespace CyanTools.ViewModel
         public ICommand SavePromptCommand { get; }
         public ICommand RemoveTagCommand { get; }
         public ICommand UpsertTagTranslationCommand { get; }
+        public ICommand TranslateAllMissingTagsCommand { get; }
         
 
         public DatasetManagerViewModel()
@@ -204,8 +246,11 @@ namespace CyanTools.ViewModel
             RemoveTagCommand = new RelayCommand(param => RemoveTag(param as TagTokenViewModel));
             UpsertTagTranslationCommand = new RelayCommand(async _ => await UpsertTagTranslationAsync(),
                 _ => !string.IsNullOrWhiteSpace(ManualTagInput));
+            TranslateAllMissingTagsCommand = new RelayCommand(async _ => await TranslateAllMissingTagsAsync(),
+                _ => !IsTranslatingAllTags);
 
             TagTokens.CollectionChanged += TagTokens_CollectionChanged;
+            _ = RefreshTranslationCountsAsync();
             
         }
 
@@ -461,6 +506,7 @@ namespace CyanTools.ViewModel
                             UpdateTokenTranslation(tag, translated);
                         }
                     }
+                    await RefreshTranslationCountsAsync().ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -894,10 +940,97 @@ namespace CyanTools.ViewModel
 
                 ManualTagInput = string.Empty;
                 ManualTagTranslation = string.Empty;
+                _ = RefreshTranslationCountsAsync();
             }
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show($"保存标签翻译失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private async Task TranslateAllMissingTagsAsync()
+        {
+            if (IsTranslatingAllTags)
+            {
+                return;
+            }
+
+            IsTranslatingAllTags = true;
+            _translationCancellation?.Cancel();
+            _translationCancellation?.Dispose();
+            _translationCancellation = new CancellationTokenSource();
+            var cancellationToken = _translationCancellation.Token;
+
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    const int batchSize = 200;
+                    while (true)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var batch = await _tagDictionaryService.GetMissingTranslationBatchAsync(batchSize, cancellationToken).ConfigureAwait(false);
+                        if (batch.Count == 0)
+                        {
+                            break;
+                        }
+
+                        int translatedInBatch = 0;
+                        foreach (var tag in batch)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            try
+                            {
+                                var translated = await _tagDictionaryService.TranslateAndCacheAsync(tag, cancellationToken).ConfigureAwait(false);
+                                if (!string.IsNullOrWhiteSpace(translated))
+                                {
+                                    UpdateTokenTranslation(tag, translated);
+                                    translatedInBatch++;
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch
+                            {
+                            }
+                        }
+
+                        if (translatedInBatch == 0)
+                        {
+                            break;
+                        }
+                    }
+                }, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"翻译未翻译标签失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsTranslatingAllTags = false;
+                _ = RefreshTranslationCountsAsync();
+            }
+        }
+
+        private async Task RefreshTranslationCountsAsync()
+        {
+            try
+            {
+                var counts = await _tagDictionaryService.GetTranslationCountsAsync(_tagCancellation.Token).ConfigureAwait(false);
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    TranslatedTagCount = counts.Translated;
+                    UntranslatedTagCount = counts.Untranslated;
+                });
+            }
+            catch
+            {
             }
         }
 

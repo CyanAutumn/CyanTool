@@ -660,6 +660,57 @@ namespace CyanTools.Utils
             return result;
         }
 
+        public async Task<(int Translated, int Untranslated)> GetTranslationCountsAsync(CancellationToken cancellationToken)
+        {
+            await using var connection = new SqliteConnection(GetConnectionString());
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "SELECT " +
+                "SUM(CASE WHEN translation IS NOT NULL AND translation <> '' THEN 1 ELSE 0 END) AS translated, " +
+                "SUM(CASE WHEN translation IS NULL OR translation = '' THEN 1 ELSE 0 END) AS untranslated " +
+                "FROM tag_catalog;";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var translated = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0));
+                var untranslated = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
+                return (translated, untranslated);
+            }
+
+            return (0, 0);
+        }
+
+        public async Task<IReadOnlyList<string>> GetMissingTranslationBatchAsync(int limit, CancellationToken cancellationToken)
+        {
+            if (limit <= 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var result = new List<string>(limit);
+            await using var connection = new SqliteConnection(GetConnectionString());
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "SELECT tag FROM tag_catalog " +
+                "WHERE translation IS NULL OR translation = '' " +
+                "LIMIT $limit";
+            command.Parameters.AddWithValue("$limit", limit);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!reader.IsDBNull(0))
+                {
+                    result.Add(reader.GetString(0));
+                }
+            }
+
+            return result;
+        }
+
         private async Task<string?> TranslateWithGoogleAsync(string tag, CancellationToken cancellationToken)
         {
             var query = Uri.EscapeDataString(tag);
