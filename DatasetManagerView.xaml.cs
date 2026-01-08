@@ -25,6 +25,7 @@ namespace CyanTools
         private Point? _tagDragStartPoint;
         private TagTokenViewModel? _tagDragToken;
         private bool _isTagDragging;
+        private bool _suppressSuggestionAfterDrag;
         
         public DatasetManagerView()
         {
@@ -392,6 +393,9 @@ namespace CyanTools
             }
 
             _isTagDragging = true;
+            _suppressSuggestionAfterDrag = true;
+            ViewModel?.ClearSuggestions();
+            ViewModel?.SuppressSuggestionRefresh();
             var data = new DataObject(typeof(TagTokenViewModel), _tagDragToken);
             DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Move);
             ClearTagDragState();
@@ -457,6 +461,19 @@ namespace CyanTools
             return null;
         }
 
+        private bool TrySuppressSuggestionAfterDrag()
+        {
+            if (!_suppressSuggestionAfterDrag)
+            {
+                return false;
+            }
+
+            _suppressSuggestionAfterDrag = false;
+            ViewModel?.ClearSuggestions();
+            ViewModel?.SuppressSuggestionRefresh();
+            return true;
+        }
+
         private void TagItemsControl_PreviewDragOver(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(typeof(TagTokenViewModel)))
@@ -515,6 +532,8 @@ namespace CyanTools
             }
 
             tokens.Move(oldIndex, newIndex);
+            ViewModel.ClearSuggestions();
+            ViewModel.SuppressSuggestionRefresh();
             e.Handled = true;
         }
 
@@ -762,6 +781,11 @@ namespace CyanTools
         {
             if (sender is TextBox textBox)
             {
+                if (TrySuppressSuggestionAfterDrag())
+                {
+                    return;
+                }
+
                 SetActiveSuggestionTarget(textBox);
                 _ = ViewModel?.RefreshSuggestionsAsync(textBox.Text);
             }
@@ -773,6 +797,11 @@ namespace CyanTools
             {
                 textBox.Focus();
                 textBox.SelectAll();
+                if (TrySuppressSuggestionAfterDrag())
+                {
+                    return;
+                }
+
                 SetActiveSuggestionTarget(textBox);
                 _ = ViewModel?.RefreshSuggestionsAsync(textBox.Text);
             }
