@@ -18,7 +18,7 @@ namespace CyanTools.Utils
     {
         private const string DatabaseFileName = "tag_dictionary.sqlite";
         private const string TagArchiveFileName = "tag_by_category.7z";
-        private const string BatchTranslationDelimiter = "<|>";
+        private const string BatchTranslationDelimiter = "、";
         private static readonly Uri TagArchiveUri = new("https://huggingface.co/datasets/toyxyz/danbooru2024_wildcard/resolve/main/tag_by_category.7z");
         private static readonly string[] KnownCategories = { "general", "artist", "character", "copyright", "meta", "rating", "quality" };
 
@@ -335,7 +335,10 @@ namespace CyanTools.Utils
             return _translationTasks.GetOrAdd(normalized, _ => TranslateAndCacheInternalAsync(normalized, cancellationToken));
         }
 
-        public async Task<IReadOnlyDictionary<string, string>> TranslateAndCacheBatchAsync(IReadOnlyList<string> tags, CancellationToken cancellationToken)
+        public async Task<IReadOnlyDictionary<string, string>> TranslateAndCacheBatchAsync(
+            IReadOnlyList<string> tags,
+            CancellationToken cancellationToken,
+            bool allowSequentialFallback = true)
         {
             if (!_enableTranslation)
             {
@@ -375,10 +378,33 @@ namespace CyanTools.Utils
                 gateTaken = true;
 
                 var combined = string.Join($" {BatchTranslationDelimiter} ", normalizedTags);
-                var translatedText = await TranslateWithGoogleAsync(combined, cancellationToken).ConfigureAwait(false);
+                string? translatedText;
+                try
+                {
+                    translatedText = await TranslateWithGoogleAsync(combined, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    if (!allowSequentialFallback)
+                    {
+                        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    }
+
+                    return await TranslateAndCacheSequentialAsync(normalizedTags, cancellationToken).ConfigureAwait(false);
+                }
+
                 var parts = SplitBatchTranslation(translatedText, normalizedTags.Count);
                 if (parts == null)
                 {
+                    if (!allowSequentialFallback)
+                    {
+                        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    }
+
                     return await TranslateAndCacheSequentialAsync(normalizedTags, cancellationToken).ConfigureAwait(false);
                 }
 
@@ -836,20 +862,26 @@ namespace CyanTools.Utils
                 return null;
             }
 
-            var normalized = translatedText.Replace("＜|＞", BatchTranslationDelimiter, StringComparison.Ordinal)
-                                           .Replace(" <|> ", BatchTranslationDelimiter, StringComparison.Ordinal)
-                                           .Replace(" <|>", BatchTranslationDelimiter, StringComparison.Ordinal)
-                                           .Replace("<|> ", BatchTranslationDelimiter, StringComparison.Ordinal);
+            var normalized = translatedText.Replace(" 、 ", BatchTranslationDelimiter, StringComparison.Ordinal)
+                                           .Replace(" 、", BatchTranslationDelimiter, StringComparison.Ordinal)
+                                           .Replace("、 ", BatchTranslationDelimiter, StringComparison.Ordinal)
+                                           .Replace("，", BatchTranslationDelimiter, StringComparison.Ordinal);
             var parts = normalized.Split(new[] { BatchTranslationDelimiter }, StringSplitOptions.None);
             if (parts.Length != expectedCount)
             {
-                var fallback = normalized.Replace('｜', '|').Split('|');
-                if (fallback.Length != expectedCount)
+                var fallbackComma = normalized.Split('，');
+                if (fallbackComma.Length == expectedCount)
                 {
-                    return null;
+                    return fallbackComma.Select(part => part.Trim()).ToList();
                 }
 
-                return fallback.Select(part => part.Trim()).ToList();
+                var fallbackPipe = normalized.Replace('｜', '|').Split('|');
+                if (fallbackPipe.Length == expectedCount)
+                {
+                    return fallbackPipe.Select(part => part.Trim()).ToList();
+                }
+
+                return null;
             }
 
             return parts.Select(part => part.Trim()).ToList();
@@ -861,7 +893,19 @@ namespace CyanTools.Utils
             foreach (var tag in tags)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var translated = await TranslateWithGoogleAsync(tag, cancellationToken).ConfigureAwait(false);
+                string? translated;
+                try
+                {
+                    translated = await TranslateWithGoogleAsync(tag, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    continue;
+                }
                 if (string.IsNullOrWhiteSpace(translated))
                 {
                     continue;

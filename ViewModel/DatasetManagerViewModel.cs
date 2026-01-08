@@ -497,15 +497,40 @@ namespace CyanTools.ViewModel
                     }
 
                     var toTranslate = await _tagDictionaryService.GetTagsNeedingTranslationAsync(tags, cancellationToken).ConfigureAwait(false);
-                    const int translateChunkSize = 20;
-                    for (int offset = 0; offset < toTranslate.Count; offset += translateChunkSize)
+                    const int translateChunkSize = 100;
+                    int currentChunkSize = translateChunkSize;
+                    int offset = 0;
+                    while (offset < toTranslate.Count)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var chunk = toTranslate.Skip(offset).Take(translateChunkSize).ToList();
-                        var translatedMap = await _tagDictionaryService.TranslateAndCacheBatchAsync(chunk, cancellationToken).ConfigureAwait(false);
+                        int size = Math.Min(currentChunkSize, toTranslate.Count - offset);
+                        var chunk = toTranslate.Skip(offset).Take(size).ToList();
+                        var translatedMap = await _tagDictionaryService.TranslateAndCacheBatchAsync(
+                            chunk,
+                            cancellationToken,
+                            allowSequentialFallback: false).ConfigureAwait(false);
+
+                        if (translatedMap.Count == 0)
+                        {
+                            if (currentChunkSize != 1)
+                            {
+                                currentChunkSize = 1;
+                                continue;
+                            }
+
+                            offset += 1;
+                            continue;
+                        }
+
                         foreach (var pair in translatedMap)
                         {
                             UpdateTokenTranslation(pair.Key, pair.Value);
+                        }
+
+                        offset += size;
+                        if (currentChunkSize == 1)
+                        {
+                            currentChunkSize = translateChunkSize;
                         }
                     }
                     await RefreshTranslationCountsAsync().ConfigureAwait(false);
@@ -968,8 +993,9 @@ namespace CyanTools.ViewModel
                 await Task.Run(async () =>
                 {
                     const int batchSize = 200;
-                    const int translateChunkSize = 20;
+                    const int translateChunkSize = 100;
                     int translatedSinceRefresh = 0;
+                    int emptyBatchCount = 0;
                     while (true)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -980,14 +1006,20 @@ namespace CyanTools.ViewModel
                         }
 
                         int translatedInBatch = 0;
-                        for (int offset = 0; offset < batch.Count; offset += translateChunkSize)
+                        int currentChunkSize = translateChunkSize;
+                        int offset = 0;
+                        while (offset < batch.Count)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            var chunk = batch.Skip(offset).Take(translateChunkSize).ToList();
+                            int size = Math.Min(currentChunkSize, batch.Count - offset);
+                            var chunk = batch.Skip(offset).Take(size).ToList();
                             IReadOnlyDictionary<string, string> translatedMap;
                             try
                             {
-                                translatedMap = await _tagDictionaryService.TranslateAndCacheBatchAsync(chunk, cancellationToken).ConfigureAwait(false);
+                                translatedMap = await _tagDictionaryService.TranslateAndCacheBatchAsync(
+                                    chunk,
+                                    cancellationToken,
+                                    allowSequentialFallback: false).ConfigureAwait(false);
                             }
                             catch (OperationCanceledException)
                             {
@@ -996,6 +1028,18 @@ namespace CyanTools.ViewModel
                             catch
                             {
                                 translatedMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            }
+
+                            if (translatedMap.Count == 0)
+                            {
+                                if (currentChunkSize != 1)
+                                {
+                                    currentChunkSize = 1;
+                                    continue;
+                                }
+
+                                offset += 1;
+                                continue;
                             }
 
                             foreach (var pair in translatedMap)
@@ -1009,12 +1053,26 @@ namespace CyanTools.ViewModel
                                     translatedSinceRefresh = 0;
                                 }
                             }
+
+                            offset += size;
+                            if (currentChunkSize == 1)
+                            {
+                                currentChunkSize = translateChunkSize;
+                            }
                         }
 
                         if (translatedInBatch == 0)
                         {
-                            break;
+                            emptyBatchCount++;
+                            if (emptyBatchCount >= 3)
+                            {
+                                break;
+                            }
+
+                            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+                            continue;
                         }
+                        emptyBatchCount = 0;
 
                         if (translatedSinceRefresh > 0)
                         {
