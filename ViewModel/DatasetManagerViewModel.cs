@@ -966,6 +966,7 @@ namespace CyanTools.ViewModel
                 await Task.Run(async () =>
                 {
                     const int batchSize = 200;
+                    int translatedSinceRefresh = 0;
                     while (true)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -986,6 +987,12 @@ namespace CyanTools.ViewModel
                                 {
                                     UpdateTokenTranslation(tag, translated);
                                     translatedInBatch++;
+                                    translatedSinceRefresh++;
+                                    if (translatedSinceRefresh >= 10)
+                                    {
+                                        await RefreshTranslationCountsAsync().ConfigureAwait(false);
+                                        translatedSinceRefresh = 0;
+                                    }
                                 }
                             }
                             catch (OperationCanceledException)
@@ -1000,6 +1007,12 @@ namespace CyanTools.ViewModel
                         if (translatedInBatch == 0)
                         {
                             break;
+                        }
+
+                        if (translatedSinceRefresh > 0)
+                        {
+                            await RefreshTranslationCountsAsync().ConfigureAwait(false);
+                            translatedSinceRefresh = 0;
                         }
                     }
                 }, cancellationToken);
