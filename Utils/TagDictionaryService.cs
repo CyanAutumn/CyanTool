@@ -18,6 +18,7 @@ namespace CyanTools.Utils
     {
         private const string DatabaseFileName = "tag_dictionary.sqlite";
         private const string TagArchiveFileName = "tag_by_category.7z";
+        private const string BatchTranslationDelimiter = "<|>";
         private static readonly Uri TagArchiveUri = new("https://huggingface.co/datasets/toyxyz/danbooru2024_wildcard/resolve/main/tag_by_category.7z");
         private static readonly string[] KnownCategories = { "general", "artist", "character", "copyright", "meta", "rating", "quality" };
 
@@ -332,6 +333,77 @@ namespace CyanTools.Utils
             }
 
             return _translationTasks.GetOrAdd(normalized, _ => TranslateAndCacheInternalAsync(normalized, cancellationToken));
+        }
+
+        public async Task<IReadOnlyDictionary<string, string>> TranslateAndCacheBatchAsync(IReadOnlyList<string> tags, CancellationToken cancellationToken)
+        {
+            if (!_enableTranslation)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (tags == null || tags.Count == 0)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var normalizedTags = new List<string>(tags.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tag in tags)
+            {
+                var normalized = NormalizeTag(tag);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    continue;
+                }
+
+                if (seen.Add(normalized))
+                {
+                    normalizedTags.Add(normalized);
+                }
+            }
+
+            if (normalizedTags.Count == 0)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            bool gateTaken = false;
+            try
+            {
+                await _translationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                gateTaken = true;
+
+                var combined = string.Join($" {BatchTranslationDelimiter} ", normalizedTags);
+                var translatedText = await TranslateWithGoogleAsync(combined, cancellationToken).ConfigureAwait(false);
+                var parts = SplitBatchTranslation(translatedText, normalizedTags.Count);
+                if (parts == null)
+                {
+                    return await TranslateAndCacheSequentialAsync(normalizedTags, cancellationToken).ConfigureAwait(false);
+                }
+
+                var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < normalizedTags.Count; i++)
+                {
+                    var translation = parts[i];
+                    if (string.IsNullOrWhiteSpace(translation))
+                    {
+                        continue;
+                    }
+
+                    await SaveTranslationAsync(normalizedTags[i], translation, cancellationToken).ConfigureAwait(false);
+                    result[normalizedTags[i]] = translation;
+                }
+
+                return result;
+            }
+            finally
+            {
+                if (gateTaken)
+                {
+                    _translationGate.Release();
+                }
+            }
         }
 
         public async Task<int> DownloadAndImportCatalogAsync(IProgress<string>? progress, CancellationToken cancellationToken)
@@ -755,6 +827,51 @@ namespace CyanTools.Utils
             {
                 return null;
             }
+        }
+
+        private static IReadOnlyList<string>? SplitBatchTranslation(string? translatedText, int expectedCount)
+        {
+            if (string.IsNullOrWhiteSpace(translatedText))
+            {
+                return null;
+            }
+
+            var normalized = translatedText.Replace("＜|＞", BatchTranslationDelimiter, StringComparison.Ordinal)
+                                           .Replace(" <|> ", BatchTranslationDelimiter, StringComparison.Ordinal)
+                                           .Replace(" <|>", BatchTranslationDelimiter, StringComparison.Ordinal)
+                                           .Replace("<|> ", BatchTranslationDelimiter, StringComparison.Ordinal);
+            var parts = normalized.Split(new[] { BatchTranslationDelimiter }, StringSplitOptions.None);
+            if (parts.Length != expectedCount)
+            {
+                var fallback = normalized.Replace('｜', '|').Split('|');
+                if (fallback.Length != expectedCount)
+                {
+                    return null;
+                }
+
+                return fallback.Select(part => part.Trim()).ToList();
+            }
+
+            return parts.Select(part => part.Trim()).ToList();
+        }
+
+        private async Task<IReadOnlyDictionary<string, string>> TranslateAndCacheSequentialAsync(IReadOnlyList<string> tags, CancellationToken cancellationToken)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tag in tags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var translated = await TranslateWithGoogleAsync(tag, cancellationToken).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(translated))
+                {
+                    continue;
+                }
+
+                await SaveTranslationAsync(tag, translated, cancellationToken).ConfigureAwait(false);
+                result[tag] = translated;
+            }
+
+            return result;
         }
 
         private static bool TryParseTagLine(string line, out string tag, out int count)

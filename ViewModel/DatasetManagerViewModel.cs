@@ -497,13 +497,15 @@ namespace CyanTools.ViewModel
                     }
 
                     var toTranslate = await _tagDictionaryService.GetTagsNeedingTranslationAsync(tags, cancellationToken).ConfigureAwait(false);
-                    foreach (var tag in toTranslate)
+                    const int translateChunkSize = 20;
+                    for (int offset = 0; offset < toTranslate.Count; offset += translateChunkSize)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var translated = await _tagDictionaryService.TranslateAndCacheAsync(tag, cancellationToken).ConfigureAwait(false);
-                        if (!string.IsNullOrWhiteSpace(translated))
+                        var chunk = toTranslate.Skip(offset).Take(translateChunkSize).ToList();
+                        var translatedMap = await _tagDictionaryService.TranslateAndCacheBatchAsync(chunk, cancellationToken).ConfigureAwait(false);
+                        foreach (var pair in translatedMap)
                         {
-                            UpdateTokenTranslation(tag, translated);
+                            UpdateTokenTranslation(pair.Key, pair.Value);
                         }
                     }
                     await RefreshTranslationCountsAsync().ConfigureAwait(false);
@@ -966,6 +968,7 @@ namespace CyanTools.ViewModel
                 await Task.Run(async () =>
                 {
                     const int batchSize = 200;
+                    const int translateChunkSize = 20;
                     int translatedSinceRefresh = 0;
                     while (true)
                     {
@@ -977,23 +980,14 @@ namespace CyanTools.ViewModel
                         }
 
                         int translatedInBatch = 0;
-                        foreach (var tag in batch)
+                        for (int offset = 0; offset < batch.Count; offset += translateChunkSize)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
+                            var chunk = batch.Skip(offset).Take(translateChunkSize).ToList();
+                            IReadOnlyDictionary<string, string> translatedMap;
                             try
                             {
-                                var translated = await _tagDictionaryService.TranslateAndCacheAsync(tag, cancellationToken).ConfigureAwait(false);
-                                if (!string.IsNullOrWhiteSpace(translated))
-                                {
-                                    UpdateTokenTranslation(tag, translated);
-                                    translatedInBatch++;
-                                    translatedSinceRefresh++;
-                                    if (translatedSinceRefresh >= 10)
-                                    {
-                                        await RefreshTranslationCountsAsync().ConfigureAwait(false);
-                                        translatedSinceRefresh = 0;
-                                    }
-                                }
+                                translatedMap = await _tagDictionaryService.TranslateAndCacheBatchAsync(chunk, cancellationToken).ConfigureAwait(false);
                             }
                             catch (OperationCanceledException)
                             {
@@ -1001,6 +995,19 @@ namespace CyanTools.ViewModel
                             }
                             catch
                             {
+                                translatedMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            }
+
+                            foreach (var pair in translatedMap)
+                            {
+                                UpdateTokenTranslation(pair.Key, pair.Value);
+                                translatedInBatch++;
+                                translatedSinceRefresh++;
+                                if (translatedSinceRefresh >= 10)
+                                {
+                                    await RefreshTranslationCountsAsync().ConfigureAwait(false);
+                                    translatedSinceRefresh = 0;
+                                }
                             }
                         }
 
