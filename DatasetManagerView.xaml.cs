@@ -22,6 +22,9 @@ namespace CyanTools
         private TagTokenViewModel? _activeEditingToken;
         private bool _suppressTagInputTextChange;
         private bool _suppressTagTextHandling;
+        private Point? _tagDragStartPoint;
+        private TagTokenViewModel? _tagDragToken;
+        private bool _isTagDragging;
         
         public DatasetManagerView()
         {
@@ -342,12 +345,16 @@ namespace CyanTools
             return true;
         }
 
-        private void TagChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void TagChip_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.OriginalSource is DependencyObject source)
             {
-                var deleteButton = FindAncestor<Button>(source);
-                if (deleteButton?.Name == "TagDeleteButton")
+                if (IsDeleteButtonSource(source))
+                {
+                    return;
+                }
+
+                if (FindAncestor<TextBoxBase>(source) != null)
                 {
                     return;
                 }
@@ -355,9 +362,63 @@ namespace CyanTools
 
             if (sender is FrameworkElement element && element.DataContext is TagTokenViewModel token)
             {
+                _tagDragToken = token;
+                _tagDragStartPoint = e.GetPosition(null);
+                _isTagDragging = false;
+            }
+        }
+
+        private void TagChip_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_tagDragToken == null || _tagDragStartPoint == null)
+            {
+                return;
+            }
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+            {
+                ClearTagDragState();
+                return;
+            }
+
+            var position = e.GetPosition(null);
+            var deltaX = Math.Abs(position.X - _tagDragStartPoint.Value.X);
+            var deltaY = Math.Abs(position.Y - _tagDragStartPoint.Value.Y);
+            if (!_isTagDragging &&
+                deltaX < SystemParameters.MinimumHorizontalDragDistance &&
+                deltaY < SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+
+            _isTagDragging = true;
+            var data = new DataObject(typeof(TagTokenViewModel), _tagDragToken);
+            DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Move);
+            ClearTagDragState();
+            e.Handled = true;
+        }
+
+        private void TagChip_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_tagDragToken == null)
+            {
+                return;
+            }
+
+            if (!_isTagDragging && sender is FrameworkElement element && element.DataContext is TagTokenViewModel token)
+            {
                 ViewModel?.BeginEditTag(token);
                 e.Handled = true;
             }
+
+            ClearTagDragState();
+        }
+
+        private void ClearTagDragState()
+        {
+            _tagDragStartPoint = null;
+            _tagDragToken = null;
+            _isTagDragging = false;
         }
         
         private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
@@ -373,6 +434,88 @@ namespace CyanTools
             }
 
             return null;
+        }
+
+        private static bool IsDeleteButtonSource(DependencyObject source)
+        {
+            var deleteButton = FindAncestor<Button>(source);
+            return deleteButton?.Name == "TagDeleteButton";
+        }
+
+        private static TagTokenViewModel? FindTagTokenFromSource(DependencyObject? source)
+        {
+            while (source != null)
+            {
+                if (source is FrameworkElement element && element.DataContext is TagTokenViewModel token)
+                {
+                    return token;
+                }
+
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            return null;
+        }
+
+        private void TagItemsControl_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(TagTokenViewModel)))
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+
+            e.Handled = true;
+        }
+
+        private void TagItemsControl_Drop(object sender, DragEventArgs e)
+        {
+            if (ViewModel == null || !e.Data.GetDataPresent(typeof(TagTokenViewModel)))
+            {
+                return;
+            }
+
+            var sourceToken = e.Data.GetData(typeof(TagTokenViewModel)) as TagTokenViewModel;
+            if (sourceToken == null)
+            {
+                return;
+            }
+
+            var targetToken = FindTagTokenFromSource(e.OriginalSource as DependencyObject);
+            if (targetToken == null)
+            {
+                if (ViewModel.TagTokens.Contains(sourceToken))
+                {
+                    ViewModel.TagTokens.Remove(sourceToken);
+                    ViewModel.TagTokens.Add(sourceToken);
+                }
+
+                return;
+            }
+
+            if (ReferenceEquals(sourceToken, targetToken))
+            {
+                return;
+            }
+
+            var tokens = ViewModel.TagTokens;
+            int oldIndex = tokens.IndexOf(sourceToken);
+            int newIndex = tokens.IndexOf(targetToken);
+            if (oldIndex < 0 || newIndex < 0 || oldIndex == newIndex)
+            {
+                return;
+            }
+
+            if (newIndex > oldIndex)
+            {
+                newIndex--;
+            }
+
+            tokens.Move(oldIndex, newIndex);
+            e.Handled = true;
         }
 
         private async void TagInputBox_TextChanged(object sender, TextChangedEventArgs e)

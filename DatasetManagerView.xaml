@@ -22,7 +22,9 @@
                     BorderBrush="#FFBFD9FF"
                     BorderThickness="1"
                     Background="#FFEAF3FF"
-                    MouseLeftButtonDown="TagChip_MouseLeftButtonDown">
+                    PreviewMouseLeftButtonDown="TagChip_PreviewMouseLeftButtonDown"
+                    PreviewMouseMove="TagChip_PreviewMouseMove"
+                    PreviewMouseLeftButtonUp="TagChip_PreviewMouseLeftButtonUp">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -353,7 +355,10 @@
                     <Border Grid.Row="1" BorderBrush="#FFCCCCCC" BorderThickness="1" Padding="4" Background="White">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="TagItemsControl"
-                                          ItemTemplateSelector="{StaticResource TagItemTemplateSelector}">
+                                          ItemTemplateSelector="{StaticResource TagItemTemplateSelector}"
+                                          AllowDrop="True"
+                                          PreviewDragOver="TagItemsControl_PreviewDragOver"
+                                          Drop="TagItemsControl_Drop">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel IsItemsHost="True"/>
