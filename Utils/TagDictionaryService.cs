@@ -89,6 +89,39 @@ namespace CyanTools.Utils
                 });
             }
 
+            if (suggestions.Count == 0)
+            {
+                var fuzzyPattern = BuildFuzzyLikePattern(prefix);
+                if (!string.IsNullOrWhiteSpace(fuzzyPattern))
+                {
+                    suggestions.Clear();
+                    await using var fuzzyCommand = connection.CreateCommand();
+                    fuzzyCommand.CommandText =
+                        "SELECT t.tag, t.translation " +
+                        "FROM tag_catalog t " +
+                        "WHERE t.tag LIKE $pattern COLLATE NOCASE " +
+                        (string.IsNullOrWhiteSpace(category) ? string.Empty : "AND t.category = $category ") +
+                        "ORDER BY t.count DESC, t.tag " +
+                        "LIMIT $limit";
+                    fuzzyCommand.Parameters.AddWithValue("$pattern", fuzzyPattern);
+                    fuzzyCommand.Parameters.AddWithValue("$limit", limit);
+                    if (!string.IsNullOrWhiteSpace(category))
+                    {
+                        fuzzyCommand.Parameters.AddWithValue("$category", category);
+                    }
+
+                    await using var fuzzyReader = await fuzzyCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                    while (await fuzzyReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        suggestions.Add(new TagSuggestion
+                        {
+                            Tag = fuzzyReader.GetString(0),
+                            Translation = fuzzyReader.IsDBNull(1) ? null : fuzzyReader.GetString(1)
+                        });
+                    }
+                }
+            }
+
             return suggestions;
         }
 
@@ -130,6 +163,40 @@ namespace CyanTools.Utils
                     Tag = reader.GetString(0),
                     Translation = reader.IsDBNull(1) ? null : reader.GetString(1)
                 });
+            }
+
+            if (suggestions.Count == 0)
+            {
+                var fuzzyPattern = BuildFuzzyLikePattern(prefix);
+                if (!string.IsNullOrWhiteSpace(fuzzyPattern))
+                {
+                    suggestions.Clear();
+                    await using var fuzzyCommand = connection.CreateCommand();
+                    fuzzyCommand.CommandText =
+                        "SELECT t.tag, t.translation " +
+                        "FROM tag_catalog t " +
+                        "WHERE t.translation IS NOT NULL " +
+                        "AND t.translation LIKE $pattern COLLATE NOCASE " +
+                        (string.IsNullOrWhiteSpace(category) ? string.Empty : "AND t.category = $category ") +
+                        "ORDER BY t.count DESC, t.tag " +
+                        "LIMIT $limit";
+                    fuzzyCommand.Parameters.AddWithValue("$pattern", fuzzyPattern);
+                    fuzzyCommand.Parameters.AddWithValue("$limit", limit);
+                    if (!string.IsNullOrWhiteSpace(category))
+                    {
+                        fuzzyCommand.Parameters.AddWithValue("$category", category);
+                    }
+
+                    await using var fuzzyReader = await fuzzyCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                    while (await fuzzyReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        suggestions.Add(new TagSuggestion
+                        {
+                            Tag = fuzzyReader.GetString(0),
+                            Translation = fuzzyReader.IsDBNull(1) ? null : fuzzyReader.GetString(1)
+                        });
+                    }
+                }
             }
 
             return suggestions;
@@ -296,6 +363,31 @@ namespace CyanTools.Utils
             }
 
             return trimmed;
+        }
+
+        private static string BuildFuzzyLikePattern(string input)
+        {
+            var normalized = NormalizeTag(input);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            var compact = normalized.Replace(" ", string.Empty);
+            if (string.IsNullOrWhiteSpace(compact))
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder(compact.Length * 2 + 2);
+            builder.Append('%');
+            foreach (var ch in compact)
+            {
+                builder.Append(ch);
+                builder.Append('%');
+            }
+
+            return builder.ToString();
         }
 
         public static bool ContainsCjk(string value)

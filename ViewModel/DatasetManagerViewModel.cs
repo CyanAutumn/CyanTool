@@ -820,14 +820,8 @@ namespace CyanTools.ViewModel
                     translationQuery = normalized;
                 }
                 var results = searchTranslation
-                    ? await _tagDictionaryService.GetSuggestionsByTranslationAsync(translationQuery, 20, "general", cancellationToken)
-                    : await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, "general", cancellationToken);
-                if (results.Count == 0)
-                {
-                    results = searchTranslation
-                        ? await _tagDictionaryService.GetSuggestionsByTranslationAsync(translationQuery, 20, null, cancellationToken)
-                        : await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, null, cancellationToken);
-                }
+                    ? await _tagDictionaryService.GetSuggestionsByTranslationAsync(translationQuery, 20, null, cancellationToken)
+                    : await _tagDictionaryService.GetSuggestionsAsync(normalized, 20, null, cancellationToken);
                 if (cancellationToken.IsCancellationRequested)
                 {
                     return;
