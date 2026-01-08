@@ -207,11 +207,12 @@
             <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="#FFCCCCCC" Background="#FFF0F0F0">
                 <StackPanel Orientation="Horizontal" Margin="5">
                     <CheckBox Content="自动下一张" IsChecked="{Binding AutoNext}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    <CheckBox Content="浏览模式" IsChecked="{Binding IsBrowseMode}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
             </Border>
 
 
-            <Border Grid.Row="1" x:Name="ImageContainer" Background="#FFCCCCCC" ClipToBounds="True">
+            <Border Grid.Row="1" x:Name="ImageContainer" Background="#FFCCCCCC" ClipToBounds="True" SizeChanged="ImageContainer_SizeChanged">
                 <Canvas x:Name="MainCanvas"
                         Background="Transparent"
                         MouseRightButtonDown="MainCanvas_MouseRightButtonDown"
@@ -221,7 +222,10 @@
                         MouseMove="MainCanvas_MouseMove">
                     <Canvas x:Name="TransformGroupCanvas">
                         <Canvas.RenderTransform>
-                            <TranslateTransform x:Name="ImagePanTransform"/>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="ImageScaleTransform"/>
+                                <TranslateTransform x:Name="ImagePanTransform"/>
+                            </TransformGroup>
                         </Canvas.RenderTransform>
                         <Image x:Name="MyImage" Source="{Binding CurrentImageSource}" Stretch="None" />
                     </Canvas>

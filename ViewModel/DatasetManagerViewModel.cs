@@ -44,6 +44,7 @@ namespace CyanTools.ViewModel
         private DatasetDataItem? _selectedDataItem;
         private string _currentTextContent = "";
         private bool _autoNext = true;
+        private bool _isBrowseMode;
         private int _currentIndex = 0;
         private readonly Random _random = new Random();
         private readonly TagDictionaryService _tagDictionaryService;
@@ -107,6 +108,12 @@ namespace CyanTools.ViewModel
         {
             get => _autoNext;
             set => SetField(ref _autoNext, value);
+        }
+
+        public bool IsBrowseMode
+        {
+            get => _isBrowseMode;
+            set => SetField(ref _isBrowseMode, value);
         }
 
         public string PendingTagText
@@ -1640,7 +1647,7 @@ namespace CyanTools.ViewModel
             Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         }
 
-        public void HandleMouseMove(System.Windows.Input.MouseEventArgs e, Canvas mainCanvas, Border imageContainer, TranslateTransform imagePanTransform)
+        public void HandleMouseMove(System.Windows.Input.MouseEventArgs e, Canvas mainCanvas, Border imageContainer, TranslateTransform imagePanTransform, double imageScale)
         {
             if (_isPanning)
             {
@@ -1653,10 +1660,12 @@ namespace CyanTools.ViewModel
 
                 if (CurrentImageSource != null)
                 {
-                    if (CurrentImageSource.Width > imageContainer.ActualWidth)
-                        minX = imageContainer.ActualWidth - CurrentImageSource.Width;
-                    if (CurrentImageSource.Height > imageContainer.ActualHeight)
-                        minY = imageContainer.ActualHeight - CurrentImageSource.Height;
+                    double scaledWidth = CurrentImageSource.Width * imageScale;
+                    double scaledHeight = CurrentImageSource.Height * imageScale;
+                    if (scaledWidth > imageContainer.ActualWidth)
+                        minX = imageContainer.ActualWidth - scaledWidth;
+                    if (scaledHeight > imageContainer.ActualHeight)
+                        minY = imageContainer.ActualHeight - scaledHeight;
                 }
 
                 imagePanTransform.X = Math.Max(minX, Math.Min(maxX, newX));

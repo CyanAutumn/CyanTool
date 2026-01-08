@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using CyanTools.Navigation;
@@ -40,12 +41,14 @@ namespace CyanTools
             if (e.OldValue is DatasetManagerViewModel oldViewModel)
             {
                 oldViewModel.OnCanvasResetRequired -= ResetCanvas;
+                oldViewModel.PropertyChanged -= ViewModel_PropertyChanged;
             }
             
 
             if (ViewModel != null)
             {
                 ViewModel.OnCanvasResetRequired += ResetCanvas;
+                ViewModel.PropertyChanged += ViewModel_PropertyChanged;
             }
         }
         
@@ -93,6 +96,56 @@ namespace CyanTools
             if (ViewModel != null)
             {
                 ViewModel.OnCanvasResetRequired += ResetCanvas;
+            }
+
+            UpdateImageScale(resetPan: false);
+        }
+
+        private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(DatasetManagerViewModel.IsBrowseMode))
+            {
+                UpdateImageScale(resetPan: true);
+                return;
+            }
+
+            if (e.PropertyName == nameof(DatasetManagerViewModel.CurrentImageSource))
+            {
+                UpdateImageScale(resetPan: ViewModel?.IsBrowseMode == true);
+            }
+        }
+
+        private void ImageContainer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateImageScale(resetPan: false);
+        }
+
+        private void UpdateImageScale(bool resetPan)
+        {
+            double scale = 1.0;
+
+            if (ViewModel?.IsBrowseMode == true && ViewModel.CurrentImageSource != null)
+            {
+                double containerWidth = ImageContainer.ActualWidth;
+                double containerHeight = ImageContainer.ActualHeight;
+                double imageWidth = ViewModel.CurrentImageSource.Width;
+                double imageHeight = ViewModel.CurrentImageSource.Height;
+
+                if (containerWidth > 0 && containerHeight > 0 && imageWidth > 0 && imageHeight > 0)
+                {
+                    double scaleX = containerWidth / imageWidth;
+                    double scaleY = containerHeight / imageHeight;
+                    scale = Math.Min(scaleX, scaleY);
+                }
+            }
+
+            ImageScaleTransform.ScaleX = scale;
+            ImageScaleTransform.ScaleY = scale;
+
+            if (resetPan)
+            {
+                ImagePanTransform.X = 0;
+                ImagePanTransform.Y = 0;
             }
         }
 
@@ -834,7 +887,7 @@ namespace CyanTools
 
         private void MainCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
-            ViewModel?.HandleMouseMove(e, MainCanvas, ImageContainer, ImagePanTransform);
+            ViewModel?.HandleMouseMove(e, MainCanvas, ImageContainer, ImagePanTransform, ImageScaleTransform.ScaleX);
         }
 
         private void MainCanvas_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
