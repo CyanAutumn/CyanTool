@@ -103,6 +103,14 @@ namespace CyanTools
 
         private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(DatasetManagerViewModel.SelectedDataItem))
+            {
+                _suppressSuggestionAfterDrag = true;
+                ViewModel?.ClearSuggestions();
+                ViewModel?.SuppressSuggestionRefresh();
+                return;
+            }
+
             if (e.PropertyName == nameof(DatasetManagerViewModel.IsBrowseMode))
             {
                 UpdateImageScale(resetPan: true);

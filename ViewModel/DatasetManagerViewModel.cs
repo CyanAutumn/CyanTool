@@ -52,7 +52,10 @@ namespace CyanTools.ViewModel
         private CancellationTokenSource? _suggestionCancellation;
         private CancellationTokenSource? _translationCancellation;
         private int _suggestionRequestId;
+        private CancellationTokenSource? _imageLoadCancellation;
+        private int _imageLoadRequestId;
         private int _suppressSuggestionRefresh;
+        private bool _suppressTagTokenChange;
         private string _pendingTagText = string.Empty;
         private string _manualTagInput = string.Empty;
         private string _manualTagTranslation = string.Empty;
@@ -439,20 +442,23 @@ namespace CyanTools.ViewModel
         {
             if (SelectedDataItem == null)
             {
+                CancelImageLoad();
                 ClearCurrentImagePreview();
                 CurrentTextContent = "";
                 return;
             }
 
-            if (!string.IsNullOrEmpty(SelectedDataItem.ImagePath) && File.Exists(SelectedDataItem.ImagePath))
+            var imagePath = SelectedDataItem.ImagePath;
+            if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
             {
-                LoadImageFromFile(SelectedDataItem.ImagePath);
+                _ = LoadImageFromFileAsync(imagePath);
             }
             else
             {
-                ClearCurrentImagePreview();
+                CancelImageLoad();
             }
 
+            ClearCurrentImagePreview();
             LoadTextFromFile(SelectedDataItem.TextPath);
         }
 
@@ -462,6 +468,14 @@ namespace CyanTools.ViewModel
             _currentFilePath = null;
             ResetState();
             OnCanvasResetRequired?.Invoke();
+        }
+
+        private void CancelImageLoad()
+        {
+            _imageLoadCancellation?.Cancel();
+            _imageLoadCancellation?.Dispose();
+            _imageLoadCancellation = null;
+            Interlocked.Increment(ref _imageLoadRequestId);
         }
 
         private void LoadTextFromFile(string? filePath)
@@ -656,11 +670,19 @@ namespace CyanTools.ViewModel
 
         private void LoadTagsFromText(string text)
         {
-            ResetTagEditor();
-
-            foreach (var tag in SplitTags(text))
+            _suppressTagTokenChange = true;
+            try
             {
-                AddTagToken(tag);
+                ResetTagEditor();
+
+                foreach (var tag in SplitTags(text))
+                {
+                    AddTagToken(tag);
+                }
+            }
+            finally
+            {
+                _suppressTagTokenChange = false;
             }
 
             UpdateCurrentTextContentFromTokens();
@@ -676,6 +698,11 @@ namespace CyanTools.ViewModel
 
         private void TagTokens_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
+            if (_suppressTagTokenChange)
+            {
+                return;
+            }
+
             UpdateCurrentTextContentFromTokens();
         }
 
@@ -1155,6 +1182,7 @@ namespace CyanTools.ViewModel
             {
                 if (CurrentImageSource != null && _currentFilePath == item.ImagePath)
                 {
+                    CancelImageLoad();
                     ClearCurrentImagePreview();
                 }
                 File.Delete(item.ImagePath);
@@ -1436,24 +1464,34 @@ namespace CyanTools.ViewModel
 
         #region 核心逻辑 (加载、缓存、重置)
 
-        private void LoadImageFromFile(string filePath)
+        private async Task LoadImageFromFileAsync(string filePath)
         {
+            _imageLoadCancellation?.Cancel();
+            _imageLoadCancellation?.Dispose();
+            _imageLoadCancellation = new CancellationTokenSource();
+            var cancellationToken = _imageLoadCancellation.Token;
+            int requestId = Interlocked.Increment(ref _imageLoadRequestId);
+
             try
             {
-                _originalBitmap = new BitmapImage();
-                _originalBitmap.BeginInit();
-                _originalBitmap.UriSource = new Uri(filePath);
-                _originalBitmap.CacheOption = BitmapCacheOption.OnLoad;
-                _originalBitmap.EndInit();
+                var bitmap = await Task.Run(() => LoadBitmapFromFile(filePath, cancellationToken), cancellationToken);
+                if (cancellationToken.IsCancellationRequested || requestId != _imageLoadRequestId)
+                {
+                    return;
+                }
 
-                CurrentImageSource = _originalBitmap;
+                _originalBitmap = bitmap;
+                CurrentImageSource = bitmap;
                 _currentFilePath = filePath;
 
                 ResetState();
                 LoadEditsFromCache();
-                
+
 
                 OnCanvasResetRequired?.Invoke();
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception ex)
             {
@@ -1462,6 +1500,21 @@ namespace CyanTools.ViewModel
                 _currentFilePath = null;
                 ResetState();
             }
+        }
+
+        private static BitmapImage LoadBitmapFromFile(string filePath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            cancellationToken.ThrowIfCancellationRequested();
+            return bitmap;
         }
 
         private void SaveChangesToCache()
