@@ -234,6 +234,10 @@ namespace CyanTools.ViewModel
         public ICommand RemoveTagCommand { get; }
         public ICommand MoveTagToStartCommand { get; }
         public ICommand MoveTagToEndCommand { get; }
+        public ICommand MoveTagToStartDatasetCommand { get; }
+        public ICommand MoveTagToEndDatasetCommand { get; }
+        public ICommand RemoveTagFromDatasetCommand { get; }
+        public ICommand AddTagToDatasetCommand { get; }
         public ICommand UpsertTagTranslationCommand { get; }
         public ICommand TranslateAllMissingTagsCommand { get; }
         
@@ -260,6 +264,14 @@ namespace CyanTools.ViewModel
                 param => CanMoveTagToStart(param as TagTokenViewModel));
             MoveTagToEndCommand = new RelayCommand(param => MoveTagToEnd(param as TagTokenViewModel),
                 param => CanMoveTagToEnd(param as TagTokenViewModel));
+            MoveTagToStartDatasetCommand = new RelayCommand(param => MoveTagToStartDataset(param as TagTokenViewModel),
+                param => CanApplyDatasetTagAction(param as TagTokenViewModel));
+            MoveTagToEndDatasetCommand = new RelayCommand(param => MoveTagToEndDataset(param as TagTokenViewModel),
+                param => CanApplyDatasetTagAction(param as TagTokenViewModel));
+            RemoveTagFromDatasetCommand = new RelayCommand(param => RemoveTagFromDataset(param as TagTokenViewModel),
+                param => CanApplyDatasetTagAction(param as TagTokenViewModel));
+            AddTagToDatasetCommand = new RelayCommand(param => AddTagToDataset(param as TagTokenViewModel),
+                param => CanApplyDatasetTagAction(param as TagTokenViewModel));
             UpsertTagTranslationCommand = new RelayCommand(async _ => await UpsertTagTranslationAsync(),
                 _ => !string.IsNullOrWhiteSpace(ManualTagInput));
             TranslateAllMissingTagsCommand = new RelayCommand(async _ => await TranslateAllMissingTagsAsync(),
@@ -885,6 +897,269 @@ namespace CyanTools.ViewModel
             }
 
             TagTokens.Move(currentIndex, targetIndex);
+        }
+
+        private enum DatasetTagUpdateMode
+        {
+            MoveToStart,
+            MoveToEnd,
+            Remove,
+            Add
+        }
+
+        private void MoveTagToStartDataset(TagTokenViewModel? token)
+        {
+            ApplyDatasetTagUpdate(token, DatasetTagUpdateMode.MoveToStart);
+        }
+
+        private void MoveTagToEndDataset(TagTokenViewModel? token)
+        {
+            ApplyDatasetTagUpdate(token, DatasetTagUpdateMode.MoveToEnd);
+        }
+
+        private void RemoveTagFromDataset(TagTokenViewModel? token)
+        {
+            ApplyDatasetTagUpdate(token, DatasetTagUpdateMode.Remove);
+        }
+
+        private void AddTagToDataset(TagTokenViewModel? token)
+        {
+            ApplyDatasetTagUpdate(token, DatasetTagUpdateMode.Add);
+        }
+
+        private bool CanApplyDatasetTagAction(TagTokenViewModel? token)
+        {
+            return token != null && DataItemsWithOperations.Any();
+        }
+
+        private void ApplyDatasetTagUpdate(TagTokenViewModel? token, DatasetTagUpdateMode mode)
+        {
+            if (!CanApplyDatasetTagAction(token))
+            {
+                return;
+            }
+
+            var normalized = TagDictionaryService.NormalizeTag(token!.Text);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return;
+            }
+
+            int updatedCount = 0;
+            int createdCount = 0;
+            int errorCount = 0;
+            bool selectedUpdated = false;
+            string? selectedPath = null;
+
+            var selectedItem = SelectedDataItem;
+            string? selectedContent = null;
+            if (selectedItem != null)
+            {
+                CommitPendingTags(true);
+                UpdateCurrentTextContentFromTokens();
+                selectedContent = CurrentTextContent ?? string.Empty;
+            }
+
+            foreach (var item in DataItemsWithOperations)
+            {
+                string? targetPath = GetDatasetTagTextPath(item);
+                if (string.IsNullOrWhiteSpace(targetPath))
+                {
+                    continue;
+                }
+
+                bool exists = File.Exists(targetPath);
+                if (!exists && mode != DatasetTagUpdateMode.Add)
+                {
+                    continue;
+                }
+
+                string content = string.Empty;
+                bool isSelectedItem = ReferenceEquals(item, selectedItem);
+                if (isSelectedItem && selectedContent != null)
+                {
+                    content = selectedContent;
+                }
+                else if (exists)
+                {
+                    try
+                    {
+                        content = File.ReadAllText(targetPath);
+                    }
+                    catch
+                    {
+                        errorCount++;
+                        continue;
+                    }
+                }
+
+                var tags = SplitTags(content).ToList();
+                var updatedTags = UpdateDatasetTags(tags, normalized, mode, out bool changed);
+                if (!changed)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    File.WriteAllText(targetPath, string.Join(", ", updatedTags));
+                }
+                catch
+                {
+                    errorCount++;
+                    continue;
+                }
+
+                updatedCount++;
+                if (!exists && string.IsNullOrWhiteSpace(item.TextPath))
+                {
+                    item.TextPath = targetPath;
+                    createdCount++;
+                }
+
+                if (isSelectedItem)
+                {
+                    selectedUpdated = true;
+                    selectedPath = targetPath;
+                }
+            }
+
+            if (selectedUpdated && !string.IsNullOrWhiteSpace(selectedPath))
+            {
+                LoadTextFromFile(selectedPath);
+            }
+
+            ShowDatasetTagUpdateResult(mode, updatedCount, createdCount, errorCount);
+        }
+
+        private static string? GetDatasetTagTextPath(DatasetDataItem item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.TextPath))
+            {
+                return item.TextPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.ImagePath))
+            {
+                return System.IO.Path.ChangeExtension(item.ImagePath, ".txt");
+            }
+
+            return null;
+        }
+
+        private static List<string> UpdateDatasetTags(List<string> tags, string normalizedTag, DatasetTagUpdateMode mode, out bool changed)
+        {
+            changed = false;
+            if (string.IsNullOrWhiteSpace(normalizedTag))
+            {
+                return tags;
+            }
+
+            bool IsMatch(string tag) => string.Equals(tag, normalizedTag, StringComparison.OrdinalIgnoreCase);
+
+            if (mode == DatasetTagUpdateMode.Add)
+            {
+                if (tags.Any(IsMatch))
+                {
+                    return tags;
+                }
+
+                var added = new List<string>(tags) { normalizedTag };
+                changed = true;
+                return added;
+            }
+
+            if (tags.Count == 0)
+            {
+                return tags;
+            }
+
+            var matches = new List<string>();
+            var others = new List<string>();
+            foreach (var tag in tags)
+            {
+                if (IsMatch(tag))
+                {
+                    matches.Add(tag);
+                }
+                else
+                {
+                    others.Add(tag);
+                }
+            }
+
+            if (matches.Count == 0)
+            {
+                return tags;
+            }
+
+            List<string> updated;
+            switch (mode)
+            {
+                case DatasetTagUpdateMode.MoveToStart:
+                    updated = matches.Concat(others).ToList();
+                    break;
+                case DatasetTagUpdateMode.MoveToEnd:
+                    updated = others.Concat(matches).ToList();
+                    break;
+                case DatasetTagUpdateMode.Remove:
+                    updated = others;
+                    break;
+                default:
+                    updated = tags;
+                    break;
+            }
+
+            changed = !AreTagListsEqual(tags, updated);
+            return changed ? updated : tags;
+        }
+
+        private static bool AreTagListsEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
+        {
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void ShowDatasetTagUpdateResult(DatasetTagUpdateMode mode, int updatedCount, int createdCount, int errorCount)
+        {
+            if (updatedCount == 0 && errorCount == 0)
+            {
+                System.Windows.MessageBox.Show("未找到需要处理的标签。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            string actionName = mode switch
+            {
+                DatasetTagUpdateMode.MoveToStart => "移到最前(当前数据集)",
+                DatasetTagUpdateMode.MoveToEnd => "移到最后(当前数据集)",
+                DatasetTagUpdateMode.Remove => "删除(当前数据集)",
+                DatasetTagUpdateMode.Add => "添加(当前数据集)",
+                _ => "操作"
+            };
+
+            string message = $"{actionName} 完成。\n更新: {updatedCount} 个文件";
+            if (createdCount > 0)
+            {
+                message += $"\n新增文件: {createdCount} 个";
+            }
+            if (errorCount > 0)
+            {
+                message += $"\n失败: {errorCount} 个";
+            }
+
+            System.Windows.MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
 
         public void CommitPendingTags(bool flushAll)
