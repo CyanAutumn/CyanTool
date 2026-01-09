@@ -115,6 +115,10 @@ namespace CyanTools
             if (e.PropertyName == nameof(DatasetManagerViewModel.IsBrowseMode))
             {
                 UpdateImageScale(resetPan: true);
+                if (ViewModel?.IsBrowseMode == true)
+                {
+                    FocusRootForShortcuts();
+                }
                 return;
             }
 
@@ -155,6 +159,19 @@ namespace CyanTools
             {
                 ImagePanTransform.X = 0;
                 ImagePanTransform.Y = 0;
+            }
+        }
+
+        private void FocusRootForShortcuts()
+        {
+            if (RootGrid == null)
+            {
+                return;
+            }
+
+            if (!RootGrid.Focus())
+            {
+                Keyboard.Focus(RootGrid);
             }
         }
 
