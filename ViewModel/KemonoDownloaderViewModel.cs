@@ -212,6 +212,7 @@ namespace CyanTools.ViewModel
             var service = string.IsNullOrWhiteSpace(SelectedService) ? ServiceOptions.First() : SelectedService;
             int page = 0;
             int savedCount = 0;
+            var postContentCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
             while (!token.IsCancellationRequested)
             {
@@ -236,7 +237,8 @@ namespace CyanTools.ViewModel
                     {
                         savedCount++;
                         AppendLog($"已保存 {asset.FileName}");
-                        await SaveContentAsync(asset, OutputDirectory, token);
+                        var content = await ResolvePostContentAsync(asset, artistId, service, postContentCache, token);
+                        await SaveContentAsync(content, asset.FileName, OutputDirectory, token);
                     }
                     await Task.Delay(DownloadDelay, token);
                 }
@@ -342,6 +344,8 @@ namespace CyanTools.ViewModel
 
                 int assetIndex = 0;
                 string dateSegment = FormatDate(post.Published);
+                string? postContent = GetPostContent(post);
+                string? postId = post.Id;
 
                 foreach (var (type, asset) in assets)
                 {
@@ -370,7 +374,7 @@ namespace CyanTools.ViewModel
                         ? asset.Path
                         : $"{ApiBaseUrl}{asset.Path}";
 
-                    yield return new KemonoAssetDownload(downloadUrl, fileName, post.Content);
+                    yield return new KemonoAssetDownload(downloadUrl, fileName, postContent, postId);
                     assetIndex++;
                 }
             }
@@ -390,6 +394,94 @@ namespace CyanTools.ViewModel
 
             var datePart = published.Split('T').FirstOrDefault();
             return string.IsNullOrWhiteSpace(datePart) ? "unknown" : datePart.Replace('-', '_');
+        }
+
+        private static string? GetPostContent(KemonoPost post)
+        {
+            if (!string.IsNullOrWhiteSpace(post.ContentRaw))
+            {
+                return post.ContentRaw;
+            }
+
+            if (!string.IsNullOrWhiteSpace(post.Content))
+            {
+                return post.Content;
+            }
+
+            return null;
+        }
+
+        private async Task<string?> ResolvePostContentAsync(KemonoAssetDownload asset, string artistId, string service, IDictionary<string, string?> cache, CancellationToken token)
+        {
+            if (!string.IsNullOrWhiteSpace(asset.Content))
+            {
+                return asset.Content;
+            }
+
+            if (string.IsNullOrWhiteSpace(asset.PostId))
+            {
+                return null;
+            }
+
+            if (cache.TryGetValue(asset.PostId, out var cached))
+            {
+                return cached;
+            }
+
+            var content = await FetchPostContentAsync(artistId, service, asset.PostId, token);
+            cache[asset.PostId] = content;
+            return content;
+        }
+
+        private async Task<string?> FetchPostContentAsync(string artistId, string service, string postId, CancellationToken token)
+        {
+            var requestUri = $"/api/v1/{service}/user/{artistId}/post/{postId}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+
+            var payload = await response.Content.ReadAsStringAsync(token);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                AppendLog($"获取内容 {postId} 失败: {response.StatusCode}");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return null;
+            }
+
+            try
+            {
+                var tokenJson = JToken.Parse(payload);
+                if (tokenJson.Type != JTokenType.Object)
+                {
+                    return null;
+                }
+
+                var error = tokenJson.Value<string>("error");
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    AppendLog($"获取内容 {postId} 失败: {error}");
+                    return null;
+                }
+
+                var contentRaw = tokenJson.Value<string>("content_raw");
+                if (!string.IsNullOrWhiteSpace(contentRaw))
+                {
+                    return contentRaw;
+                }
+
+                var content = tokenJson.Value<string>("content");
+                return string.IsNullOrWhiteSpace(content) ? null : content;
+            }
+            catch (JsonException jsonEx)
+            {
+                AppendLog($"解析内容 {postId} 失败: {jsonEx.Message}");
+                return null;
+            }
         }
 
         private async Task<bool> DownloadAssetAsync(KemonoAssetDownload asset, string outputDirectory, CancellationToken token)
@@ -430,17 +522,17 @@ namespace CyanTools.ViewModel
             return false;
         }
 
-        private async Task SaveContentAsync(KemonoAssetDownload asset, string outputDirectory, CancellationToken token)
+        private async Task SaveContentAsync(string? content, string fileName, string outputDirectory, CancellationToken token)
         {
-            if (string.IsNullOrWhiteSpace(asset.Content))
+            if (string.IsNullOrWhiteSpace(content))
             {
                 return;
             }
 
             try
             {
-                var txtPath = Path.Combine(outputDirectory, Path.ChangeExtension(asset.FileName, ".txt"));
-                await File.WriteAllTextAsync(txtPath, asset.Content, Encoding.UTF8, token);
+                var txtPath = Path.Combine(outputDirectory, Path.ChangeExtension(fileName, ".txt"));
+                await File.WriteAllTextAsync(txtPath, content, Encoding.UTF8, token);
             }
             catch (OperationCanceledException)
             {
@@ -448,7 +540,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                AppendLog($"保存内容 {asset.FileName} 失败: {ex.Message}");
+                AppendLog($"保存内容 {fileName} 失败: {ex.Message}");
             }
         }
 
@@ -489,15 +581,21 @@ namespace CyanTools.ViewModel
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private sealed record KemonoAssetDownload(string Url, string FileName, string? Content);
+        private sealed record KemonoAssetDownload(string Url, string FileName, string? Content, string? PostId);
 
         private sealed class KemonoPost
         {
+            [JsonProperty("id")]
+            public string? Id { get; set; }
+
             [JsonProperty("published")]
             public string? Published { get; set; }
 
             [JsonProperty("content")]
             public string? Content { get; set; }
+
+            [JsonProperty("content_raw")]
+            public string? ContentRaw { get; set; }
 
             [JsonProperty("file")]
             public KemonoAsset? File { get; set; }

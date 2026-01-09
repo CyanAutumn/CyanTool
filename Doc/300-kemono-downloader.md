@@ -31,7 +31,7 @@
 
 - `type` 为 `file` 或 `attachment`
 - 日期从 post 的 `published` 字段解析
-- 会额外保存 post 的 `content` 到同名的 `.txt` 文件中
+- 会额外保存 post 的 `content` 到同名的 `.txt` 文件中；如果列表缺失 `content`，会再请求单条 post 详情补全
 
 ## 注意事项
 
