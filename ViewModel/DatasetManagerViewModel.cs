@@ -232,6 +232,8 @@ namespace CyanTools.ViewModel
         public ICommand CopyNextDataCommand { get; }
         public ICommand SavePromptCommand { get; }
         public ICommand RemoveTagCommand { get; }
+        public ICommand MoveTagToStartCommand { get; }
+        public ICommand MoveTagToEndCommand { get; }
         public ICommand UpsertTagTranslationCommand { get; }
         public ICommand TranslateAllMissingTagsCommand { get; }
         
@@ -254,6 +256,10 @@ namespace CyanTools.ViewModel
             CopyNextDataCommand = new RelayCommand(_ => CopyNextData(), _ => DataItemsWithOperations.Any());
             SavePromptCommand = new RelayCommand(_ => SavePrompt(), _ => SelectedDataItem != null);
             RemoveTagCommand = new RelayCommand(param => RemoveTag(param as TagTokenViewModel));
+            MoveTagToStartCommand = new RelayCommand(param => MoveTagToStart(param as TagTokenViewModel),
+                param => CanMoveTagToStart(param as TagTokenViewModel));
+            MoveTagToEndCommand = new RelayCommand(param => MoveTagToEnd(param as TagTokenViewModel),
+                param => CanMoveTagToEnd(param as TagTokenViewModel));
             UpsertTagTranslationCommand = new RelayCommand(async _ => await UpsertTagTranslationAsync(),
                 _ => !string.IsNullOrWhiteSpace(ManualTagInput));
             TranslateAllMissingTagsCommand = new RelayCommand(async _ => await TranslateAllMissingTagsAsync(),
@@ -810,6 +816,75 @@ namespace CyanTools.ViewModel
             }
 
             TagTokens.Remove(token);
+        }
+
+        private void MoveTagToStart(TagTokenViewModel? token)
+        {
+            MoveTagToken(token, 0);
+        }
+
+        private void MoveTagToEnd(TagTokenViewModel? token)
+        {
+            if (token == null)
+            {
+                return;
+            }
+
+            int lastIndex = TagTokens.Count - 1;
+            MoveTagToken(token, lastIndex);
+        }
+
+        private bool CanMoveTagToStart(TagTokenViewModel? token)
+        {
+            if (token == null || TagTokens.Count <= 1)
+            {
+                return false;
+            }
+
+            int index = TagTokens.IndexOf(token);
+            return index > 0;
+        }
+
+        private bool CanMoveTagToEnd(TagTokenViewModel? token)
+        {
+            if (token == null || TagTokens.Count <= 1)
+            {
+                return false;
+            }
+
+            int index = TagTokens.IndexOf(token);
+            return index >= 0 && index < TagTokens.Count - 1;
+        }
+
+        private void MoveTagToken(TagTokenViewModel? token, int targetIndex)
+        {
+            if (token == null || TagTokens.Count == 0)
+            {
+                return;
+            }
+
+            int currentIndex = TagTokens.IndexOf(token);
+            if (currentIndex < 0)
+            {
+                return;
+            }
+
+            if (targetIndex < 0)
+            {
+                targetIndex = 0;
+            }
+
+            if (targetIndex >= TagTokens.Count)
+            {
+                targetIndex = TagTokens.Count - 1;
+            }
+
+            if (currentIndex == targetIndex)
+            {
+                return;
+            }
+
+            TagTokens.Move(currentIndex, targetIndex);
         }
 
         public void CommitPendingTags(bool flushAll)

@@ -25,6 +25,16 @@
                     PreviewMouseLeftButtonDown="TagChip_PreviewMouseLeftButtonDown"
                     PreviewMouseMove="TagChip_PreviewMouseMove"
                     PreviewMouseLeftButtonUp="TagChip_PreviewMouseLeftButtonUp">
+                <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="移到最前"
+                                  Command="{Binding Data.MoveTagToStartCommand, Source={StaticResource TagViewModelProxy}}"
+                                  CommandParameter="{Binding}"/>
+                        <MenuItem Header="移到最后"
+                                  Command="{Binding Data.MoveTagToEndCommand, Source={StaticResource TagViewModelProxy}}"
+                                  CommandParameter="{Binding}"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
