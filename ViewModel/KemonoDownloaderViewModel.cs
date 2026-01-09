@@ -11,6 +11,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,11 +23,8 @@ namespace CyanTools.ViewModel
     {
         private const string ApiBaseUrl = "https://kemono.cr";
         private const int PageSize = 50;
-        private static readonly TimeSpan DownloadDelay = TimeSpan.FromSeconds(3);
-        private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"
-        };
+        private const int DownloadRetryCount = 3;
+        private static readonly TimeSpan DownloadDelay = TimeSpan.FromSeconds(5);
         private static readonly HttpClient HttpClient;
 
         static KemonoDownloaderViewModel()
@@ -238,6 +236,7 @@ namespace CyanTools.ViewModel
                     {
                         savedCount++;
                         AppendLog($"已保存 {asset.FileName}");
+                        await SaveContentAsync(asset, OutputDirectory, token);
                     }
                     await Task.Delay(DownloadDelay, token);
                 }
@@ -247,7 +246,7 @@ namespace CyanTools.ViewModel
 
             if (savedCount == 0)
             {
-                AppendLog("没有可下载的图片。");
+                AppendLog("没有可下载的文件。");
             }
             else
             {
@@ -361,14 +360,9 @@ namespace CyanTools.ViewModel
                         extension = Path.GetExtension(asset.Path);
                     }
 
-                    if (!IsImageExtension(extension))
-                    {
-                        continue;
-                    }
-
                     if (string.IsNullOrWhiteSpace(extension))
                     {
-                        extension = ".img";
+                        extension = ".bin";
                     }
 
                     string fileName = $"{artistId}_{dateSegment}_{page}_{type}_{assetIndex}{extension}";
@@ -376,7 +370,7 @@ namespace CyanTools.ViewModel
                         ? asset.Path
                         : $"{ApiBaseUrl}{asset.Path}";
 
-                    yield return new KemonoAssetDownload(downloadUrl, fileName);
+                    yield return new KemonoAssetDownload(downloadUrl, fileName, post.Content);
                     assetIndex++;
                 }
             }
@@ -398,24 +392,55 @@ namespace CyanTools.ViewModel
             return string.IsNullOrWhiteSpace(datePart) ? "unknown" : datePart.Replace('-', '_');
         }
 
-        private static bool IsImageExtension(string? extension)
-        {
-            return !string.IsNullOrWhiteSpace(extension) && AllowedExtensions.Contains(extension);
-        }
-
         private async Task<bool> DownloadAssetAsync(KemonoAssetDownload asset, string outputDirectory, CancellationToken token)
         {
+            Directory.CreateDirectory(outputDirectory);
+            var targetPath = Path.Combine(outputDirectory, asset.FileName);
+
+            for (int attempt = 0; attempt <= DownloadRetryCount; attempt++)
+            {
+                try
+                {
+                    token.ThrowIfCancellationRequested();
+                    using var response = await HttpClient.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead, token);
+                    response.EnsureSuccessStatusCode();
+
+                    await using var input = await response.Content.ReadAsStreamAsync(token);
+                    await using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                    await input.CopyToAsync(output, token);
+                    return true;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    if (attempt < DownloadRetryCount)
+                    {
+                        AppendLog($"下载 {asset.FileName} 失败，重试 {attempt + 1}/{DownloadRetryCount}: {ex.Message}");
+                        continue;
+                    }
+
+                    AppendLog($"下载 {asset.FileName} 失败: {ex.Message}");
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private async Task SaveContentAsync(KemonoAssetDownload asset, string outputDirectory, CancellationToken token)
+        {
+            if (string.IsNullOrWhiteSpace(asset.Content))
+            {
+                return;
+            }
+
             try
             {
-                Directory.CreateDirectory(outputDirectory);
-                using var response = await HttpClient.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead, token);
-                response.EnsureSuccessStatusCode();
-
-                await using var input = await response.Content.ReadAsStreamAsync(token);
-                var targetPath = Path.Combine(outputDirectory, asset.FileName);
-                await using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await input.CopyToAsync(output, token);
-                return true;
+                var txtPath = Path.Combine(outputDirectory, Path.ChangeExtension(asset.FileName, ".txt"));
+                await File.WriteAllTextAsync(txtPath, asset.Content, Encoding.UTF8, token);
             }
             catch (OperationCanceledException)
             {
@@ -423,8 +448,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                AppendLog($"下载 {asset.FileName} 失败: {ex.Message}");
-                return false;
+                AppendLog($"保存内容 {asset.FileName} 失败: {ex.Message}");
             }
         }
 
@@ -465,12 +489,15 @@ namespace CyanTools.ViewModel
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private sealed record KemonoAssetDownload(string Url, string FileName);
+        private sealed record KemonoAssetDownload(string Url, string FileName, string? Content);
 
         private sealed class KemonoPost
         {
             [JsonProperty("published")]
             public string? Published { get; set; }
+
+            [JsonProperty("content")]
+            public string? Content { get; set; }
 
             [JsonProperty("file")]
             public KemonoAsset? File { get; set; }
