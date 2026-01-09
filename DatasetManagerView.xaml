@@ -57,7 +57,7 @@
                              PreviewKeyDown="TagEditBox_PreviewKeyDown"
                              TextChanged="TagEditBox_TextChanged"
                              LostKeyboardFocus="TagEditBox_LostKeyboardFocus"
-                             Loaded="TagEditBox_Loaded"/>
+                             IsVisibleChanged="TagEditBox_IsVisibleChanged"/>
                 </Grid>
             </Border>
             <DataTemplate.Triggers>
@@ -109,88 +109,113 @@
             </Grid>
 
             <TextBlock DockPanel.Dock="Top" Text="数据列表" FontWeight="Bold" Margin="0,0,0,5"/>
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl x:Name="DataItemsList" ItemsSource="{Binding DataItemsWithOperations}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel IsItemsHost="True" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button Command="{Binding DataContext.SelectDataItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    CommandParameter="{Binding}"
-                                    Width="100"
-                                    Height="130"
-                                    Margin="4"
-                                    Padding="0"
-                                    BorderThickness="0"
-                                    Background="Transparent"
-                                    HorizontalContentAlignment="Stretch"
-                                    VerticalContentAlignment="Stretch"
-                                    Focusable="False">
-                                <Border>
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
-                                            <Setter Property="Background" Value="White"/>
-                                            <Setter Property="BorderThickness" Value="1"/>
-                                            <Setter Property="CornerRadius" Value="4"/>
-                                            <Setter Property="Padding" Value="4"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Value="True">
-                                                    <DataTrigger.Binding>
-                                                        <MultiBinding Converter="{StaticResource ReferenceEqualsMultiConverter}">
-                                                            <Binding />
-                                                            <Binding Path="DataContext.SelectedDataItem" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
-                                                        </MultiBinding>
-                                                    </DataTrigger.Binding>
-                                                    <Setter Property="BorderBrush" Value="#FF409EFF"/>
-                                                    <Setter Property="Background" Value="#FFEAF3FF"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
+            <ListBox x:Name="DataItemsList"
+                     ItemsSource="{Binding DataItemsWithOperations}"
+                     SelectedItem="{Binding SelectedDataItem, Mode=TwoWay}"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="True"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <utils:VirtualizingWrapPanel ItemWidth="108" ItemHeight="138"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Button Command="{Binding DataContext.SelectDataItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"
+                                Width="100"
+                                Height="130"
+                                Margin="4"
+                                Padding="0"
+                                BorderThickness="0"
+                                Background="Transparent"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"
+                                Focusable="False">
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
+                                        <Setter Property="Background" Value="White"/>
+                                        <Setter Property="BorderThickness" Value="1"/>
+                                        <Setter Property="CornerRadius" Value="4"/>
+                                        <Setter Property="Padding" Value="4"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Value="True">
+                                                <DataTrigger.Binding>
+                                                    <MultiBinding Converter="{StaticResource ReferenceEqualsMultiConverter}">
+                                                        <Binding />
+                                                        <Binding Path="DataContext.SelectedDataItem" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                    </MultiBinding>
+                                                </DataTrigger.Binding>
+                                                <Setter Property="BorderBrush" Value="#FF409EFF"/>
+                                                <Setter Property="Background" Value="#FFEAF3FF"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
                                     <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <Grid>
-                                            <Border Background="#FFEFEFEF" CornerRadius="3">
-                                                <Image Width="80"
-                                                       Height="80"
-                                                       Stretch="UniformToFill"
-                                                       Source="{Binding ImagePath, Converter={StaticResource ImagePathThumbnailConverter}, ConverterParameter=96}"/>
-                                            </Border>
-                                            <Border x:Name="OperationBadge"
-                                                    HorizontalAlignment="Right"
-                                                    VerticalAlignment="Top"
-                                                    Margin="2"
-                                                    Background="#CC333333"
-                                                    CornerRadius="2"
-                                                    Padding="2">
-                                                <TextBlock Text="{Binding Operation}" Foreground="White" FontSize="10"/>
-                                            </Border>
-                                        </Grid>
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding ImageDisplayName}"
-                                                   FontSize="11"
-                                                   Margin="0,4,0,0"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding ImageDisplayName}"/>
+                                        <Border Background="#FFEFEFEF" CornerRadius="3">
+                                            <Image Width="80"
+                                                   Height="80"
+                                                   Stretch="UniformToFill"
+                                                   Source="{Binding ImagePath, Converter={StaticResource ImagePathThumbnailConverter}, ConverterParameter=96}"/>
+                                        </Border>
+                                        <Border x:Name="OperationBadge"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="2"
+                                                Background="#CC333333"
+                                                CornerRadius="2"
+                                                Padding="2">
+                                            <TextBlock Text="{Binding Operation}" Foreground="White" FontSize="10"/>
+                                        </Border>
                                     </Grid>
-                                </Border>
-                            </Button>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding Operation}" Value="">
-                                    <Setter TargetName="OperationBadge" Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding ImageDisplayName}"
+                                               FontSize="11"
+                                               Margin="0,4,0,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding ImageDisplayName}"/>
+                                </Grid>
+                            </Border>
+                        </Button>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Operation}" Value="">
+                                <Setter TargetName="OperationBadge" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </DockPanel>
 
 

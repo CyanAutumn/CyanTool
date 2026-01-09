@@ -12,6 +12,7 @@ using CyanTools.ViewModel;
 using System.Windows.Controls.Primitives;
 using CyanTools.Model;
 using System.Windows.Threading;
+using CyanTools.Utils;
 
 namespace CyanTools
 {
@@ -275,6 +276,12 @@ namespace CyanTools
 
         private int GetItemsPerRow()
         {
+            var virtualPanel = FindVisualChild<VirtualizingWrapPanel>(DataItemsList);
+            if (virtualPanel != null && virtualPanel.ItemsPerRow > 0)
+            {
+                return virtualPanel.ItemsPerRow;
+            }
+
             var panel = FindVisualChild<WrapPanel>(DataItemsList);
             if (panel == null || panel.Children.Count == 0)
             {
@@ -310,19 +317,24 @@ namespace CyanTools
 
         private void BringItemIntoView(int index)
         {
-            var panel = FindVisualChild<WrapPanel>(DataItemsList);
-            if (panel != null && index >= 0 && index < panel.Children.Count)
+            if (DataItemsList is ListBox listBox)
             {
-                if (panel.Children[index] is FrameworkElement element)
+                if (index < 0 || index >= listBox.Items.Count)
                 {
-                    element.BringIntoView();
                     return;
                 }
+
+                listBox.ScrollIntoView(listBox.Items[index]);
+                if (listBox.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
+                {
+                    container.BringIntoView();
+                }
+                return;
             }
 
-            if (DataItemsList.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
+            if (DataItemsList.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement fallbackContainer)
             {
-                container.BringIntoView();
+                fallbackContainer.BringIntoView();
             }
         }
 
@@ -852,20 +864,22 @@ namespace CyanTools
             }
         }
 
-        private void TagEditBox_Loaded(object sender, RoutedEventArgs e)
+        private void TagEditBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (sender is TextBox textBox)
+            if (ViewModel == null || sender is not TextBox textBox || !textBox.IsVisible)
             {
-                textBox.Focus();
-                textBox.SelectAll();
-                if (TrySuppressSuggestionAfterDrag())
-                {
-                    return;
-                }
-
-                SetActiveSuggestionTarget(textBox);
-                _ = ViewModel?.RefreshSuggestionsAsync(textBox.Text);
+                return;
             }
+
+            textBox.Focus();
+            textBox.SelectAll();
+            if (TrySuppressSuggestionAfterDrag())
+            {
+                return;
+            }
+
+            SetActiveSuggestionTarget(textBox);
+            _ = ViewModel.RefreshSuggestionsAsync(textBox.Text);
         }
 
         private void TagSuggestionList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
