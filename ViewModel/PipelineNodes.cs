@@ -87,7 +87,7 @@ namespace CyanTools.ViewModel
 
     public sealed class DanbooruCrawlerPipelineNode : CyanTools.Pipeline.SimplePipelineNode<DanbooruCrawlerViewModel>
     {
-        public DanbooruCrawlerPipelineNode() : base("Danbooru下载器") { }
+        public DanbooruCrawlerPipelineNode() : base("Booru下载器") { }
     }
 
     public sealed class KemonoDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<KemonoDownloaderViewModel>

@@ -49,7 +49,7 @@ namespace CyanTools.Pipeline
             Register(new PipelineNodeDescriptor("图片打标", typeof(TaggingPipelineNode), () => new TaggingPipelineNode()));
             Register(new PipelineNodeDescriptor("训练集配平", typeof(TrainingSetBalancerPipelineNode), () => new TrainingSetBalancerPipelineNode()));
             Register(new PipelineNodeDescriptor("图片重命名", typeof(ImageRenamePipelineNode), () => new ImageRenamePipelineNode()));
-            Register(new PipelineNodeDescriptor("Danbooru下载器", typeof(DanbooruCrawlerPipelineNode), () => new DanbooruCrawlerPipelineNode(), requiresUnlock: true));
+            Register(new PipelineNodeDescriptor("Booru下载器", typeof(DanbooruCrawlerPipelineNode), () => new DanbooruCrawlerPipelineNode(), requiresUnlock: true));
             Register(new PipelineNodeDescriptor("Kemono下载器", typeof(KemonoDownloaderPipelineNode), () => new KemonoDownloaderPipelineNode(), requiresUnlock: true));
             Register(new PipelineNodeDescriptor("Pixiv下载器", typeof(PixivDownloaderPipelineNode), () => new PixivDownloaderPipelineNode(), requiresUnlock: true));
         }
