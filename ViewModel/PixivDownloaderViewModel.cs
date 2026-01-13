@@ -33,6 +33,7 @@ namespace CyanTools.ViewModel
         private const string PixivUserAgent = "PixivIOSApp/7.13.3 (iOS 14.6; iPhone13,2)";
         private const string AppOs = "ios";
         private const string AppOsVersion = "14.6";
+        private const string DefaultOutputDirectory = "./output";
         private static readonly string RefreshTokenDirectory = Path.Combine(AppContext.BaseDirectory, "Configs", "Crawler");
         private static readonly string RefreshTokenFilePath = Path.Combine(RefreshTokenDirectory, "pixiv_refresh_token.txt");
         private static readonly string[] ContentTypes = { "illust", "manga" };
@@ -59,7 +60,7 @@ namespace CyanTools.ViewModel
         private CancellationTokenSource? _cancellationTokenSource;
         private string _artistId = string.Empty;
         private string _refreshToken = string.Empty;
-        private string _outputDirectory = Path.Combine(AppContext.BaseDirectory, "output", "pixiv");
+        private string _outputDirectory = DefaultOutputDirectory;
         private string _logText = string.Empty;
         private bool _isDownloading;
         private bool _hasShownCancelMessage;
@@ -271,7 +272,7 @@ namespace CyanTools.ViewModel
             var artistId = (ArtistId ?? string.Empty).Trim();
             var refreshToken = (RefreshToken ?? string.Empty).Trim();
             var baseDirectory = string.IsNullOrWhiteSpace(OutputDirectory)
-                ? Path.Combine(AppContext.BaseDirectory, "output", "pixiv")
+                ? DefaultOutputDirectory
                 : OutputDirectory.Trim();
 
             var artistDirectory = Path.Combine(baseDirectory, artistId);
@@ -612,7 +613,7 @@ namespace CyanTools.ViewModel
             try
             {
                 var rootDirectory = string.IsNullOrWhiteSpace(OutputDirectory)
-                    ? Path.Combine(AppContext.BaseDirectory, "output", "pixiv")
+                    ? DefaultOutputDirectory
                     : OutputDirectory.Trim();
                 if (string.IsNullOrWhiteSpace(rootDirectory))
                 {

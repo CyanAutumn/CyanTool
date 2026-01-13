@@ -3,7 +3,7 @@ using CyanTools.Navigation;
 
 namespace CyanTools
 {
-    [ToolPage("转换图片格式", 250)]
+    [ToolPage("格式转换", 250)]
     public partial class ConvertImageFormatView : UserControl
     {
         public ConvertImageFormatView()

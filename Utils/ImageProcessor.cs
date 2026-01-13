@@ -41,46 +41,55 @@ namespace CyanTools.Utils {
         }
 
         private static readonly HttpClient HttpClient = new HttpClient();
-        private const string LmStudioApiUrl = "http://127.0.0.1:1234/v1";
 
-        public async Task<List<ModelData>> GetLoadedModelsAsync() {
+        public async Task<List<ModelData>> GetLoadedModelsAsync(string apiUrl) {
             try {
-                var response = await HttpClient.GetAsync($"{LmStudioApiUrl}/models");
+                var uri = new Uri(apiUrl.TrimEnd('/'));
+                var baseUrl = $"{uri.Scheme}://{uri.Host}:{uri.Port}/v1"; 
+
+
+
+
+
+                
+                var response = await HttpClient.GetAsync($"{apiUrl}/models");
                 response.EnsureSuccessStatusCode();
                 var loadedModels = await response.Content.ReadFromJsonAsync<LoadedModelsModel>();
                 return loadedModels?.Data ?? new List<ModelData>();
             }
             catch (Exception ex) {
-                Console.WriteLine($"Error fetching models: {ex.Message}");
+                Console.WriteLine($"获取模型出错: {ex.Message}");
                 return new List<ModelData>();
             }
         }
 
         public async Task ProcessImagesAsync(string prompt, string workingDirectory, IEnumerable<string> destPaths,
-            bool useReasoning, IProgress<string> progress) {
+            bool useReasoning, string apiUrl, string functionType, IProgress<string> progress) {
             if (string.IsNullOrWhiteSpace(prompt)) {
                 progress.Report("错误: 主输入框的提示词不能为空。");
                 return;
             }
 
             if (string.IsNullOrEmpty(workingDirectory) || !Directory.Exists(workingDirectory)) {
-                progress.Report("Error: Working directory is not valid.");
+                progress.Report("错误: 工作目录无效。");
                 return;
             }
-
 
             var destDirs = destPaths.ToList();
             var dirOther = Path.Combine(workingDirectory, "other");
-            try {
-                foreach (var dir in destDirs) {
-                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                }
 
-                Directory.CreateDirectory(dirOther);
-            }
-            catch (Exception ex) {
-                progress.Report($"Error creating directories: {ex.Message}");
-                return;
+            if (functionType == "归类")
+            {
+                try {
+                    foreach (var dir in destDirs) {
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    }
+                    Directory.CreateDirectory(dirOther);
+                }
+                catch (Exception ex) {
+                    progress.Report($"创建目录出错: {ex.Message}");
+                    return;
+                }
             }
 
             var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
@@ -89,40 +98,88 @@ namespace CyanTools.Utils {
                 .ToList();
 
             if (!imageFiles.Any()) {
-                progress.Report("No images found in the source directory.");
+                progress.Report("源目录中未找到图片。");
                 return;
             }
 
-            progress.Report($"Found {imageFiles.Count} images to process.");
+            progress.Report($"找到 {imageFiles.Count} 张图片待处理。模式: {functionType}");
 
             foreach (var imagePath in imageFiles) {
                 var fileName = Path.GetFileName(imagePath);
-                progress.Report($"Processing: {fileName}");
+                progress.Report($"正在处理: {fileName}");
 
-                var analysisResult = await AnalyzeImageAsync(imagePath, prompt, useReasoning, progress);
+                if (functionType == "归类")
+                {
+                    var analysisResult = await AnalyzeImageAsync(imagePath, prompt, useReasoning, apiUrl, progress);
 
-                if (analysisResult == null) {
-                    progress.Report($"  -> Skipped (error): {fileName}");
-                    continue;
+                    if (analysisResult == null) {
+                        progress.Report($"  -> 跳过 (错误): {fileName}");
+                        continue;
+                    }
+
+                    var targetDir = analysisResult.Level > 0 && analysisResult.Level <= destDirs.Count
+                        ? destDirs[analysisResult.Level - 1]
+                        : dirOther;
+
+                    MoveFileWithCompanion(imagePath, targetDir, progress);
+                    progress.Report(
+                        $"  -> 移动到等级 {analysisResult.Level}: {fileName}。原因: {analysisResult.Reason}");
                 }
-
-                var targetDir = analysisResult.Level > 0 && analysisResult.Level <= destDirs.Count
-                    ? destDirs[analysisResult.Level - 1]
-                    : dirOther;
-
-                MoveFileWithCompanion(imagePath, targetDir, progress);
-                progress.Report(
-                    $"  -> Moved to level {analysisResult.Level}: {fileName}. Reason: {analysisResult.Reason}");
+                else if (functionType == "打标")
+                {
+                    var response = await GenerateResponseAsync(imagePath, prompt, useReasoning, apiUrl, progress);
+                    if (!string.IsNullOrWhiteSpace(response))
+                    {
+                        var txtPath = Path.ChangeExtension(imagePath, ".txt");
+                        try {
+                            File.WriteAllText(txtPath, response);
+                            progress.Report($"  -> 已保存标签至 {Path.GetFileName(txtPath)}");
+                        } catch (Exception ex) {
+                            progress.Report($"  -> 保存标签出错: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        progress.Report($"  -> 跳过 (空响应/错误): {fileName}");
+                    }
+                }
             }
 
-            progress.Report("--- Finished Image Filtering Process ---");
+            progress.Report("--- 图片处理完成 ---");
         }
 
-        private async Task<AnalysisResult> AnalyzeImageAsync(string imagePath, string prompt, bool useReasoning,
+        private async Task<string> GenerateResponseAsync(string imagePath, string prompt, bool useReasoning, string apiUrl, IProgress<string> progress)
+        {
+            var base64Image = EncodeImageToBase64(imagePath);
+            if (base64Image == null) {
+                progress.Report($"  - 编码图片出错: {Path.GetFileName(imagePath)}");
+                return null;
+            }
+
+            var request = new ApiRequest
+            {
+                Messages = new List<CyanTools.Model.Message>
+                {
+                    new CyanTools.Model.Message
+                    {
+                        Content = new List<ContentPart>
+                        {
+                            new ContentPart { Type = "text", Text = prompt },
+                            new ContentPart { Type = "image_url", ImageUrl = new ImageUrlData { Url = $"data:image/jpeg;base64,{base64Image}" } }
+                        }
+                    }
+                },
+                Stream = false
+            };
+            
+            return await ExecuteRequestAsync(request, imagePath, apiUrl, useReasoning, progress);
+        }
+
+        private async Task<AnalysisResult> AnalyzeImageAsync(string imagePath, string prompt, bool useReasoning, string apiUrl,
             IProgress<string> progress) {
             var base64Image = EncodeImageToBase64(imagePath);
             if (base64Image == null) {
-                progress.Report($"  - Error encoding image: {Path.GetFileName(imagePath)}");
+                progress.Report($"  - 编码图片出错: {Path.GetFileName(imagePath)}");
                 return null;
             }
 
@@ -151,16 +208,45 @@ namespace CyanTools.Utils {
                 ResponseFormat = useReasoning ? BuildJsonSchemaResponseFormat() : null
             };
 
+            var modelResponse = await ExecuteRequestAsync(request, imagePath, apiUrl, useReasoning, progress);
+            if (string.IsNullOrEmpty(modelResponse)) return null;
+
+            progress.Report($"  - LLM 响应 (已处理): {BuildLogResponse(modelResponse)}");
+
+            if (TryExtractJsonObject(modelResponse, out var jsonPayload)
+                && TryParseAnalysisResultFromJson(jsonPayload, out var jsonResult)) {
+                return jsonResult;
+            }
+
+            if (!TryGetParseSource(modelResponse, out var parseSource)) {
+                progress.Report($"  - 未能在响应中找到最终结果: {Path.GetFileName(imagePath)}");
+                return null;
+            }
+
+            if (!TryParseLevel(parseSource, out var level)) {
+                progress.Report($"  - 未能在响应中找到 'level' 关键词: {Path.GetFileName(imagePath)}");
+                return null;
+            }
+
+            return new AnalysisResult
+            {
+                Level = level,
+                Reason = parseSource.Trim()
+            };
+        }
+
+        private async Task<string> ExecuteRequestAsync(ApiRequest request, string imagePath, string apiUrl, bool useReasoning, IProgress<string> progress)
+        {
             try {
-                var (isSuccess, statusCode, body) = await SendChatRequestAsync(request);
+                var (isSuccess, statusCode, body) = await SendChatRequestAsync(request, apiUrl);
                 if (!isSuccess) {
-                    progress.Report($"  - API request failed ({(int)statusCode} {statusCode}): {Truncate(body)}");
+                    progress.Report($"  - API 请求失败 ({(int)statusCode} {statusCode}): {Truncate(body)}");
                     if (useReasoning && statusCode == HttpStatusCode.BadRequest && request.ResponseFormat != null) {
-                        progress.Report("  - Retrying without response_format...");
+                        progress.Report("  - 正在重试 (不使用 response_format)...");
                         request.ResponseFormat = null;
-                        var retry = await SendChatRequestAsync(request);
+                        var retry = await SendChatRequestAsync(request, apiUrl);
                         if (!retry.IsSuccess) {
-                            progress.Report($"  - API request failed ({(int)retry.StatusCode} {retry.StatusCode}): {Truncate(retry.Body)}");
+                            progress.Report($"  - API 请求失败 ({(int)retry.StatusCode} {retry.StatusCode}): {Truncate(retry.Body)}");
                             return null;
                         }
 
@@ -174,49 +260,34 @@ namespace CyanTools.Utils {
                 var modelResponse = apiResponse?.Choices?.FirstOrDefault()?.Message?.Content?.Trim();
 
                 if (string.IsNullOrEmpty(modelResponse)) {
-                    progress.Report($"  - Failed to parse response for {Path.GetFileName(imagePath)}");
+                    progress.Report($"  - 解析响应失败: {Path.GetFileName(imagePath)}");
                     return null;
                 }
+                
+                modelResponse = StripThinkContent(modelResponse);
 
-                progress.Report($"  - LLM response: {BuildLogResponse(modelResponse)}");
-
-                if (TryExtractJsonObject(modelResponse, out var jsonPayload)
-                    && TryParseAnalysisResultFromJson(jsonPayload, out var jsonResult)) {
-                    return jsonResult;
-                }
-
-                if (!TryGetParseSource(modelResponse, out var parseSource)) {
-                    if (HasThinkTag(modelResponse)) {
-                        progress.Report("  - Model returned reasoning only. Use a non-reasoning model or enforce JSON-only output.");
-                    }
-                    progress.Report($"  - No final result found in response for {Path.GetFileName(imagePath)}");
-                    return null;
-                }
-
-                if (!TryParseLevel(parseSource, out var level)) {
-                    progress.Report($"  - No level keyword found in response for {Path.GetFileName(imagePath)}");
-                    return null;
-                }
-
-                return new AnalysisResult
-                {
-                    Level = level,
-                    Reason = parseSource.Trim()
-                };
+                return modelResponse;
             }
             catch (HttpRequestException ex) {
-                progress.Report($"  - API request failed for {Path.GetFileName(imagePath)}: {ex.Message}");
+                progress.Report($"  - API 请求失败 {Path.GetFileName(imagePath)}: {ex.Message}");
                 return null;
             }
             catch (JsonException ex) {
                 progress.Report(
-                    $"  - Failed to deserialize JSON response for {Path.GetFileName(imagePath)}: {ex.Message}");
+                    $"  - 反序列化 JSON 响应失败 {Path.GetFileName(imagePath)}: {ex.Message}");
                 return null;
             }
             catch (Exception ex) {
-                progress.Report($"  - An unexpected error occurred for {Path.GetFileName(imagePath)}: {ex.Message}");
+                progress.Report($"  - 发生意外错误 {Path.GetFileName(imagePath)}: {ex.Message}");
                 return null;
             }
+        }
+
+        private static string StripThinkContent(string text) {
+            if (string.IsNullOrEmpty(text)) return text;
+            var pattern = @"<think>.*?</think>";
+            var result = Regex.Replace(text, pattern, "", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            return result.Trim();
         }
 
         private string EncodeImageToBase64(string filePath) {
@@ -226,7 +297,7 @@ namespace CyanTools.Utils {
             }
             catch (Exception ex) {
 
-                Console.WriteLine($"Error encoding image {filePath}: {ex.Message}");
+                Console.WriteLine($"图片编码出错 {filePath}: {ex.Message}");
                 return null;
             }
         }
@@ -254,8 +325,10 @@ namespace CyanTools.Utils {
             };
         }
 
-        private static async Task<(bool IsSuccess, HttpStatusCode StatusCode, string Body)> SendChatRequestAsync(ApiRequest request) {
-            using var response = await HttpClient.PostAsJsonAsync($"{LmStudioApiUrl}/chat/completions", request);
+        private static async Task<(bool IsSuccess, HttpStatusCode StatusCode, string Body)> SendChatRequestAsync(ApiRequest request, string apiUrl) {
+
+            var url = $"{apiUrl.TrimEnd('/')}/chat/completions";
+            using var response = await HttpClient.PostAsJsonAsync(url, request);
             var body = await response.Content.ReadAsStringAsync();
             return (response.IsSuccessStatusCode, response.StatusCode, body);
         }
@@ -497,7 +570,7 @@ namespace CyanTools.Utils {
                 }
             }
             catch (Exception ex) {
-                progress.Report($"  - Error moving file {fileName}: {ex.Message}");
+                progress.Report($"  - 移动文件出错 {fileName}: {ex.Message}");
             }
         }
     }

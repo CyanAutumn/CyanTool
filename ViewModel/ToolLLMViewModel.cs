@@ -26,6 +26,8 @@ namespace CyanTools.ViewModel
             private string _path5 = "";
         private bool _isRunEnabled = true;
         private bool _isReasoning;
+        private string _apiUrl = "http://127.0.0.1:1234/v1";
+        private string _selectedFunction = "归类";
         private string _newConfigName;
         private ConfigurationModel _selectedConfig;
         private string _workingDirectory = "";
@@ -42,6 +44,20 @@ namespace CyanTools.ViewModel
         public string Path5 { get => _path5; set => SetField(ref _path5, value); }
         public bool IsRunEnabled { get => _isRunEnabled; set => SetField(ref _isRunEnabled, value); }
         public bool IsReasoning { get => _isReasoning; set => SetField(ref _isReasoning, value); }
+        public string ApiUrl { get => _apiUrl; set => SetField(ref _apiUrl, value); }
+        public string SelectedFunction 
+        { 
+            get => _selectedFunction; 
+            set 
+            {
+                if (SetField(ref _selectedFunction, value))
+                {
+                    OnPropertyChanged(nameof(IsPathSettingsVisible));
+                }
+            }
+        }
+        public bool IsPathSettingsVisible => SelectedFunction == "归类";
+        public ObservableCollection<string> FunctionTypes { get; } = new ObservableCollection<string> { "归类", "打标" };
         
         public ObservableCollection<string> LogLines { get; }
         public ObservableCollection<ConfigurationModel> Configs { get; set; }
@@ -124,9 +140,9 @@ namespace CyanTools.ViewModel
 
         private async Task ExecuteRefreshModelsCommand()
         {
-            AddLog("\nRefreshing models list...");
+            AddLog("\n正在刷新模型列表...");
             ModelsList.Clear();
-            var models = await _imageProcessor.GetLoadedModelsAsync();
+            var models = await _imageProcessor.GetLoadedModelsAsync(ApiUrl);
             if (models.Any())
             {
                 foreach (var model in models)
@@ -134,11 +150,11 @@ namespace CyanTools.ViewModel
                     ModelsList.Add(model);
                 }
                 SelectedModel = ModelsList.FirstOrDefault();
-                AddLog($"Found {models.Count} models.");
+                AddLog($"找到 {models.Count} 个模型。");
             }
             else
             {
-                AddLog("Could not find any loaded models. Make sure LM Studio is running.");
+                AddLog("未能找到任何加载的模型。请确保 API 服务正在运行。");
             }
         }
 
@@ -162,6 +178,12 @@ namespace CyanTools.ViewModel
             Path4 = config.Paths.Count > 3 ? config.Paths[3] : "";
             Path5 = config.Paths.Count > 4 ? config.Paths[4] : "";
             IsReasoning = config.IsReasoning;
+            ApiUrl = string.IsNullOrWhiteSpace(config.ApiUrl) ? "http://127.0.0.1:1234/v1" : config.ApiUrl;
+            
+            if (config.FunctionType == "Classification") SelectedFunction = "归类";
+            else if (config.FunctionType == "Tagging") SelectedFunction = "打标";
+            else SelectedFunction = string.IsNullOrWhiteSpace(config.FunctionType) ? "归类" : config.FunctionType;
+
             NewConfigName = config.Name;
         }
 
@@ -173,7 +195,9 @@ namespace CyanTools.ViewModel
                 Prompt = MainInput,
                 WorkingDirectory = WorkingDirectory,
                 Paths = new List<string> { Path1, Path2, Path3, Path4, Path5 },
-                IsReasoning = IsReasoning
+                IsReasoning = IsReasoning,
+                ApiUrl = ApiUrl,
+                FunctionType = SelectedFunction
             };
 
             try
@@ -181,11 +205,11 @@ namespace CyanTools.ViewModel
                 _configManager.SaveConfiguration(config);
                 LoadAllConfigs();
                 SelectedConfig = Configs.FirstOrDefault(c => c.Name == config.Name);
-                AddLog($"Configuration '{NewConfigName}' saved.");
+                AddLog($"配置 '{NewConfigName}' 已保存。");
             }
             catch (Exception ex)
             {
-                AddLog($"Error saving configuration: {ex.Message}");
+                AddLog($"保存配置时出错: {ex.Message}");
             }
         }
 
@@ -198,29 +222,29 @@ namespace CyanTools.ViewModel
                 _configManager.DeleteConfiguration(SelectedConfig.Name);
                 var oldSelection = SelectedConfig.Name;
                 LoadAllConfigs();
-                AddLog($"Deleted configuration: {oldSelection}");
+                AddLog($"已删除配置: {oldSelection}");
             }
             catch (Exception ex)
             {
-                AddLog($"Error deleting configuration: {ex.Message}");
+                AddLog($"删除配置时出错: {ex.Message}");
             }
         }
 
         private async Task ExecuteRunCommand()
         {
             IsRunEnabled = false;
-            AddLog("\nStarting execution...");
+            AddLog("\n开始执行...");
             var progress = new Progress<string>(AddLog);
 
             try
             {
                 var destPaths = new List<string> { Path1, Path2, Path3, Path4, Path5 };
-                await _imageProcessor.ProcessImagesAsync(MainInput, WorkingDirectory, destPaths, IsReasoning, progress);
-                AddLog("Execution finished.");
+                await _imageProcessor.ProcessImagesAsync(MainInput, WorkingDirectory, destPaths, IsReasoning, ApiUrl, SelectedFunction, progress);
+                AddLog("执行完成。");
             }
             catch (Exception ex)
             {
-                AddLog($"An unexpected error occurred: {ex.Message}");
+                AddLog($"发生意外错误: {ex.Message}");
             }
             finally
             {

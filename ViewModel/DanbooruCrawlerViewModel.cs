@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Input;
 using CyanTools.Model;
 using CyanTools.Utils;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RestSharp;
@@ -23,6 +24,7 @@ namespace CyanTools.ViewModel
         private string _tags;
         private string _cookies;
         private string _postId;
+        private string _outputDirectory = DefaultOutputDirectory;
         private string _logText;
         private string _selectedSource;
         private bool _isCrawling;
@@ -36,7 +38,7 @@ namespace CyanTools.ViewModel
         private const string GelbooruBaseUrl = "https://gelbooru.com";
         private const int DanbooruPageSize = 200;
         private const int GelbooruPageSize = 100;
-        private static readonly string OutputDirectory = Path.Combine(AppContext.BaseDirectory, "output");
+        private const string DefaultOutputDirectory = "./output";
         private const string CookiesFileName = "cookies.txt";
         private static readonly IReadOnlyList<string> SourceOptionsList = new[] { "Danbooru", "Gelbooru" };
 
@@ -56,6 +58,12 @@ namespace CyanTools.ViewModel
         {
             get => _postId;
             set { _postId = value; OnPropertyChanged(); }
+        }
+
+        public string OutputDirectory
+        {
+            get => _outputDirectory;
+            set { _outputDirectory = value; OnPropertyChanged(); }
         }
 
         public string LogText
@@ -100,6 +108,7 @@ namespace CyanTools.ViewModel
 
         public ICommand StartStopCommand { get; }
         public ICommand DownloadByIdCommand { get; }
+        public ICommand BrowseOutputFolderCommand { get; }
 
         public DanbooruCrawlerViewModel()
         {
@@ -112,6 +121,7 @@ namespace CyanTools.ViewModel
 
             StartStopCommand = new RelayCommand(async _ => await StartStopCrawling());
             DownloadByIdCommand = new RelayCommand(async _ => await DownloadSinglePost(), _ => !IsCrawling && !string.IsNullOrWhiteSpace(PostId));
+            BrowseOutputFolderCommand = new RelayCommand(_ => BrowseOutputFolder());
             
             LoadCookies();
         }
@@ -210,7 +220,7 @@ namespace CyanTools.ViewModel
         {
             if (string.IsNullOrWhiteSpace(PostId)) return;
 
-            Print($"开始下载 Post ID: {PostId}...");
+            Print($"开始下载帖子 ID: {PostId}...");
             IsCrawling = true;
 
             try
@@ -233,17 +243,17 @@ namespace CyanTools.ViewModel
                     }
                     else
                     {
-                        Print($"无法找到 Post ID: {PostId} 或该 Post 没有文件。");
+                        Print($"无法找到帖子 ID: {PostId} 或该帖子没有文件。");
                     }
                 }
                 else
                 {
-                    Print($"下载 Post ID: {PostId} 失败: {response.StatusCode} - {response.ErrorMessage}");
+                    Print($"下载帖子 ID: {PostId} 失败: {response.StatusCode} - {response.ErrorMessage}");
                 }
             }
             catch (Exception ex)
             {
-                Print($"下载 Post ID: {PostId} 时发生错误: {ex.Message}");
+                Print($"下载帖子 ID: {PostId} 时发生错误: {ex.Message}");
             }
             finally
             {
@@ -260,10 +270,11 @@ namespace CyanTools.ViewModel
                 if (string.IsNullOrWhiteSpace(url)) return;
 
                 var fileName = Path.GetFileName(new Uri(url).LocalPath);
-                Directory.CreateDirectory(OutputDirectory);
+                var outputDirectory = ResolveOutputDirectory();
+                Directory.CreateDirectory(outputDirectory);
 
-                var localPath = Path.Combine(OutputDirectory, fileName);
-                var txtPath = Path.Combine(OutputDirectory, $"{Path.GetFileNameWithoutExtension(fileName)}.txt");
+                var localPath = Path.Combine(outputDirectory, fileName);
+                var txtPath = Path.Combine(outputDirectory, $"{Path.GetFileNameWithoutExtension(fileName)}.txt");
 
 
                 var request = new RestRequest(url, Method.Get);
@@ -299,6 +310,26 @@ namespace CyanTools.ViewModel
             {
                 LogText += $"{DateTime.Now:HH:mm:ss} - {text}\n";
             });
+        }
+
+        private void BrowseOutputFolder()
+        {
+            var dialog = new CommonOpenFileDialog { IsFolderPicker = true };
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                OutputDirectory = dialog.FileName;
+            }
+        }
+
+        private string ResolveOutputDirectory()
+        {
+            var configured = string.IsNullOrWhiteSpace(OutputDirectory) ? DefaultOutputDirectory : OutputDirectory.Trim();
+            if (Path.IsPathRooted(configured))
+            {
+                return configured;
+            }
+
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configured));
         }
 
         private static string? GetBestFileUrl(Danbooru.Post post)
@@ -482,12 +513,12 @@ namespace CyanTools.ViewModel
                 if (File.Exists(CookiesFileName))
                 {
                     Cookies = File.ReadAllText(CookiesFileName);
-                    Print("Cookies 已加载。");
+                    Print("登录信息已加载。");
                 }
             }
             catch (Exception ex)
             {
-                Print($"加载 Cookies 失败: {ex.Message}");
+                Print($"加载登录信息失败: {ex.Message}");
             }
         }
 
@@ -499,7 +530,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"保存 Cookies 失败: {ex.Message}");
+                System.Windows.MessageBox.Show($"保存登录信息失败: {ex.Message}");
             }
         }
 

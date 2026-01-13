@@ -45,7 +45,7 @@ namespace CyanTools.Pipeline
             Register(new PipelineNodeDescriptor("保留指定文件", typeof(KeepFilesPipelineNode), () => new KeepFilesPipelineNode()));
             Register(new PipelineNodeDescriptor("导出视频帧", typeof(ExportVideoFramePipelineNode), () => new ExportVideoFramePipelineNode()));
             Register(new PipelineNodeDescriptor("高斯模糊", typeof(GaussianBlurPipelineNode), () => new GaussianBlurPipelineNode()));
-            Register(new PipelineNodeDescriptor("转换图片格式", typeof(ConvertImageFormatPipelineNode), () => new ConvertImageFormatPipelineNode()));
+            Register(new PipelineNodeDescriptor("格式转换", typeof(ConvertImageFormatPipelineNode), () => new ConvertImageFormatPipelineNode()));
             Register(new PipelineNodeDescriptor("图片打标", typeof(TaggingPipelineNode), () => new TaggingPipelineNode()));
             Register(new PipelineNodeDescriptor("训练集配平", typeof(TrainingSetBalancerPipelineNode), () => new TrainingSetBalancerPipelineNode()));
             Register(new PipelineNodeDescriptor("图片重命名", typeof(ImageRenamePipelineNode), () => new ImageRenamePipelineNode()));

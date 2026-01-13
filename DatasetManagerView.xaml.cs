@@ -34,6 +34,11 @@ namespace CyanTools
             InitializeComponent();
             this.Loaded += DatasetManagerView_Loaded;
             this.DataContextChanged += DatasetManagerView_DataContextChanged;
+            if (ViewModel != null)
+            {
+                ViewModel.OnCanvasResetRequired += ResetCanvas;
+                ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+            }
         }
         
         private void DatasetManagerView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -91,14 +96,7 @@ namespace CyanTools
         
         private void DatasetManagerView_Loaded(object sender, RoutedEventArgs e)
         {
-            this.Focus();
-            
-
-            if (ViewModel != null)
-            {
-                ViewModel.OnCanvasResetRequired += ResetCanvas;
-            }
-
+            FocusRootForShortcuts();
             UpdateImageScale(resetPan: false);
         }
 
@@ -236,14 +234,19 @@ namespace CyanTools
             }
 
             int targetIndex = currentIndex;
-            int column = currentIndex % itemsPerRow;
+            int rowStart = (currentIndex / itemsPerRow) * itemsPerRow;
+            int rowEnd = Math.Min(rowStart + itemsPerRow - 1, itemCount - 1);
 
             switch (direction)
             {
                 case ThumbnailMoveDirection.Left:
-                    if (column > 0)
+                    if (currentIndex > rowStart)
                     {
                         targetIndex = currentIndex - 1;
+                    }
+                    else if (rowStart > 0)
+                    {
+                        targetIndex = rowStart - 1;
                     }
                     else
                     {
@@ -251,9 +254,13 @@ namespace CyanTools
                     }
                     break;
                 case ThumbnailMoveDirection.Right:
-                    if (column < itemsPerRow - 1 && currentIndex + 1 < itemCount)
+                    if (currentIndex < rowEnd)
                     {
                         targetIndex = currentIndex + 1;
+                    }
+                    else if (rowEnd + 1 < itemCount)
+                    {
+                        targetIndex = rowEnd + 1;
                     }
                     else
                     {
@@ -919,8 +926,14 @@ namespace CyanTools
             ViewModel?.ClearSuggestions();
         }
 
+        private void DataItemsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            FocusRootForShortcuts();
+        }
+
         private void MainCanvas_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            FocusRootForShortcuts();
             ViewModel?.HandleMouseLeftButtonDown(e, MainCanvas, TransformGroupCanvas, MyImage);
         }
 
@@ -936,6 +949,7 @@ namespace CyanTools
 
         private void MainCanvas_MouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            FocusRootForShortcuts();
             ViewModel?.HandleMouseRightButtonDown(e, MainCanvas, ImageContainer);
         }
 

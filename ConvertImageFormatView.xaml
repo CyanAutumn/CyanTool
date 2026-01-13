@@ -46,10 +46,21 @@
         </GroupBox>
 
         <GroupBox Header="格式选择" Grid.Row="1" Margin="0,5">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="目标格式:" VerticalAlignment="Center" Margin="5"/>
-                <ComboBox ItemsSource="{Binding ImageFormats}" SelectedItem="{Binding SelectedFormat}" Margin="5" Width="100"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="目标格式:" VerticalAlignment="Center" Margin="5"/>
+                    <ComboBox ItemsSource="{Binding ImageFormats}" SelectedItem="{Binding SelectedFormat}" Margin="5" Width="100"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1"
+                           Text="可将主流图片格式包括psd文件一并转换成目标格式"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="10,5,5,5"/>
+            </Grid>
         </GroupBox>
 
         <Button Grid.Row="2" Content="开始转换" Command="{Binding StartConversionCommand}" Margin="0,10,0,5" Padding="10,5" HorizontalAlignment="Center" IsEnabled="{Binding IsConverting, Converter={StaticResource BooleanToInverseBooleanConverter}}"/>

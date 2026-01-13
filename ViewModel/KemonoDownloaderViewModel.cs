@@ -24,7 +24,7 @@ namespace CyanTools.ViewModel
         private const string ApiBaseUrl = "https://kemono.cr";
         private const int PageSize = 50;
         private const int DownloadRetryCount = 3;
-        private static readonly TimeSpan DownloadDelay = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan DownloadDelay = TimeSpan.FromSeconds(20);
         private static readonly HttpClient HttpClient;
 
         static KemonoDownloaderViewModel()
@@ -469,12 +469,19 @@ namespace CyanTools.ViewModel
                 }
 
                 var contentRaw = tokenJson.Value<string>("content_raw");
+                var content = tokenJson.Value<string>("content");
+                if (string.IsNullOrWhiteSpace(contentRaw) && string.IsNullOrWhiteSpace(content))
+                {
+                    var postToken = tokenJson["post"];
+                    contentRaw = postToken?.Value<string>("content_raw");
+                    content = postToken?.Value<string>("content");
+                }
+
                 if (!string.IsNullOrWhiteSpace(contentRaw))
                 {
                     return contentRaw;
                 }
 
-                var content = tokenJson.Value<string>("content");
                 return string.IsNullOrWhiteSpace(content) ? null : content;
             }
             catch (JsonException jsonEx)

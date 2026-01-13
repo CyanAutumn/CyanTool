@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -7,6 +8,12 @@ namespace CyanTools.Navigation
 {
     public static class ToolPageRegistry
     {
+        private static readonly HashSet<Type> HiddenControls = new HashSet<Type>
+        {
+            typeof(global::CyanTools.LoraTrainingView),
+            typeof(global::CyanTools.ModelTrainingView),
+            typeof(global::CyanTools.HandIntegrityFilterView)
+        };
         private static IReadOnlyList<ToolPageMetadata>? _cached;
 
         public static IReadOnlyList<ToolPageMetadata> GetAllPages()
@@ -21,7 +28,7 @@ namespace CyanTools.Navigation
                 .GetTypes()
                 .Where(t => typeof(UserControl).IsAssignableFrom(t) && !t.IsAbstract)
                 .Select(t => new { Type = t, Attribute = t.GetCustomAttribute<ToolPageAttribute>() })
-                .Where(x => x.Attribute != null)
+                .Where(x => x.Attribute != null && !HiddenControls.Contains(x.Type))
                 .Select(x => new ToolPageMetadata(x.Attribute!.DisplayName, x.Type, x.Attribute.Order, x.Attribute.RequiresUnlock))
                 .OrderBy(x => x.Order)
                 .ToList();

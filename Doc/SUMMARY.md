@@ -17,7 +17,7 @@
 * [图片元数据](220-image-metadata.md)
 * [高斯模糊](230-gaussian-blur.md)
 * [图片聚类](240-image-clustering.md)
-* [转换图片格式](250-convert-image-format.md)
+* [格式转换](250-convert-image-format.md)
 * [图片打标](260-image-tagging.md)
 * [训练集配平](270-training-set-balancer.md)
 * [图片重命名](280-image-rename.md)

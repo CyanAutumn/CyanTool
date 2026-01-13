@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -363,7 +364,7 @@ namespace CyanTools.ViewModel
                         }
 
                         DataItemsWithOperations.Clear();
-                        foreach (var item in itemsByBaseName.Values.OrderBy(i => i.BaseName, StringComparer.OrdinalIgnoreCase))
+                        foreach (var item in itemsByBaseName.Values.OrderBy(i => i.BaseName, NaturalStringComparer.Instance))
                         {
                             DataItemsWithOperations.Add(item);
                         }
@@ -2149,6 +2150,34 @@ namespace CyanTools.ViewModel
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private sealed class NaturalStringComparer : IComparer<string>
+        {
+            public static readonly NaturalStringComparer Instance = new NaturalStringComparer();
+
+            [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+            private static extern int StrCmpLogicalW(string? x, string? y);
+
+            public int Compare(string? x, string? y)
+            {
+                if (ReferenceEquals(x, y))
+                {
+                    return 0;
+                }
+
+                if (x is null)
+                {
+                    return -1;
+                }
+
+                if (y is null)
+                {
+                    return 1;
+                }
+
+                return StrCmpLogicalW(x, y);
+            }
         }
     }
 }

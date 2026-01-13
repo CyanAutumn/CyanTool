@@ -67,7 +67,7 @@ namespace CyanTools.ViewModel
 
     public sealed class ConvertImageFormatPipelineNode : CyanTools.Pipeline.SimplePipelineNode<ConvertImageFormatViewModel>
     {
-        public ConvertImageFormatPipelineNode() : base("转换图片格式") { }
+        public ConvertImageFormatPipelineNode() : base("格式转换") { }
     }
 
     public sealed class TaggingPipelineNode : CyanTools.Pipeline.SimplePipelineNode<TaggingViewModel>

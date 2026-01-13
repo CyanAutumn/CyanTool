@@ -10,5 +10,7 @@ namespace CyanTools.Model
         public string WorkingDirectory { get; set; }
         public List<string> Paths { get; set; }
         public bool IsReasoning { get; set; }
+        public string ApiUrl { get; set; }
+        public string FunctionType { get; set; }
     }
 }

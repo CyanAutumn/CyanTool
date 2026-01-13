@@ -133,6 +133,7 @@
 
             <TextBlock DockPanel.Dock="Top" Text="数据列表" FontWeight="Bold" Margin="0,0,0,5"/>
             <ListBox x:Name="DataItemsList"
+                     PreviewMouseLeftButtonDown="DataItemsList_PreviewMouseLeftButtonDown"
                      ItemsSource="{Binding DataItemsWithOperations}"
                      SelectedItem="{Binding SelectedDataItem, Mode=TwoWay}"
                      BorderThickness="0"

@@ -4,7 +4,7 @@ using CyanTools.Navigation;
 
 namespace CyanTools
 {
-    [ToolPage("LLM分类", 100)]
+    [ToolPage("LLM工具", 100)]
     public partial class ToolLLM : UserControl
     {
         public ToolLLM()
@@ -14,8 +14,6 @@ namespace CyanTools
 
         private void ToolLLM_Loaded(object sender, RoutedEventArgs e)
         {
-
-
         }
     }
 }
