@@ -24,13 +24,13 @@ namespace CyanTools.ViewModel
 {
     public class DatasetManagerViewModel : INotifyPropertyChanged
     {
-
+        
         public event Action? OnCanvasResetRequired;
-
+        
         private readonly Dictionary<string, List<Rect>> _cachedEdits = new Dictionary<string, List<Rect>>();
         private string? _currentFilePath;
 
-
+        
         private BitmapImage? _originalBitmap;
         private bool _isPanning = false;
         private System.Windows.Point _panStartPoint;
@@ -40,7 +40,7 @@ namespace CyanTools.ViewModel
         private readonly List<System.Windows.Shapes.Rectangle> _drawnRectangles = new List<System.Windows.Shapes.Rectangle>();
         private readonly List<Rect> _finalRects = new List<Rect>();
 
-
+        
         private BitmapImage? _currentImageSource;
         private DatasetDataItem? _selectedDataItem;
         private string _currentTextContent = "";
@@ -66,19 +66,19 @@ namespace CyanTools.ViewModel
         private bool _isSuggestionOpen = false;
         private static readonly char[] TagSeparators = { ',', '，', '\r', '\n' };
 
-
+        
         private string _category1Path = "";
         private string _category2Path = "";
         private string _category3Path = "";
         private string _category4Path = "";
         private string _category5Path = "";
 
-
+        
         public ObservableCollection<DatasetDataItem> DataItemsWithOperations { get; } = new ObservableCollection<DatasetDataItem>();
         public ObservableCollection<TagTokenViewModel> TagTokens { get; } = new ObservableCollection<TagTokenViewModel>();
         public ObservableCollection<TagSuggestion> TagSuggestions { get; } = new ObservableCollection<TagSuggestion>();
 
-
+        
         public DatasetDataItem? SelectedDataItem
         {
             get => _selectedDataItem;
@@ -218,7 +218,7 @@ namespace CyanTools.ViewModel
             set => SetField(ref _category5Path, value);
         }
 
-
+        
         public ICommand SelectFolderCommand { get; }
         public ICommand SaveAllCommand { get; }
         public ICommand SelectDataItemCommand { get; }
@@ -391,7 +391,7 @@ namespace CyanTools.ViewModel
 
         private void SaveAllChanges()
         {
-            SaveChangesToCache();
+            SaveChangesToCache(); 
 
             if (!DataItemsWithOperations.Any())
             {
@@ -437,7 +437,7 @@ namespace CyanTools.ViewModel
                     }
                 }
 
-
+                
                 DataItemsWithOperations.Clear();
                 SelectedDataItem = null;
                 CurrentImageSource = null;
@@ -1833,12 +1833,12 @@ namespace CyanTools.ViewModel
 
                 _originalBitmap = bitmap;
                 CurrentImageSource = bitmap;
-                _currentFilePath = filePath;
+                _currentFilePath = filePath; 
 
-                ResetState();
-                LoadEditsFromCache();
+                ResetState(); 
+                LoadEditsFromCache(); 
 
-
+                
                 OnCanvasResetRequired?.Invoke();
             }
             catch (OperationCanceledException)
@@ -1890,13 +1890,13 @@ namespace CyanTools.ViewModel
             }
         }
         
-
+        
         public List<Rect> GetCurrentRects()
         {
             return new List<Rect>(_finalRects);
         }
         
-
+        
         public void AddDrawnRectangle(System.Windows.Shapes.Rectangle rectangle)
         {
             if (!_drawnRectangles.Contains(rectangle))
@@ -1905,7 +1905,7 @@ namespace CyanTools.ViewModel
             }
         }
         
-
+        
         public void ClearDrawnRectangles()
         {
             _drawnRectangles.Clear();
@@ -1929,7 +1929,7 @@ namespace CyanTools.ViewModel
                 bmp.UriSource = new Uri(imagePath);
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
-                bmp.Freeze();
+                bmp.Freeze(); 
 
                 DrawingVisual drawingVisual = new DrawingVisual();
                 using (DrawingContext dc = drawingVisual.RenderOpen())
@@ -1976,16 +1976,16 @@ namespace CyanTools.ViewModel
                 catch (Exception ex)
                 {
                     Console.WriteLine($"读取 .txt 文件失败: {ex.Message}");
-                    return;
+                    return; 
                 }
             }
 
             string finalContent = originalContent;
 
-
+            
             if (hasModifications)
             {
-
+                
                 if (!finalContent.Contains(promptToAdd))
                 {
                     if (!string.IsNullOrEmpty(finalContent) && !finalContent.EndsWith(","))
@@ -1996,7 +1996,7 @@ namespace CyanTools.ViewModel
                 }
             }
 
-
+            
             if (!string.IsNullOrEmpty(finalContent))
             {
                 try

@@ -107,6 +107,7 @@ namespace CyanTools
                 _suppressSuggestionAfterDrag = true;
                 ViewModel?.ClearSuggestions();
                 ViewModel?.SuppressSuggestionRefresh();
+                RequestScrollSelectedItemIntoView();
                 return;
             }
 
@@ -124,6 +125,30 @@ namespace CyanTools
             {
                 UpdateImageScale(resetPan: ViewModel?.IsBrowseMode == true);
             }
+        }
+
+        private void RequestScrollSelectedItemIntoView()
+        {
+            if (ViewModel?.SelectedDataItem == null)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (ViewModel?.SelectedDataItem == null)
+                {
+                    return;
+                }
+
+                int index = ViewModel.DataItemsWithOperations.IndexOf(ViewModel.SelectedDataItem);
+                if (index < 0)
+                {
+                    return;
+                }
+
+                BringItemIntoView(index);
+            }), DispatcherPriority.Background);
         }
 
         private void ImageContainer_SizeChanged(object sender, SizeChangedEventArgs e)
