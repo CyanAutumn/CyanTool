@@ -280,8 +280,19 @@ namespace CyanTools.Utils
             var outputSpan = results.First().AsTensor<float>().ToDenseTensor().Buffer.Span;
 
             var probs = new float[outputSpan.Length];
-            for (int i = 0; i < outputSpan.Length; i++) {
-                probs[i] = (float)(1.0 / (1.0 + Math.Exp(-outputSpan[i])));
+            if (LooksLikeProbabilities(outputSpan))
+            {
+                for (int i = 0; i < outputSpan.Length; i++)
+                {
+                    probs[i] = Math.Clamp(outputSpan[i], 0f, 1f);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < outputSpan.Length; i++)
+                {
+                    probs[i] = Sigmoid(outputSpan[i]);
+                }
             }
 
             var ratingTags = new List<TagInfo>();
@@ -347,6 +358,31 @@ namespace CyanTools.Utils
 
             var orderedByConfidence = allTags.OrderByDescending(t => t.Confidence).ToList();
             return ApplyPriorityOrdering(orderedByConfidence, priorityTags);
+        }
+
+        private static bool LooksLikeProbabilities(ReadOnlySpan<float> output)
+        {
+            const float epsilon = 1e-3f;
+            for (int i = 0; i < output.Length; i++)
+            {
+                float value = output[i];
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                {
+                    return false;
+                }
+
+                if (value < -epsilon || value > 1f + epsilon)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static float Sigmoid(float value)
+        {
+            return 1f / (1f + MathF.Exp(-value));
         }
 
         private static List<TagInfo> ApplyPriorityOrdering(List<TagInfo> tags, IReadOnlyList<string> priorityTags)
