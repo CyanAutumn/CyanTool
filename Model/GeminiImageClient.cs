@@ -13,6 +13,8 @@ namespace CyanTools.Model
 {
     public sealed class GeminiImageClient
     {
+        private const string DefaultBaseUrl = "https://generativelanguage.googleapis.com";
+
         private static readonly HttpClient HttpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(120)
@@ -33,7 +35,7 @@ namespace CyanTools.Model
             }
 
             var payload = BuildRequestPayload(request);
-            string url = $"https://generativelanguage.googleapis.com/v1beta/models/{request.Model}:generateContent?key={request.ApiKey}";
+            string url = BuildRequestUrl(request.ApiBaseUrl, request.Model, request.ApiKey);
             string jsonBody = JsonSerializer.Serialize(payload, _serializerOptions);
 
             using var message = new HttpRequestMessage(HttpMethod.Post, url)
@@ -180,6 +182,49 @@ namespace CyanTools.Model
             };
         }
 
+        private static string BuildRequestUrl(string? apiBaseUrl, string model, string apiKey)
+        {
+            string baseUrl = string.IsNullOrWhiteSpace(apiBaseUrl) ? DefaultBaseUrl : apiBaseUrl.Trim();
+
+            if (baseUrl.Contains("{model}", StringComparison.OrdinalIgnoreCase) ||
+                baseUrl.Contains("{key}", StringComparison.OrdinalIgnoreCase) ||
+                baseUrl.Contains("{apikey}", StringComparison.OrdinalIgnoreCase))
+            {
+                return baseUrl
+                    .Replace("{model}", Uri.EscapeDataString(model), StringComparison.OrdinalIgnoreCase)
+                    .Replace("{key}", Uri.EscapeDataString(apiKey), StringComparison.OrdinalIgnoreCase)
+                    .Replace("{apikey}", Uri.EscapeDataString(apiKey), StringComparison.OrdinalIgnoreCase);
+            }
+
+            string trimmedBase = baseUrl.TrimEnd('/');
+            string endpoint;
+
+            if (trimmedBase.Contains(":generateContent", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = trimmedBase;
+            }
+            else if (trimmedBase.IndexOf("/v1beta/models", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                endpoint = $"{trimmedBase}/{model}:generateContent";
+            }
+            else if (trimmedBase.IndexOf("/v1beta", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                endpoint = $"{trimmedBase}/models/{model}:generateContent";
+            }
+            else
+            {
+                endpoint = $"{trimmedBase}/v1beta/models/{model}:generateContent";
+            }
+
+            if (endpoint.IndexOf("key=", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                string separator = endpoint.Contains('?') ? "&" : "?";
+                endpoint = $"{endpoint}{separator}key={Uri.EscapeDataString(apiKey)}";
+            }
+
+            return endpoint;
+        }
+
         private byte[]? ExtractInlineBytes(JsonElement candidate)
         {
             if (!candidate.TryGetProperty("content", out var content) || !content.TryGetProperty("parts", out var parts))
@@ -296,6 +341,8 @@ namespace CyanTools.Model
     public sealed record GeminiImageRequest
     {
         public required string ApiKey { get; init; }
+
+        public string? ApiBaseUrl { get; init; }
 
         public required string Model { get; init; }
 

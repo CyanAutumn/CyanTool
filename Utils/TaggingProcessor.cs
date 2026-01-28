@@ -5,9 +5,11 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -49,12 +51,354 @@ namespace CyanTools.Utils
         private static readonly HttpClient httpClient = new HttpClient();
         private InferenceSession _session;
         private TagData[] _labels;
+        private static readonly string[] Cuda12RequiredDlls = {
+            "cudart64_12.dll",
+            "cublas64_12.dll",
+            "cublasLt64_12.dll",
+            "cufft64_11.dll",
+            "cudnn64_8.dll"
+        };
 
         public TaggingProcessor()
         {
         }
 
-        public async Task InitializeAsync(string modelUrl, string tagsUrl, string modelDisplayName, IProgress<string> progress)
+        public sealed class CudaCheckResult
+        {
+            public bool NvidiaDriverDetected { get; init; }
+            public bool CudaAppendApiSupported { get; init; }
+            public bool CudaExecutionProviderAvailable { get; init; }
+            public string Details { get; init; } = string.Empty;
+        }
+
+        public static CudaCheckResult CheckCudaEnvironment()
+        {
+            TryConfigureCuda12ForCurrentProcess(log: null, out var cuda12Bin, out var cuda12Version, out var missingCuda12Dlls);
+            TryGetCudaBinDirectory(13, out var cuda13Bin, out var cuda13Version);
+
+            bool driverDetected = NativeLibrary.TryLoad("nvcuda.dll", out var driverHandle);
+            if (driverDetected && driverHandle != IntPtr.Zero)
+            {
+                try
+                {
+                    NativeLibrary.Free(driverHandle);
+                }
+                catch
+                {
+
+                }
+            }
+
+            bool cudaEpAvailable = false;
+            bool cudaAppendApiSupported = false;
+            string cudaEpDetails;
+            try
+            {
+                using var options = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
+                options.AppendExecutionProvider_CUDA();
+                cudaAppendApiSupported = true;
+                cudaEpAvailable = true;
+                cudaEpDetails = "ONNXRuntime CUDA 执行提供器可用。";
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                cudaAppendApiSupported = false;
+                cudaEpDetails =
+                    $"当前 onnxruntime.dll 不支持 CUDA 执行提供器（缺少入口点：{ex.Message}）。\n" +
+                    "这通常是因为应用加载了 CPU 版 onnxruntime.dll（或版本不匹配）。请确保使用 `Microsoft.ML.OnnxRuntime.Gpu` 并重新发布/更新程序。";
+            }
+            catch (DllNotFoundException ex)
+            {
+                cudaAppendApiSupported = false;
+                cudaEpDetails =
+                    $"无法加载 CUDA 相关 DLL（或其依赖）。{ex.Message}\n" +
+                    "通常需要安装 CUDA 12.x 运行库（cudart64_12.dll / cublas64_12.dll / cublasLt64_12.dll / cufft64_11.dll）以及 cuDNN 8（cudnn64_8.dll）。\n" +
+                    "如果你安装的是 CUDA 13.x，也需要额外安装 CUDA 12.x（因为 DLL 名称是 cudart64_12.dll，而不是 cudart64_13.dll）。";
+            }
+            catch (OnnxRuntimeException ex)
+            {
+                cudaAppendApiSupported = true;
+                if (ex.Message.Contains("LoadLibrary failed with error 126", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("onnxruntime_providers_cuda.dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    cudaEpDetails =
+                        $"CUDA 执行提供器不可用。{ex.Message}\n" +
+                        "通常是缺少 CUDA 12.x / cuDNN 8 的运行库 DLL，请先安装对应版本并确保它们在 PATH 中（或放到程序同目录）。";
+                }
+                else
+                {
+                    cudaEpDetails = $"CUDA 执行提供器不可用。{ex.Message}";
+                }
+            }
+            catch (Exception ex)
+            {
+                cudaAppendApiSupported = true;
+                cudaEpDetails = $"检测 CUDA 时发生错误。{ex.Message}";
+            }
+
+            var cuda12Summary = cuda12Bin == null
+                ? (cuda13Bin == null
+                    ? "未检测到 CUDA 12.x 安装目录。"
+                    : $"未检测到 CUDA 12.x 安装目录，但检测到 CUDA {cuda13Version}（{cuda13Bin}）。GPU 推理需要 CUDA 12.x（提供 cudart64_12.dll 等）。")
+                : $"检测到 CUDA {cuda12Version}（{cuda12Bin}）。" +
+                  (missingCuda12Dlls.Count == 0
+                      ? "已找到 CUDA 12.x/cuDNN 依赖 DLL。"
+                      : $"未在该目录找到以下 DLL：{string.Join(", ", missingCuda12Dlls)}");
+
+            var details = string.Join("\n", new[]
+            {
+                driverDetected
+                    ? "已检测到 NVIDIA 驱动 (nvcuda.dll)。"
+                    : "未检测到 NVIDIA 驱动 (nvcuda.dll)，请先安装/更新显卡驱动。",
+                cuda12Summary,
+                cudaEpDetails
+            }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+            return new CudaCheckResult
+            {
+                NvidiaDriverDetected = driverDetected,
+                CudaAppendApiSupported = cudaAppendApiSupported,
+                CudaExecutionProviderAvailable = cudaEpAvailable,
+                Details = details
+            };
+        }
+
+        internal static bool TryConfigureCuda12ForCurrentProcess(Action<string>? log, out string? cudaBinDirectory, out Version? cudaVersion, out IReadOnlyList<string> missingRequiredDlls)
+        {
+            cudaBinDirectory = null;
+            cudaVersion = null;
+            missingRequiredDlls = Array.Empty<string>();
+
+            if (!TryGetCudaBinDirectory(12, out var bin, out var version))
+            {
+                log?.Invoke("未检测到 CUDA 12.x 安装目录。");
+                return false;
+            }
+
+            cudaBinDirectory = bin;
+            cudaVersion = version;
+            var missing = GetMissingDlls(bin, Cuda12RequiredDlls);
+            missingRequiredDlls = missing;
+
+            if (TryPrependToProcessPath(bin, out var reason))
+            {
+                log?.Invoke($"已将 CUDA {version} 的 bin 目录加入当前进程 PATH：{bin}");
+            }
+            else if (!string.IsNullOrWhiteSpace(reason))
+            {
+                log?.Invoke(reason);
+            }
+
+            if (missing.Count > 0)
+            {
+                log?.Invoke($"CUDA 依赖可能不完整，未在 {bin} 找到：{string.Join(", ", missing)}");
+            }
+
+            return true;
+        }
+
+        private static IReadOnlyList<string> GetMissingDlls(string directory, IEnumerable<string> dllNames)
+        {
+            var missing = new List<string>();
+            foreach (var dllName in dllNames)
+            {
+                var path = Path.Combine(directory, dllName);
+                if (!File.Exists(path))
+                {
+                    missing.Add(dllName);
+                }
+            }
+            return missing;
+        }
+
+        private static bool TryPrependToProcessPath(string directory, out string? reason)
+        {
+            reason = null;
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                reason = "CUDA bin 目录为空，无法加入 PATH。";
+                return false;
+            }
+
+            if (!Directory.Exists(directory))
+            {
+                reason = $"CUDA bin 目录不存在：{directory}";
+                return false;
+            }
+
+            try
+            {
+                var current = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+                string Normalize(string value)
+                {
+                    value = value.Trim().Trim('"');
+                    try
+                    {
+                        value = Path.GetFullPath(value);
+                    }
+                    catch
+                    {
+
+                    }
+                    return value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+
+                var normalizedTarget = Normalize(directory);
+                var parts = current.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(Normalize)
+                    .Where(p => !string.IsNullOrWhiteSpace(p));
+
+                if (parts.Contains(normalizedTarget, StringComparer.OrdinalIgnoreCase))
+                {
+                    reason = $"CUDA bin 目录已在 PATH 中：{directory}";
+                    return false;
+                }
+
+                Environment.SetEnvironmentVariable("PATH", directory + ";" + current);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = $"加入 PATH 失败：{ex.Message}";
+                return false;
+            }
+        }
+
+        private static bool TryGetCudaBinDirectory(int majorVersion, out string? binDirectory, out Version? version)
+        {
+            binDirectory = null;
+            version = null;
+
+            var candidates = new List<(Version version, string bin)>();
+
+            foreach (var candidate in EnumerateCudaPathsFromEnvironment(majorVersion))
+            {
+                var bin = Path.Combine(candidate.path, "bin");
+                if (Directory.Exists(bin) && File.Exists(Path.Combine(bin, $"cudart64_{majorVersion}.dll")))
+                {
+                    candidates.Add((candidate.version, bin));
+                }
+            }
+
+            var defaultRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "NVIDIA GPU Computing Toolkit",
+                "CUDA");
+            if (Directory.Exists(defaultRoot))
+            {
+                foreach (var dir in Directory.GetDirectories(defaultRoot, "v*"))
+                {
+                    var name = Path.GetFileName(dir);
+                    if (!TryParseCudaVersionDirectoryName(name, out var parsed))
+                    {
+                        continue;
+                    }
+
+                    if (parsed.Major != majorVersion)
+                    {
+                        continue;
+                    }
+
+                    var bin = Path.Combine(dir, "bin");
+                    if (Directory.Exists(bin) && File.Exists(Path.Combine(bin, $"cudart64_{majorVersion}.dll")))
+                    {
+                        candidates.Add((parsed, bin));
+                    }
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                return false;
+            }
+
+            var best = candidates.OrderByDescending(c => c.version).First();
+            version = best.version;
+            binDirectory = best.bin;
+            return true;
+        }
+
+        private static IEnumerable<(Version version, string path)> EnumerateCudaPathsFromEnvironment(int majorVersion)
+        {
+            var env = Environment.GetEnvironmentVariables();
+            foreach (DictionaryEntry entry in env)
+            {
+                if (entry.Key is not string key || entry.Value is not string value)
+                {
+                    continue;
+                }
+
+                if (!key.StartsWith($"CUDA_PATH_V{majorVersion}_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (TryParseCudaVersionFromEnvVarKey(key, out var ver) && Directory.Exists(value))
+                {
+                    yield return (ver, value);
+                }
+            }
+
+            var cudaPath = Environment.GetEnvironmentVariable("CUDA_PATH");
+            if (!string.IsNullOrWhiteSpace(cudaPath) && Directory.Exists(cudaPath))
+            {
+
+                var dirName = Path.GetFileName(cudaPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (TryParseCudaVersionDirectoryName(dirName, out var ver))
+                {
+                    yield return (ver, cudaPath);
+                }
+                else
+                {
+                    yield return (new Version(majorVersion, 0), cudaPath);
+                }
+            }
+        }
+
+        private static bool TryParseCudaVersionFromEnvVarKey(string key, out Version version)
+        {
+            version = new Version();
+
+            var prefix = "CUDA_PATH_V";
+            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var tail = key.Substring(prefix.Length);
+            var parts = tail.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+            {
+                return false;
+            }
+
+            if (!int.TryParse(parts[0], out var major) || !int.TryParse(parts[1], out var minor))
+            {
+                return false;
+            }
+
+            version = new Version(major, minor);
+            return true;
+        }
+
+        private static bool TryParseCudaVersionDirectoryName(string name, out Version version)
+        {
+            version = new Version();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            name = name.Trim();
+            if (name.Length >= 2 && (name[0] == 'v' || name[0] == 'V'))
+            {
+                name = name.Substring(1);
+            }
+
+            return Version.TryParse(name, out version);
+        }
+
+        public async Task InitializeAsync(string modelUrl, string tagsUrl, string modelDisplayName, bool preferGpu, IProgress<string> progress)
         {
             string appDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TaggerModels");
             Directory.CreateDirectory(appDataPath);
@@ -69,9 +413,16 @@ namespace CyanTools.Utils
             progress.Report("Loading model into memory...");
             await Task.Run(async () =>
             {
-                var sessionOptions = new SessionOptions();
-                sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
-                _session = new InferenceSession(_modelPath, sessionOptions);
+                try
+                {
+                    _session?.Dispose();
+                }
+                catch
+                {
+
+                }
+
+                _session = CreateSession(_modelPath, preferGpu, progress);
 
 
 
@@ -117,6 +468,47 @@ namespace CyanTools.Utils
                 }
             });
             progress.Report("Initialization complete. Ready to tag.");
+        }
+
+        private static InferenceSession CreateSession(string modelPath, bool preferGpu, IProgress<string> progress)
+        {
+            if (preferGpu)
+            {
+                var gpuOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
+                progress.Report("尝试使用 GPU (CUDA) 执行提供器...");
+                try
+                {
+                    TryConfigureCuda12ForCurrentProcess(progress.Report, out _, out _, out _);
+                    gpuOptions.AppendExecutionProvider_CUDA();
+                    gpuOptions.AppendExecutionProvider_CPU();
+                    var session = new InferenceSession(modelPath, gpuOptions);
+                    progress.Report("CUDA 会话创建成功，将使用 GPU 打标。");
+                    return session;
+                }
+                catch (EntryPointNotFoundException ex)
+                {
+                    progress.Report(
+                        $"当前 onnxruntime.dll 不支持 CUDA 执行提供器（{ex.Message}），回退到 CPU。\n" +
+                        "请确认使用 `Microsoft.ML.OnnxRuntime.Gpu` 版本并重新发布/更新程序。");
+                }
+                catch (DllNotFoundException ex)
+                {
+                    progress.Report($"CUDA 依赖缺失，回退到 CPU。原因: {ex.Message}");
+                }
+                catch (OnnxRuntimeException ex)
+                {
+                    progress.Report($"CUDA 执行提供器不可用，回退到 CPU。原因: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    progress.Report($"GPU 会话创建失败，回退到 CPU。原因: {ex.Message}");
+                }
+            }
+
+            var cpuOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
+            cpuOptions.AppendExecutionProvider_CPU();
+            progress.Report("创建 CPU 会话进行打标。");
+            return new InferenceSession(modelPath, cpuOptions);
         }
         
         private async Task LoadTagsFromJsonAsync(string jsonPath)

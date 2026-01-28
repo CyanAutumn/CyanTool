@@ -58,8 +58,10 @@
                 <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
                 <Button Content="开始打标" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
                 <Button Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
+                <Button Content="检查/安装CUDA" Command="{Binding CheckCudaCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
             </StackPanel>
             <WrapPanel Margin="0,10,0,0" IsEnabled="{Binding IsIdle}">
+                <CheckBox Content="优先使用GPU(CUDA)" IsChecked="{Binding PreferGpu}" Margin="0,0,10,5"/>
                 <CheckBox Content="评级标签" IsChecked="{Binding IncludeRating}" Margin="0,0,10,5"/>
                 <CheckBox Content="质量标签" IsChecked="{Binding IncludeQuality}" Margin="0,0,10,5"/>
                 <CheckBox Content="通用标签" IsChecked="{Binding IncludeGeneral}" Margin="0,0,10,5"/>
@@ -88,5 +90,3 @@
 
     </Grid>
 </UserControl>
-
-

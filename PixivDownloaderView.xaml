@@ -23,6 +23,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="画师 ID:" VerticalAlignment="Center" Margin="5" />
@@ -41,6 +42,9 @@
                     <Button Content="打开目录" Command="{Binding OpenOutputFolderCommand}" Width="90" DockPanel.Dock="Right" Margin="5,0,0,0" />
                     <TextBox Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0" />
                 </DockPanel>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="下载间隔(秒):" VerticalAlignment="Center" Margin="5" />
+                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding DownloadIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
             </Grid>
             <TextBlock Text="提示：pixiv_refresh_token 会以明文形式存放在 Configs/Crawler 下，分享软件前请删除该文件夹"
                        TextWrapping="Wrap"

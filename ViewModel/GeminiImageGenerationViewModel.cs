@@ -35,6 +35,7 @@ namespace CyanTools.ViewModel
         private readonly GeminiImageClient _geminiClient;
 
         private string _apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? string.Empty;
+        private string _apiBaseUrl = "https://generativelanguage.googleapis.com";
         private string _selectedModel = "gemini-2.5-flash-image";
         private string _prompt = string.Empty;
         private ImageSource? _resultImageSource;
@@ -104,6 +105,21 @@ namespace CyanTools.ViewModel
                 _apiKey = value;
                 OnPropertyChanged(nameof(ApiKey));
                 RaiseCanExecuteChanged();
+            }
+        }
+
+        public string ApiBaseUrl
+        {
+            get => _apiBaseUrl;
+            set
+            {
+                string newValue = value ?? string.Empty;
+                if (_apiBaseUrl == newValue)
+                {
+                    return;
+                }
+                _apiBaseUrl = newValue;
+                OnPropertyChanged(nameof(ApiBaseUrl));
             }
         }
 
@@ -787,6 +803,7 @@ namespace CyanTools.ViewModel
             return new GeminiGenerationTask
             {
                 ApiKey = ApiKey,
+                ApiBaseUrl = ApiBaseUrl,
                 SelectedModel = SelectedModel,
                 Prompt = Prompt,
                 Temperature = Temperature,
@@ -1027,6 +1044,7 @@ namespace CyanTools.ViewModel
             var request = new GeminiImageRequest
             {
                 ApiKey = task.ApiKey,
+                ApiBaseUrl = task.ApiBaseUrl,
                 Model = task.SelectedModel,
                 Prompt = task.Prompt,
                 Temperature = task.Temperature,
@@ -1130,6 +1148,7 @@ namespace CyanTools.ViewModel
         private sealed class GeminiConfigDto
         {
             public string? ApiKey { get; set; }
+            public string? ApiBaseUrl { get; set; }
             public string? SelectedModel { get; set; }
             public string? Prompt { get; set; }
             public double Temperature { get; set; }
@@ -1208,6 +1227,7 @@ namespace CyanTools.ViewModel
 
                 _isApplyingConfig = true;
                 ApiKey = config.ApiKey ?? string.Empty;
+                ApiBaseUrl = string.IsNullOrWhiteSpace(config.ApiBaseUrl) ? ApiBaseUrl : config.ApiBaseUrl;
                 SelectedModel = string.IsNullOrWhiteSpace(config.SelectedModel) ? SelectedModel : config.SelectedModel;
                 Prompt = config.Prompt ?? string.Empty;
                 Temperature = config.Temperature;
@@ -1269,6 +1289,7 @@ namespace CyanTools.ViewModel
             var dto = new GeminiConfigDto
             {
                 ApiKey = ApiKey,
+                ApiBaseUrl = string.IsNullOrWhiteSpace(ApiBaseUrl) ? null : ApiBaseUrl,
                 SelectedModel = SelectedModel,
                 Prompt = Prompt,
                 Temperature = Temperature,
@@ -1423,6 +1444,7 @@ namespace CyanTools.ViewModel
         private sealed class GeminiGenerationTask
         {
             public string ApiKey { get; set; } = string.Empty;
+            public string ApiBaseUrl { get; set; } = string.Empty;
             public string SelectedModel { get; set; } = string.Empty;
             public string Prompt { get; set; } = string.Empty;
             public double Temperature { get; set; }

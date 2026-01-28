@@ -46,11 +46,13 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Label Content="计算设备:" Grid.Column="0" VerticalAlignment="Center"/>
                     <ComboBox ItemsSource="{Binding ComputeDevices}"
                               SelectedItem="{Binding SelectedComputeDevice}"
                               Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                    <Button Content="检查/安装CUDA" Command="{Binding CheckCudaCommand}" Grid.Column="2" Padding="10,2"/>
                 </Grid>
 
                 <Grid Margin="0,5,0,0">

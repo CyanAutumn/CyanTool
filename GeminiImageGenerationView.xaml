@@ -155,6 +155,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -167,8 +168,13 @@
                                  utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  VerticalContentAlignment="Center" />
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="模型:" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding SelectedModel}"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="API 地址:" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ApiBaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,6,0,0" Height="28" VerticalContentAlignment="Center"
+                             ToolTip="例如 https://generativelanguage.googleapis.com"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="模型:" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding SelectedModel}"
                               Margin="0,6,0,0" Height="28"/>
                 </Grid>
             </GroupBox>

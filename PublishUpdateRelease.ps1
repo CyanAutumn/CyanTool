@@ -31,6 +31,7 @@ param(
     [string]$VersionXmlPath = "version.xml",
     [string]$VersionXmlBranch = "main",
     [switch]$SkipVersionXmlUpdate,
+    [switch]$SkipChangelogUpdate,
     [switch]$SkipProjectVersionUpdate,
     [switch]$SkipBuild
 )
@@ -505,13 +506,8 @@ try {
         $items += $files
     }
 
-    $runtimesDir = Join-Path $BuildDir "runtimes"
-    if (Test-Path -LiteralPath $runtimesDir -PathType Container) {
-        $items += "runtimes"
-    }
-
     if ($items.Count -eq 0) {
-        throw "目标目录下没有可打包的顶层文件或 runtimes 目录：$BuildDir"
+        throw "目标目录下没有可打包的顶层文件：$BuildDir"
     }
 
     if ($null -ne $sevenZip) {
@@ -534,7 +530,10 @@ finally {
 
 $releaseNotes = Read-ReleaseNotes -ReleaseNotes $ReleaseNotes -ReleaseNotesFile $ReleaseNotesFile -SkipPrompt:$SkipReleaseNotesPrompt
 $hasReleaseNotes = -not [string]::IsNullOrWhiteSpace($releaseNotes)
-$changelogUrl = Get-RawGitHubUrl -Repo $Repo -Branch $VersionXmlBranch -Path $ChangelogPath
+$changelogUrl = ""
+if (-not $SkipChangelogUpdate -and -not [string]::IsNullOrWhiteSpace($ChangelogPath)) {
+    $changelogUrl = Get-RawGitHubUrl -Repo $Repo -Branch $VersionXmlBranch -Path $ChangelogPath
+}
 
 $releaseExists = $false
 $prevErrorActionPreference = $ErrorActionPreference
@@ -571,7 +570,7 @@ else {
     }
 }
 
-if (-not [string]::IsNullOrWhiteSpace($ChangelogPath)) {
+if (-not $SkipChangelogUpdate -and -not [string]::IsNullOrWhiteSpace($ChangelogPath)) {
     $changelogContent = if ($hasReleaseNotes) { $releaseNotes } else { "No release notes provided." }
     Write-Host "更新更新日志: $Repo $VersionXmlBranch/$ChangelogPath"
     Update-RepoTextFile -Repo $Repo -Path $ChangelogPath -Branch $VersionXmlBranch -Message "Update changelog to $Version" -Content $changelogContent

@@ -40,12 +40,16 @@ namespace CyanTools.Utils
                 var gpuOptions = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
                 _log("请求使用 GPU (CUDA) 执行提供器");
                 try {
+                    TaggingProcessor.TryConfigureCuda12ForCurrentProcess(_log, out _, out _, out _);
                     gpuOptions.AppendExecutionProvider_CUDA();
                     gpuOptions.AppendExecutionProvider_CPU();
                     _log("开始创建 GPU 会话");
                     var gpuSession = new InferenceSession(modelPath, gpuOptions);
                     _log("GPU 会话创建成功");
                     return gpuSession;
+                }
+                catch (EntryPointNotFoundException ex) {
+                    _log($"当前 onnxruntime.dll 不支持 CUDA 执行提供器，回退到 CPU。原因: {ex.Message}");
                 }
                 catch (DllNotFoundException ex) {
                     _log($"CUDA 依赖缺失，回退到 CPU。原因: {ex.Message}");

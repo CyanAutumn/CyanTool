@@ -9,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -34,11 +35,12 @@ namespace CyanTools.ViewModel
         private const string AppOs = "ios";
         private const string AppOsVersion = "14.6";
         private const string DefaultOutputDirectory = "./output";
+        private const int DefaultDownloadIntervalSeconds = 20;
+        private static readonly string SettingsDirectory = Path.Combine(AppContext.BaseDirectory, "Config");
+        private static readonly string SettingsFilePath = Path.Combine(SettingsDirectory, "config.json");
         private static readonly string RefreshTokenDirectory = Path.Combine(AppContext.BaseDirectory, "Configs", "Crawler");
         private static readonly string RefreshTokenFilePath = Path.Combine(RefreshTokenDirectory, "pixiv_refresh_token.txt");
         private static readonly string[] ContentTypes = { "illust", "manga" };
-        private const int MinDownloadDelaySeconds = 8;
-        private const int MaxDownloadDelaySeconds = 12;
 
         private static readonly HttpClient AuthClient;
         private static readonly HttpClient ApiClient;
@@ -58,14 +60,25 @@ namespace CyanTools.ViewModel
         private readonly RelayCommand _openOutputFolderCommand;
         private readonly RelayCommand _getRefreshTokenCommand;
         private CancellationTokenSource? _cancellationTokenSource;
+        private CancellationTokenSource? _saveSettingsCts;
         private string _artistId = string.Empty;
         private string _refreshToken = string.Empty;
         private string _outputDirectory = DefaultOutputDirectory;
+        private int _downloadIntervalSeconds = DefaultDownloadIntervalSeconds;
         private string _logText = string.Empty;
         private bool _isDownloading;
         private bool _hasShownCancelMessage;
         private string? _accessToken;
         private Action<string>? _pipelineLogger;
+        private bool _isApplyingSettings;
+
+        private static readonly JsonSerializerOptions SettingsSerializerOptions = new()
+        {
+            AllowTrailingCommas = true,
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            WriteIndented = true
+        };
 
         public string ArtistId
         {
@@ -77,6 +90,7 @@ namespace CyanTools.ViewModel
                     _artistId = value;
                     OnPropertyChanged();
                     _startStopCommand?.RaiseCanExecuteChanged();
+                    ScheduleSaveSettings();
                 }
             }
         }
@@ -107,6 +121,22 @@ namespace CyanTools.ViewModel
                     OnPropertyChanged();
                     _startStopCommand?.RaiseCanExecuteChanged();
                     _openOutputFolderCommand?.RaiseCanExecuteChanged();
+                    ScheduleSaveSettings();
+                }
+            }
+        }
+
+        public int DownloadIntervalSeconds
+        {
+            get => _downloadIntervalSeconds;
+            set
+            {
+                var normalized = value < 0 ? 0 : value;
+                if (_downloadIntervalSeconds != normalized)
+                {
+                    _downloadIntervalSeconds = normalized;
+                    OnPropertyChanged();
+                    ScheduleSaveSettings();
                 }
             }
         }
@@ -145,11 +175,12 @@ namespace CyanTools.ViewModel
 
         public PixivDownloaderViewModel()
         {
-            Directory.CreateDirectory(_outputDirectory);
             _startStopCommand = new RelayCommand(async _ => await StartOrStopAsync(), _ => CanStartOrStop());
             _openOutputFolderCommand = new RelayCommand(_ => OpenOutputFolder(), _ => !string.IsNullOrWhiteSpace(OutputDirectory));
             _getRefreshTokenCommand = new RelayCommand(async _ => await FetchRefreshTokenAsync(), _ => !IsDownloading);
 
+            LoadSettings();
+            Directory.CreateDirectory(string.IsNullOrWhiteSpace(OutputDirectory) ? DefaultOutputDirectory : OutputDirectory);
             LoadRefreshToken();
         }
 
@@ -181,6 +212,7 @@ namespace CyanTools.ViewModel
             _hasShownCancelMessage = false;
             _cancellationTokenSource = new CancellationTokenSource();
             IsDownloading = true;
+            SaveSettings();
             var artistId = (ArtistId ?? string.Empty).Trim();
             AppendLog($"开始抓取 Pixiv 画师 {artistId} 的作品...");
 
@@ -321,7 +353,7 @@ namespace CyanTools.ViewModel
                             AppendLog($"已保存 {item.FileName}");
                         }
 
-                        await Task.Delay(GetRandomDelay(), token);
+                        await Task.Delay(GetDownloadDelay(), token);
                     }
 
                     nextUrl = response.NextUrl;
@@ -687,11 +719,9 @@ namespace CyanTools.ViewModel
             return $"{LoginUrl}?code_challenge={Uri.EscapeDataString(codeChallenge)}&code_challenge_method=S256&client=pixiv-android";
         }
 
-        private static TimeSpan GetRandomDelay()
+        private TimeSpan GetDownloadDelay()
         {
-            var seconds = MinDownloadDelaySeconds
-                          + Random.Shared.NextDouble() * (MaxDownloadDelaySeconds - MinDownloadDelaySeconds);
-            return TimeSpan.FromSeconds(seconds);
+            return TimeSpan.FromSeconds(DownloadIntervalSeconds);
         }
 
         private static string? TryGetFileName(string url)
@@ -739,6 +769,91 @@ namespace CyanTools.ViewModel
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
         }
 
+        private void LoadSettings()
+        {
+            try
+            {
+                if (!File.Exists(SettingsFilePath))
+                {
+                    DownloadIntervalSeconds = DefaultDownloadIntervalSeconds;
+                    return;
+                }
+
+                var json = File.ReadAllText(SettingsFilePath);
+                var settings = System.Text.Json.JsonSerializer.Deserialize<PixivDownloaderSettings>(json, SettingsSerializerOptions);
+                if (settings == null)
+                {
+                    return;
+                }
+
+                _isApplyingSettings = true;
+                ArtistId = settings.ArtistId ?? string.Empty;
+                OutputDirectory = string.IsNullOrWhiteSpace(settings.OutputDirectory) ? DefaultOutputDirectory : settings.OutputDirectory;
+                DownloadIntervalSeconds = settings.DownloadIntervalSeconds;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"加载 Pixiv 下载器配置失败: {ex.Message}");
+            }
+            finally
+            {
+                _isApplyingSettings = false;
+            }
+        }
+
+        private void ScheduleSaveSettings()
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            _saveSettingsCts?.Cancel();
+            _saveSettingsCts = new CancellationTokenSource();
+
+            var token = _saveSettingsCts.Token;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(400, token);
+                    SaveSettings();
+                }
+                catch (OperationCanceledException)
+                {
+
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"保存 Pixiv 下载器配置失败: {ex.Message}");
+                }
+            });
+        }
+
+        private void SaveSettings()
+        {
+            try
+            {
+                Directory.CreateDirectory(SettingsDirectory);
+
+                var settings = new PixivDownloaderSettings
+                {
+                    ArtistId = ArtistId?.Trim() ?? string.Empty,
+                    OutputDirectory = OutputDirectory?.Trim() ?? string.Empty,
+                    DownloadIntervalSeconds = DownloadIntervalSeconds
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(settings, SettingsSerializerOptions);
+                var tempPath = SettingsFilePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, SettingsFilePath, overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"保存 Pixiv 下载器配置失败: {ex.Message}");
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -747,5 +862,12 @@ namespace CyanTools.ViewModel
         }
 
         private sealed record PixivDownloadItem(string Url, string FileName);
+
+        private sealed class PixivDownloaderSettings
+        {
+            public string? ArtistId { get; set; }
+            public string? OutputDirectory { get; set; }
+            public int DownloadIntervalSeconds { get; set; } = DefaultDownloadIntervalSeconds;
+        }
     }
 }
