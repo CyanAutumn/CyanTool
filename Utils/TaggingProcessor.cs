@@ -398,6 +398,138 @@ namespace CyanTools.Utils
             return Version.TryParse(name, out version);
         }
 
+        private static bool TryResolveLocalFile(string pathOrUrl, out string localPath)
+        {
+            localPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(pathOrUrl))
+            {
+                return false;
+            }
+
+            if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out var uri) && uri.IsFile)
+            {
+                localPath = uri.LocalPath;
+                return File.Exists(localPath);
+            }
+
+            if (File.Exists(pathOrUrl))
+            {
+                localPath = Path.GetFullPath(pathOrUrl);
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool TryDetectInputConfig(string modelPath, out int inputSize, out string inputFormat, out string message)
+        {
+            inputSize = 0;
+            inputFormat = string.Empty;
+            message = string.Empty;
+
+            if (!TryResolveLocalFile(modelPath, out var localPath))
+            {
+                message = "模型文件不存在或路径无效。";
+                return false;
+            }
+
+            try
+            {
+                using var session = new InferenceSession(localPath);
+                if (session.InputMetadata.Count == 0)
+                {
+                    message = "模型未提供输入信息。";
+                    return false;
+                }
+
+                var metadata = session.InputMetadata.First().Value;
+                var dims = metadata.Dimensions;
+                if (dims == null || dims.Length == 0)
+                {
+                    message = "无法读取模型输入维度。";
+                    return false;
+                }
+
+                bool formatDetected = false;
+                if (dims.Length >= 4)
+                {
+                    if (dims[1] == 3)
+                    {
+                        inputFormat = "NCHW";
+                        formatDetected = true;
+                    }
+                    else if (dims[3] == 3)
+                    {
+                        inputFormat = "NHWC";
+                        formatDetected = true;
+                    }
+                }
+
+                if (!formatDetected)
+                {
+                    inputFormat = "NHWC";
+                }
+
+                int sizeDetected = 0;
+                if (dims.Length >= 4)
+                {
+                    int hIndex = inputFormat == "NCHW" ? 2 : 1;
+                    int wIndex = inputFormat == "NCHW" ? 3 : 2;
+                    var h = dims[hIndex];
+                    var w = dims[wIndex];
+                    if (h > 0 && w > 0)
+                    {
+                        sizeDetected = h == w ? h : Math.Max(h, w);
+                    }
+                    else if (h > 0)
+                    {
+                        sizeDetected = h;
+                    }
+                    else if (w > 0)
+                    {
+                        sizeDetected = w;
+                    }
+                }
+
+                if (sizeDetected <= 0)
+                {
+                    var fallback = dims.FirstOrDefault(d => d > 0 && d != 3);
+                    if (fallback > 0)
+                    {
+                        sizeDetected = fallback;
+                    }
+                }
+
+                inputSize = sizeDetected;
+
+                if (formatDetected && inputSize > 0)
+                {
+                    message = $"识别到输入格式 {inputFormat}，输入尺寸 {inputSize}。";
+                    return true;
+                }
+
+                if (formatDetected)
+                {
+                    message = $"识别到输入格式 {inputFormat}，输入尺寸未确定。";
+                    return true;
+                }
+
+                if (inputSize > 0)
+                {
+                    message = $"识别到输入尺寸 {inputSize}，输入格式未确定。";
+                    return true;
+                }
+
+                message = "未能从模型输入维度识别参数。";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                message = $"识别失败：{ex.Message}";
+                return false;
+            }
+        }
+
         public async Task InitializeAsync(string modelUrl, string tagsUrl, string modelDisplayName, bool preferGpu, IProgress<string> progress)
         {
             string appDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TaggerModels");
@@ -543,6 +675,14 @@ namespace CyanTools.Utils
             if (File.Exists(destinationPath))
             {
                 progress.Report($"{fileDescription} already exists. Skipping download.");
+                return;
+            }
+
+            if (TryResolveLocalFile(url, out var localPath))
+            {
+                progress.Report($"Copying {fileDescription} from local path...");
+                File.Copy(localPath, destinationPath, overwrite: true);
+                progress.Report($"{fileDescription} copied.");
                 return;
             }
 

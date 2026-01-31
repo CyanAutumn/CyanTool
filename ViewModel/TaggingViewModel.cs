@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using CyanTools.Utils;
+using CyanTools;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
@@ -70,6 +71,7 @@ namespace CyanTools.ViewModel
         public ICommand StartTaggingCommand { get; }
         public ICommand ClearLogCommand { get; }
         public ICommand CheckCudaCommand { get; }
+        public ICommand AddTaggerCommand { get; }
 
         public TaggingViewModel()
         {
@@ -97,6 +99,7 @@ namespace CyanTools.ViewModel
             StartTaggingCommand = new RelayCommand(async _ => await StartProcessing(), _ => IsIdle && !string.IsNullOrWhiteSpace(InputDirectory));
             ClearLogCommand = new RelayCommand(_ => LogLines.Clear(), _ => IsIdle);
             CheckCudaCommand = new RelayCommand(async _ => await CheckOrInstallCudaAsync(), _ => IsIdle);
+            AddTaggerCommand = new RelayCommand(_ => AddTagger(), _ => IsIdle);
         }
 
         private void AddLog(string message)
@@ -134,6 +137,41 @@ namespace CyanTools.ViewModel
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 setPathAction(dialog.FileName);
+            }
+        }
+
+        private void AddTagger()
+        {
+            var window = new AddTaggerWindow
+            {
+                Owner = Application.Current?.MainWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            if (window.ShowDialog() == true && window.ResultModel != null)
+            {
+                var newModel = window.ResultModel;
+                var existing = TaggerModels.FirstOrDefault(model =>
+                    string.Equals(model.DisplayName, newModel.DisplayName, StringComparison.OrdinalIgnoreCase));
+
+                if (existing != null)
+                {
+                    var result = MessageBox.Show(
+                        $"已存在同名打标器：{existing.DisplayName}，是否覆盖？",
+                        "添加打标器",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (result != MessageBoxResult.Yes)
+                    {
+                        return;
+                    }
+
+                    TaggerModels.Remove(existing);
+                }
+
+                TaggerModels.Add(newModel);
+                SelectedTaggerModel = newModel;
             }
         }
 
