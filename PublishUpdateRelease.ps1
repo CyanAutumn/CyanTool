@@ -26,12 +26,10 @@ param(
     [string]$ReleaseNotes = "",
     [string]$ReleaseNotesFile = "",
     [switch]$SkipReleaseNotesPrompt,
-    [string]$ChangelogPath = "changelog.txt",
     [string]$SevenZipPath = "",
     [string]$VersionXmlPath = "version.xml",
     [string]$VersionXmlBranch = "main",
     [switch]$SkipVersionXmlUpdate,
-    [switch]$SkipChangelogUpdate,
     [switch]$SkipProjectVersionUpdate,
     [switch]$SkipBuild
 )
@@ -306,74 +304,34 @@ function Build-VersionXml {
 "@
 }
 
-function Get-RawGitHubUrl {
-    param(
-        [string]$Repo,
-        [string]$Branch,
-        [string]$Path
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        return ""
-    }
-
-    $normalizedPath = ($Path -replace "\\", "/").TrimStart("/")
-    return "https://raw.githubusercontent.com/$Repo/$Branch/$normalizedPath"
-}
-
 function Update-VersionXml {
     param(
         [string]$Repo,
         [string]$Path,
         [string]$Branch,
         [string]$Version,
-        [string]$DownloadUrl,
-        [string]$ChangelogUrl
+        [string]$DownloadUrl
     )
-
-    $defaultChangelog = if ([string]::IsNullOrWhiteSpace($ChangelogUrl)) { "https://github.com/$Repo/releases/latest" } else { $ChangelogUrl }
     $defaultMandatory = "false"
 
     $existing = Get-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch
 
-    $changelog = $defaultChangelog
     $mandatory = $defaultMandatory
 
     if ($null -ne $existing -and -not [string]::IsNullOrWhiteSpace($existing.Content)) {
         try {
             [xml]$xml = $existing.Content
-            if ([string]::IsNullOrWhiteSpace($ChangelogUrl) -and $xml.item.changelog) { $changelog = $xml.item.changelog }
             if ($xml.item.mandatory) { $mandatory = $xml.item.mandatory }
         }
         catch {
-            $changelog = $defaultChangelog
             $mandatory = $defaultMandatory
         }
     }
 
-    $newContent = Build-VersionXml -Version $Version -Url $DownloadUrl -Changelog $changelog -Mandatory $mandatory
+    $newContent = Build-VersionXml -Version $Version -Url $DownloadUrl -Changelog "" -Mandatory $mandatory
     $sha = if ($null -ne $existing) { $existing.Sha } else { "" }
 
     Put-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch -Message "Update version.xml to $Version" -Content $newContent -Sha $sha
-}
-
-function Update-RepoTextFile {
-    param(
-        [string]$Repo,
-        [string]$Path,
-        [string]$Branch,
-        [string]$Message,
-        [string]$Content
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        return
-    }
-
-    $existing = Get-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch
-    $sha = if ($null -ne $existing) { $existing.Sha } else { "" }
-
-    Put-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch -Message $Message -Content $Content -Sha $sha
 }
 
 function Read-ReleaseNotes {
@@ -530,10 +488,6 @@ finally {
 
 $releaseNotes = Read-ReleaseNotes -ReleaseNotes $ReleaseNotes -ReleaseNotesFile $ReleaseNotesFile -SkipPrompt:$SkipReleaseNotesPrompt
 $hasReleaseNotes = -not [string]::IsNullOrWhiteSpace($releaseNotes)
-$changelogUrl = ""
-if (-not $SkipChangelogUpdate -and -not [string]::IsNullOrWhiteSpace($ChangelogPath)) {
-    $changelogUrl = Get-RawGitHubUrl -Repo $Repo -Branch $VersionXmlBranch -Path $ChangelogPath
-}
 
 $releaseExists = $false
 $prevErrorActionPreference = $ErrorActionPreference
@@ -570,16 +524,10 @@ else {
     }
 }
 
-if (-not $SkipChangelogUpdate -and -not [string]::IsNullOrWhiteSpace($ChangelogPath)) {
-    $changelogContent = if ($hasReleaseNotes) { $releaseNotes } else { "No release notes provided." }
-    Write-Host "更新更新日志: $Repo $VersionXmlBranch/$ChangelogPath"
-    Update-RepoTextFile -Repo $Repo -Path $ChangelogPath -Branch $VersionXmlBranch -Message "Update changelog to $Version" -Content $changelogContent
-}
-
 if (-not $SkipVersionXmlUpdate) {
     $downloadUrl = "https://github.com/$Repo/releases/download/$tag/$zipAssetName"
     Write-Host "更新 version.xml: $Repo $VersionXmlBranch/$VersionXmlPath"
-    Update-VersionXml -Repo $Repo -Path $VersionXmlPath -Branch $VersionXmlBranch -Version $Version -DownloadUrl $downloadUrl -ChangelogUrl $changelogUrl
+    Update-VersionXml -Repo $Repo -Path $VersionXmlPath -Branch $VersionXmlBranch -Version $Version -DownloadUrl $downloadUrl
 }
 
 $viewJson = & gh release view $tag --repo $Repo --json url 2>$null
