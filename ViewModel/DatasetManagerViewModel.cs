@@ -324,16 +324,27 @@ namespace CyanTools.ViewModel
                         var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
                         var itemsByBaseName = new Dictionary<string, DatasetDataItem>(StringComparer.OrdinalIgnoreCase);
 
-                        foreach (var file in Directory.GetFiles(folderPath))
+                        var enumerationOptions = new EnumerationOptions
+                        {
+                            RecurseSubdirectories = true,
+                            IgnoreInaccessible = true
+                        };
+
+                        foreach (var file in Directory.EnumerateFiles(folderPath, "*", enumerationOptions))
                         {
                             string extension = System.IO.Path.GetExtension(file);
+                            string relativePath = System.IO.Path.GetRelativePath(folderPath, file)
+                                .Replace(System.IO.Path.AltDirectorySeparatorChar, System.IO.Path.DirectorySeparatorChar);
+                            string baseKey = extension.Length > 0 && relativePath.Length > extension.Length
+                                ? relativePath.Substring(0, relativePath.Length - extension.Length)
+                                : System.IO.Path.GetFileNameWithoutExtension(relativePath);
+
                             if (extension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
                             {
-                                string baseName = System.IO.Path.GetFileNameWithoutExtension(file);
-                                if (!itemsByBaseName.TryGetValue(baseName, out var item))
+                                if (!itemsByBaseName.TryGetValue(baseKey, out var item))
                                 {
-                                    item = new DatasetDataItem { BaseName = baseName };
-                                    itemsByBaseName.Add(baseName, item);
+                                    item = new DatasetDataItem { BaseName = baseKey };
+                                    itemsByBaseName.Add(baseKey, item);
                                 }
                                 item.TextPath = file;
                                 continue;
@@ -341,11 +352,10 @@ namespace CyanTools.ViewModel
 
                             if (imageExtensions.Contains(extension))
                             {
-                                string baseName = System.IO.Path.GetFileNameWithoutExtension(file);
-                                if (!itemsByBaseName.TryGetValue(baseName, out var item))
+                                if (!itemsByBaseName.TryGetValue(baseKey, out var item))
                                 {
-                                    item = new DatasetDataItem { BaseName = baseName };
-                                    itemsByBaseName.Add(baseName, item);
+                                    item = new DatasetDataItem { BaseName = baseKey };
+                                    itemsByBaseName.Add(baseKey, item);
                                 }
 
                                 if (string.IsNullOrEmpty(item.ImagePath))
@@ -354,7 +364,7 @@ namespace CyanTools.ViewModel
                                 }
                                 else
                                 {
-                                    string uniqueKey = System.IO.Path.GetFileName(file);
+                                    string uniqueKey = relativePath;
                                     if (!itemsByBaseName.ContainsKey(uniqueKey))
                                     {
                                         itemsByBaseName.Add(uniqueKey, new DatasetDataItem { BaseName = uniqueKey, ImagePath = file });

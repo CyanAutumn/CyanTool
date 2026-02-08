@@ -28,7 +28,7 @@ namespace CyanTools.Utils
                 return Enumerable.Range(0, data?.Count ?? 0).ToArray();
             }
 
-            var mlContext = new MLContext();
+            var mlContext = new MLContext(seed: 42);
 
 
             int vectorSize = data[0].Length;

@@ -43,7 +43,8 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private int _numClusters = 5;
+
+        private int _numClusters = 40;
         public int NumClusters
         {
             get => _numClusters;
@@ -336,20 +337,68 @@ namespace CyanTools.ViewModel
                     ? imageResults.Select(r => r.StyleVector).ToList()
                     : imageResults.Select(r => r.ContentVector).ToList();
 
-                var featureSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensions(dataPoints);
-                if (featureSpace.Count != dataPoints.Count)
+                List<float[]> featureSpace;
+                try
                 {
-                    featureSpace = dataPoints;
+                    AppendLog($"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors=15, n_components=2）: {SelectedFeatureType}");
+                    var umapOptions = new Utils.UmapReducer.Options
+                    {
+                        Metric = "cosine",
+                        RandomState = 42,
+                        NNeighbors = 15,
+                        NComponents = 2,
+                        MinDist = 0.1f,
+                        Spread = 1.0f
+                    };
+
+                    featureSpace = Utils.UmapReducer.ReduceToTwoDimensions(
+                        dataPoints,
+                        umapOptions,
+                        token,
+                        p => Application.Current.Dispatcher.Invoke(() => Progress = 30 + p * 40));
+                }
+                catch (Exception ex)
+                {
+
+                    AppendLog($"UMAP 失败，回退 PCA。原因: {ex.Message}");
+                    featureSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(dataPoints);
+                }
+
+                if (featureSpace.Count != dataPoints.Count || featureSpace.Any(v => v == null || v.Length != 2))
+                {
+                    throw new InvalidOperationException("降维输出异常：UMAP/PCA 未生成有效 2D 特征。");
                 }
 
                 int[] assignments = SelectedAlgorithm switch
                 {
-                    "KMeans" => Utils.MlNetClusterer.Cluster(featureSpace, NumClusters),
+                    "KMeans" => Utils.SklearnKMeansClusterer.Cluster(featureSpace, NumClusters, randomState: 42),
                     "HDBSCAN" => Utils.HdbscanClusterer.Cluster(featureSpace, MinClusterSize),
                     _ => new int[dataPoints.Count]
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Progress = 75);
+
+                string featureLower = SelectedFeatureType.Equals("Style", StringComparison.OrdinalIgnoreCase) ? "style" : "content";
+                string title = $"{SelectedAlgorithm}_{featureLower}";
+                string outputRoot = Path.Combine(OutputPath, title);
+                PrepareOutputRoot(outputRoot);
+
+                if (SelectedAlgorithm == "KMeans")
+                {
+                    for (int c = 0; c < NumClusters; c++)
+                    {
+                        Directory.CreateDirectory(Path.Combine(outputRoot, $"class_{c}"));
+                    }
+                }
+                else if (SelectedAlgorithm == "HDBSCAN")
+                {
+                    int clusterCount = assignments.Where(a => a >= 0).Distinct().Count();
+                    for (int c = 0; c < clusterCount; c++)
+                    {
+                        Directory.CreateDirectory(Path.Combine(outputRoot, $"class_{c}"));
+                    }
+                    Directory.CreateDirectory(Path.Combine(outputRoot, "noise"));
+                }
 
                 for (int i = 0; i < imageResults.Count; i++)
                 {
@@ -357,21 +406,13 @@ namespace CyanTools.ViewModel
 
                     int clusterId = assignments[i];
                     string sourceFilePath = imageResults[i].FilePath;
-                    string clusterFolderName = clusterId == -1 ? "noise" : $"group_{clusterId}";
-                    string targetSubFolder = Path.Combine(OutputPath, clusterFolderName);
+                    string targetDir = clusterId == -1
+                        ? Path.Combine(outputRoot, "noise")
+                        : Path.Combine(outputRoot, $"class_{clusterId}");
 
-                    Directory.CreateDirectory(targetSubFolder);
-
-                    string fileName = Path.GetFileName(sourceFilePath);
-                    string targetFilePath = Path.Combine(targetSubFolder, fileName);
+                    Directory.CreateDirectory(targetDir);
+                    string targetFilePath = Path.Combine(targetDir, $"image_{i}.jpg");
                     CopyFileWithRetry(sourceFilePath, targetFilePath);
-
-                    string txtFilePath = Path.ChangeExtension(sourceFilePath, ".txt");
-                    if (File.Exists(txtFilePath))
-                    {
-                        string targetTxtFilePath = Path.Combine(targetSubFolder, Path.GetFileName(txtFilePath));
-                        CopyFileWithRetry(txtFilePath, targetTxtFilePath);
-                    }
 
                     Application.Current.Dispatcher.Invoke(() =>
                         Progress = 75 + (double)(i + 1) / imageResults.Count * 25);
@@ -514,16 +555,22 @@ namespace CyanTools.ViewModel
 
         private void CopyFileWithRetry(string source, string destination, int maxRetries = 3)
         {
+
+            if (File.Exists(destination))
+            {
+                return;
+            }
+
+            if (!File.Exists(source))
+            {
+                AppendLog($"警告: 源文件不存在，已跳过: {source}");
+                return;
+            }
+
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
                 try
                 {
-                    if (File.Exists(destination))
-                    {
-                        File.Delete(destination);
-                        Thread.Sleep(100);
-                    }
-
                     using var sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
                     using var destStream = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None);
                     sourceStream.CopyTo(destStream);
@@ -535,9 +582,28 @@ namespace CyanTools.ViewModel
                 }
                 catch (Exception ex)
                 {
-                    throw new IOException($"无法复制文件 {Path.GetFileName(source)}: {ex.Message}", ex);
+                    AppendLog($"警告: 无法复制文件 {Path.GetFileName(source)}: {ex.Message}");
+                    return;
                 }
             }
+        }
+
+        private void PrepareOutputRoot(string outputRoot)
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                AppendLog($"检测到已有输出目录，先清理旧结果: {outputRoot}");
+                try
+                {
+                    Directory.Delete(outputRoot, recursive: true);
+                }
+                catch (Exception ex)
+                {
+                    throw new IOException($"无法清理旧输出目录: {outputRoot}，请关闭占用该目录的程序后重试。", ex);
+                }
+            }
+
+            Directory.CreateDirectory(outputRoot);
         }
     }
 }

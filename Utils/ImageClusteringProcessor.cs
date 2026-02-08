@@ -74,9 +74,17 @@ namespace CyanTools.Utils
         {
             try
             {
-                var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp" };
-                var imageFiles = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories)
-                    .Where(f => supportedExtensions.Contains(Path.GetExtension(f).ToLower()))
+                var supportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".bmp"
+                };
+
+
+                var imageFiles = EnumerateFilesOsWalkOrder(folderPath)
+                    .Where(f => supportedExtensions.Contains(Path.GetExtension(f)))
                     .ToList();
 
                 if (!imageFiles.Any())
@@ -106,6 +114,42 @@ namespace CyanTools.Utils
             {
                 onError?.Invoke($"读取文件时发生错误: {ex.Message}");
                 return new List<ImageStyleResult>();
+            }
+        }
+
+        private static IEnumerable<string> EnumerateFilesOsWalkOrder(string rootPath)
+        {
+
+            IEnumerable<string> files = Enumerable.Empty<string>();
+            try
+            {
+                files = Directory.EnumerateFiles(rootPath, "*.*", SearchOption.TopDirectoryOnly);
+            }
+            catch
+            {
+            }
+
+            foreach (var file in files)
+            {
+                yield return file;
+            }
+
+
+            IEnumerable<string> dirs = Enumerable.Empty<string>();
+            try
+            {
+                dirs = Directory.EnumerateDirectories(rootPath, "*", SearchOption.TopDirectoryOnly);
+            }
+            catch
+            {
+            }
+
+            foreach (var dir in dirs)
+            {
+                foreach (var subFile in EnumerateFilesOsWalkOrder(dir))
+                {
+                    yield return subFile;
+                }
             }
         }
 

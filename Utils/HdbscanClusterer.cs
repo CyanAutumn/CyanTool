@@ -2,310 +2,582 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CyanTools.Utils {
-    public static class HdbscanClusterer {
-        public static int[] Cluster(List<float[]> data, int minClusterSize) {
+namespace CyanTools.Utils
+{
+
+
+
+
+    public static class HdbscanClusterer
+    {
+        public static int[] Cluster(List<float[]> data, int minClusterSize)
+        {
             if (data == null || data.Count == 0)
-                return new int[0];
+            {
+                return Array.Empty<int>();
+            }
 
-            if (data.Count < minClusterSize)
-                return Enumerable.Repeat(-1, data.Count).ToArray();
+            if (minClusterSize <= 1)
+            {
 
-            var points = data.Select((d, i) => new HdbscanPoint(d, i)).ToList();
-            var distances = CalculateDistances(points);
-            var coreDistances = CalculateCoreDistances(distances, minClusterSize);
-            var mutualReachabilityDistances = CalculateMutualReachability(distances, coreDistances);
-            var mst = BuildMst(mutualReachabilityDistances, points.Count);
+                return Enumerable.Repeat(0, data.Count).ToArray();
+            }
+
+            int n = data.Count;
+            if (n < minClusterSize)
+            {
+                return Enumerable.Repeat(-1, n).ToArray();
+            }
+
+            for (int i = 0; i < n; i++)
+            {
+                if (data[i] == null || data[i].Length != 2)
+                {
+                    throw new ArgumentException("HDBSCAN 仅支持 2D 输入。", nameof(data));
+                }
+            }
+
+            int minSamples = minClusterSize;
 
 
-            mst.Sort((a, b) => b.Weight.CompareTo(a.Weight));
+            var xs = new double[n];
+            var ys = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                xs[i] = data[i][0];
+                ys[i] = data[i][1];
+            }
 
-            var hierarchy = BuildHierarchy(mst, points.Count);
-            var clusters = ExtractClusters(hierarchy, minClusterSize);
-            return AssignClusters(points, clusters, hierarchy);
+
+            var coreDist = ComputeCoreDistances(xs, ys, minSamples);
+
+
+            var mstEdges = BuildMutualReachabilityMst(xs, ys, coreDist);
+
+
+            var tree = BuildLinkageTree(n, mstEdges);
+
+
+            var condensed = CondenseTree(tree, minClusterSize);
+
+
+            var selected = SelectClustersEom(condensed);
+
+
+            return AssignLabels(condensed, selected, n);
         }
 
-        private static double[,] CalculateDistances(List<HdbscanPoint> points) {
-            int numPoints = points.Count;
-            double[,] distances = new double[numPoints, numPoints];
-            for (int i = 0; i < numPoints; i++) {
-                for (int j = i; j < numPoints; j++) {
-                    if (i == j) {
-                        distances[i, j] = 0;
+        #region Core distances
+
+        private static double[] ComputeCoreDistances(double[] xs, double[] ys, int minSamples)
+        {
+            int n = xs.Length;
+            var core = new double[n];
+            var tmp = new double[n - 1];
+
+            for (int i = 0; i < n; i++)
+            {
+                int idx = 0;
+                double xi = xs[i];
+                double yi = ys[i];
+                for (int j = 0; j < n; j++)
+                {
+                    if (i == j) continue;
+                    double dx = xi - xs[j];
+                    double dy = yi - ys[j];
+                    tmp[idx++] = Math.Sqrt(dx * dx + dy * dy);
+                }
+
+                Array.Sort(tmp, 0, idx);
+
+
+                int pick = Math.Min(Math.Max(minSamples - 2, 0), idx - 1);
+                core[i] = tmp[pick];
+            }
+
+            return core;
+        }
+
+        #endregion
+
+        #region MST (Prim)
+
+        private readonly record struct Edge(int From, int To, double Weight);
+
+        private static List<Edge> BuildMutualReachabilityMst(double[] xs, double[] ys, double[] coreDist)
+        {
+            int n = xs.Length;
+            var inMst = new bool[n];
+            var bestCost = new double[n];
+            var parent = new int[n];
+
+            for (int i = 0; i < n; i++)
+            {
+                bestCost[i] = double.PositiveInfinity;
+                parent[i] = -1;
+            }
+
+            inMst[0] = true;
+            for (int v = 1; v < n; v++)
+            {
+                bestCost[v] = MutualReachability(0, v, xs, ys, coreDist);
+                parent[v] = 0;
+            }
+
+            var edges = new List<Edge>(n - 1);
+
+            for (int iter = 0; iter < n - 1; iter++)
+            {
+                int next = -1;
+                double nextCost = double.PositiveInfinity;
+
+                for (int v = 0; v < n; v++)
+                {
+                    if (!inMst[v] && bestCost[v] < nextCost)
+                    {
+                        nextCost = bestCost[v];
+                        next = v;
                     }
-                    else {
-                        double dist = EuclideanDistance(points[i].Features, points[j].Features);
-                        distances[i, j] = dist;
-                        distances[j, i] = dist;
+                }
+
+                if (next < 0)
+                {
+                    break;
+                }
+
+                inMst[next] = true;
+                edges.Add(new Edge(parent[next], next, nextCost));
+
+                for (int v = 0; v < n; v++)
+                {
+                    if (inMst[v]) continue;
+                    double cost = MutualReachability(next, v, xs, ys, coreDist);
+                    if (cost < bestCost[v])
+                    {
+                        bestCost[v] = cost;
+                        parent[v] = next;
                     }
                 }
             }
-            return distances;
+
+            edges.Sort(static (a, b) =>
+            {
+                int c = a.Weight.CompareTo(b.Weight);
+                if (c != 0) return c;
+
+                int aMin = a.From < a.To ? a.From : a.To;
+                int aMax = a.From < a.To ? a.To : a.From;
+                int bMin = b.From < b.To ? b.From : b.To;
+                int bMax = b.From < b.To ? b.To : b.From;
+
+                c = aMin.CompareTo(bMin);
+                return c != 0 ? c : aMax.CompareTo(bMax);
+            });
+            return edges;
         }
 
-        private static double EuclideanDistance(float[] a, float[] b) {
-            double sum = 0;
-            for (int i = 0; i < a.Length; i++) {
-                sum += (a[i] - b[i]) * (a[i] - b[i]);
-            }
-            return Math.Sqrt(sum);
+        private static double MutualReachability(int i, int j, double[] xs, double[] ys, double[] coreDist)
+        {
+            double dx = xs[i] - xs[j];
+            double dy = ys[i] - ys[j];
+            double dist = Math.Sqrt(dx * dx + dy * dy);
+            double cd = coreDist[i] > coreDist[j] ? coreDist[i] : coreDist[j];
+            return dist > cd ? dist : cd;
         }
 
-        private static double[] CalculateCoreDistances(double[,] distances, int k) {
-            int numPoints = distances.GetLength(0);
-            double[] coreDistances = new double[numPoints];
+        #endregion
 
-            for (int i = 0; i < numPoints; i++) {
-                var sortedDistances = new List<double>();
-                for (int j = 0; j < numPoints; j++) {
-                    if (i != j)
-                        sortedDistances.Add(distances[i, j]);
-                }
-                sortedDistances.Sort();
+        #region Linkage tree
 
+        private sealed class LinkageTree
+        {
+            public int NPoints { get; init; }
+            public int TotalNodes => 2 * NPoints - 1;
+            public int RootNodeId => 2 * NPoints - 2;
 
-                coreDistances[i] = k - 1 < sortedDistances.Count ? sortedDistances[k - 1] : double.MaxValue;
-            }
-            return coreDistances;
+            public int[] LeftChild { get; init; } = Array.Empty<int>();
+            public int[] RightChild { get; init; } = Array.Empty<int>();
+            public double[] Distance { get; init; } = Array.Empty<double>();
+            public int[] Size { get; init; } = Array.Empty<int>();
         }
 
-        private static double[,] CalculateMutualReachability(double[,] distances, double[] coreDistances) {
-            int numPoints = distances.GetLength(0);
-            double[,] mrd = new double[numPoints, numPoints];
+        private static LinkageTree BuildLinkageTree(int nPoints, List<Edge> mstEdges)
+        {
 
-            for (int i = 0; i < numPoints; i++) {
-                for (int j = i; j < numPoints; j++) {
-                    if (i == j) {
-                        mrd[i, j] = 0;
-                    }
-                    else {
-                        double val = Math.Max(coreDistances[i], Math.Max(coreDistances[j], distances[i, j]));
-                        mrd[i, j] = val;
-                        mrd[j, i] = val;
-                    }
-                }
-            }
-            return mrd;
-        }
+            var parent = new int[nPoints];
+            var rank = new int[nPoints];
+            var compNodeId = new int[nPoints];
+            var compSize = new int[nPoints];
 
-        private static List<HdbscanEdge> BuildMst(double[,] mrd, int numPoints) {
-            var edges = new List<HdbscanEdge>();
-            for (int i = 0; i < numPoints; i++) {
-                for (int j = i + 1; j < numPoints; j++) {
-                    edges.Add(new HdbscanEdge(i, j, mrd[i, j]));
-                }
-            }
-            edges.Sort((a, b) => a.Weight.CompareTo(b.Weight));
-
-            var mst = new List<HdbscanEdge>();
-            var disjointSet = new DisjointSet(numPoints);
-
-            foreach (var edge in edges) {
-                if (disjointSet.Find(edge.From) != disjointSet.Find(edge.To)) {
-                    mst.Add(edge);
-                    disjointSet.Union(edge.From, edge.To);
-                    if (mst.Count == numPoints - 1)
-                        break;
-                }
-            }
-            return mst;
-        }
-
-        private static HierarchyNode BuildHierarchy(List<HdbscanEdge> mst, int numPoints) {
-            var nodes = new Dictionary<int, HierarchyNode>();
-
-
-            for (int i = 0; i < numPoints; i++) {
-                nodes[i] = new HierarchyNode(i, 1, 0);
+            for (int i = 0; i < nPoints; i++)
+            {
+                parent[i] = i;
+                rank[i] = 0;
+                compNodeId[i] = i;
+                compSize[i] = 1;
             }
 
-            var disjointSet = new DisjointSet(numPoints);
-            int nextClusterId = numPoints;
+            int totalNodes = 2 * nPoints - 1;
+            var left = new int[totalNodes];
+            var right = new int[totalNodes];
+            var dist = new double[totalNodes];
+            var size = new int[totalNodes];
 
-
-            foreach (var edge in mst.OrderBy(e => e.Weight)) {
-                int root1 = disjointSet.Find(edge.From);
-                int root2 = disjointSet.Find(edge.To);
-
-                if (root1 != root2) {
-                    var node1 = nodes[root1];
-                    var node2 = nodes[root2];
-
-
-                    var parentNode = new HierarchyNode(
-                        nextClusterId++,
-                        node1.Size + node2.Size,
-                        edge.Weight
-                    );
-
-                    parentNode.Children.Add(node1);
-                    parentNode.Children.Add(node2);
-                    node1.Parent = parentNode;
-                    node2.Parent = parentNode;
-
-
-                    disjointSet.Union(root1, root2);
-                    int newRoot = disjointSet.Find(root1);
-                    nodes[newRoot] = parentNode;
-                }
+            for (int i = 0; i < nPoints; i++)
+            {
+                left[i] = -1;
+                right[i] = -1;
+                dist[i] = 0;
+                size[i] = 1;
             }
 
-
-            return nodes.Values.FirstOrDefault(n => n.Parent == null) ?? nodes[0];
-        }
-
-        private static List<HierarchyNode> ExtractClusters(HierarchyNode root, int minClusterSize) {
-            var clusters = new List<HierarchyNode>();
-            var toProcess = new Queue<HierarchyNode>();
-            toProcess.Enqueue(root);
-
-            while (toProcess.Count > 0) {
-                var node = toProcess.Dequeue();
-
-                if (node.Size < minClusterSize) {
-
+            int mergeIndex = 0;
+            foreach (var edge in mstEdges)
+            {
+                int r1 = Find(parent, edge.From);
+                int r2 = Find(parent, edge.To);
+                if (r1 == r2)
+                {
                     continue;
                 }
 
-                if (node.Children.Count == 0) {
+                int node1 = compNodeId[r1];
+                int node2 = compNodeId[r2];
+                int newNodeId = nPoints + mergeIndex;
+                int newSize = compSize[r1] + compSize[r2];
 
-                    if (node.Size >= minClusterSize)
-                        clusters.Add(node);
+                left[newNodeId] = node1;
+                right[newNodeId] = node2;
+                dist[newNodeId] = edge.Weight;
+                size[newNodeId] = newSize;
+
+                int newRoot = Union(parent, rank, r1, r2);
+                compNodeId[newRoot] = newNodeId;
+                compSize[newRoot] = newSize;
+                mergeIndex++;
+
+                if (mergeIndex == nPoints - 1)
+                {
+                    break;
                 }
-                else {
+            }
 
-                    bool hasValidChildren = node.Children.Any(c => c.Size >= minClusterSize);
+            return new LinkageTree
+            {
+                NPoints = nPoints,
+                LeftChild = left,
+                RightChild = right,
+                Distance = dist,
+                Size = size
+            };
+        }
 
-                    if (!hasValidChildren) {
+        private static int Find(int[] parent, int i)
+        {
+            while (parent[i] != i)
+            {
+                parent[i] = parent[parent[i]];
+                i = parent[i];
+            }
+            return i;
+        }
 
-                        clusters.Add(node);
+        private static int Union(int[] parent, int[] rank, int a, int b)
+        {
+            a = Find(parent, a);
+            b = Find(parent, b);
+            if (a == b) return a;
+
+            if (rank[a] < rank[b])
+            {
+                parent[a] = b;
+                return b;
+            }
+
+            if (rank[a] > rank[b])
+            {
+                parent[b] = a;
+                return a;
+            }
+
+
+            if (a <= b)
+            {
+                parent[b] = a;
+                rank[a]++;
+                return a;
+            }
+
+            parent[a] = b;
+            rank[b]++;
+            return b;
+        }
+
+        #endregion
+
+        #region Condensed tree
+
+        private readonly record struct CondensedEdge(int ParentCluster, int ChildId, bool ChildIsPoint, double Lambda, int ChildSize);
+
+        private sealed class CondensedTree
+        {
+            public int NPoints { get; init; }
+            public int ClusterCount { get; init; }
+            public double[] BirthLambda { get; init; } = Array.Empty<double>();
+            public int[] ClusterSize { get; init; } = Array.Empty<int>();
+
+            public List<CondensedEdge> Edges { get; init; } = new();
+            public List<int>[] ChildClusters { get; init; } = Array.Empty<List<int>>();
+            public List<int>[] ChildPoints { get; init; } = Array.Empty<List<int>>();
+            public double[] Stability { get; init; } = Array.Empty<double>();
+        }
+
+        private static CondensedTree CondenseTree(LinkageTree tree, int minClusterSize)
+        {
+            int n = tree.NPoints;
+            int totalNodes = tree.TotalNodes;
+
+            var nodeToCluster = new int[totalNodes];
+            Array.Fill(nodeToCluster, -1);
+
+            var birthLambda = new List<double> { 0.0 };
+            var clusterSizes = new List<int> { tree.Size[tree.RootNodeId] };
+
+            var edges = new List<CondensedEdge>();
+
+            int nextClusterLabel = 0;
+            int rootNode = tree.RootNodeId;
+            nodeToCluster[rootNode] = 0;
+
+            var stack = new Stack<int>();
+            stack.Push(rootNode);
+
+            while (stack.Count > 0)
+            {
+                int node = stack.Pop();
+                int parentCluster = nodeToCluster[node];
+
+                int left = tree.LeftChild[node];
+                int right = tree.RightChild[node];
+                if (left < 0 && right < 0)
+                {
+                    continue;
+                }
+
+                double lambda = tree.Distance[node] > 0 ? 1.0 / tree.Distance[node] : double.PositiveInfinity;
+
+
+                if (right >= 0)
+                {
+                    ProcessChild(node, right, parentCluster, lambda);
+                }
+                if (left >= 0)
+                {
+                    ProcessChild(node, left, parentCluster, lambda);
+                }
+            }
+
+            int clusterCount = nextClusterLabel + 1;
+            var childClusters = new List<int>[clusterCount];
+            var childPoints = new List<int>[clusterCount];
+            for (int i = 0; i < clusterCount; i++)
+            {
+                childClusters[i] = new List<int>();
+                childPoints[i] = new List<int>();
+            }
+
+            var stability = new double[clusterCount];
+            var birthArr = birthLambda.ToArray();
+
+            foreach (var e in edges)
+            {
+                if (!e.ChildIsPoint)
+                {
+                    childClusters[e.ParentCluster].Add(e.ChildId);
+                }
+                else
+                {
+                    childPoints[e.ParentCluster].Add(e.ChildId);
+                }
+
+                double birth = birthArr[e.ParentCluster];
+                stability[e.ParentCluster] += (e.Lambda - birth) * e.ChildSize;
+            }
+
+            return new CondensedTree
+            {
+                NPoints = n,
+                ClusterCount = clusterCount,
+                BirthLambda = birthArr,
+                ClusterSize = clusterSizes.ToArray(),
+                Edges = edges,
+                ChildClusters = childClusters,
+                ChildPoints = childPoints,
+                Stability = stability
+            };
+
+            void ProcessChild(int parentNode, int childNode, int parentCluster, double lambda)
+            {
+                _ = parentNode;
+                int childSize = childNode < n ? 1 : tree.Size[childNode];
+
+                if (childSize >= minClusterSize)
+                {
+                    int childClusterLabel = ++nextClusterLabel;
+                    if (childClusterLabel >= birthLambda.Count)
+                    {
+                        birthLambda.Add(lambda);
+                        clusterSizes.Add(childSize);
                     }
-                    else {
+                    else
+                    {
+                        birthLambda[childClusterLabel] = lambda;
+                        clusterSizes[childClusterLabel] = childSize;
+                    }
 
-                        foreach (var child in node.Children) {
-                            toProcess.Enqueue(child);
-                        }
+                    nodeToCluster[childNode] = childClusterLabel;
+                    edges.Add(new CondensedEdge(parentCluster, childClusterLabel, ChildIsPoint: false, lambda, childSize));
+                    stack.Push(childNode);
+                }
+                else
+                {
+                    foreach (var point in EnumerateLeaves(childNode, tree.LeftChild, tree.RightChild, n))
+                    {
+                        edges.Add(new CondensedEdge(parentCluster, point, ChildIsPoint: true, lambda, 1));
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<int> EnumerateLeaves(int nodeId, int[] left, int[] right, int nPoints)
+        {
+            var stack = new Stack<int>();
+            stack.Push(nodeId);
+            while (stack.Count > 0)
+            {
+                int node = stack.Pop();
+                if (node < nPoints)
+                {
+                    yield return node;
+                    continue;
+                }
+
+                int l = left[node];
+                int r = right[node];
+                if (r >= 0) stack.Push(r);
+                if (l >= 0) stack.Push(l);
+            }
+        }
+
+        #endregion
+
+        #region Cluster selection (EOM)
+
+        private static bool[] SelectClustersEom(CondensedTree tree)
+        {
+            var selected = new bool[tree.ClusterCount];
+
+
+            foreach (var child in tree.ChildClusters[0])
+            {
+                SelectRecursive(child);
+            }
+
+            selected[0] = false;
+            return selected;
+
+            double SelectRecursive(int cluster)
+            {
+                var children = tree.ChildClusters[cluster];
+                if (children.Count == 0)
+                {
+                    selected[cluster] = true;
+                    return tree.Stability[cluster];
+                }
+
+                double sumChildren = 0;
+                foreach (var child in children)
+                {
+                    sumChildren += SelectRecursive(child);
+                }
+
+                if (tree.Stability[cluster] >= sumChildren)
+                {
+                    selected[cluster] = true;
+                    foreach (var child in children)
+                    {
+                        UnselectAll(child);
+                    }
+                    return tree.Stability[cluster];
+                }
+
+                selected[cluster] = false;
+                return sumChildren;
+            }
+
+            void UnselectAll(int cluster)
+            {
+                selected[cluster] = false;
+                foreach (var child in tree.ChildClusters[cluster])
+                {
+                    UnselectAll(child);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Labels
+
+        private static int[] AssignLabels(CondensedTree tree, bool[] selectedClusters, int nPoints)
+        {
+            var labels = Enumerable.Repeat(-1, nPoints).ToArray();
+
+            var selected = new List<int>();
+            for (int i = 1; i < selectedClusters.Length; i++)
+            {
+                if (selectedClusters[i])
+                {
+                    selected.Add(i);
+                }
+            }
+
+            if (selected.Count == 0)
+            {
+                return labels;
+            }
+
+            selected.Sort();
+            var map = new Dictionary<int, int>(selected.Count);
+            for (int i = 0; i < selected.Count; i++)
+            {
+                map[selected[i]] = i;
+            }
+
+            foreach (var cluster in selected)
+            {
+                int outLabel = map[cluster];
+                var stack = new Stack<int>();
+                stack.Push(cluster);
+                while (stack.Count > 0)
+                {
+                    int cur = stack.Pop();
+
+                    foreach (var p in tree.ChildPoints[cur])
+                    {
+                        labels[p] = outLabel;
+                    }
+
+                    foreach (var child in tree.ChildClusters[cur])
+                    {
+                        stack.Push(child);
                     }
                 }
             }
 
-            return clusters;
+            return labels;
         }
 
-        private static int[] AssignClusters(List<HdbscanPoint> points, List<HierarchyNode> clusters, HierarchyNode root) {
-            var assignments = new int[points.Count];
-            Array.Fill(assignments, -1);
-
-            int clusterId = 0;
-            foreach (var cluster in clusters) {
-                var pointIndices = GetPointsInNode(cluster);
-                foreach (var idx in pointIndices) {
-                    if (idx < assignments.Length)
-                        assignments[idx] = clusterId;
-                }
-                clusterId++;
-            }
-
-            return assignments;
-        }
-
-        private static List<int> GetPointsInNode(HierarchyNode node) {
-            var points = new List<int>();
-            var toProcess = new Queue<HierarchyNode>();
-            toProcess.Enqueue(node);
-
-            while (toProcess.Count > 0) {
-                var current = toProcess.Dequeue();
-
-                if (current.Children.Count == 0) {
-
-                    if (current.Id < int.MaxValue / 2)
-                        points.Add(current.Id);
-                }
-                else {
-                    foreach (var child in current.Children) {
-                        toProcess.Enqueue(child);
-                    }
-                }
-            }
-
-            return points;
-        }
-
-
-        private class HierarchyNode {
-            public int Id { get; }
-            public int Size { get; }
-            public double Lambda { get; }
-            public HierarchyNode Parent { get; set; }
-            public List<HierarchyNode> Children { get; }
-
-            public HierarchyNode(int id, int size, double lambda) {
-                Id = id;
-                Size = size;
-                Lambda = lambda;
-                Children = new List<HierarchyNode>();
-            }
-        }
-    }
-
-
-    public class HdbscanPoint {
-        public float[] Features { get; }
-        public int Id { get; }
-        public HdbscanPoint(float[] features, int id) {
-            Features = features;
-            Id = id;
-        }
-    }
-
-    public class HdbscanEdge {
-        public int From { get; }
-        public int To { get; }
-        public double Weight { get; }
-        public HdbscanEdge(int from, int to, double weight) {
-            From = from;
-            To = to;
-            Weight = weight;
-        }
-    }
-
-    public class DisjointSet {
-        private int[] parent;
-        private int[] rank;
-
-        public DisjointSet(int size) {
-            parent = new int[size];
-            rank = new int[size];
-            for (int i = 0; i < size; i++) {
-                parent[i] = i;
-                rank[i] = 0;
-            }
-        }
-
-        public int Find(int i) {
-            if (parent[i] != i)
-                parent[i] = Find(parent[i]);
-            return parent[i];
-        }
-
-        public void Union(int i, int j) {
-            int rootI = Find(i);
-            int rootJ = Find(j);
-
-            if (rootI != rootJ) {
-
-                if (rank[rootI] < rank[rootJ]) {
-                    parent[rootI] = rootJ;
-                }
-                else if (rank[rootI] > rank[rootJ]) {
-                    parent[rootJ] = rootI;
-                }
-                else {
-                    parent[rootJ] = rootI;
-                    rank[rootI]++;
-                }
-            }
-        }
+        #endregion
     }
 }

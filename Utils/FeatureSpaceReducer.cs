@@ -16,6 +16,11 @@ namespace CyanTools.Utils {
         }
 
         public static List<float[]> ReduceToTwoDimensions(List<float[]> dataPoints) {
+
+            return UmapReducer.ReduceToTwoDimensions(dataPoints);
+        }
+
+        public static List<float[]> ReduceToTwoDimensionsPca(List<float[]> dataPoints) {
             if (dataPoints == null || dataPoints.Count == 0) {
                 return new List<float[]>();
             }
