@@ -22,6 +22,7 @@ namespace CyanTools.ViewModel
     public class KemonoDownloaderViewModel : INotifyPropertyChanged
     {
         private const string ApiBaseUrl = "https://kemono.cr";
+        private const string DefaultOutputDirectory = "./output";
         private const int PageSize = 50;
         private const int DownloadRetryCount = 3;
         private static readonly TimeSpan DownloadDelay = TimeSpan.FromSeconds(20);
@@ -55,7 +56,7 @@ namespace CyanTools.ViewModel
         private readonly RelayCommand _openOutputFolderCommand;
         private CancellationTokenSource _cancellationTokenSource;
         private string _artistId = string.Empty;
-        private string _outputDirectory = Path.Combine(AppContext.BaseDirectory, "output", "kemono");
+        private string _outputDirectory = DefaultOutputDirectory;
         private string _logText = string.Empty;
         private string _selectedService = string.Empty;
         private bool _isDownloading;
@@ -148,7 +149,7 @@ namespace CyanTools.ViewModel
                 "gumroad"
             };
 
-            Directory.CreateDirectory(_outputDirectory);
+            Directory.CreateDirectory(ResolveOutputDirectoryRoot());
             _selectedService = ServiceOptions.First();
 
             _startStopCommand = new RelayCommand(async _ => await StartOrStopAsync(), _ => CanStartOrStop());
@@ -179,7 +180,6 @@ namespace CyanTools.ViewModel
             }
 
             _hasShownCancelMessage = false;
-            Directory.CreateDirectory(OutputDirectory);
             _cancellationTokenSource = new CancellationTokenSource();
             IsDownloading = true;
             var artist = (ArtistId ?? string.Empty).Trim();
@@ -210,6 +210,9 @@ namespace CyanTools.ViewModel
         {
             var artistId = (ArtistId ?? string.Empty).Trim();
             var service = string.IsNullOrWhiteSpace(SelectedService) ? ServiceOptions.First() : SelectedService;
+            var outputDirectory = ResolveOutputDirectory();
+            Directory.CreateDirectory(outputDirectory);
+            AppendLog($"输出目录: {outputDirectory}");
             int page = 0;
             int savedCount = 0;
             var postContentCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -233,12 +236,12 @@ namespace CyanTools.ViewModel
                 {
                     token.ThrowIfCancellationRequested();
                     AppendLog($"下载 {asset.FileName}...");
-                    if (await DownloadAssetAsync(asset, OutputDirectory, token))
+                    if (await DownloadAssetAsync(asset, outputDirectory, token))
                     {
                         savedCount++;
                         AppendLog($"已保存 {asset.FileName}");
                         var content = await ResolvePostContentAsync(asset, artistId, service, postContentCache, token);
-                        await SaveContentAsync(content, asset.FileName, OutputDirectory, token);
+                        await SaveContentAsync(content, asset.FileName, outputDirectory, token);
                     }
                     await Task.Delay(DownloadDelay, token);
                 }
@@ -560,10 +563,11 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                Directory.CreateDirectory(OutputDirectory);
+                var targetDirectory = ResolveOutputDirectory();
+                Directory.CreateDirectory(targetDirectory);
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = OutputDirectory,
+                    FileName = targetDirectory,
                     UseShellExecute = true
                 });
             }
@@ -579,6 +583,24 @@ namespace CyanTools.ViewModel
             {
                 LogText += $"{DateTime.Now:HH:mm:ss} - {message}\n";
             });
+        }
+
+        private string ResolveOutputDirectoryRoot()
+        {
+            var configured = string.IsNullOrWhiteSpace(OutputDirectory) ? DefaultOutputDirectory : OutputDirectory.Trim();
+            if (Path.IsPathRooted(configured))
+            {
+                return configured;
+            }
+
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configured));
+        }
+
+        private string ResolveOutputDirectory()
+        {
+            var rootDirectory = ResolveOutputDirectoryRoot();
+            var artistId = (ArtistId ?? string.Empty).Trim();
+            return Path.Combine(rootDirectory, string.IsNullOrWhiteSpace(artistId) ? "unknown_artist" : artistId);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

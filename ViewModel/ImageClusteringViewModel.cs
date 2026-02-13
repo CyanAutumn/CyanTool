@@ -303,6 +303,25 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
+                string inputPathFull = NormalizeDirectoryPath(InputPath);
+                string outputPathFull = NormalizeDirectoryPath(OutputPath);
+                if (inputPathFull.Equals(outputPathFull, StringComparison.OrdinalIgnoreCase))
+                {
+                    const string samePathMessage = "输入目录与输出目录不能相同，请将输出目录设置为其它路径。";
+                    AppendLog(samePathMessage);
+                    if (showDialogs)
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                            MessageBox.Show(samePathMessage, "参数错误", MessageBoxButton.OK, MessageBoxImage.Warning));
+                    }
+                    return;
+                }
+
+                if (IsSameOrSubDirectory(outputPathFull, inputPathFull))
+                {
+                    AppendLog("检测到输出目录位于输入目录内，已自动在特征提取阶段排除输出目录，避免旧结果污染聚类。");
+                }
+
                 bool useGpu = SelectedComputeDevice.Equals("GPU", StringComparison.OrdinalIgnoreCase);
                 AppendLog($"选择计算设备: {SelectedComputeDevice}");
 
@@ -317,7 +336,8 @@ namespace CyanTools.ViewModel
                             Application.Current.Dispatcher.Invoke(() =>
                                 MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning));
                         }
-                    });
+                    },
+                    new[] { outputPathFull });
 
                 token.ThrowIfCancellationRequested();
 
@@ -593,17 +613,103 @@ namespace CyanTools.ViewModel
             if (Directory.Exists(outputRoot))
             {
                 AppendLog($"检测到已有输出目录，先清理旧结果: {outputRoot}");
-                try
+
+                if (!TryDeleteDirectoryWithRetry(outputRoot, maxRetries: 6, delayMilliseconds: 400, out Exception? deleteError))
                 {
-                    Directory.Delete(outputRoot, recursive: true);
-                }
-                catch (Exception ex)
-                {
-                    throw new IOException($"无法清理旧输出目录: {outputRoot}，请关闭占用该目录的程序后重试。", ex);
+                    var backupPath = $"{outputRoot}_old_{DateTime.Now:yyyyMMdd_HHmmss}";
+                    try
+                    {
+                        Directory.Move(outputRoot, backupPath);
+                        AppendLog($"旧输出目录被占用，已重命名为: {backupPath}");
+                    }
+                    catch (Exception moveEx)
+                    {
+                        throw new IOException(
+                            $"无法清理旧输出目录: {outputRoot}，请关闭占用该目录的程序后重试。",
+                            new AggregateException(deleteError ?? moveEx, moveEx));
+                    }
                 }
             }
 
             Directory.CreateDirectory(outputRoot);
+        }
+
+        private static bool TryDeleteDirectoryWithRetry(string path, int maxRetries, int delayMilliseconds, out Exception? lastError)
+        {
+            lastError = null;
+
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    if (!Directory.Exists(path))
+                    {
+                        return true;
+                    }
+
+                    ClearReadOnlyAttributes(path);
+                    Directory.Delete(path, recursive: true);
+
+                    if (!Directory.Exists(path))
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    lastError = ex;
+                }
+
+                Thread.Sleep(delayMilliseconds * (attempt + 1));
+            }
+
+            return false;
+        }
+
+        private static void ClearReadOnlyAttributes(string rootPath)
+        {
+            foreach (var file in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
+            {
+                var attributes = File.GetAttributes(file);
+                if ((attributes & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(file, attributes & ~FileAttributes.ReadOnly);
+                }
+            }
+
+            foreach (var dir in Directory.EnumerateDirectories(rootPath, "*", SearchOption.AllDirectories))
+            {
+                var attributes = File.GetAttributes(dir);
+                if ((attributes & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(dir, attributes & ~FileAttributes.ReadOnly);
+                }
+            }
+        }
+
+        private static bool IsSameOrSubDirectory(string candidatePath, string parentPath)
+        {
+            if (candidatePath.Equals(parentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return candidatePath.StartsWith(parentPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeDirectoryPath(string path)
+        {
+            var full = Path.GetFullPath(path)
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            var root = Path.GetPathRoot(full)?
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
+                ?? string.Empty;
+            if (full.Equals(root, StringComparison.OrdinalIgnoreCase))
+            {
+                return full;
+            }
+
+            return full.TrimEnd(Path.DirectorySeparatorChar);
         }
     }
 }

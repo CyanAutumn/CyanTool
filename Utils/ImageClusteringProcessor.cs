@@ -70,7 +70,11 @@ namespace CyanTools.Utils
             return cpuSession;
         }
 
-        public List<ImageStyleResult> ProcessFolder(string folderPath, Action<double> onProgress, Action<string> onError)
+        public List<ImageStyleResult> ProcessFolder(
+            string folderPath,
+            Action<double> onProgress,
+            Action<string> onError,
+            IEnumerable<string>? excludedFolders = null)
         {
             try
             {
@@ -82,8 +86,10 @@ namespace CyanTools.Utils
                     ".bmp"
                 };
 
+                var excludedSet = BuildExcludedDirectorySet(excludedFolders);
 
-                var imageFiles = EnumerateFilesOsWalkOrder(folderPath)
+
+                var imageFiles = EnumerateFilesOsWalkOrder(folderPath, excludedSet)
                     .Where(f => supportedExtensions.Contains(Path.GetExtension(f)))
                     .ToList();
 
@@ -117,8 +123,13 @@ namespace CyanTools.Utils
             }
         }
 
-        private static IEnumerable<string> EnumerateFilesOsWalkOrder(string rootPath)
+        private static IEnumerable<string> EnumerateFilesOsWalkOrder(string rootPath, HashSet<string> excludedDirs)
         {
+            if (IsPathExcluded(rootPath, excludedDirs))
+            {
+                yield break;
+            }
+
 
             IEnumerable<string> files = Enumerable.Empty<string>();
             try
@@ -146,11 +157,91 @@ namespace CyanTools.Utils
 
             foreach (var dir in dirs)
             {
-                foreach (var subFile in EnumerateFilesOsWalkOrder(dir))
+                if (IsPathExcluded(dir, excludedDirs))
+                {
+                    continue;
+                }
+
+                foreach (var subFile in EnumerateFilesOsWalkOrder(dir, excludedDirs))
                 {
                     yield return subFile;
                 }
             }
+        }
+
+        private static HashSet<string> BuildExcludedDirectorySet(IEnumerable<string>? excludedFolders)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (excludedFolders == null)
+            {
+                return set;
+            }
+
+            foreach (var folder in excludedFolders)
+            {
+                if (string.IsNullOrWhiteSpace(folder))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    set.Add(NormalizeDirectoryPath(folder));
+                }
+                catch
+                {
+                }
+            }
+
+            return set;
+        }
+
+        private static bool IsPathExcluded(string path, HashSet<string> excludedDirs)
+        {
+            if (excludedDirs.Count == 0)
+            {
+                return false;
+            }
+
+            string normalizedPath;
+            try
+            {
+                normalizedPath = NormalizeDirectoryPath(path);
+            }
+            catch
+            {
+                return false;
+            }
+
+            foreach (var excluded in excludedDirs)
+            {
+                if (normalizedPath.Equals(excluded, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                if (normalizedPath.StartsWith(excluded + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string NormalizeDirectoryPath(string path)
+        {
+            var full = Path.GetFullPath(path)
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            var root = Path.GetPathRoot(full)?
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
+                ?? string.Empty;
+            if (full.Equals(root, StringComparison.OrdinalIgnoreCase))
+            {
+                return full;
+            }
+
+            return full.TrimEnd(Path.DirectorySeparatorChar);
         }
 
         private DenseTensor<Float16> PreprocessImage(string imagePath) {
