@@ -52,7 +52,6 @@ namespace CyanTools.ViewModel
         private readonly SemaphoreSlim _downloadQueueSignal = new SemaphoreSlim(0);
         private readonly SemaphoreSlim _sessionLock = new SemaphoreSlim(1, 1);
         private Task _downloadQueueWorkerTask = Task.CompletedTask;
-        private DateTime _lastQueueItemCompletedAtUtc = DateTime.MinValue;
         private bool _isApplyingSettings;
         private string _lastSavedOutputDirectory = DefaultOutputDirectory;
 
@@ -180,6 +179,7 @@ namespace CyanTools.ViewModel
         public ICommand DownloadByIdCommand { get; }
         public ICommand BrowseOutputFolderCommand { get; }
         public ICommand OpenOutputFolderCommand { get; }
+        public ICommand ClearLogCommand { get; }
 
         public DanbooruCrawlerViewModel()
         {
@@ -194,6 +194,7 @@ namespace CyanTools.ViewModel
             DownloadByIdCommand = new RelayCommand(async _ => await DownloadSinglePost(), _ => !string.IsNullOrWhiteSpace(PostId));
             BrowseOutputFolderCommand = new RelayCommand(_ => BrowseOutputFolder());
             OpenOutputFolderCommand = new RelayCommand(_ => OpenOutputFolder());
+            ClearLogCommand = new RelayCommand(_ => ClearLog());
 
             LoadSettings();
             LoadCookies();
@@ -232,6 +233,10 @@ namespace CyanTools.ViewModel
                     }
 
                     await WaitForQueueIdleAsync(_cancellationTokenSource.Token);
+                    if (!_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        Print(runCrawler ? "任务完成。" : "下载队列处理完成。");
+                    }
                     _cancellationTokenSource.Cancel();
                 }
                 catch (OperationCanceledException)
@@ -455,32 +460,30 @@ namespace CyanTools.ViewModel
                     continue;
                 }
 
-                await WaitForDownloadIntervalAsync(token);
-
                 _isDownloadInProgress = true;
+                bool shouldApplyInterval = false;
                 try
                 {
-                    await ProcessQueueItemAsync(item, token);
+                    shouldApplyInterval = await ProcessQueueItemAsync(item, token);
                 }
                 finally
                 {
                     _isDownloadInProgress = false;
-                    _lastQueueItemCompletedAtUtc = DateTime.UtcNow;
+                }
+
+                if (shouldApplyInterval)
+                {
+                    await WaitForDownloadIntervalAsync(token);
                 }
             }
         }
 
         private async Task WaitForDownloadIntervalAsync(CancellationToken token)
         {
-            var elapsed = DateTime.UtcNow - _lastQueueItemCompletedAtUtc;
-            var remaining = TimeSpan.FromMilliseconds(DownloadIntervalMilliseconds) - elapsed;
-            if (remaining > TimeSpan.Zero)
-            {
-                await Task.Delay(remaining, token);
-            }
+            await Task.Delay(DownloadIntervalMilliseconds, token);
         }
 
-        private async Task ProcessQueueItemAsync(DownloadQueueItem item, CancellationToken token)
+        private async Task<bool> ProcessQueueItemAsync(DownloadQueueItem item, CancellationToken token)
         {
             BooruPostInfo? post;
             if (item.Post != null)
@@ -492,12 +495,12 @@ namespace CyanTools.ViewModel
                 post = await FetchPostByIdAsync(item.PostId, item.IsGelbooru, token);
                 if (post == null)
                 {
-                    return;
+                    return false;
                 }
             }
             else
             {
-                return;
+                return false;
             }
 
             if (string.IsNullOrWhiteSpace(post.FileUrl))
@@ -506,10 +509,10 @@ namespace CyanTools.ViewModel
                 {
                     Print($"无法找到帖子 ID: {item.PostId} 或该帖子没有文件。");
                 }
-                return;
+                return false;
             }
 
-            await DownloadFileAsync(post, token, item.IsGelbooru);
+            return await DownloadFileAsync(post, token, item.IsGelbooru);
         }
 
         private async Task<BooruPostInfo?> FetchPostByIdAsync(string postId, bool isGelbooru, CancellationToken token)
@@ -558,12 +561,15 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task DownloadFileAsync(BooruPostInfo post, CancellationToken token, bool isGelbooru)
+        private async Task<bool> DownloadFileAsync(BooruPostInfo post, CancellationToken token, bool isGelbooru)
         {
             try
             {
                 var url = NormalizeFileUrl(post.FileUrl, isGelbooru);
-                if (string.IsNullOrWhiteSpace(url)) return;
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    return false;
+                }
 
                 var fileName = Path.GetFileName(new Uri(url).LocalPath);
                 var outputDirectory = ResolveOutputDirectory();
@@ -586,7 +592,7 @@ namespace CyanTools.ViewModel
                         }
                     }
 
-                    return;
+                    return false;
                 }
 
 
@@ -606,15 +612,17 @@ namespace CyanTools.ViewModel
                         await File.WriteAllTextAsync(txtPath, selectedTags, token);
                         Print($"标签文件已保存: {txtPath}");
                     }
+
+                    return true;
                 }
-                else
-                {
-                    Print($"下载失败: {response.StatusCode} - {response.ErrorMessage}");
-                }
+
+                Print($"下载失败: {response.StatusCode} - {response.ErrorMessage}");
+                return true;
             }
             catch (Exception ex)
             {
                 Print($"下载过程中发生错误: {ex.Message}");
+                return true;
             }
         }
 
@@ -624,6 +632,11 @@ namespace CyanTools.ViewModel
             {
                 LogText += $"{DateTime.Now:HH:mm:ss} - {text}\n";
             });
+        }
+
+        private void ClearLog()
+        {
+            LogText = string.Empty;
         }
 
         private void BrowseOutputFolder()

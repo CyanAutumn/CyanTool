@@ -63,6 +63,7 @@ namespace CyanTools.ViewModel
 
         private readonly RelayCommand _startStopCommand;
         private readonly RelayCommand _openOutputFolderCommand;
+        private readonly RelayCommand _clearLogCommand;
         private CancellationTokenSource _cancellationTokenSource;
         private string _artistId = string.Empty;
         private string _outputDirectory = DefaultOutputDirectory;
@@ -147,6 +148,7 @@ namespace CyanTools.ViewModel
 
         public ICommand StartStopCommand => _startStopCommand;
         public ICommand OpenOutputFolderCommand => _openOutputFolderCommand;
+        public ICommand ClearLogCommand => _clearLogCommand;
 
         public KemonoDownloaderViewModel()
         {
@@ -166,6 +168,7 @@ namespace CyanTools.ViewModel
 
             _startStopCommand = new RelayCommand(async _ => await StartOrStopAsync(), _ => CanStartOrStop());
             _openOutputFolderCommand = new RelayCommand(_ => OpenOutputFolder(), _ => !string.IsNullOrWhiteSpace(OutputDirectory));
+            _clearLogCommand = new RelayCommand(_ => ClearLog());
         }
 
         private bool CanStartOrStop()
@@ -216,6 +219,11 @@ namespace CyanTools.ViewModel
                 _cancellationTokenSource = null;
                 IsDownloading = false;
             }
+        }
+
+        private void ClearLog()
+        {
+            LogText = string.Empty;
         }
 
         private async Task DownloadAsync(CancellationToken token)

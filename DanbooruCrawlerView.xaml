@@ -68,6 +68,7 @@
             </Grid>
             <StackPanel Orientation="Horizontal" Margin="5,5,5,0">
                 <Button Content="{Binding StartButtonText}" Command="{Binding StartStopCommand}" Width="100"/>
+                <Button Content="清空日志" Command="{Binding ClearLogCommand}" Margin="8,0,0,0" Width="90"/>
                 <Button Content="打开输出目录" Command="{Binding OpenOutputFolderCommand}" Margin="8,0,0,0" MinWidth="110"/>
             </StackPanel>
         </StackPanel>

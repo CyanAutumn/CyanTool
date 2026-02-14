@@ -59,6 +59,7 @@ namespace CyanTools.ViewModel
         private readonly RelayCommand _startStopCommand;
         private readonly RelayCommand _openOutputFolderCommand;
         private readonly RelayCommand _getRefreshTokenCommand;
+        private readonly RelayCommand _clearLogCommand;
         private CancellationTokenSource? _cancellationTokenSource;
         private CancellationTokenSource? _saveSettingsCts;
         private string _artistId = string.Empty;
@@ -173,12 +174,14 @@ namespace CyanTools.ViewModel
         public ICommand StartStopCommand => _startStopCommand;
         public ICommand OpenOutputFolderCommand => _openOutputFolderCommand;
         public ICommand GetRefreshTokenCommand => _getRefreshTokenCommand;
+        public ICommand ClearLogCommand => _clearLogCommand;
 
         public PixivDownloaderViewModel()
         {
             _startStopCommand = new RelayCommand(async _ => await StartOrStopAsync(), _ => CanStartOrStop());
             _openOutputFolderCommand = new RelayCommand(_ => OpenOutputFolder(), _ => !string.IsNullOrWhiteSpace(OutputDirectory));
             _getRefreshTokenCommand = new RelayCommand(async _ => await FetchRefreshTokenAsync(), _ => !IsDownloading);
+            _clearLogCommand = new RelayCommand(_ => ClearLog());
 
             LoadSettings();
             Directory.CreateDirectory(string.IsNullOrWhiteSpace(OutputDirectory) ? DefaultOutputDirectory : OutputDirectory);
@@ -236,6 +239,11 @@ namespace CyanTools.ViewModel
                 _cancellationTokenSource = null;
                 IsDownloading = false;
             }
+        }
+
+        private void ClearLog()
+        {
+            LogText = string.Empty;
         }
 
         private async Task FetchRefreshTokenAsync()
