@@ -27,6 +27,15 @@ namespace CyanTools.ViewModel
         private const int DownloadRetryCount = 3;
         private static readonly TimeSpan DownloadDelay = TimeSpan.FromSeconds(20);
         private static readonly HttpClient HttpClient;
+        private static readonly string SettingsDirectory = Path.Combine(AppContext.BaseDirectory, "Config");
+        private static readonly string SettingsFilePath = Path.Combine(SettingsDirectory, "kemono_downloader.json");
+        private static readonly System.Text.Json.JsonSerializerOptions SettingsSerializerOptions = new()
+        {
+            AllowTrailingCommas = true,
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = System.Text.Json.JsonCommentHandling.Skip,
+            WriteIndented = true
+        };
 
         static KemonoDownloaderViewModel()
         {
@@ -61,6 +70,8 @@ namespace CyanTools.ViewModel
         private string _selectedService = string.Empty;
         private bool _isDownloading;
         private bool _hasShownCancelMessage;
+        private bool _isApplyingSettings;
+        private string _lastSavedOutputDirectory = DefaultOutputDirectory;
 
         public IReadOnlyList<string> ServiceOptions { get; }
 
@@ -149,6 +160,7 @@ namespace CyanTools.ViewModel
                 "gumroad"
             };
 
+            LoadSettings();
             Directory.CreateDirectory(ResolveOutputDirectoryRoot());
             _selectedService = ServiceOptions.First();
 
@@ -188,7 +200,7 @@ namespace CyanTools.ViewModel
             try
             {
                 await DownloadAsync(_cancellationTokenSource.Token);
-                AppendLog("下载任务完成。");
+                AppendLog("任务完成。");
             }
             catch (OperationCanceledException)
             {
@@ -215,6 +227,7 @@ namespace CyanTools.ViewModel
             AppendLog($"输出目录: {outputDirectory}");
             int page = 0;
             int savedCount = 0;
+            int skippedCount = 0;
             var postContentCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
             while (!token.IsCancellationRequested)
@@ -235,6 +248,14 @@ namespace CyanTools.ViewModel
                 foreach (var asset in downloads)
                 {
                     token.ThrowIfCancellationRequested();
+                    var targetPath = Path.Combine(outputDirectory, asset.FileName);
+                    if (File.Exists(targetPath))
+                    {
+                        skippedCount++;
+                        AppendLog($"跳过已存在文件 {asset.FileName}");
+                        continue;
+                    }
+
                     AppendLog($"下载 {asset.FileName}...");
                     if (await DownloadAssetAsync(asset, outputDirectory, token))
                     {
@@ -249,13 +270,13 @@ namespace CyanTools.ViewModel
                 page++;
             }
 
-            if (savedCount == 0)
+            if (savedCount == 0 && skippedCount == 0)
             {
                 AppendLog("没有可下载的文件。");
             }
             else
             {
-                AppendLog($"共保存 {savedCount} 个文件。");
+                AppendLog($"本次保存 {savedCount} 个文件，跳过 {skippedCount} 个已存在文件。");
             }
         }
 
@@ -312,7 +333,7 @@ namespace CyanTools.ViewModel
                 var posts = tokenJson.ToObject<List<KemonoPost>>();
                 return posts ?? new List<KemonoPost>();
             }
-            catch (JsonException jsonEx)
+            catch (Newtonsoft.Json.JsonException jsonEx)
             {
                 var preview = payload.Length > 200 ? payload[..200] + "..." : payload;
                 throw new InvalidOperationException($"无法解析 Kemono API 响应，返回内容: {preview}", jsonEx);
@@ -487,7 +508,7 @@ namespace CyanTools.ViewModel
 
                 return string.IsNullOrWhiteSpace(content) ? null : content;
             }
-            catch (JsonException jsonEx)
+            catch (Newtonsoft.Json.JsonException jsonEx)
             {
                 AppendLog($"解析内容 {postId} 失败: {jsonEx.Message}");
                 return null;
@@ -601,6 +622,78 @@ namespace CyanTools.ViewModel
             var rootDirectory = ResolveOutputDirectoryRoot();
             var artistId = (ArtistId ?? string.Empty).Trim();
             return Path.Combine(rootDirectory, string.IsNullOrWhiteSpace(artistId) ? "unknown_artist" : artistId);
+        }
+
+        public async Task SaveOutputDirectoryIfChangedAsync()
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            var normalizedOutputDirectory = string.IsNullOrWhiteSpace(OutputDirectory)
+                ? DefaultOutputDirectory
+                : OutputDirectory.Trim();
+            if (string.Equals(normalizedOutputDirectory, _lastSavedOutputDirectory, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(SettingsDirectory);
+
+                var settings = new KemonoDownloaderSettings
+                {
+                    OutputDirectory = normalizedOutputDirectory
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(settings, SettingsSerializerOptions);
+                var tempPath = SettingsFilePath + ".tmp";
+                await File.WriteAllTextAsync(tempPath, json);
+                File.Move(tempPath, SettingsFilePath, overwrite: true);
+
+                _lastSavedOutputDirectory = normalizedOutputDirectory;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"保存 Kemono 下载器配置失败: {ex.Message}");
+            }
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                if (!File.Exists(SettingsFilePath))
+                {
+                    _lastSavedOutputDirectory = DefaultOutputDirectory;
+                    return;
+                }
+
+                var json = File.ReadAllText(SettingsFilePath);
+                var settings = System.Text.Json.JsonSerializer.Deserialize<KemonoDownloaderSettings>(json, SettingsSerializerOptions);
+                var outputDirectory = string.IsNullOrWhiteSpace(settings?.OutputDirectory)
+                    ? DefaultOutputDirectory
+                    : settings.OutputDirectory.Trim();
+
+                _isApplyingSettings = true;
+                OutputDirectory = outputDirectory;
+                _lastSavedOutputDirectory = outputDirectory;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"加载 Kemono 下载器配置失败: {ex.Message}");
+            }
+            finally
+            {
+                _isApplyingSettings = false;
+            }
+        }
+
+        private sealed class KemonoDownloaderSettings
+        {
+            public string? OutputDirectory { get; set; }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

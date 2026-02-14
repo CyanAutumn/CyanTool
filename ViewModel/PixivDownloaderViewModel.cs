@@ -71,6 +71,7 @@ namespace CyanTools.ViewModel
         private string? _accessToken;
         private Action<string>? _pipelineLogger;
         private bool _isApplyingSettings;
+        private bool _settingsDirty;
 
         private static readonly JsonSerializerOptions SettingsSerializerOptions = new()
         {
@@ -808,6 +809,8 @@ namespace CyanTools.ViewModel
                 return;
             }
 
+            _settingsDirty = true;
+
             _saveSettingsCts?.Cancel();
             _saveSettingsCts = new CancellationTokenSource();
 
@@ -847,10 +850,23 @@ namespace CyanTools.ViewModel
                 var tempPath = SettingsFilePath + ".tmp";
                 File.WriteAllText(tempPath, json);
                 File.Move(tempPath, SettingsFilePath, overwrite: true);
+                _settingsDirty = false;
             }
             catch (Exception ex)
             {
                 AppendLog($"保存 Pixiv 下载器配置失败: {ex.Message}");
+            }
+        }
+
+        public void SaveSettingsOnClose()
+        {
+            _saveSettingsCts?.Cancel();
+            _saveSettingsCts?.Dispose();
+            _saveSettingsCts = null;
+
+            if (_settingsDirty)
+            {
+                SaveSettings();
             }
         }
 

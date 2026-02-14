@@ -39,11 +39,22 @@ namespace CyanTools.ViewModel
         private volatile bool _isDownloadInProgress;
         private CancellationTokenSource? _cancellationTokenSource;
         private static readonly Random _random = new Random();
+        private static readonly string SettingsDirectory = Path.Combine(AppContext.BaseDirectory, "Config");
+        private static readonly string SettingsFilePath = Path.Combine(SettingsDirectory, "danbooru_downloader.json");
+        private static readonly System.Text.Json.JsonSerializerOptions SettingsSerializerOptions = new()
+        {
+            AllowTrailingCommas = true,
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = System.Text.Json.JsonCommentHandling.Skip,
+            WriteIndented = true
+        };
         private readonly ConcurrentQueue<DownloadQueueItem> _downloadQueue = new ConcurrentQueue<DownloadQueueItem>();
         private readonly SemaphoreSlim _downloadQueueSignal = new SemaphoreSlim(0);
         private readonly SemaphoreSlim _sessionLock = new SemaphoreSlim(1, 1);
         private Task _downloadQueueWorkerTask = Task.CompletedTask;
         private DateTime _lastQueueItemCompletedAtUtc = DateTime.MinValue;
+        private bool _isApplyingSettings;
+        private string _lastSavedOutputDirectory = DefaultOutputDirectory;
 
 
         private readonly RestClient _danbooruClient;
@@ -84,7 +95,15 @@ namespace CyanTools.ViewModel
         public string OutputDirectory
         {
             get => _outputDirectory;
-            set { _outputDirectory = value; OnPropertyChanged(); }
+            set
+            {
+                var sanitized = value?.Trim() ?? string.Empty;
+                if (_outputDirectory != sanitized)
+                {
+                    _outputDirectory = sanitized;
+                    OnPropertyChanged();
+                }
+            }
         }
 
         public string LogText
@@ -175,7 +194,8 @@ namespace CyanTools.ViewModel
             DownloadByIdCommand = new RelayCommand(async _ => await DownloadSinglePost(), _ => !string.IsNullOrWhiteSpace(PostId));
             BrowseOutputFolderCommand = new RelayCommand(_ => BrowseOutputFolder());
             OpenOutputFolderCommand = new RelayCommand(_ => OpenOutputFolder());
-            
+
+            LoadSettings();
             LoadCookies();
         }
 
@@ -307,7 +327,7 @@ namespace CyanTools.ViewModel
                         }
                     }
                 }
-                catch (JsonException jsonEx)
+                catch (Newtonsoft.Json.JsonException jsonEx)
                 {
                     Print($"JSON解析错误: {jsonEx.Message}");
                     break;
@@ -518,7 +538,7 @@ namespace CyanTools.ViewModel
                     ? ParseGelbooruPosts(response.Content).FirstOrDefault()
                     : ParseDanbooruSingle(response.Content);
             }
-            catch (JsonException ex)
+            catch (Newtonsoft.Json.JsonException ex)
             {
                 Print($"下载帖子 ID: {postId} 失败: JSON解析错误: {ex.Message}");
                 return null;
@@ -933,6 +953,84 @@ namespace CyanTools.ViewModel
             {
                 System.Windows.MessageBox.Show($"保存登录信息失败: {ex.Message}");
             }
+        }
+
+        public async Task SaveStateOnCloseAsync()
+        {
+            await SaveCookiesAsync();
+            await SaveOutputDirectoryIfChangedAsync();
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                if (!File.Exists(SettingsFilePath))
+                {
+                    _lastSavedOutputDirectory = DefaultOutputDirectory;
+                    return;
+                }
+
+                var json = File.ReadAllText(SettingsFilePath);
+                var settings = System.Text.Json.JsonSerializer.Deserialize<DanbooruCrawlerSettings>(json, SettingsSerializerOptions);
+                var outputDirectory = string.IsNullOrWhiteSpace(settings?.OutputDirectory)
+                    ? DefaultOutputDirectory
+                    : settings.OutputDirectory.Trim();
+
+                _isApplyingSettings = true;
+                OutputDirectory = outputDirectory;
+                _lastSavedOutputDirectory = outputDirectory;
+            }
+            catch (Exception ex)
+            {
+                Print($"加载 Booru 下载器配置失败: {ex.Message}");
+            }
+            finally
+            {
+                _isApplyingSettings = false;
+            }
+        }
+
+        private async Task SaveOutputDirectoryIfChangedAsync()
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            var normalizedOutputDirectory = string.IsNullOrWhiteSpace(OutputDirectory)
+                ? DefaultOutputDirectory
+                : OutputDirectory.Trim();
+            if (string.Equals(normalizedOutputDirectory, _lastSavedOutputDirectory, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(SettingsDirectory);
+
+                var settings = new DanbooruCrawlerSettings
+                {
+                    OutputDirectory = normalizedOutputDirectory
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(settings, SettingsSerializerOptions);
+                var tempPath = SettingsFilePath + ".tmp";
+                await File.WriteAllTextAsync(tempPath, json);
+                File.Move(tempPath, SettingsFilePath, overwrite: true);
+
+                _lastSavedOutputDirectory = normalizedOutputDirectory;
+            }
+            catch (Exception ex)
+            {
+                Print($"保存 Booru 下载器配置失败: {ex.Message}");
+            }
+        }
+
+        private sealed class DanbooruCrawlerSettings
+        {
+            public string? OutputDirectory { get; set; }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
