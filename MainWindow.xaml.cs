@@ -174,21 +174,9 @@ namespace CyanTools
         private async void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (_navigationService.TryGetCachedControl(typeof(DanbooruCrawlerView), out var danbooruView) &&
-                danbooruView.DataContext is ViewModel.DanbooruCrawlerViewModel viewModel)
+                danbooruView.DataContext is ViewModel.DatasetDownloaderViewModel viewModel)
             {
                 await viewModel.SaveStateOnCloseAsync();
-            }
-
-            if (_navigationService.TryGetCachedControl(typeof(PixivDownloaderView), out var pixivView) &&
-                pixivView.DataContext is ViewModel.PixivDownloaderViewModel pixivViewModel)
-            {
-                pixivViewModel.SaveSettingsOnClose();
-            }
-
-            if (_navigationService.TryGetCachedControl(typeof(KemonoDownloaderView), out var kemonoView) &&
-                kemonoView.DataContext is ViewModel.KemonoDownloaderViewModel kemonoViewModel)
-            {
-                await kemonoViewModel.SaveOutputDirectoryIfChangedAsync();
             }
         }
     }

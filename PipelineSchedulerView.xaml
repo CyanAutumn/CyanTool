@@ -45,14 +45,8 @@
         <DataTemplate DataType="{x:Type viewModel:ImageRenamePipelineNode}">
             <local:ImageRenameView DataContext="{Binding Inner}" />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewModel:DanbooruCrawlerPipelineNode}">
+        <DataTemplate DataType="{x:Type viewModel:DatasetDownloaderPipelineNode}">
             <local:DanbooruCrawlerView DataContext="{Binding Inner}" />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewModel:KemonoDownloaderPipelineNode}">
-            <local:KemonoDownloaderView DataContext="{Binding Inner}" />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewModel:PixivDownloaderPipelineNode}">
-            <local:PixivDownloaderView DataContext="{Binding Inner}" />
         </DataTemplate>
     </UserControl.Resources>
 

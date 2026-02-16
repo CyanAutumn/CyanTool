@@ -85,23 +85,8 @@ namespace CyanTools.ViewModel
         public ImageRenamePipelineNode() : base("图片重命名") { }
     }
 
-    public sealed class DanbooruCrawlerPipelineNode : CyanTools.Pipeline.SimplePipelineNode<DanbooruCrawlerViewModel>
+    public sealed class DatasetDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<DatasetDownloaderViewModel>
     {
-        public DanbooruCrawlerPipelineNode() : base("Booru下载器") { }
-    }
-
-    public sealed class KemonoDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<KemonoDownloaderViewModel>
-    {
-        public KemonoDownloaderPipelineNode() : base("Kemono下载器") { }
-    }
-
-    public sealed class PixivDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<PixivDownloaderViewModel>
-    {
-        public PixivDownloaderPipelineNode() : base("Pixiv下载器") { }
-
-        public override Task RunAsync(PipelineContext context, CancellationToken token)
-        {
-            return Inner.RunPipelineAsync(context, token);
-        }
+        public DatasetDownloaderPipelineNode() : base("数据集下载器") { }
     }
 }

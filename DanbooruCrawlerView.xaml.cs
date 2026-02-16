@@ -3,7 +3,7 @@ using CyanTools.Navigation;
 
 namespace CyanTools
 {
-    [ToolPage("Booru下载器", 290, true)]
+    [ToolPage("数据集下载器", 290, true)]
     public partial class DanbooruCrawlerView : UserControl
     {
         public DanbooruCrawlerView()
@@ -16,7 +16,7 @@ namespace CyanTools
         {
             if (DataContext == null)
             {
-                DataContext = new ViewModel.DanbooruCrawlerViewModel();
+                DataContext = new ViewModel.DatasetDownloaderViewModel();
             }
         }
     }
