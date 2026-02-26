@@ -34,18 +34,21 @@
                                   Command="{Binding Data.MoveTagToEndCommand, Source={StaticResource TagViewModelProxy}}"
                                   CommandParameter="{Binding}"/>
                         <Separator/>
-                        <MenuItem Header="移到最前(当前数据集)"
+                        <MenuItem Header="移到最前(数据集)"
                                   Command="{Binding Data.MoveTagToStartDatasetCommand, Source={StaticResource TagViewModelProxy}}"
                                   CommandParameter="{Binding}"/>
-                        <MenuItem Header="移到最后(当前数据集)"
+                        <MenuItem Header="移到最后(数据集)"
                                   Command="{Binding Data.MoveTagToEndDatasetCommand, Source={StaticResource TagViewModelProxy}}"
                                   CommandParameter="{Binding}"/>
-                        <MenuItem Header="删除(当前数据集)"
+                        <MenuItem Header="删除(数据集)"
                                   Command="{Binding Data.RemoveTagFromDatasetCommand, Source={StaticResource TagViewModelProxy}}"
                                   CommandParameter="{Binding}"/>
-                        <MenuItem Header="添加(当前数据集)"
+                        <MenuItem Header="添加(数据集)"
                                   Command="{Binding Data.AddTagToDatasetCommand, Source={StaticResource TagViewModelProxy}}"
                                   CommandParameter="{Binding}"/>
+                        <Separator/>
+                        <MenuItem Header="打乱提示词（数据集）"
+                                  Command="{Binding Data.ShufflePromptTagsDatasetCommand, Source={StaticResource TagViewModelProxy}}"/>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Grid>

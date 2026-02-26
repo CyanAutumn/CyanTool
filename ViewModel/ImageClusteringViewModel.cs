@@ -433,6 +433,7 @@ namespace CyanTools.ViewModel
                     Directory.CreateDirectory(targetDir);
                     string targetFilePath = Path.Combine(targetDir, $"image_{i}.jpg");
                     CopyFileWithRetry(sourceFilePath, targetFilePath);
+                    CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
 
                     Application.Current.Dispatcher.Invoke(() =>
                         Progress = 75 + (double)(i + 1) / imageResults.Count * 25);
@@ -606,6 +607,18 @@ namespace CyanTools.ViewModel
                     return;
                 }
             }
+        }
+
+        private void CopyCompanionTextFileWithRetry(string sourceImagePath, string destinationImagePath, int maxRetries = 3)
+        {
+            string sourceTxtPath = Path.ChangeExtension(sourceImagePath, ".txt");
+            if (!File.Exists(sourceTxtPath))
+            {
+                return;
+            }
+
+            string destinationTxtPath = Path.ChangeExtension(destinationImagePath, ".txt");
+            CopyFileWithRetry(sourceTxtPath, destinationTxtPath, maxRetries);
         }
 
         private void PrepareOutputRoot(string outputRoot)

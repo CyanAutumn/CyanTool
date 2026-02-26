@@ -40,6 +40,13 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private bool _syncDanbooruTagsToRoot = true;
+        public bool SyncDanbooruTagsToRoot
+        {
+            get => _syncDanbooruTagsToRoot;
+            set => SetField(ref _syncDanbooruTagsToRoot, value);
+        }
+
         private bool _includeSubfolders = true;
         public bool IncludeSubfolders
         {
@@ -252,6 +259,7 @@ namespace CyanTools.ViewModel
             {
                 InputPath = InputPath,
                 OutputPath = OutputPath,
+                SyncDanbooruTagsToRoot = SyncDanbooruTagsToRoot,
                 IncludeSubfolders = IncludeSubfolders,
                 EnablePatchHash = EnablePatchHash,
                 EnableHashMatch = EnableHashMatch,
@@ -379,8 +387,24 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
+                string inputFull = Path.GetFullPath(InputPath);
+                string outputFull = Path.GetFullPath(OutputPath);
+                string inputWithSlash = inputFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                bool outputInsideInput = outputFull.StartsWith(inputWithSlash, StringComparison.OrdinalIgnoreCase);
+                if (string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase) || outputInsideInput)
+                {
+                    AppendLog("输出目录不能与输入目录相同，且不能位于输入目录内。请选择独立输出目录，避免修改输入目录。");
+                    if (showDialogs)
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                            MessageBox.Show("输出目录不能与输入目录相同，且不能位于输入目录内。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
+                    }
+                    return;
+                }
+
                 var options = new SameSourceGroupingOptions
                 {
+                    SyncDanbooruTagsToRoot = SyncDanbooruTagsToRoot,
                     IncludeSubfolders = IncludeSubfolders,
                     EnablePatchHash = EnablePatchHash,
                     EnableHashMatch = EnableHashMatch,

@@ -38,6 +38,14 @@
                     <TextBox Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
                     <Button Content="浏览..." Command="{Binding SelectOutputCommand}" Grid.Column="2" Padding="10,2"/>
                 </Grid>
+                <TextBlock Text="程序会在输出目录下自动创建: 原图 / 被包含 / 缩略图 / 差分 / 未知"
+                           Margin="0,6,0,0"
+                           Foreground="Gray"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="输出目录必须与输入目录分离，不能放在输入目录里"
+                           Margin="0,2,0,0"
+                           Foreground="Gray"
+                           TextWrapping="Wrap"/>
             </StackPanel>
         </GroupBox>
 
@@ -55,6 +63,14 @@
                     <CheckBox Content="启用ORB几何匹配" IsChecked="{Binding EnableOrbMatch}" Margin="0,0,20,0"/>
                     <CheckBox Content="启用模板匹配" IsChecked="{Binding EnableTemplateMatch}"/>
                 </StackPanel>
+
+                <Expander Header="输出分类设置" IsExpanded="True" Margin="0,6,0,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox Content="同步Danbooru标签到原图txt" IsChecked="{Binding SyncDanbooruTagsToRoot}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
             </StackPanel>
         </GroupBox>
 

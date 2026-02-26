@@ -55,6 +55,7 @@ namespace CyanTools.ViewModel
         private static readonly string DanbooruTokenFilePath = Path.Combine(AppContext.BaseDirectory, "cookies.txt");
         private static readonly string PixivRefreshTokenDirectory = Path.Combine(AppContext.BaseDirectory, "Configs", "Crawler");
         private static readonly string PixivRefreshTokenFilePath = Path.Combine(PixivRefreshTokenDirectory, "pixiv_refresh_token.txt");
+        private static readonly TimeSpan DanbooruDownloadDelay = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan KemonoDownloadDelay = TimeSpan.FromSeconds(20);
         private static readonly string[] PixivContentTypes = { "illust", "manga" };
 
@@ -736,16 +737,26 @@ namespace CyanTools.ViewModel
                 request.AddHeader("Cookie", DanbooruToken);
             }
 
-            var response = await _danbooruClient.ExecuteAsync(request, token);
-            if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
+            try
             {
-                AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
-                return;
-            }
+                var response = await _danbooruClient.ExecuteAsync(request, token);
+                if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
+                {
+                    AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
+                    return;
+                }
 
-            await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
-            await SaveDanbooruTagsTxtAsync(post, txtPath, token);
-            AppendLog($"[Danbooru] 已保存 {fileName}");
+                await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
+                await SaveDanbooruTagsTxtAsync(post, txtPath, token);
+                AppendLog($"[Danbooru] 已保存 {fileName}");
+            }
+            finally
+            {
+                if (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(DanbooruDownloadDelay, token);
+                }
+            }
         }
 
         private async Task SaveDanbooruTagsTxtAsync(BooruPostInfo post, string txtPath, CancellationToken token)

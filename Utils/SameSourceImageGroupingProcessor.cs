@@ -13,6 +13,7 @@ namespace CyanTools.Utils
 {
     public sealed class SameSourceGroupingOptions
     {
+        public bool SyncDanbooruTagsToRoot { get; set; } = true;
         public bool IncludeSubfolders { get; set; } = true;
         public bool EnablePatchHash { get; set; } = true;
         public bool EnableHashMatch { get; set; } = false;
@@ -44,6 +45,18 @@ namespace CyanTools.Utils
 
     public static class SameSourceImageGroupingProcessor
     {
+        private const string RootFolderName = "原图";
+        private const string CropFolderName = "被包含";
+        private const string LowResFolderName = "缩略图";
+        private const string EditedFolderName = "差分";
+        private const string UnknownFolderName = "未知";
+        private const double CandidateAspectRatioTolerance = 0.22;
+        private const double DirectLowResAspectRatioTolerance = 0.08;
+        private const double DirectLowResDiffRatioThreshold = 0.12;
+        private const int DirectLowResCompareSize = 320;
+        private const double MinInlierCoverageRatioForMatch = 0.05;
+        private const double MinMappedAreaRatioForMatch = 0.08;
+
         private static readonly HashSet<string> SupportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tif", ".tiff"
@@ -88,19 +101,22 @@ namespace CyanTools.Utils
 
             if (string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase))
             {
-                logAction?.Invoke("输出文件夹不能与输入文件夹相同。");
+                logAction?.Invoke("输出目录不能与输入目录相同。");
                 return;
             }
 
             if (IsSubPath(inputFull, outputFull))
             {
-                logAction?.Invoke("输出文件夹位于输入文件夹内，扫描时会自动跳过输出目录。");
+                logAction?.Invoke("输出目录不能位于输入目录内。");
+                return;
             }
 
             Directory.CreateDirectory(outputFull);
 
+            var excludedRoots = BuildExcludedRoots(inputFull, outputFull);
+
             logAction?.Invoke("扫描图片文件...");
-            var files = EnumerateImageFiles(inputFull, outputFull, options.IncludeSubfolders).ToList();
+            var files = EnumerateImageFiles(inputFull, options.IncludeSubfolders, excludedRoots).ToList();
             if (files.Count == 0)
             {
                 logAction?.Invoke("未找到支持的图片文件。");
@@ -141,7 +157,7 @@ namespace CyanTools.Utils
             logAction?.Invoke($"匹配完成，确认同源对数: {matchedPairs}");
 
             token.ThrowIfCancellationRequested();
-            logAction?.Invoke("汇总分组并复制文件...");
+            logAction?.Invoke("汇总分组并输出文件...");
 
             CopyGroupedFiles(items, unionFind, outputFull, options, orb, featureCache, progress, logAction, token);
 
@@ -149,13 +165,13 @@ namespace CyanTools.Utils
             logAction?.Invoke("处理完成。");
         }
 
-        private static IEnumerable<string> EnumerateImageFiles(string inputFull, string outputFull, bool includeSubfolders)
+        private static IEnumerable<string> EnumerateImageFiles(string inputFull, bool includeSubfolders, IReadOnlyList<string> excludedRoots)
         {
             var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             foreach (var file in Directory.EnumerateFiles(inputFull, "*.*", searchOption))
             {
                 string fullPath = Path.GetFullPath(file);
-                if (outputFull.Length > 0 && IsSubPath(outputFull, fullPath))
+                if (IsUnderAnyRoot(fullPath, excludedRoots))
                 {
                     continue;
                 }
@@ -165,6 +181,41 @@ namespace CyanTools.Utils
                     yield return fullPath;
                 }
             }
+        }
+
+        private static List<string> BuildExcludedRoots(string inputFull, string outputFull)
+        {
+            var roots = new List<string>();
+            if (string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase))
+            {
+                roots.Add(Path.Combine(inputFull, RootFolderName));
+                roots.Add(Path.Combine(inputFull, CropFolderName));
+                roots.Add(Path.Combine(inputFull, LowResFolderName));
+                roots.Add(Path.Combine(inputFull, EditedFolderName));
+                roots.Add(Path.Combine(inputFull, UnknownFolderName));
+
+                roots.Add(Path.Combine(inputFull, "被包含图片"));
+                roots.Add(Path.Combine(inputFull, "略缩图"));
+            }
+            else if (IsSubPath(inputFull, outputFull))
+            {
+                roots.Add(outputFull);
+            }
+
+            return roots;
+        }
+
+        private static bool IsUnderAnyRoot(string filePath, IReadOnlyList<string> roots)
+        {
+            foreach (var root in roots)
+            {
+                if (IsSubPath(root, filePath))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsSubPath(string basePath, string filePath)
@@ -283,12 +334,6 @@ namespace CyanTools.Utils
                 }
 
                 var candidates = GatherCandidates(i, items[i], hashIndex);
-                if (candidates.Count == 0)
-                {
-                    progress?.Report(35 + 45.0 * (i + 1) / total);
-                    continue;
-                }
-
                 var candidateList = new List<CandidateMatch>();
                 foreach (var j in candidates)
                 {
@@ -301,6 +346,11 @@ namespace CyanTools.Utils
                     {
                         candidateList.Add(new CandidateMatch(j, minDistance));
                     }
+                }
+
+                if (candidateList.Count == 0)
+                {
+                    AddFallbackCandidatesByGeometry(i, items, options, candidateList);
                 }
 
                 if (candidateList.Count == 0)
@@ -352,7 +402,8 @@ namespace CyanTools.Utils
                             matchedPairs++;
                             matched = true;
                         }
-                        else if (IsLowResMatchByHash(items[i], items[j], options))
+                        else if (IsLowResMatchByHash(items[i], items[j], options)
+                            || IsLowResMatchByResize(items[i], items[j], options, logAction))
                         {
                             unionFind.Union(i, j);
                             matchedPairs++;
@@ -372,12 +423,21 @@ namespace CyanTools.Utils
 
                             if (featuresB != null && !featuresB.Descriptors.Empty())
                             {
-                                if (TryEstimateHomography(featuresA, featuresB, options, out var homography, out int inliers, out int matches))
+                                if (TryEstimateHomography(featuresA, featuresB, options, out var homography, out _, out _,
+                                    out double inlierCoverageA, out double inlierCoverageB))
                                 {
+                                    double mappedAreaRatio = ComputeMappedAreaRatio(featuresA.ScaledSize, featuresB.ScaledSize, homography);
+                                    bool geometryValid = inlierCoverageA >= MinInlierCoverageRatioForMatch
+                                                         && inlierCoverageB >= MinInlierCoverageRatioForMatch
+                                                         && mappedAreaRatio >= MinMappedAreaRatioForMatch;
                                     homography.Dispose();
-                                    unionFind.Union(i, j);
-                                    matchedPairs++;
-                                    matched = true;
+
+                                    if (geometryValid)
+                                    {
+                                        unionFind.Union(i, j);
+                                        matchedPairs++;
+                                        matched = true;
+                                    }
                                 }
                             }
                         }
@@ -449,6 +509,63 @@ namespace CyanTools.Utils
             }
 
             return candidates;
+        }
+
+        private static void AddFallbackCandidatesByGeometry(int index, IReadOnlyList<ImageItem> items,
+            SameSourceGroupingOptions options, List<CandidateMatch> candidateList)
+        {
+            for (int j = index + 1; j < items.Count; j++)
+            {
+                if (!CouldBeContainmentOrLowRes(items[index], items[j], options))
+                {
+                    continue;
+                }
+
+                int score = BuildGeometryCandidateScore(items[index], items[j]);
+                candidateList.Add(new CandidateMatch(j, score));
+            }
+        }
+
+        private static bool CouldBeContainmentOrLowRes(ImageItem a, ImageItem b, SameSourceGroupingOptions options)
+        {
+            int smaller = Math.Min(a.PixelCount, b.PixelCount);
+            int larger = Math.Max(a.PixelCount, b.PixelCount);
+            if (larger <= 0)
+            {
+                return false;
+            }
+
+            double areaRatio = (double)smaller / larger;
+            if (areaRatio >= 0.99 || areaRatio < 0.03)
+            {
+                return false;
+            }
+
+            double aspectRatioDiff = GetAspectRatioDiff(a, b);
+            if (aspectRatioDiff <= CandidateAspectRatioTolerance)
+            {
+                return true;
+            }
+
+            return areaRatio < options.CropAreaRatioThreshold;
+        }
+
+        private static int BuildGeometryCandidateScore(ImageItem a, ImageItem b)
+        {
+            int smaller = Math.Min(a.PixelCount, b.PixelCount);
+            int larger = Math.Max(a.PixelCount, b.PixelCount);
+            double areaRatio = larger <= 0 ? 1.0 : (double)smaller / larger;
+            double aspectDiff = GetAspectRatioDiff(a, b);
+            int areaPenalty = (int)Math.Round((1.0 - areaRatio) * 1000);
+            int aspectPenalty = (int)Math.Round(aspectDiff * 500);
+            return 10_000 + areaPenalty + aspectPenalty;
+        }
+
+        private static double GetAspectRatioDiff(ImageItem a, ImageItem b)
+        {
+            double ratioA = (double)a.Width / Math.Max(1, a.Height);
+            double ratioB = (double)b.Width / Math.Max(1, b.Height);
+            return Math.Abs(ratioA - ratioB) / Math.Max(ratioA, ratioB);
         }
 
         private static bool MarkNonRootAfterMatch(int indexA, int indexB, IReadOnlyList<ImageItem> items,
@@ -543,6 +660,60 @@ namespace CyanTools.Utils
             return smaller < larger * options.LowResRatioThreshold;
         }
 
+        private static bool IsLowResMatchByResize(ImageItem a, ImageItem b, SameSourceGroupingOptions options, Action<string>? logAction)
+        {
+            int smaller = Math.Min(a.PixelCount, b.PixelCount);
+            int larger = Math.Max(a.PixelCount, b.PixelCount);
+            if (smaller >= larger * options.LowResRatioThreshold)
+            {
+                return false;
+            }
+
+            if (GetAspectRatioDiff(a, b) > DirectLowResAspectRatioTolerance)
+            {
+                return false;
+            }
+
+            if (HammingDistance(a.FullHash, b.FullHash) <= options.LowResHashThreshold)
+            {
+                return true;
+            }
+
+            using var grayA = Cv2.ImRead(a.Path, ImreadModes.Grayscale);
+            using var grayB = Cv2.ImRead(b.Path, ImreadModes.Grayscale);
+            if (grayA.Empty() || grayB.Empty())
+            {
+                if (grayA.Empty())
+                {
+                    logAction?.Invoke($"无法读取图片灰度: {a.Path}");
+                }
+
+                if (grayB.Empty())
+                {
+                    logAction?.Invoke($"无法读取图片灰度: {b.Path}");
+                }
+
+                return false;
+            }
+
+            int width = Math.Max(1, Math.Min(DirectLowResCompareSize, Math.Min(grayA.Width, grayB.Width)));
+            int height = Math.Max(1, Math.Min(DirectLowResCompareSize, Math.Min(grayA.Height, grayB.Height)));
+            var compareSize = new Size(width, height);
+
+            using var resizedA = new Mat();
+            using var resizedB = new Mat();
+            Cv2.Resize(grayA, resizedA, compareSize, 0, 0, InterpolationFlags.Area);
+            Cv2.Resize(grayB, resizedB, compareSize, 0, 0, InterpolationFlags.Area);
+
+            using var diff = new Mat();
+            Cv2.Absdiff(resizedA, resizedB, diff);
+            using var thresh = new Mat();
+            Cv2.Threshold(diff, thresh, options.DiffPixelThreshold, 255, ThresholdTypes.Binary);
+            double diffRatio = Cv2.CountNonZero(thresh) / (double)(compareSize.Width * compareSize.Height);
+
+            return diffRatio <= DirectLowResDiffRatioThreshold;
+        }
+
         private static bool TryTemplateMatchCrop(ImageItem a, ImageItem b, SameSourceGroupingOptions options, Action<string>? logAction)
         {
             ImageItem larger = a.PixelCount >= b.PixelCount ? a : b;
@@ -626,9 +797,10 @@ namespace CyanTools.Utils
 
             var groupList = groups.Values.OrderByDescending(g => g.Count).ToList();
             int totalGroups = groupList.Count;
-            int copiedCount = 0;
+            int processedImages = 0;
             int totalImages = items.Count;
             int groupIndex = 1;
+            var relationOutputDirs = BuildRelationOutputDirectories(outputPath);
 
             for (int g = 0; g < groupList.Count; g++)
             {
@@ -639,10 +811,14 @@ namespace CyanTools.Utils
                 var rootItem = items[rootIndex];
 
                 string groupId = BuildGroupId(rootItem);
-                groupIndex = FindNextAvailableGroupIndex(outputPath, groupIndex);
+                groupIndex = FindNextAvailableGroupIndex(relationOutputDirs.Root, groupIndex);
                 string baseName = $"原图{groupIndex}";
 
                 logAction?.Invoke($"[{g + 1}/{totalGroups}] 组 {baseName} (hash {groupId})，数量 {group.Count}");
+
+                string? mergedDanbooruTags = options.SyncDanbooruTagsToRoot
+                    ? BuildMergedDanbooruTags(group, items, logAction)
+                    : null;
 
                 var rootFeatures = featureCache.GetOrCreate(rootIndex, () =>
                     ComputeOrbFeaturesFromFile(rootItem, orb, options, logAction));
@@ -661,16 +837,25 @@ namespace CyanTools.Utils
                     }
                 }
 
-                var relationCounts = new Dictionary<RelationType, int>();
-                relationCounts[RelationType.Same] = 0;
-                relationCounts[RelationType.Crop] = 0;
-                relationCounts[RelationType.LowRes] = 0;
-                relationCounts[RelationType.Edited] = 0;
-                relationCounts[RelationType.Unknown] = 0;
+                var relationCounts = new Dictionary<RelationType, int>
+                {
+                    [RelationType.Same] = 0,
+                    [RelationType.Crop] = 0,
+                    [RelationType.LowRes] = 0,
+                    [RelationType.Edited] = 0,
+                    [RelationType.Unknown] = 0
+                };
 
-                string rootFilePath = Path.Combine(outputPath, $"{baseName}{Path.GetExtension(rootItem.Path)}");
-                CopyWithCompanion(rootItem.Path, rootFilePath, logAction);
-                copiedCount++;
+                string rootTargetPath = Path.Combine(relationOutputDirs.Root, $"{baseName}{Path.GetExtension(rootItem.Path)}");
+                string? actualRootPath = CopyWithCompanion(rootItem.Path, rootTargetPath, logAction);
+                processedImages++;
+
+                if (!string.IsNullOrWhiteSpace(actualRootPath)
+                    && options.SyncDanbooruTagsToRoot
+                    && !string.IsNullOrWhiteSpace(mergedDanbooruTags))
+                {
+                    WriteCompanionTags(actualRootPath, mergedDanbooruTags, logAction);
+                }
 
                 int modifyIndex = 1;
                 foreach (var idx in group)
@@ -709,21 +894,31 @@ namespace CyanTools.Utils
                     }
 
                     otherGrayScaled?.Dispose();
-
                     relationCounts[relation] += 1;
 
-                    string modifySuffix = modifyIndex == 1 ? $"{baseName}修改" : $"{baseName}修改{modifyIndex}";
-                    string newFilePath = Path.Combine(outputPath, $"{modifySuffix}{Path.GetExtension(item.Path)}");
-                    CopyWithCompanion(item.Path, newFilePath, logAction);
+                    string targetDir = ResolveRelationOutputDirectory(relationOutputDirs, relation);
+                    string relationSuffix = relation switch
+                    {
+                        RelationType.Crop => "被包含",
+                        RelationType.LowRes => "缩略图",
+                        RelationType.Edited => "差分",
+                        RelationType.Same => "未知",
+                        RelationType.Unknown => "未知",
+                        _ => "未知"
+                    };
+                    string modifySuffix = modifyIndex == 1 ? $"{baseName}{relationSuffix}" : $"{baseName}{relationSuffix}{modifyIndex}";
+                    string targetPath = Path.Combine(targetDir, $"{modifySuffix}{Path.GetExtension(item.Path)}");
+                    _ = CopyWithCompanion(item.Path, targetPath, logAction);
+
                     modifyIndex++;
-                    copiedCount++;
+                    processedImages++;
                 }
 
                 rootGrayScaled?.Dispose();
 
-                logAction?.Invoke($"  关系统计: 裁剪 {relationCounts[RelationType.Crop]}, 低清 {relationCounts[RelationType.LowRes]}, 修改 {relationCounts[RelationType.Edited]}, 未知 {relationCounts[RelationType.Unknown]}");
+                logAction?.Invoke($"  关系统计: 同图 {relationCounts[RelationType.Same]}, 裁剪 {relationCounts[RelationType.Crop]}, 低清 {relationCounts[RelationType.LowRes]}, 差分 {relationCounts[RelationType.Edited]}, 未知 {relationCounts[RelationType.Unknown]}");
 
-                progress?.Report(80 + 20.0 * copiedCount / totalImages);
+                progress?.Report(80 + 20.0 * processedImages / totalImages);
                 groupIndex++;
             }
         }
@@ -743,15 +938,15 @@ namespace CyanTools.Utils
             return $"{hashPart}_{item.Width}x{item.Height}";
         }
 
-        private static int FindNextAvailableGroupIndex(string outputPath, int startIndex)
+        private static int FindNextAvailableGroupIndex(string rootOutputPath, int startIndex)
         {
             int index = Math.Max(1, startIndex);
             while (true)
             {
                 string baseName = $"原图{index}";
                 bool hasImage = SupportedExtensions.Any(ext =>
-                    File.Exists(Path.Combine(outputPath, $"{baseName}{ext}")));
-                bool hasTxt = File.Exists(Path.Combine(outputPath, $"{baseName}.txt"));
+                    File.Exists(Path.Combine(rootOutputPath, $"{baseName}{ext}")));
+                bool hasTxt = File.Exists(Path.Combine(rootOutputPath, $"{baseName}.txt"));
 
                 if (!hasImage && !hasTxt)
                 {
@@ -762,62 +957,71 @@ namespace CyanTools.Utils
             }
         }
 
-        private static string EnsureUniqueDirectory(string basePath)
+        private static RelationOutputDirectories BuildRelationOutputDirectories(string outputPath)
         {
-            if (!Directory.Exists(basePath))
-            {
-                Directory.CreateDirectory(basePath);
-                return basePath;
-            }
+            string rootDir = Path.Combine(outputPath, RootFolderName);
+            string cropDir = Path.Combine(outputPath, CropFolderName);
+            string lowResDir = Path.Combine(outputPath, LowResFolderName);
+            string editedDir = Path.Combine(outputPath, EditedFolderName);
+            string unknownDir = Path.Combine(outputPath, UnknownFolderName);
 
-            int index = 1;
-            string candidate;
-            do
-            {
-                candidate = $"{basePath}_{index}";
-                index++;
-            } while (Directory.Exists(candidate));
+            Directory.CreateDirectory(rootDir);
+            Directory.CreateDirectory(cropDir);
+            Directory.CreateDirectory(lowResDir);
+            Directory.CreateDirectory(editedDir);
+            Directory.CreateDirectory(unknownDir);
 
-            Directory.CreateDirectory(candidate);
-            return candidate;
+            return new RelationOutputDirectories(rootDir, cropDir, lowResDir, editedDir, unknownDir);
         }
 
-        private static void CopyWithCompanion(string sourceImagePath, string targetImagePath, Action<string>? logAction)
+        private static string ResolveRelationOutputDirectory(RelationOutputDirectories directories, RelationType relation)
         {
+            return relation switch
+            {
+                RelationType.Crop => directories.Crop,
+                RelationType.LowRes => directories.LowRes,
+                RelationType.Edited => directories.Edited,
+                RelationType.Same => directories.Unknown,
+                RelationType.Unknown => directories.Unknown,
+                _ => directories.Unknown
+            };
+        }
+
+        private static string? CopyWithCompanion(string sourceImagePath, string targetImagePath, Action<string>? logAction)
+        {
+            string finalImagePath;
             try
             {
-                File.Copy(sourceImagePath, targetImagePath, overwrite: false);
-            }
-            catch (IOException)
-            {
-                string uniquePath = EnsureUniqueFilePath(targetImagePath);
-                File.Copy(sourceImagePath, uniquePath, overwrite: false);
-                targetImagePath = uniquePath;
+                finalImagePath = EnsureUniqueFilePath(targetImagePath);
+                string? targetDir = Path.GetDirectoryName(finalImagePath);
+                if (!string.IsNullOrWhiteSpace(targetDir))
+                {
+                    Directory.CreateDirectory(targetDir);
+                }
+
+                File.Copy(sourceImagePath, finalImagePath, overwrite: false);
             }
             catch (Exception ex)
             {
                 logAction?.Invoke($"复制失败: {sourceImagePath} ({ex.Message})");
-                return;
+                return null;
             }
 
             string companion = Path.ChangeExtension(sourceImagePath, ".txt");
             if (File.Exists(companion))
             {
-                string targetTxt = Path.ChangeExtension(targetImagePath, ".txt");
+                string targetTxt = EnsureUniqueFilePath(Path.ChangeExtension(finalImagePath, ".txt"));
                 try
                 {
                     File.Copy(companion, targetTxt, overwrite: false);
-                }
-                catch (IOException)
-                {
-                    string uniqueTxt = EnsureUniqueFilePath(targetTxt);
-                    File.Copy(companion, uniqueTxt, overwrite: false);
                 }
                 catch (Exception ex)
                 {
                     logAction?.Invoke($"复制TXT失败: {companion} ({ex.Message})");
                 }
             }
+
+            return finalImagePath;
         }
 
         private static string EnsureUniqueFilePath(string path)
@@ -842,12 +1046,142 @@ namespace CyanTools.Utils
             return candidate;
         }
 
+        private static string? BuildMergedDanbooruTags(IEnumerable<int> group, IReadOnlyList<ImageItem> items, Action<string>? logAction)
+        {
+            var merged = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var idx in group)
+            {
+                string txtPath = Path.ChangeExtension(items[idx].Path, ".txt");
+                if (!File.Exists(txtPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string content = File.ReadAllText(txtPath);
+                    var tags = ParseDanbooruTags(content);
+                    foreach (var tag in tags)
+                    {
+                        if (seen.Add(tag))
+                        {
+                            merged.Add(tag);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logAction?.Invoke($"读取TXT失败: {txtPath} ({ex.Message})");
+                }
+            }
+
+            return merged.Count == 0 ? null : string.Join(",", merged);
+        }
+
+        private static List<string> ParseDanbooruTags(string content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return new List<string>();
+            }
+
+            var rawTokens = content
+                .Split(new[] { ',', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .ToList();
+
+            if (rawTokens.Count < 3)
+            {
+                return new List<string>();
+            }
+
+            int validCount = rawTokens.Count(IsLikelyDanbooruTagToken);
+            double validRatio = (double)validCount / rawTokens.Count;
+            if (validCount < 3 || validRatio < 0.85)
+            {
+                return new List<string>();
+            }
+
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var token in rawTokens)
+            {
+                if (!IsLikelyDanbooruTagToken(token))
+                {
+                    continue;
+                }
+
+                if (seen.Add(token))
+                {
+                    result.Add(token);
+                }
+            }
+
+            return result;
+        }
+
+        private static bool IsLikelyDanbooruTagToken(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token) || token.Length > 80)
+            {
+                return false;
+            }
+
+            bool hasLetterOrDigit = false;
+            foreach (char c in token)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    return false;
+                }
+
+                if (char.IsLetterOrDigit(c))
+                {
+                    hasLetterOrDigit = true;
+                    continue;
+                }
+
+                if (c is '_' or '-' or ':' or '(' or ')' or '.' or '\'' or '/')
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return hasLetterOrDigit;
+        }
+
+        private static void WriteCompanionTags(string imagePath, string tags, Action<string>? logAction)
+        {
+            if (string.IsNullOrWhiteSpace(imagePath) || string.IsNullOrWhiteSpace(tags))
+            {
+                return;
+            }
+
+            try
+            {
+                string txtPath = Path.ChangeExtension(imagePath, ".txt");
+                File.WriteAllText(txtPath, tags);
+            }
+            catch (Exception ex)
+            {
+                logAction?.Invoke($"写入标签TXT失败: {imagePath} ({ex.Message})");
+            }
+        }
+
+        private sealed record RelationOutputDirectories(string Root, string Crop, string LowRes, string Edited, string Unknown);
+
         private static RelationType ClassifyRelation(ImageItem rootItem, OrbFeatureData rootFeatures, ImageItem otherItem,
             OrbFeatureData otherFeatures, SameSourceGroupingOptions options, Mat? rootGrayScaled, Mat? otherGrayScaled)
         {
-            if (!TryEstimateHomography(rootFeatures, otherFeatures, options, out var homography, out _, out _))
+            if (!TryEstimateHomography(rootFeatures, otherFeatures, options, out var homography, out _, out _, out _, out _))
             {
-                if (IsLowResMatchByHash(rootItem, otherItem, options))
+                if (IsLowResMatchByHash(rootItem, otherItem, options)
+                    || IsLowResMatchByResize(rootItem, otherItem, options, null))
                 {
                     return RelationType.LowRes;
                 }
@@ -1016,11 +1350,13 @@ namespace CyanTools.Utils
         }
 
         private static bool TryEstimateHomography(OrbFeatureData featuresA, OrbFeatureData featuresB, SameSourceGroupingOptions options,
-            out Mat? homography, out int inliers, out int matchCount)
+            out Mat? homography, out int inliers, out int matchCount, out double inlierCoverageA, out double inlierCoverageB)
         {
             homography = null;
             inliers = 0;
             matchCount = 0;
+            inlierCoverageA = 0;
+            inlierCoverageB = 0;
 
             if (featuresA.Descriptors.Empty() || featuresB.Descriptors.Empty())
             {
@@ -1064,13 +1400,23 @@ namespace CyanTools.Utils
                 return false;
             }
 
+            var inlierPointsA = new List<Point2f>();
+            var inlierPointsB = new List<Point2f>();
             for (int i = 0; i < mask.Rows; i++)
             {
                 if (mask.At<byte>(i, 0) != 0)
                 {
                     inliers++;
+                    var m = good[i];
+                    var pointA = featuresA.KeyPoints[m.QueryIdx].Pt;
+                    var pointB = featuresB.KeyPoints[m.TrainIdx].Pt;
+                    inlierPointsA.Add(new Point2f(pointA.X, pointA.Y));
+                    inlierPointsB.Add(new Point2f(pointB.X, pointB.Y));
                 }
             }
+
+            inlierCoverageA = ComputePointCoverage(inlierPointsA, featuresA.ScaledSize);
+            inlierCoverageB = ComputePointCoverage(inlierPointsB, featuresB.ScaledSize);
 
             double inlierRatio = (double)inliers / good.Count;
             if (inliers < options.MinInliers || inlierRatio < options.MinInlierRatio)
@@ -1081,6 +1427,33 @@ namespace CyanTools.Utils
             }
 
             return true;
+        }
+
+        private static double ComputePointCoverage(IReadOnlyList<Point2f> points, Size size)
+        {
+            if (points == null || points.Count < 4)
+            {
+                return 0;
+            }
+
+            float minX = points.Min(p => p.X);
+            float minY = points.Min(p => p.Y);
+            float maxX = points.Max(p => p.X);
+            float maxY = points.Max(p => p.Y);
+
+            double width = Math.Max(0, maxX - minX);
+            double height = Math.Max(0, maxY - minY);
+            double areaBox = width * height;
+            double areaAll = Math.Max(1, size.Width * size.Height);
+            return areaBox / areaAll;
+        }
+
+        private static double ComputeMappedAreaRatio(Size sizeA, Size sizeB, Mat homographyBToA)
+        {
+            var (_, mappedBox) = IsCrop(sizeA, sizeB, homographyBToA, 0.0);
+            double areaBox = Math.Max(0, mappedBox.Width) * Math.Max(0, mappedBox.Height);
+            double areaA = Math.Max(1, sizeA.Width * sizeA.Height);
+            return areaBox / areaA;
         }
 
         private static ulong ComputePHash64(Mat bgr)

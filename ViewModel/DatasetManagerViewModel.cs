@@ -239,6 +239,7 @@ namespace CyanTools.ViewModel
         public ICommand MoveTagToEndDatasetCommand { get; }
         public ICommand RemoveTagFromDatasetCommand { get; }
         public ICommand AddTagToDatasetCommand { get; }
+        public ICommand ShufflePromptTagsDatasetCommand { get; }
         public ICommand UpsertTagTranslationCommand { get; }
         public ICommand TranslateAllMissingTagsCommand { get; }
         
@@ -273,6 +274,8 @@ namespace CyanTools.ViewModel
                 param => CanApplyDatasetTagAction(param as TagTokenViewModel));
             AddTagToDatasetCommand = new RelayCommand(param => AddTagToDataset(param as TagTokenViewModel),
                 param => CanApplyDatasetTagAction(param as TagTokenViewModel));
+            ShufflePromptTagsDatasetCommand = new RelayCommand(_ => ShufflePromptTagsDataset(),
+                _ => DataItemsWithOperations.Any());
             UpsertTagTranslationCommand = new RelayCommand(async _ => await UpsertTagTranslationAsync(),
                 _ => !string.IsNullOrWhiteSpace(ManualTagInput));
             TranslateAllMissingTagsCommand = new RelayCommand(async _ => await TranslateAllMissingTagsAsync(),
@@ -938,6 +941,200 @@ namespace CyanTools.ViewModel
             ApplyDatasetTagUpdate(token, DatasetTagUpdateMode.Add);
         }
 
+        private void ShufflePromptTagsDataset()
+        {
+            if (!DataItemsWithOperations.Any())
+            {
+                return;
+            }
+
+            if (!TryPromptFixedTagCount(out int fixedTagCount))
+            {
+                return;
+            }
+
+            int updatedCount = 0;
+            int errorCount = 0;
+            bool selectedUpdated = false;
+            string? selectedPath = null;
+
+            var selectedItem = SelectedDataItem;
+            string? selectedContent = null;
+            if (selectedItem != null)
+            {
+                CommitPendingTags(true);
+                UpdateCurrentTextContentFromTokens();
+                selectedContent = CurrentTextContent ?? string.Empty;
+            }
+
+            foreach (var item in DataItemsWithOperations)
+            {
+                string? targetPath = GetDatasetTagTextPath(item);
+                if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath))
+                {
+                    continue;
+                }
+
+                string content;
+                bool isSelectedItem = ReferenceEquals(item, selectedItem);
+                if (isSelectedItem && selectedContent != null)
+                {
+                    content = selectedContent;
+                }
+                else
+                {
+                    try
+                    {
+                        content = File.ReadAllText(targetPath);
+                    }
+                    catch
+                    {
+                        errorCount++;
+                        continue;
+                    }
+                }
+
+                var tags = SplitTags(content).ToList();
+                var shuffledTags = ShuffleDatasetTags(tags, fixedTagCount, out bool changed);
+                if (!changed)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    File.WriteAllText(targetPath, string.Join(", ", shuffledTags));
+                }
+                catch
+                {
+                    errorCount++;
+                    continue;
+                }
+
+                updatedCount++;
+                if (isSelectedItem)
+                {
+                    selectedUpdated = true;
+                    selectedPath = targetPath;
+                }
+            }
+
+            if (selectedUpdated && !string.IsNullOrWhiteSpace(selectedPath))
+            {
+                LoadTextFromFile(selectedPath);
+            }
+
+            ShowDatasetPromptShuffleResult(updatedCount, errorCount, fixedTagCount);
+        }
+
+        private bool TryPromptFixedTagCount(out int fixedTagCount)
+        {
+            fixedTagCount = 0;
+            int parsedTagCount = 0;
+
+            var owner = Application.Current?.Windows
+                .OfType<Window>()
+                .FirstOrDefault(window => window.IsActive);
+
+            var promptLabel = new TextBlock
+            {
+                Text = "固定前（",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var inputBox = new TextBox
+            {
+                Text = "0",
+                MinWidth = 64,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            var suffixLabel = new TextBlock
+            {
+                Text = "）个tag",
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var inputRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            inputRow.Children.Add(promptLabel);
+            inputRow.Children.Add(inputBox);
+            inputRow.Children.Add(suffixLabel);
+
+            var okButton = new Button
+            {
+                Content = "确定",
+                IsDefault = true,
+                MinWidth = 72,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            var cancelButton = new Button
+            {
+                Content = "取消",
+                IsCancel = true,
+                MinWidth = 72
+            };
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            buttons.Children.Add(okButton);
+            buttons.Children.Add(cancelButton);
+
+            var panel = new StackPanel
+            {
+                Margin = new Thickness(16, 14, 16, 14)
+            };
+            panel.Children.Add(inputRow);
+            panel.Children.Add(buttons);
+
+            var dialog = new Window
+            {
+                Title = "打乱提示词（数据集）",
+                Content = panel,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                WindowStartupLocation = owner == null
+                    ? WindowStartupLocation.CenterScreen
+                    : WindowStartupLocation.CenterOwner
+            };
+
+            if (owner != null && !ReferenceEquals(owner, dialog))
+            {
+                dialog.Owner = owner;
+            }
+
+            okButton.Click += (_, _) =>
+            {
+                if (!int.TryParse(inputBox.Text?.Trim(), out int parsed) || parsed < 0)
+                {
+                    System.Windows.MessageBox.Show(dialog, "请输入大于等于 0 的整数。", "提示",
+                        System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    inputBox.Focus();
+                    inputBox.SelectAll();
+                    return;
+                }
+
+                parsedTagCount = parsed;
+                dialog.DialogResult = true;
+            };
+
+            dialog.Loaded += (_, _) =>
+            {
+                inputBox.Focus();
+                inputBox.SelectAll();
+            };
+
+            bool confirmed = dialog.ShowDialog() == true;
+            fixedTagCount = confirmed ? parsedTagCount : 0;
+            return confirmed;
+        }
+
         private bool CanApplyDatasetTagAction(TagTokenViewModel? token)
         {
             return token != null && DataItemsWithOperations.Any();
@@ -1143,6 +1340,66 @@ namespace CyanTools.ViewModel
             return true;
         }
 
+        private List<string> ShuffleDatasetTags(List<string> tags, int fixedTagCount, out bool changed)
+        {
+            changed = false;
+            if (tags.Count <= 1)
+            {
+                return tags;
+            }
+
+            int keepCount = Math.Clamp(fixedTagCount, 0, tags.Count);
+            int shuffleCount = tags.Count - keepCount;
+            if (shuffleCount <= 1)
+            {
+                return tags;
+            }
+
+            bool suffixAllSame = true;
+            string firstValue = tags[keepCount];
+            for (int i = keepCount + 1; i < tags.Count; i++)
+            {
+                if (!string.Equals(tags[i], firstValue, StringComparison.Ordinal))
+                {
+                    suffixAllSame = false;
+                    break;
+                }
+            }
+
+            if (suffixAllSame)
+            {
+                return tags;
+            }
+
+            var shuffled = new List<string>(tags);
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                for (int i = shuffled.Count - 1; i > keepCount; i--)
+                {
+                    int swapIndex = _random.Next(keepCount, i + 1);
+                    (shuffled[i], shuffled[swapIndex]) = (shuffled[swapIndex], shuffled[i]);
+                }
+
+                if (!AreTagListsEqual(tags, shuffled))
+                {
+                    changed = true;
+                    return shuffled;
+                }
+
+                shuffled = new List<string>(tags);
+            }
+
+            string first = shuffled[keepCount];
+            for (int i = keepCount; i < shuffled.Count - 1; i++)
+            {
+                shuffled[i] = shuffled[i + 1];
+            }
+            shuffled[^1] = first;
+
+            changed = !AreTagListsEqual(tags, shuffled);
+            return changed ? shuffled : tags;
+        }
+
         private void ShowDatasetTagUpdateResult(DatasetTagUpdateMode mode, int updatedCount, int createdCount, int errorCount)
         {
             if (updatedCount == 0 && errorCount == 0)
@@ -1153,10 +1410,10 @@ namespace CyanTools.ViewModel
 
             string actionName = mode switch
             {
-                DatasetTagUpdateMode.MoveToStart => "移到最前(当前数据集)",
-                DatasetTagUpdateMode.MoveToEnd => "移到最后(当前数据集)",
-                DatasetTagUpdateMode.Remove => "删除(当前数据集)",
-                DatasetTagUpdateMode.Add => "添加(当前数据集)",
+                DatasetTagUpdateMode.MoveToStart => "移到最前(数据集)",
+                DatasetTagUpdateMode.MoveToEnd => "移到最后(数据集)",
+                DatasetTagUpdateMode.Remove => "删除(数据集)",
+                DatasetTagUpdateMode.Add => "添加(数据集)",
                 _ => "操作"
             };
 
@@ -1165,6 +1422,23 @@ namespace CyanTools.ViewModel
             {
                 message += $"\n新增文件: {createdCount} 个";
             }
+            if (errorCount > 0)
+            {
+                message += $"\n失败: {errorCount} 个";
+            }
+
+            System.Windows.MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
+
+        private void ShowDatasetPromptShuffleResult(int updatedCount, int errorCount, int fixedTagCount)
+        {
+            if (updatedCount == 0 && errorCount == 0)
+            {
+                System.Windows.MessageBox.Show("未找到可打乱的提示词。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            string message = $"打乱提示词（数据集）完成。\n固定前 {Math.Max(0, fixedTagCount)} 个tag\n更新: {updatedCount} 个文件";
             if (errorCount > 0)
             {
                 message += $"\n失败: {errorCount} 个";
