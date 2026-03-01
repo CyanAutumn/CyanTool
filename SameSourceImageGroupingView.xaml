@@ -56,6 +56,9 @@
                     <CheckBox Content="匹配后跳过较小图(加速,可能漏检)" IsChecked="{Binding SkipMatchedNonRoot}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <CheckBox Content="加速模式(更快,可能漏检)" IsChecked="{Binding EnableFastMode}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                     <CheckBox Content="启用裁剪候选(分块Hash)" IsChecked="{Binding EnablePatchHash}" Margin="0,0,20,0"/>
                     <CheckBox Content="启用哈希直接判定(快,可能误判)" IsChecked="{Binding EnableHashMatch}"/>
                 </StackPanel>
@@ -184,6 +187,15 @@
                             </Grid.ColumnDefinitions>
                             <Label Content="单图候选上限(0不限):" Grid.Column="0" VerticalAlignment="Center"/>
                             <TextBox Text="{Binding MaxCandidatesPerImage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
+                        </Grid>
+
+                        <Grid Margin="0,5,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Content="并行线程数(0=自动):" Grid.Column="0" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding MaxDegreeOfParallelism, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
                         </Grid>
                     </StackPanel>
                 </Expander>
