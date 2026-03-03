@@ -11,38 +11,37 @@ using OpenCvSharp.Features2D;
 
 namespace CyanTools.Utils
 {
-        public sealed class SameSourceGroupingOptions
-        {
-            public bool SyncDanbooruTagsToRoot { get; set; } = true;
-            public bool IncludeSubfolders { get; set; } = true;
-            public bool EnableFastMode { get; set; } = false;
-            public bool EnablePatchHash { get; set; } = true;
-            public bool EnableHashMatch { get; set; } = false;
-            public bool EnableOrbMatch { get; set; } = true;
-            public int PatchGrid { get; set; } = 5;
-            public int PhashThreshold { get; set; } = 12;
-            public int PatchPhashThreshold { get; set; } = 16;
-            public int LowResHashThreshold { get; set; } = 12;
-            public int OrbFeatures { get; set; } = 2000;
-            public int OrbMaxSize { get; set; } = 1024;
-            public float LoweRatio { get; set; } = 0.75f;
-            public int MinGoodMatches { get; set; } = 25;
-            public int MinInliers { get; set; } = 20;
-            public double MinInlierRatio { get; set; } = 0.30;
-            public double RansacReprojThreshold { get; set; } = 3.0;
-            public double CropAreaRatioThreshold { get; set; } = 0.90;
-            public double LowResRatioThreshold { get; set; } = 0.85;
-            public double EditedDiffRatioThreshold { get; set; } = 0.15;
-            public int DiffCheckSize { get; set; } = 512;
-            public int DiffPixelThreshold { get; set; } = 20;
-            public bool EnableTemplateMatch { get; set; } = true;
-            public double TemplateMatchThreshold { get; set; } = 0.85;
-            public int TemplateMaxSize { get; set; } = 1024;
-            public int TemplateMinSize { get; set; } = 64;
-            public bool SkipMatchedNonRoot { get; set; } = true;
-            public int MaxCandidatesPerImage { get; set; } = 600;
-            public int MaxDegreeOfParallelism { get; set; } = 4;
-        }
+    public sealed class SameSourceGroupingOptions
+    {
+        public bool SyncDanbooruTagsToRoot { get; set; } = true;
+        public bool IncludeSubfolders { get; set; } = true;
+        public bool EnablePatchHash { get; set; } = true;
+        public bool EnableHashMatch { get; set; } = false;
+        public bool EnableOrbMatch { get; set; } = true;
+        public int PatchGrid { get; set; } = 5;
+        public int PhashThreshold { get; set; } = 12;
+        public int PatchPhashThreshold { get; set; } = 16;
+        public int LowResHashThreshold { get; set; } = 12;
+        public int OrbFeatures { get; set; } = 2000;
+        public int OrbMaxSize { get; set; } = 1024;
+        public float LoweRatio { get; set; } = 0.75f;
+        public int MinGoodMatches { get; set; } = 25;
+        public int MinInliers { get; set; } = 20;
+        public double MinInlierRatio { get; set; } = 0.30;
+        public double RansacReprojThreshold { get; set; } = 3.0;
+        public double CropAreaRatioThreshold { get; set; } = 0.90;
+        public double LowResRatioThreshold { get; set; } = 0.85;
+        public double EditedDiffRatioThreshold { get; set; } = 0.15;
+        public int DiffCheckSize { get; set; } = 512;
+        public int DiffPixelThreshold { get; set; } = 20;
+        public bool EnableTemplateMatch { get; set; } = true;
+        public double TemplateMatchThreshold { get; set; } = 0.85;
+        public int TemplateMaxSize { get; set; } = 1024;
+        public int TemplateMinSize { get; set; } = 64;
+        public bool SkipMatchedNonRoot { get; set; } = true;
+        public int MaxCandidatesPerImage { get; set; } = 600;
+        public int MaxDegreeOfParallelism { get; set; } = Math.Max(1, Environment.ProcessorCount - 1);
+    }
 
     public static class SameSourceImageGroupingProcessor
     {
@@ -55,16 +54,8 @@ namespace CyanTools.Utils
         private const double DirectLowResAspectRatioTolerance = 0.08;
         private const double DirectLowResDiffRatioThreshold = 0.12;
         private const int DirectLowResCompareSize = 320;
-        private const double TemplateVerifyDiffRatioThreshold = 0.30;
-        private const double TemplateStrictVerifyDiffRatioThreshold = 0.20;
-        private const double TemplateStrictMatchThreshold = 0.92;
         private const double MinInlierCoverageRatioForMatch = 0.05;
         private const double MinMappedAreaRatioForMatch = 0.08;
-        private const double OrbSanityAspectRatioTolerance = 0.12;
-        private const double OrbSanityAreaRatioThreshold = 0.45;
-        private const double OrbSanityDiffMargin = 0.55;
-        private const double OrbSanityMinDiffThreshold = 0.55;
-        private const double OrbSanityMaxDiffThreshold = 0.85;
 
         private static readonly HashSet<string> SupportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -158,10 +149,6 @@ namespace CyanTools.Utils
 
             token.ThrowIfCancellationRequested();
             logAction?.Invoke("开始匹配同源图片...");
-            if (options.EnableFastMode)
-            {
-                logAction?.Invoke("加速模式已开启：将限制候选并提前停止低优先级匹配，可能漏检。");
-            }
 
             using var orb = ORB.Create(options.OrbFeatures);
             using var featureCache = new OrbFeatureCache();
@@ -335,11 +322,6 @@ namespace CyanTools.Utils
             bool enableHashMatch = options.EnableHashMatch;
             bool enableOrbMatch = options.EnableOrbMatch;
             bool enableTemplateMatch = options.EnableTemplateMatch;
-            bool fastMode = options.EnableFastMode;
-            int fastModeCandidateCap = 240;
-            int fastModeExpensiveCheckDistance = Math.Max(Math.Max(options.PhashThreshold, options.LowResHashThreshold), options.PatchPhashThreshold) + 4;
-            int fastModeEarlyStopDistance = fastModeExpensiveCheckDistance + 4;
-            int fastModeEarlyStopFailures = 40;
 
             for (int i = 0; i < total; i++)
             {
@@ -368,10 +350,7 @@ namespace CyanTools.Utils
 
                 if (candidateList.Count == 0)
                 {
-                    if (!fastMode)
-                    {
-                        AddFallbackCandidatesByGeometry(i, items, options, candidateList);
-                    }
+                    AddFallbackCandidatesByGeometry(i, items, options, candidateList);
                 }
 
                 if (candidateList.Count == 0)
@@ -380,28 +359,15 @@ namespace CyanTools.Utils
                     continue;
                 }
 
-                int effectiveMaxCandidates = maxCandidates;
-                if (fastMode)
+                if (maxCandidates > 0 && candidateList.Count > maxCandidates)
                 {
-                    effectiveMaxCandidates = effectiveMaxCandidates > 0
-                        ? Math.Min(effectiveMaxCandidates, fastModeCandidateCap)
-                        : fastModeCandidateCap;
-                }
-
-                if (candidateList.Count > 1
-                    && (fastMode || (effectiveMaxCandidates > 0 && candidateList.Count > effectiveMaxCandidates)))
-                {
+                    int originalCount = candidateList.Count;
                     candidateList.Sort((a, b) =>
                     {
                         int cmp = a.HashDistance.CompareTo(b.HashDistance);
                         return cmp != 0 ? cmp : a.Index.CompareTo(b.Index);
                     });
-                }
-
-                if (effectiveMaxCandidates > 0 && candidateList.Count > effectiveMaxCandidates)
-                {
-                    int originalCount = candidateList.Count;
-                    candidateList.RemoveRange(effectiveMaxCandidates, candidateList.Count - effectiveMaxCandidates);
+                    candidateList.RemoveRange(maxCandidates, candidateList.Count - maxCandidates);
 
                     if (trimmedLogCount < maxTrimmedLogs)
                     {
@@ -417,12 +383,10 @@ namespace CyanTools.Utils
                 try
                 {
                     OrbFeatureData? featuresA = null;
-                    int fastFarMisses = 0;
 
                     for (int c = 0; c < candidateList.Count; c++)
                     {
-                        var candidate = candidateList[c];
-                        int j = candidate.Index;
+                        int j = candidateList[c].Index;
                         token.ThrowIfCancellationRequested();
 
                         if (unionFind.Find(i) == unionFind.Find(j))
@@ -431,7 +395,6 @@ namespace CyanTools.Utils
                         }
 
                         bool matched = false;
-                        bool allowExpensiveChecks = !fastMode || candidate.HashDistance <= fastModeExpensiveCheckDistance;
 
                         if (enableHashMatch)
                         {
@@ -447,13 +410,13 @@ namespace CyanTools.Utils
                             matched = true;
                         }
 
-                        if (!matched && enableOrbMatch && allowExpensiveChecks && featuresA == null)
+                        if (!matched && enableOrbMatch && featuresA == null)
                         {
                             featuresA = featureCache.GetOrCreate(i, () =>
                                 ComputeOrbFeaturesFromFile(items[i], orb, options, logAction));
                         }
 
-                        if (!matched && enableOrbMatch && allowExpensiveChecks && featuresA != null && !featuresA.Descriptors.Empty())
+                        if (!matched && enableOrbMatch && featuresA != null && !featuresA.Descriptors.Empty())
                         {
                             var featuresB = featureCache.GetOrCreate(j, () =>
                                 ComputeOrbFeaturesFromFile(items[j], orb, options, logAction));
@@ -461,29 +424,27 @@ namespace CyanTools.Utils
                             if (featuresB != null && !featuresB.Descriptors.Empty())
                             {
                                 if (TryEstimateHomography(featuresA, featuresB, options, out var homography, out _, out _,
-                                    out double inlierCoverageA, out double inlierCoverageB) && homography != null)
+                                    out double inlierCoverageA, out double inlierCoverageB))
                                 {
-                                    using (homography)
+                                    double mappedAreaRatio = ComputeMappedAreaRatio(featuresA.ScaledSize, featuresB.ScaledSize, homography);
+                                    bool geometryValid = inlierCoverageA >= MinInlierCoverageRatioForMatch
+                                                         && inlierCoverageB >= MinInlierCoverageRatioForMatch
+                                                         && mappedAreaRatio >= MinMappedAreaRatioForMatch;
+                                    homography.Dispose();
+
+                                    if (geometryValid)
                                     {
-                                        double mappedAreaRatio = ComputeMappedAreaRatio(featuresA.ScaledSize, featuresB.ScaledSize, homography);
-                                        bool geometryValid = inlierCoverageA >= MinInlierCoverageRatioForMatch
-                                                             && inlierCoverageB >= MinInlierCoverageRatioForMatch
-                                                             && mappedAreaRatio >= MinMappedAreaRatioForMatch;
-                                        if (geometryValid
-                                            && PassOrbAlignmentSanityCheck(items[i], featuresA, items[j], featuresB, homography, options, logAction))
-                                        {
-                                            unionFind.Union(i, j);
-                                            matchedPairs++;
-                                            matched = true;
-                                        }
+                                        unionFind.Union(i, j);
+                                        matchedPairs++;
+                                        matched = true;
                                     }
                                 }
                             }
                         }
 
-                        if (!matched && enableTemplateMatch && allowExpensiveChecks)
+                        if (!matched && enableTemplateMatch)
                         {
-                            if (TryTemplateMatchCrop(items[i], items[j], options, logAction, strict: true))
+                            if (TryTemplateMatchCrop(items[i], items[j], options, logAction))
                             {
                                 unionFind.Union(i, j);
                                 matchedPairs++;
@@ -493,25 +454,9 @@ namespace CyanTools.Utils
 
                         if (matched)
                         {
-                            fastFarMisses = 0;
                             if (MarkNonRootAfterMatch(i, j, items, skipAsSource, options))
                             {
                                 break;
-                            }
-                        }
-                        else if (fastMode)
-                        {
-                            if (candidate.HashDistance >= fastModeEarlyStopDistance)
-                            {
-                                fastFarMisses++;
-                                if (fastFarMisses >= fastModeEarlyStopFailures)
-                                {
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                fastFarMisses = 0;
                             }
                         }
 
@@ -679,37 +624,23 @@ namespace CyanTools.Utils
                 return false;
             }
 
-            if (a.PatchHashes.Length == 0 || b.PatchHashes.Length == 0)
+            foreach (var hashA in a.AllHashes)
             {
-                return false;
-            }
-
-            int patchHitCount = 0;
-            int strongPatchThreshold = Math.Max(0, options.PatchPhashThreshold - 3);
-            int weakPatchHitRequired = 3;
-
-            foreach (var hashA in a.PatchHashes)
-            {
-                foreach (var hashB in b.PatchHashes)
+                foreach (var hashB in b.AllHashes)
                 {
+                    int threshold = (hashA == a.FullHash && hashB == b.FullHash)
+                        ? fullThreshold
+                        : options.PatchPhashThreshold;
+
                     int distance = HammingDistance(hashA, hashB);
                     if (distance < minDistance)
                     {
                         minDistance = distance;
                     }
 
-                    if (distance <= strongPatchThreshold)
+                    if (distance <= threshold)
                     {
                         return true;
-                    }
-
-                    if (distance <= options.PatchPhashThreshold)
-                    {
-                        patchHitCount++;
-                        if (patchHitCount >= weakPatchHitRequired)
-                        {
-                            return true;
-                        }
                     }
                 }
             }
@@ -783,7 +714,7 @@ namespace CyanTools.Utils
             return diffRatio <= DirectLowResDiffRatioThreshold;
         }
 
-        private static bool TryTemplateMatchCrop(ImageItem a, ImageItem b, SameSourceGroupingOptions options, Action<string>? logAction, bool strict = false)
+        private static bool TryTemplateMatchCrop(ImageItem a, ImageItem b, SameSourceGroupingOptions options, Action<string>? logAction)
         {
             ImageItem larger = a.PixelCount >= b.PixelCount ? a : b;
             ImageItem smaller = a.PixelCount >= b.PixelCount ? b : a;
@@ -798,13 +729,6 @@ namespace CyanTools.Utils
             {
                 return false;
             }
-
-            double threshold = strict
-                ? Math.Max(options.TemplateMatchThreshold, TemplateStrictMatchThreshold)
-                : options.TemplateMatchThreshold;
-            double verifyDiffThreshold = strict
-                ? TemplateStrictVerifyDiffRatioThreshold
-                : TemplateVerifyDiffRatioThreshold;
 
             using var largeGray = Cv2.ImRead(larger.Path, ImreadModes.Grayscale);
             using var smallGray = Cv2.ImRead(smaller.Path, ImreadModes.Grayscale);
@@ -835,13 +759,13 @@ namespace CyanTools.Utils
                 Cv2.Resize(largeGray, largeResized, new Size(largeWidth, largeHeight), 0, 0, InterpolationFlags.Area);
                 Cv2.Resize(smallGray, smallResized, new Size(smallWidth, smallHeight), 0, 0, InterpolationFlags.Area);
 
-                return TemplateMatch(largeResized, smallResized, threshold, options.DiffPixelThreshold, verifyDiffThreshold);
+                return TemplateMatch(largeResized, smallResized, options.TemplateMatchThreshold);
             }
 
-            return TemplateMatch(largeGray, smallGray, threshold, options.DiffPixelThreshold, verifyDiffThreshold);
+            return TemplateMatch(largeGray, smallGray, options.TemplateMatchThreshold);
         }
 
-        private static bool TemplateMatch(Mat largeGray, Mat smallGray, double threshold, int diffPixelThreshold, double verifyDiffThreshold)
+        private static bool TemplateMatch(Mat largeGray, Mat smallGray, double threshold)
         {
             if (smallGray.Width > largeGray.Width || smallGray.Height > largeGray.Height)
             {
@@ -850,25 +774,8 @@ namespace CyanTools.Utils
 
             using var result = new Mat();
             Cv2.MatchTemplate(largeGray, smallGray, result, TemplateMatchModes.CCoeffNormed);
-            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out Point maxLoc);
-            if (maxVal < threshold)
-            {
-                return false;
-            }
-
-            int maxX = largeGray.Width - smallGray.Width;
-            int maxY = largeGray.Height - smallGray.Height;
-            int x = Math.Clamp(maxLoc.X, 0, Math.Max(0, maxX));
-            int y = Math.Clamp(maxLoc.Y, 0, Math.Max(0, maxY));
-
-            using var matchedRegion = new Mat(largeGray, new Rect(x, y, smallGray.Width, smallGray.Height));
-            using var diff = new Mat();
-            Cv2.Absdiff(matchedRegion, smallGray, diff);
-            using var thresh = new Mat();
-            Cv2.Threshold(diff, thresh, diffPixelThreshold, 255, ThresholdTypes.Binary);
-
-            double diffRatio = Cv2.CountNonZero(thresh) / (double)(smallGray.Width * smallGray.Height);
-            return diffRatio <= verifyDiffThreshold;
+            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out _);
+            return maxVal >= threshold;
         }
 
         private static void CopyGroupedFiles(IReadOnlyList<ImageItem> items, DisjointSet unionFind,
@@ -1279,7 +1186,7 @@ namespace CyanTools.Utils
                     return RelationType.LowRes;
                 }
 
-                if (options.EnableTemplateMatch && TryTemplateMatchCrop(rootItem, otherItem, options, null, strict: true))
+                if (options.EnableTemplateMatch && TryTemplateMatchCrop(rootItem, otherItem, options, null))
                 {
                     return RelationType.Crop;
                 }
@@ -1292,20 +1199,10 @@ namespace CyanTools.Utils
                 var (isCrop, _) = IsCrop(rootFeatures.ScaledSize, otherFeatures.ScaledSize, homography, options.CropAreaRatioThreshold);
                 if (isCrop)
                 {
-                    if (options.EnableTemplateMatch && TryTemplateMatchCrop(rootItem, otherItem, options, null, strict: true))
-                    {
-                        return RelationType.Crop;
-                    }
-
-                    bool isLowResWhenCropFailed = otherItem.PixelCount < rootItem.PixelCount * options.LowResRatioThreshold
-                        && (IsLowResMatchByHash(rootItem, otherItem, options)
-                            || IsLowResMatchByResize(rootItem, otherItem, options, null));
-                    return isLowResWhenCropFailed ? RelationType.LowRes : RelationType.Unknown;
+                    return RelationType.Crop;
                 }
 
-                bool isLowRes = otherItem.PixelCount < rootItem.PixelCount * options.LowResRatioThreshold
-                    && (IsLowResMatchByHash(rootItem, otherItem, options)
-                        || IsLowResMatchByResize(rootItem, otherItem, options, null));
+                bool isLowRes = otherItem.PixelCount < rootItem.PixelCount * options.LowResRatioThreshold;
                 if (isLowRes)
                 {
                     return RelationType.LowRes;
@@ -1557,54 +1454,6 @@ namespace CyanTools.Utils
             double areaBox = Math.Max(0, mappedBox.Width) * Math.Max(0, mappedBox.Height);
             double areaA = Math.Max(1, sizeA.Width * sizeA.Height);
             return areaBox / areaA;
-        }
-
-        private static bool PassOrbAlignmentSanityCheck(ImageItem a, OrbFeatureData featuresA, ImageItem b, OrbFeatureData featuresB,
-            Mat homographyBToA, SameSourceGroupingOptions options, Action<string>? logAction)
-        {
-            if (GetAspectRatioDiff(a, b) > OrbSanityAspectRatioTolerance)
-            {
-                return true;
-            }
-
-            int smaller = Math.Min(a.PixelCount, b.PixelCount);
-            int larger = Math.Max(a.PixelCount, b.PixelCount);
-            if (larger <= 0)
-            {
-                return false;
-            }
-
-            double areaRatio = (double)smaller / larger;
-            if (areaRatio < OrbSanityAreaRatioThreshold)
-            {
-                return true;
-            }
-
-            using var grayA = Cv2.ImRead(a.Path, ImreadModes.Grayscale);
-            using var grayB = Cv2.ImRead(b.Path, ImreadModes.Grayscale);
-            if (grayA.Empty() || grayB.Empty())
-            {
-                if (grayA.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片灰度: {a.Path}");
-                }
-
-                if (grayB.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片灰度: {b.Path}");
-                }
-
-                return true;
-            }
-
-            using var scaledA = ResizeToSize(grayA, featuresA.ScaledSize);
-            using var scaledB = ResizeToSize(grayB, featuresB.ScaledSize);
-
-            double diffRatio = ComputeDiffRatio(scaledA, scaledB, homographyBToA, options);
-            double maxAllowedDiff = Math.Clamp(options.EditedDiffRatioThreshold + OrbSanityDiffMargin,
-                OrbSanityMinDiffThreshold, OrbSanityMaxDiffThreshold);
-
-            return diffRatio <= maxAllowedDiff;
         }
 
         private static ulong ComputePHash64(Mat bgr)

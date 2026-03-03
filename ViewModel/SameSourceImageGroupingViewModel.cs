@@ -54,13 +54,6 @@ namespace CyanTools.ViewModel
             set => SetField(ref _includeSubfolders, value);
         }
 
-        private bool _enableFastMode;
-        public bool EnableFastMode
-        {
-            get => _enableFastMode;
-            set => SetField(ref _enableFastMode, value);
-        }
-
         private bool _enablePatchHash = true;
         public bool EnablePatchHash
         {
@@ -215,13 +208,6 @@ namespace CyanTools.ViewModel
             set => SetField(ref _maxCandidatesPerImage, value);
         }
 
-        private int _maxDegreeOfParallelism = 4;
-        public int MaxDegreeOfParallelism
-        {
-            get => _maxDegreeOfParallelism;
-            set => SetField(ref _maxDegreeOfParallelism, value);
-        }
-
         private double _progress;
         public double Progress
         {
@@ -275,7 +261,6 @@ namespace CyanTools.ViewModel
                 OutputPath = OutputPath,
                 SyncDanbooruTagsToRoot = SyncDanbooruTagsToRoot,
                 IncludeSubfolders = IncludeSubfolders,
-                EnableFastMode = EnableFastMode,
                 EnablePatchHash = EnablePatchHash,
                 EnableHashMatch = EnableHashMatch,
                 EnableOrbMatch = EnableOrbMatch,
@@ -297,8 +282,7 @@ namespace CyanTools.ViewModel
                 TemplateMatchThreshold = TemplateMatchThreshold,
                 TemplateMaxSize = TemplateMaxSize,
                 TemplateMinSize = TemplateMinSize,
-                MaxCandidatesPerImage = MaxCandidatesPerImage,
-                MaxDegreeOfParallelism = MaxDegreeOfParallelism
+                MaxCandidatesPerImage = MaxCandidatesPerImage
             };
         }
 
@@ -422,7 +406,6 @@ namespace CyanTools.ViewModel
                 {
                     SyncDanbooruTagsToRoot = SyncDanbooruTagsToRoot,
                     IncludeSubfolders = IncludeSubfolders,
-                    EnableFastMode = EnableFastMode,
                     EnablePatchHash = EnablePatchHash,
                     EnableHashMatch = EnableHashMatch,
                     EnableOrbMatch = EnableOrbMatch,
@@ -444,10 +427,7 @@ namespace CyanTools.ViewModel
                     TemplateMatchThreshold = TemplateMatchThreshold,
                     TemplateMaxSize = TemplateMaxSize,
                     TemplateMinSize = TemplateMinSize,
-                    MaxCandidatesPerImage = MaxCandidatesPerImage,
-                    MaxDegreeOfParallelism = MaxDegreeOfParallelism <= 0
-                        ? Math.Max(1, Environment.ProcessorCount - 1)
-                        : MaxDegreeOfParallelism
+                    MaxCandidatesPerImage = MaxCandidatesPerImage
                 };
 
                 SameSourceImageGroupingProcessor.Process(InputPath, OutputPath, options, progress, AppendLog, token);
