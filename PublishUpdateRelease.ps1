@@ -458,14 +458,10 @@ Write-Host "输出文件: $zipArchivePath"
 
 Push-Location $BuildDir
 try {
-    $items = @()
-    $files = Get-ChildItem -File | Select-Object -ExpandProperty Name
-    if ($null -ne $files) {
-        $items += $files
-    }
+    $items = @(Get-ChildItem -Force | Select-Object -ExpandProperty Name)
 
     if ($items.Count -eq 0) {
-        throw "目标目录下没有可打包的顶层文件：$BuildDir"
+        throw "目标目录下没有可打包内容：$BuildDir"
     }
 
     if ($null -ne $sevenZip) {

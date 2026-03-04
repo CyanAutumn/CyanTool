@@ -48,7 +48,7 @@ namespace CyanTools.ViewModel
         private const string PixivUserAgent = "PixivIOSApp/7.13.3 (iOS 14.6; iPhone13,2)";
         private const string PixivAppOs = "ios";
         private const string PixivAppOsVersion = "14.6";
-        private const string DefaultOutputDirectory = "./output_{time}_{id}_{artist}";
+        private const string DefaultOutputDirectory = "./output_{time}_{id}_{name}";
         private const int DefaultPixivIntervalSeconds = 20;
         private static readonly string SettingsDirectory = Path.Combine(AppContext.BaseDirectory, "Config");
         private static readonly string SettingsFilePath = Path.Combine(SettingsDirectory, "dataset_downloader.json");
@@ -123,7 +123,7 @@ namespace CyanTools.ViewModel
         private bool _isDownloading;
         private DatasetDownloadMode _selectedMode = DatasetDownloadMode.ArtistId;
         private string _sessionOutputIdSegment = "unknown";
-        private string _sessionOutputArtistSegment = "unknown_artist";
+        private string _sessionOutputArtistSegment = "unknown_name";
 
         public DatasetDownloaderViewModel()
         {
@@ -1443,6 +1443,7 @@ namespace CyanTools.ViewModel
             var result = pattern ?? string.Empty;
             result = result.Replace("{time}", DateTime.Now.ToString("yyyy年M月d日"), StringComparison.OrdinalIgnoreCase);
             result = result.Replace("{id}", _sessionOutputIdSegment, StringComparison.OrdinalIgnoreCase);
+            result = result.Replace("{name}", _sessionOutputArtistSegment, StringComparison.OrdinalIgnoreCase);
             result = result.Replace("{artist}", _sessionOutputArtistSegment, StringComparison.OrdinalIgnoreCase);
             return result;
         }

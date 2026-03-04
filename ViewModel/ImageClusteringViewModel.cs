@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -16,6 +17,14 @@ namespace CyanTools.ViewModel
     public class ImageClusteringViewModel : PipelineNodeViewModelBase
     {
         public override string DisplayName => "图片聚类";
+        private const string FeatureTypeHybridDisplay = "Style+Content（偏画风+偏内容）";
+        private const string FeatureTypeStyleDisplay = "Style（偏画风）";
+        private const string FeatureTypeContentDisplay = "Content（偏内容）";
+        private const string CsdModelRelativePath = "Models/csd/csd_clip_model.onnx";
+        private const string CsdModelDownloadUrl = "https://huggingface.co/yuxi-liu-wired/CSD/resolve/main/csd_clip_model.onnx";
+        private const string CsdModelPageUrl = "https://huggingface.co/yuxi-liu-wired/CSD";
+        private const string ClusterDistributionFileName = "cluster_distribution.png";
+        private static readonly HttpClient CsdModelHttpClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
         private string _inputPath = string.Empty;
         public string InputPath
@@ -65,13 +74,27 @@ namespace CyanTools.ViewModel
             set => SetField(ref _progress, value);
         }
 
-        public List<string> FeatureTypes { get; } = new() { "Style", "Content" };
+        public List<string> FeatureTypes { get; } = new()
+        {
+            FeatureTypeHybridDisplay,
+            FeatureTypeStyleDisplay,
+            FeatureTypeContentDisplay
+        };
 
-        private string _selectedFeatureType = "Style";
+        private string _selectedFeatureType = FeatureTypeHybridDisplay;
         public string SelectedFeatureType
         {
             get => _selectedFeatureType;
-            set => SetField(ref _selectedFeatureType, value);
+            set => SetField(ref _selectedFeatureType, ToFeatureTypeDisplay(value));
+        }
+
+        public List<string> ClusteringSpaces { get; } = new() { "高维向量（推荐）", "UMAP 2D（兼容参考）" };
+
+        private string _selectedClusteringSpace = "高维向量（推荐）";
+        public string SelectedClusteringSpace
+        {
+            get => _selectedClusteringSpace;
+            set => SetField(ref _selectedClusteringSpace, value);
         }
 
         public List<string> Algorithms { get; } = new() { "KMeans", "HDBSCAN" };
@@ -155,6 +178,7 @@ namespace CyanTools.ViewModel
                 MinClusterSize = MinClusterSize,
                 SelectedAlgorithm = SelectedAlgorithm,
                 SelectedFeatureType = SelectedFeatureType,
+                SelectedClusteringSpace = SelectedClusteringSpace,
                 SelectedComputeDevice = SelectedComputeDevice
             };
         }
@@ -276,6 +300,11 @@ namespace CyanTools.ViewModel
 
             try
             {
+                if (!await EnsureCsdModelReadyAsync(showDialogs, token))
+                {
+                    return;
+                }
+
                 await Task.Run(() => RunClusteringWork(showDialogs, token), token);
             }
             finally
@@ -291,17 +320,7 @@ namespace CyanTools.ViewModel
                 token.ThrowIfCancellationRequested();
                 AppendLog("开始聚类");
 
-                string modelPath = "Models/csd/csd_clip_model.onnx";
-                if (!File.Exists(modelPath))
-                {
-                    AppendLog($"模型文件不存在: {modelPath}");
-                    if (showDialogs)
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                            MessageBox.Show($"模型文件不存在: {modelPath}", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
-                    }
-                    return;
-                }
+                string modelPath = Path.GetFullPath(CsdModelRelativePath);
 
                 string inputPathFull = NormalizeDirectoryPath(InputPath);
                 string outputPathFull = NormalizeDirectoryPath(OutputPath);
@@ -327,7 +346,7 @@ namespace CyanTools.ViewModel
 
                 var processor = new Utils.ImageClusteringProcessor(modelPath, useGpu, AppendLog);
                 var imageResults = processor.ProcessFolder(InputPath,
-                    p => Application.Current.Dispatcher.Invoke(() => Progress = p * 0.5),
+                    p => Application.Current.Dispatcher.Invoke(() => Progress = p * 50),
                     error =>
                     {
                         AppendLog(error);
@@ -353,55 +372,99 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                List<float[]> dataPoints = SelectedFeatureType == "Style"
-                    ? imageResults.Select(r => r.StyleVector).ToList()
-                    : imageResults.Select(r => r.ContentVector).ToList();
-
-                List<float[]> featureSpace;
-                try
+                List<float[]> dataPoints = new(imageResults.Count);
+                foreach (var result in imageResults)
                 {
-                    AppendLog($"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors=15, n_components=2）: {SelectedFeatureType}");
-                    var umapOptions = new Utils.UmapReducer.Options
+                    dataPoints.Add(BuildFeatureVector(result, SelectedFeatureType));
+                }
+
+                bool useUmapSpace = SelectedAlgorithm == "HDBSCAN" ||
+                    SelectedClusteringSpace.Equals("UMAP 2D（兼容参考）", StringComparison.Ordinal);
+
+                if (SelectedAlgorithm == "HDBSCAN" &&
+                    SelectedClusteringSpace.Equals("高维向量（推荐）", StringComparison.Ordinal))
+                {
+                    AppendLog("HDBSCAN 当前仅支持 2D 输入，已自动切换到 UMAP 2D 聚类空间。");
+                }
+
+                List<float[]> clusteringSpace = dataPoints;
+                if (useUmapSpace)
+                {
+                    if (dataPoints.Count < 3)
                     {
-                        Metric = "cosine",
-                        RandomState = 42,
-                        NNeighbors = 15,
-                        NComponents = 2,
-                        MinDist = 0.1f,
-                        Spread = 1.0f
-                    };
+                        AppendLog($"样本数量过少（{dataPoints.Count}），跳过 UMAP，直接使用特征前两维。");
+                        clusteringSpace = ProjectToTwoDimensions(dataPoints);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            int nNeighbors = Math.Clamp(15, 2, Math.Max(2, dataPoints.Count - 1));
+                            AppendLog($"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors={nNeighbors}, n_components=2）: {SelectedFeatureType}");
+                            var umapOptions = new Utils.UmapReducer.Options
+                            {
+                                Metric = "cosine",
+                                RandomState = 42,
+                                NNeighbors = nNeighbors,
+                                NComponents = 2,
+                                MinDist = 0.1f,
+                                Spread = 1.0f
+                            };
 
-                    featureSpace = Utils.UmapReducer.ReduceToTwoDimensions(
-                        dataPoints,
-                        umapOptions,
-                        token,
-                        p => Application.Current.Dispatcher.Invoke(() => Progress = 30 + p * 40));
+                            clusteringSpace = Utils.UmapReducer.ReduceToTwoDimensions(
+                                dataPoints,
+                                umapOptions,
+                                token,
+                                p => Application.Current.Dispatcher.Invoke(() => Progress = 50 + p * 25));
+                        }
+                        catch (Exception ex)
+                        {
+
+                            AppendLog($"UMAP 失败，回退 PCA。原因: {ex.Message}");
+                            clusteringSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(dataPoints);
+                        }
+                    }
+
+                    if (clusteringSpace.Count != dataPoints.Count || clusteringSpace.Any(v => v == null || v.Length != 2))
+                    {
+                        throw new InvalidOperationException("降维输出异常：UMAP/PCA 未生成有效 2D 特征。");
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-
-                    AppendLog($"UMAP 失败，回退 PCA。原因: {ex.Message}");
-                    featureSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(dataPoints);
-                }
-
-                if (featureSpace.Count != dataPoints.Count || featureSpace.Any(v => v == null || v.Length != 2))
-                {
-                    throw new InvalidOperationException("降维输出异常：UMAP/PCA 未生成有效 2D 特征。");
+                    AppendLog($"使用高维向量直接聚类（维度={dataPoints[0].Length}）。");
                 }
 
                 int[] assignments = SelectedAlgorithm switch
                 {
-                    "KMeans" => Utils.SklearnKMeansClusterer.Cluster(featureSpace, NumClusters, randomState: 42),
-                    "HDBSCAN" => Utils.HdbscanClusterer.Cluster(featureSpace, MinClusterSize),
+                    "KMeans" => Utils.SklearnKMeansClusterer.Cluster(clusteringSpace, NumClusters, randomState: 42),
+                    "HDBSCAN" => Utils.HdbscanClusterer.Cluster(clusteringSpace, MinClusterSize),
                     _ => new int[dataPoints.Count]
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Progress = 75);
 
-                string featureLower = SelectedFeatureType.Equals("Style", StringComparison.OrdinalIgnoreCase) ? "style" : "content";
-                string title = $"{SelectedAlgorithm}_{featureLower}";
+                string featureLower = GetFeatureTypeSlug(SelectedFeatureType);
+                string spaceLower = useUmapSpace ? "umap2d" : "raw";
+                string title = $"{SelectedAlgorithm}_{featureLower}_{spaceLower}";
                 string outputRoot = Path.Combine(OutputPath, title);
                 PrepareOutputRoot(outputRoot);
+
+                string? distributionImagePath = null;
+                try
+                {
+                    var distributionSpace = BuildDistributionSpace(dataPoints, clusteringSpace, useUmapSpace, token);
+                    distributionImagePath = Utils.ClusterDistributionPlotter.SaveScatterPlot(
+                        distributionSpace,
+                        assignments,
+                        outputRoot,
+                        ClusterDistributionFileName);
+                    AppendLog($"已生成聚类分布图: {distributionImagePath}");
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"生成聚类分布图失败: {ex.Message}");
+                }
 
                 if (SelectedAlgorithm == "KMeans")
                 {
@@ -431,7 +494,7 @@ namespace CyanTools.ViewModel
                         : Path.Combine(outputRoot, $"class_{clusterId}");
 
                     Directory.CreateDirectory(targetDir);
-                    string targetFilePath = Path.Combine(targetDir, $"image_{i}.jpg");
+                    string targetFilePath = BuildUniqueTargetFilePath(targetDir, sourceFilePath, i);
                     CopyFileWithRetry(sourceFilePath, targetFilePath);
                     CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
 
@@ -445,13 +508,382 @@ namespace CyanTools.ViewModel
                     Progress = 100;
                     if (showDialogs)
                     {
-                        MessageBox.Show("图片聚类完成！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowClusteringCompletionDialog(outputRoot, distributionImagePath, imageResults.Count, assignments);
                     }
                 });
             }
             finally
             {
                 Application.Current.Dispatcher.Invoke(() => RefreshCommandStates());
+            }
+        }
+
+        private List<float[]> BuildDistributionSpace(
+            List<float[]> dataPoints,
+            List<float[]> clusteringSpace,
+            bool useUmapSpace,
+            CancellationToken token)
+        {
+            if (useUmapSpace && IsValidTwoDimensionalSpace(clusteringSpace))
+            {
+                return clusteringSpace.Select(v => new[] { v[0], v[1] }).ToList();
+            }
+
+            if (dataPoints.Count < 3)
+            {
+                return ProjectToTwoDimensions(dataPoints);
+            }
+
+            try
+            {
+                int nNeighbors = Math.Clamp(15, 2, Math.Max(2, dataPoints.Count - 1));
+                AppendLog($"开始生成分布图坐标（UMAP 2D, n_neighbors={nNeighbors}）");
+                var umapOptions = new Utils.UmapReducer.Options
+                {
+                    Metric = "cosine",
+                    RandomState = 42,
+                    NNeighbors = nNeighbors,
+                    NComponents = 2,
+                    MinDist = 0.1f,
+                    Spread = 1.0f
+                };
+
+                return Utils.UmapReducer.ReduceToTwoDimensions(dataPoints, umapOptions, token);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"分布图 UMAP 失败，回退 PCA。原因: {ex.Message}");
+                return Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(dataPoints);
+            }
+        }
+
+        private static bool IsValidTwoDimensionalSpace(IReadOnlyList<float[]> points)
+        {
+            return points.Count > 0 && points.All(v => v != null && v.Length == 2);
+        }
+
+        private void ShowClusteringCompletionDialog(string outputRoot, string? distributionImagePath, int totalCount, IReadOnlyList<int> assignments)
+        {
+            int clusterCount = assignments.Where(a => a >= 0).Distinct().Count();
+            int noiseCount = assignments.Count(a => a < 0);
+            string summary = $"图片聚类完成：共 {totalCount} 张，聚类簇 {clusterCount} 个";
+            if (noiseCount > 0)
+            {
+                summary += $"，噪声 {noiseCount} 张";
+            }
+
+            if (!string.IsNullOrWhiteSpace(distributionImagePath) && File.Exists(distributionImagePath))
+            {
+                var window = new ClusterDistributionWindow(distributionImagePath, outputRoot, summary);
+                if (Application.Current?.MainWindow != null && Application.Current.MainWindow != window)
+                {
+                    window.Owner = Application.Current.MainWindow;
+                }
+
+                window.ShowDialog();
+                return;
+            }
+
+            MessageBox.Show($"{summary}\n\n未能生成分布图。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private static float[] BuildFeatureVector(ImageStyleResult result, string featureType)
+        {
+            if (result == null)
+            {
+                throw new InvalidOperationException("特征提取结果为空。");
+            }
+
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "Style" => NormalizeVectorCopy(result.StyleVector),
+                "Content" => NormalizeVectorCopy(result.ContentVector),
+                "Style+Content" => ConcatNormalizedVectors(result.StyleVector, result.ContentVector),
+                _ => throw new InvalidOperationException($"未知特征类型: {featureType}")
+            };
+        }
+
+        private static float[] ConcatNormalizedVectors(float[] first, float[] second)
+        {
+            var a = NormalizeVectorCopy(first);
+            var b = NormalizeVectorCopy(second);
+
+            var merged = new float[a.Length + b.Length];
+            Array.Copy(a, 0, merged, 0, a.Length);
+            Array.Copy(b, 0, merged, a.Length, b.Length);
+            return NormalizeVectorCopy(merged);
+        }
+
+        private static float[] NormalizeVectorCopy(float[] vector)
+        {
+            if (vector == null || vector.Length == 0)
+            {
+                throw new InvalidOperationException("模型输出特征为空。");
+            }
+
+            var copy = new float[vector.Length];
+            Array.Copy(vector, copy, vector.Length);
+
+            double sum = 0;
+            for (int i = 0; i < copy.Length; i++)
+            {
+                float value = copy[i];
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                {
+                    throw new InvalidOperationException("模型输出包含非法数值（NaN/Infinity）。");
+                }
+
+                sum += value * value;
+            }
+
+            if (sum <= 1e-12)
+            {
+                return copy;
+            }
+
+            float invNorm = (float)(1.0 / Math.Sqrt(sum));
+            for (int i = 0; i < copy.Length; i++)
+            {
+                copy[i] *= invNorm;
+            }
+
+            return copy;
+        }
+
+        private static string GetFeatureTypeSlug(string featureType)
+        {
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "Style" => "style",
+                "Content" => "content",
+                "Style+Content" => "hybrid",
+                _ => "unknown"
+            };
+        }
+
+        private static string GetFeatureTypeKey(string? featureType)
+        {
+            if (string.IsNullOrWhiteSpace(featureType))
+            {
+                return "Style+Content";
+            }
+
+            if (featureType.StartsWith("Style+Content", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Style+Content";
+            }
+
+            if (featureType.StartsWith("Style", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Style";
+            }
+
+            if (featureType.StartsWith("Content", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Content";
+            }
+
+            return "Style+Content";
+        }
+
+        private static string ToFeatureTypeDisplay(string? featureType)
+        {
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "Style" => FeatureTypeStyleDisplay,
+                "Content" => FeatureTypeContentDisplay,
+                _ => FeatureTypeHybridDisplay
+            };
+        }
+
+        private static List<float[]> ProjectToTwoDimensions(IReadOnlyList<float[]> dataPoints)
+        {
+            var projected = new List<float[]>(dataPoints.Count);
+            for (int i = 0; i < dataPoints.Count; i++)
+            {
+                var vector = dataPoints[i];
+                float x = vector.Length > 0 ? vector[0] : 0f;
+                float y = vector.Length > 1 ? vector[1] : 0f;
+                projected.Add(new[] { x, y });
+            }
+
+            return projected;
+        }
+
+        private static string BuildUniqueTargetFilePath(string targetDir, string sourceFilePath, int fallbackIndex)
+        {
+            string sourceName = Path.GetFileNameWithoutExtension(sourceFilePath);
+            if (string.IsNullOrWhiteSpace(sourceName))
+            {
+                sourceName = $"image_{fallbackIndex}";
+            }
+
+            string extension = Path.GetExtension(sourceFilePath);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = ".jpg";
+            }
+
+            string candidate = Path.Combine(targetDir, sourceName + extension);
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            for (int i = 1; ; i++)
+            {
+                candidate = Path.Combine(targetDir, $"{sourceName}_{i}{extension}");
+                if (!File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        private async Task<bool> EnsureCsdModelReadyAsync(bool showDialogs, CancellationToken token)
+        {
+            string modelPath = Path.GetFullPath(CsdModelRelativePath);
+            if (File.Exists(modelPath))
+            {
+                return true;
+            }
+
+            AppendLog($"模型文件不存在: {modelPath}");
+
+            bool shouldDownload = !showDialogs;
+            if (showDialogs)
+            {
+                MessageBoxResult choice = MessageBoxResult.None;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    choice = MessageBox.Show(
+                        $"检测到缺少 CSD 模型文件：\n{modelPath}\n\n是否自动下载该模型？",
+                        "缺少模型",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                });
+
+                if (choice == MessageBoxResult.No)
+                {
+                    AppendLog("已取消自动下载，准备打开 CSD Hugging Face 页面。");
+                    OpenCsdModelPage();
+                    return false;
+                }
+
+                shouldDownload = choice == MessageBoxResult.Yes;
+            }
+
+            if (!shouldDownload)
+            {
+                return false;
+            }
+
+            try
+            {
+                string? directory = Path.GetDirectoryName(modelPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                AppendLog("开始下载 CSD 模型...");
+                await DownloadCsdModelAsync(CsdModelDownloadUrl, modelPath, token);
+                AppendLog("CSD 模型下载完成。");
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                AppendLog("CSD 模型下载已取消。");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"CSD 模型下载失败: {ex.Message}");
+                if (showDialogs)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                        MessageBox.Show(
+                            $"CSD 模型下载失败：{ex.Message}\n\n将为你打开模型页面，请手动下载后重试。",
+                            "下载失败",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning));
+                    OpenCsdModelPage();
+                }
+                return false;
+            }
+        }
+
+        private async Task DownloadCsdModelAsync(string url, string destinationPath, CancellationToken token)
+        {
+            string tempPath = destinationPath + ".download";
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+
+            try
+            {
+                using var response = await CsdModelHttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+                response.EnsureSuccessStatusCode();
+
+                long? totalBytes = response.Content.Headers.ContentLength;
+                long totalBytesRead = 0;
+                long reportStep = totalBytes.HasValue && totalBytes.Value > 0
+                    ? Math.Max(1, totalBytes.Value / 20)
+                    : 10L * 1024 * 1024;
+                long nextReport = reportStep;
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync(token);
+                await using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+
+                var buffer = new byte[81920];
+                int bytesRead;
+                while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), token)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), token);
+                    totalBytesRead += bytesRead;
+
+                    if (totalBytesRead < nextReport)
+                    {
+                        continue;
+                    }
+
+                    if (totalBytes.HasValue && totalBytes.Value > 0)
+                    {
+                        double percentage = (double)totalBytesRead / totalBytes.Value * 100;
+                        AppendLog($"CSD 模型下载进度: {totalBytesRead / 1024.0 / 1024.0:F2}MB / {totalBytes.Value / 1024.0 / 1024.0:F2}MB ({percentage:F1}%)");
+                    }
+                    else
+                    {
+                        AppendLog($"CSD 模型已下载: {totalBytesRead / 1024.0 / 1024.0:F2}MB");
+                    }
+
+                    nextReport += reportStep;
+                }
+
+                await fileStream.FlushAsync(token);
+                File.Move(tempPath, destinationPath, true);
+            }
+            catch
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+
+                throw;
+            }
+        }
+
+        private void OpenCsdModelPage()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(CsdModelPageUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"打开模型页面失败: {ex.Message}");
             }
         }
 

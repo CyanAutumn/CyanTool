@@ -6,14 +6,14 @@ namespace CyanTools.Utils
 {
     public static class SklearnKMeansClusterer
     {
-        public static int[] Cluster(IReadOnlyList<float[]> data2d, int numClusters, int randomState = 42)
+        public static int[] Cluster(IReadOnlyList<float[]> data, int numClusters, int randomState = 42)
         {
-            if (data2d == null || data2d.Count == 0)
+            if (data == null || data.Count == 0)
             {
                 return Array.Empty<int>();
             }
 
-            int n = data2d.Count;
+            int n = data.Count;
             if (numClusters <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(numClusters), "numClusters must be > 0.");
@@ -24,36 +24,44 @@ namespace CyanTools.Utils
                 return Enumerable.Range(0, n).ToArray();
             }
 
+            int dimension = data[0]?.Length ?? 0;
+            if (dimension <= 0)
+            {
+                throw new ArgumentException("输入特征为空。", nameof(data));
+            }
+
             for (int i = 0; i < n; i++)
             {
-                if (data2d[i] == null || data2d[i].Length != 2)
+                if (data[i] == null || data[i].Length != dimension)
                 {
-                    throw new ArgumentException("KMeans 仅支持 2D 输入。", nameof(data2d));
+                    throw new ArgumentException("输入特征维度不一致。", nameof(data));
                 }
             }
 
             var rng = new NumpyRandom(randomState);
 
 
-            var (centers, labels) = RunKMeans(data2d, numClusters, rng);
+            var (centers, labels) = RunKMeans(data, numClusters, dimension, rng);
             _ = centers;
             return labels;
         }
 
-        private static (double[,] centers, int[] labels) RunKMeans(IReadOnlyList<float[]> data2d, int k, NumpyRandom rng)
+        private static (double[,] centers, int[] labels) RunKMeans(IReadOnlyList<float[]> data, int k, int dimension, NumpyRandom rng)
         {
-            int n = data2d.Count;
+            int n = data.Count;
             int maxIter = 300;
             double tol = 1e-4;
 
-            int[] initialCenterIndices = InitKMeansPlusPlus(data2d, k, rng);
+            int[] initialCenterIndices = InitKMeansPlusPlus(data, k, rng);
 
-            var centers = new double[k, 2];
+            var centers = new double[k, dimension];
             for (int c = 0; c < k; c++)
             {
-                var p = data2d[initialCenterIndices[c]];
-                centers[c, 0] = p[0];
-                centers[c, 1] = p[1];
+                var p = data[initialCenterIndices[c]];
+                for (int d = 0; d < dimension; d++)
+                {
+                    centers[c, d] = p[d];
+                }
             }
 
             var labels = new int[n];
@@ -65,14 +73,18 @@ namespace CyanTools.Utils
                 Array.Fill(distsToAssigned, 0);
                 for (int i = 0; i < n; i++)
                 {
-                    var p = data2d[i];
+                    var p = data[i];
                     double bestDist = double.PositiveInfinity;
                     int bestCluster = 0;
                     for (int c = 0; c < k; c++)
                     {
-                        double dx = p[0] - centers[c, 0];
-                        double dy = p[1] - centers[c, 1];
-                        double dist = dx * dx + dy * dy;
+                        double dist = 0;
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            double delta = p[d] - centers[c, d];
+                            dist += delta * delta;
+                        }
+
                         if (dist < bestDist)
                         {
                             bestDist = dist;
@@ -84,15 +96,16 @@ namespace CyanTools.Utils
                 }
 
 
-                var sumX = new double[k];
-                var sumY = new double[k];
+                var sums = new double[k, dimension];
                 var counts = new int[k];
                 for (int i = 0; i < n; i++)
                 {
                     int c = labels[i];
                     counts[c]++;
-                    sumX[c] += data2d[i][0];
-                    sumY[c] += data2d[i][1];
+                    for (int d = 0; d < dimension; d++)
+                    {
+                        sums[c, d] += data[i][d];
+                    }
                 }
 
 
@@ -118,29 +131,31 @@ namespace CyanTools.Utils
                     if (counts[oldCluster] > 1)
                     {
                         counts[oldCluster]--;
-                        sumX[oldCluster] -= data2d[farthestIndex][0];
-                        sumY[oldCluster] -= data2d[farthestIndex][1];
+                        for (int d = 0; d < dimension; d++)
+                        {
+                            sums[oldCluster, d] -= data[farthestIndex][d];
+                        }
                     }
 
                     labels[farthestIndex] = c;
                     counts[c] = 1;
-                    sumX[c] = data2d[farthestIndex][0];
-                    sumY[c] = data2d[farthestIndex][1];
+                    for (int d = 0; d < dimension; d++)
+                    {
+                        sums[c, d] = data[farthestIndex][d];
+                    }
                     distsToAssigned[farthestIndex] = 0;
                 }
 
                 double shift = 0;
                 for (int c = 0; c < k; c++)
                 {
-                    double newX = counts[c] > 0 ? sumX[c] / counts[c] : centers[c, 0];
-                    double newY = counts[c] > 0 ? sumY[c] / counts[c] : centers[c, 1];
-
-                    double dx = centers[c, 0] - newX;
-                    double dy = centers[c, 1] - newY;
-                    shift += dx * dx + dy * dy;
-
-                    centers[c, 0] = newX;
-                    centers[c, 1] = newY;
+                    for (int d = 0; d < dimension; d++)
+                    {
+                        double newValue = counts[c] > 0 ? sums[c, d] / counts[c] : centers[c, d];
+                        double delta = centers[c, d] - newValue;
+                        shift += delta * delta;
+                        centers[c, d] = newValue;
+                    }
                 }
 
                 if (shift <= tol)
@@ -152,9 +167,9 @@ namespace CyanTools.Utils
             return (centers, labels);
         }
 
-        private static int[] InitKMeansPlusPlus(IReadOnlyList<float[]> data2d, int k, NumpyRandom rng)
+        private static int[] InitKMeansPlusPlus(IReadOnlyList<float[]> data, int k, NumpyRandom rng)
         {
-            int n = data2d.Count;
+            int n = data.Count;
 
             var centers = new int[k];
             centers[0] = rng.NextInt(n);
@@ -162,7 +177,7 @@ namespace CyanTools.Utils
             var closestDistSq = new double[n];
             for (int i = 0; i < n; i++)
             {
-                closestDistSq[i] = SquaredDistance(data2d[i], data2d[centers[0]]);
+                closestDistSq[i] = SquaredDistance(data[i], data[centers[0]]);
             }
 
             double currentPot = closestDistSq.Sum();
@@ -201,7 +216,7 @@ namespace CyanTools.Utils
                     double newPot = 0;
                     for (int i = 0; i < n; i++)
                     {
-                        double d = SquaredDistance(data2d[i], data2d[candidate]);
+                        double d = SquaredDistance(data[i], data[candidate]);
                         double nd = d < closestDistSq[i] ? d : closestDistSq[i];
                         newDist[i] = nd;
                         newPot += nd;
@@ -232,9 +247,14 @@ namespace CyanTools.Utils
 
         private static double SquaredDistance(float[] a, float[] b)
         {
-            double dx = a[0] - b[0];
-            double dy = a[1] - b[1];
-            return dx * dx + dy * dy;
+            double sum = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                double delta = a[i] - b[i];
+                sum += delta * delta;
+            }
+
+            return sum;
         }
 
         private static int SearchSorted(double[] cumsum, double value)
@@ -257,4 +277,3 @@ namespace CyanTools.Utils
         }
     }
 }
-

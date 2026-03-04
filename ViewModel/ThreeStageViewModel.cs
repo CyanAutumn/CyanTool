@@ -48,8 +48,13 @@ namespace CyanTools.ViewModel
             HeadScale = 1.5f;
             EyeScale = 2.4f;
             SplitPerson = true;
+            SplitHalfbody = true;
+            SplitHead = true;
             SplitEyes = false;
             KeepOriginTags = false;
+            HalfbodyAppendTag = "upper body";
+            HeadAppendTag = "head view";
+            EyeAppendTag = "eyes view";
         }
 
         #region Properties
@@ -100,6 +105,8 @@ namespace CyanTools.ViewModel
 
 
         public bool SplitPerson { get => _processor.SplitPerson; set { _processor.SplitPerson = value; OnPropertyChanged(); } }
+        public bool SplitHalfbody { get => _processor.SplitHalfbody; set { _processor.SplitHalfbody = value; OnPropertyChanged(); } }
+        public bool SplitHead { get => _processor.SplitHead; set { _processor.SplitHead = value; OnPropertyChanged(); } }
         public bool SplitEyes { get => _processor.SplitEyes; set { _processor.SplitEyes = value; OnPropertyChanged(); } }
         public bool KeepOriginTags { get => _processor.KeepOriginTags; set { _processor.KeepOriginTags = value; OnPropertyChanged(); } }
         public float PersonConfThreshold { get => _processor.PersonConfThreshold; set { _processor.PersonConfThreshold = value; OnPropertyChanged(); } }
@@ -108,6 +115,9 @@ namespace CyanTools.ViewModel
         public float EyeConfThreshold { get => _processor.EyeConfThreshold; set { _processor.EyeConfThreshold = value; OnPropertyChanged(); } }
         public float HeadScale { get => _processor.HeadScale; set { _processor.HeadScale = value; OnPropertyChanged(); } }
         public float EyeScale { get => _processor.EyeScale; set { _processor.EyeScale = value; OnPropertyChanged(); } }
+        public string HalfbodyAppendTag { get => _processor.HalfbodyAppendTag; set { _processor.HalfbodyAppendTag = value ?? string.Empty; OnPropertyChanged(); } }
+        public string HeadAppendTag { get => _processor.HeadAppendTag; set { _processor.HeadAppendTag = value ?? string.Empty; OnPropertyChanged(); } }
+        public string EyeAppendTag { get => _processor.EyeAppendTag; set { _processor.EyeAppendTag = value ?? string.Empty; OnPropertyChanged(); } }
 
         #endregion
 
@@ -196,6 +206,10 @@ namespace CyanTools.ViewModel
                                 var outputFilename = result.Meta.TryGetValue("filename", out var fn) ? fn.ToString() : $"{Path.GetFileNameWithoutExtension(imageFile)}_processed{Path.GetExtension(imageFile)}";
                                 var outputPath = Path.Combine(OutputFolder, outputFilename!);
                                 result.Image.Save(outputPath);
+                                if (result.Meta.TryGetValue("append_tag", out var appendTagValue))
+                                {
+                                    AppendTagToCompanionText(outputPath, appendTagValue?.ToString());
+                                }
                                 result.Image.Dispose();
                             }
 
@@ -253,6 +267,45 @@ namespace CyanTools.ViewModel
         }
 
         #endregion
+
+        private static void AppendTagToCompanionText(string imagePath, string? appendTag)
+        {
+            if (string.IsNullOrWhiteSpace(imagePath) || string.IsNullOrWhiteSpace(appendTag))
+            {
+                return;
+            }
+
+            string tag = appendTag.Trim();
+            string txtPath = Path.ChangeExtension(imagePath, ".txt");
+            if (string.IsNullOrWhiteSpace(txtPath))
+            {
+                return;
+            }
+
+            if (!File.Exists(txtPath))
+            {
+                File.WriteAllText(txtPath, tag);
+                return;
+            }
+
+            string content = File.ReadAllText(txtPath).Trim();
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                File.WriteAllText(txtPath, tag);
+                return;
+            }
+
+            var tags = content
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            bool exists = tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+            if (!exists)
+            {
+                tags.Add(tag);
+            }
+
+            File.WriteAllText(txtPath, string.Join(", ", tags));
+        }
 
         private void AddLog(string message)
         {

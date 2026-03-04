@@ -53,7 +53,7 @@
                     
                     <GroupBox Header="人物检测" Margin="0,0,0,10">
                         <StackPanel>
-                            <CheckBox Content="启用人物检测" IsChecked="{Binding SplitPerson}" Margin="0,5"/>
+                            <CheckBox Content="启用" IsChecked="{Binding SplitPerson}" Margin="0,5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
                                 <TextBlock Text="置信度阈值:" Width="80"/>
                                 <TextBox Text="{Binding PersonConfThreshold}" Width="60"/>
@@ -63,15 +63,21 @@
                     
                     <GroupBox Header="半身检测" Margin="0,0,0,10">
                         <StackPanel>
+                            <CheckBox Content="启动" IsChecked="{Binding SplitHalfbody}" Margin="0,5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
                                 <TextBlock Text="置信度阈值:" Width="80"/>
                                 <TextBox Text="{Binding HalfbodyConfThreshold}" Width="60"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5">
+                                <TextBlock Text="追加Tag:" Width="80"/>
+                                <TextBox Text="{Binding HalfbodyAppendTag}" Width="180"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
                     
                     <GroupBox Header="头部检测" Margin="0,0,0,10">
                         <StackPanel>
+                            <CheckBox Content="启动" IsChecked="{Binding SplitHead}" Margin="0,5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5">
                                 <TextBlock Text="置信度阈值:" Width="80"/>
                                 <TextBox Text="{Binding HeadConfThreshold}" Width="60"/>
@@ -79,6 +85,10 @@
                             <StackPanel Orientation="Horizontal" Margin="0,5">
                                 <TextBlock Text="头部缩放:" Width="80"/>
                                 <TextBox Text="{Binding HeadScale}" Width="60"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5">
+                                <TextBlock Text="追加Tag:" Width="80"/>
+                                <TextBox Text="{Binding HeadAppendTag}" Width="180"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
@@ -94,12 +104,20 @@
                                 <TextBlock Text="眼部缩放:" Width="80"/>
                                 <TextBox Text="{Binding EyeScale}" Width="60"/>
                             </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5">
+                                <TextBlock Text="追加Tag:" Width="80"/>
+                                <TextBox Text="{Binding EyeAppendTag}" Width="180"/>
+                            </StackPanel>
                         </StackPanel>
                     </GroupBox>
                     
                     <GroupBox Header="其他选项" Margin="0,0,0,10">
                         <StackPanel>
                             <CheckBox Content="保留原始标签" IsChecked="{Binding KeepOriginTags}" Margin="0,5"/>
+                            <TextBlock Text="说明：追加tag只会追加所写的视角tag，新出现的图片需要重新打标。"
+                                       Margin="0,6,0,0"
+                                       Foreground="Gray"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </GroupBox>
                 </StackPanel>

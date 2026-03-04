@@ -19,8 +19,14 @@ namespace CyanTools.Utils {
 
 
         public bool SplitPerson { get; set; } = true;
+        public bool SplitHalfbody { get; set; } = true;
+        public bool SplitHead { get; set; } = true;
         public bool SplitEyes { get; set; } = false;
         public bool KeepOriginTags { get; set; } = false;
+
+        public string HalfbodyAppendTag { get; set; } = "upper body";
+        public string HeadAppendTag { get; set; } = "head view";
+        public string EyeAppendTag { get; set; } = "eyes view";
 
 
         public float PersonConfThreshold { get; set; } = 0.3f;
@@ -65,14 +71,18 @@ namespace CyanTools.Utils {
                 progress?.Report($"处理第{personIndex}个人物");
 
 
-                var halfbodyItems = await DetectHalfbodyAsync(personItem, personIndex, filebody, ext, progress,
-                    cancellationToken);
-                results.AddRange(halfbodyItems);
+                if (SplitHalfbody) {
+                    var halfbodyItems = await DetectHalfbodyAsync(personItem, personIndex, filebody, ext, progress,
+                        cancellationToken);
+                    results.AddRange(halfbodyItems);
+                }
 
 
-                var headItems =
-                    await DetectHeadAsync(personItem, personIndex, filebody, ext, progress, cancellationToken);
-                results.AddRange(headItems);
+                var headItems = new List<ImageItem>();
+                if (SplitHead) {
+                    headItems = await DetectHeadAsync(personItem, personIndex, filebody, ext, progress, cancellationToken);
+                    results.AddRange(headItems);
+                }
 
 
                 if (SplitEyes) {
@@ -180,6 +190,7 @@ namespace CyanTools.Utils {
                     if (filebody != null) {
                         halfbodyMeta["filename"] = $"{filebody}_person{personIndex}_halfbody{ext}";
                     }
+                    halfbodyMeta["append_tag"] = HalfbodyAppendTag;
 
                     results.Add(new ImageItem(halfbodyImage, halfbodyMeta));
                     progress?.Report($"检测到半身，置信度: {detection.Score:F3}");
@@ -247,6 +258,7 @@ namespace CyanTools.Utils {
                     if (filebody != null) {
                         headMeta["filename"] = $"{filebody}_person{personIndex}_head{ext}";
                     }
+                    headMeta["append_tag"] = HeadAppendTag;
 
                     results.Add(new ImageItem(headImage, headMeta));
                     progress?.Report($"检测到头部，置信度: {detection.Score:F3}");
@@ -305,6 +317,7 @@ namespace CyanTools.Utils {
 
                         eyeMeta["filename"] = $"{filebody}_person{personIndex}_head_eye{j}{ext}";
                     }
+                    eyeMeta["append_tag"] = EyeAppendTag;
 
                     results.Add(new ImageItem(eyeImage, eyeMeta));
 

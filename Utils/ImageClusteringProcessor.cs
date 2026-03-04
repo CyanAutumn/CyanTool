@@ -106,13 +106,18 @@ namespace CyanTools.Utils
                     {
                         var inputTensor = PreprocessImage(imagePath);
                         var (styleVec, contentVec) = ExtractEmbeddings(inputTensor);
+                        if (styleVec.Length == 0 || contentVec.Length == 0)
+                        {
+                            throw new InvalidOperationException("模型输出为空，请检查 ONNX 输出名称是否与 style_output/content_output 一致。");
+                        }
+
                         results.Add(new ImageStyleResult { FilePath = imagePath, StyleVector = styleVec, ContentVector = contentVec });
                     }
                     catch (Exception ex)
                     {
                         onError?.Invoke($"处理图片失败: {imagePath}\n错误: {ex.Message}");
                     }
-                    onProgress?.Invoke((double)(i + 1) / imageFiles.Count * 50);
+                    onProgress?.Invoke((double)(i + 1) / imageFiles.Count);
                 }
                 return results;
             }
@@ -282,21 +287,49 @@ namespace CyanTools.Utils
             var inputs = new NamedOnnxValue[] { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
             using var results = _session.Run(inputs);
 
-            float[] styleVector = null;
-            float[] contentVector = null;
+            float[] styleVector = Array.Empty<float>();
+            float[] contentVector = Array.Empty<float>();
 
             foreach (var r in results)
             {
                 if (r.Name == _styleOutputName)
                 {
-                    styleVector = r.AsTensor<Float16>().ToArray().Select(v => (float)v).ToArray();
+                    styleVector = L2Normalize(r.AsTensor<Float16>().ToArray().Select(v => (float)v).ToArray());
                 }
                 else if (r.Name == _contentOutputName)
                 {
-                    contentVector = r.AsTensor<Float16>().ToArray().Select(v => (float)v).ToArray();
+                    contentVector = L2Normalize(r.AsTensor<Float16>().ToArray().Select(v => (float)v).ToArray());
                 }
             }
             return (styleVector, contentVector);
+        }
+
+        private static float[] L2Normalize(float[] vector)
+        {
+            if (vector.Length == 0)
+            {
+                return vector;
+            }
+
+            double sum = 0;
+            for (int i = 0; i < vector.Length; i++)
+            {
+                double v = vector[i];
+                sum += v * v;
+            }
+
+            if (sum <= 1e-12)
+            {
+                return vector;
+            }
+
+            float invNorm = (float)(1.0 / Math.Sqrt(sum));
+            for (int i = 0; i < vector.Length; i++)
+            {
+                vector[i] *= invNorm;
+            }
+
+            return vector;
         }
     }
 
