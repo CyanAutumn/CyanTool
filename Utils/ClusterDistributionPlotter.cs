@@ -36,7 +36,10 @@ namespace CyanTools.Utils
             IReadOnlyList<float[]> points2D,
             IReadOnlyList<int> assignments,
             string outputDirectory,
-            string fileName)
+            string fileName,
+            IReadOnlyList<string>? imagePaths = null,
+            int maxThumbnailCount = 300,
+            int thumbnailSize = 33)
         {
             if (points2D == null || assignments == null)
             {
@@ -70,6 +73,29 @@ namespace CyanTools.Utils
             float top = padding;
             float right = left + plotWidth;
             float bottom = top + plotHeight;
+            var mappedPoints = new PointF[points2D.Count];
+            var validPoint = new bool[points2D.Count];
+
+            for (int i = 0; i < points2D.Count; i++)
+            {
+                var point = points2D[i];
+                if (point == null || point.Length < 2)
+                {
+                    continue;
+                }
+
+                float x = point[0];
+                float y = point[1];
+                if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y))
+                {
+                    continue;
+                }
+
+                float mappedX = left + (x - minX) / spanX * plotWidth;
+                float mappedY = top + (1f - (y - minY) / spanY) * plotHeight;
+                mappedPoints[i] = new PointF(mappedX, mappedY);
+                validPoint[i] = true;
+            }
 
             using var image = new Image<Rgba32>(width, height, Color.ParseHex("#F7FAFC"));
             image.Mutate(ctx =>
@@ -79,21 +105,12 @@ namespace CyanTools.Utils
 
                 for (int i = 0; i < points2D.Count; i++)
                 {
-                    var point = points2D[i];
-                    if (point == null || point.Length < 2)
+                    if (!validPoint[i])
                     {
                         continue;
                     }
 
-                    float x = point[0];
-                    float y = point[1];
-                    if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y))
-                    {
-                        continue;
-                    }
-
-                    float mappedX = left + (x - minX) / spanX * plotWidth;
-                    float mappedY = top + (1f - (y - minY) / spanY) * plotHeight;
+                    PointF mappedPoint = mappedPoints[i];
 
                     int clusterId = assignments[i];
                     bool isNoise = clusterId < 0;
@@ -103,12 +120,97 @@ namespace CyanTools.Utils
                     float radius = isNoise ? 2.8f : 3.6f;
                     float alpha = isNoise ? 0.50f : 0.72f;
 
-                    ctx.Fill(color.WithAlpha(alpha), new EllipsePolygon(mappedX, mappedY, radius));
+                    ctx.Fill(color.WithAlpha(alpha), new EllipsePolygon(mappedPoint.X, mappedPoint.Y, radius));
+                }
+
+                if (imagePaths == null || imagePaths.Count == 0 || maxThumbnailCount <= 0 || thumbnailSize <= 0)
+                {
+                    return;
+                }
+
+                var thumbnailIndexes = BuildThumbnailIndexes(points2D.Count, maxThumbnailCount);
+                foreach (int index in thumbnailIndexes)
+                {
+                    if (index < 0 || index >= points2D.Count || index >= imagePaths.Count || !validPoint[index])
+                    {
+                        continue;
+                    }
+
+                    string? imagePath = imagePaths[index];
+                    if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        using var thumb = Image.Load<Rgba32>(imagePath);
+                        thumb.Mutate(x => x.Resize(new ResizeOptions
+                        {
+                            Size = new Size(thumbnailSize, thumbnailSize),
+                            Mode = ResizeMode.Crop,
+                            Position = AnchorPositionMode.Center
+                        }));
+
+                        PointF mappedPoint = mappedPoints[index];
+                        float x = Math.Clamp(mappedPoint.X - thumbnailSize / 2f, 0f, width - thumbnailSize);
+                        float y = Math.Clamp(mappedPoint.Y - thumbnailSize / 2f, 0f, height - thumbnailSize);
+
+                        ctx.Fill(Color.White.WithAlpha(0.82f), new RectangularPolygon(x - 1f, y - 1f, thumbnailSize + 2f, thumbnailSize + 2f));
+                        ctx.DrawImage(thumb, new Point((int)Math.Round(x), (int)Math.Round(y)), 1f);
+
+                        int clusterId = assignments[index];
+                        bool isNoise = clusterId < 0;
+                        Color borderColor = isNoise
+                            ? Color.ParseHex("#8F99A8")
+                            : Palette[clusterId % Palette.Length];
+                        ctx.Draw(borderColor.WithAlpha(0.95f), 1.5f, new RectangularPolygon(x, y, thumbnailSize, thumbnailSize));
+                    }
+                    catch
+                    {
+
+                    }
                 }
             });
 
             image.Save(outputPath, new PngEncoder());
             return outputPath;
+        }
+
+        private static List<int> BuildThumbnailIndexes(int totalCount, int maxCount)
+        {
+            var indexes = new List<int>();
+            if (totalCount <= 0 || maxCount <= 0)
+            {
+                return indexes;
+            }
+
+            if (totalCount <= maxCount)
+            {
+                for (int i = 0; i < totalCount; i++)
+                {
+                    indexes.Add(i);
+                }
+
+                return indexes;
+            }
+
+            double step = (double)totalCount / maxCount;
+            for (int i = 0; i < maxCount; i++)
+            {
+                int index = (int)Math.Floor(i * step);
+                if (index < 0 || index >= totalCount)
+                {
+                    continue;
+                }
+
+                if (indexes.Count == 0 || indexes[indexes.Count - 1] != index)
+                {
+                    indexes.Add(index);
+                }
+            }
+
+            return indexes;
         }
 
         private static (float minX, float maxX, float minY, float maxY) ComputeBounds(IReadOnlyList<float[]> points2D)

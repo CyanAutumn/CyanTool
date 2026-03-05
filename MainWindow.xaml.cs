@@ -178,6 +178,12 @@ namespace CyanTools
             {
                 await viewModel.SaveStateOnCloseAsync();
             }
+
+            if (_navigationService.TryGetCachedControl(typeof(ImageClusteringView), out var imageClusteringView) &&
+                imageClusteringView.DataContext is ViewModel.ImageClusteringViewModel imageClusteringViewModel)
+            {
+                await imageClusteringViewModel.SaveStateOnCloseAsync();
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -20,10 +21,27 @@ namespace CyanTools.ViewModel
         private const string FeatureTypeHybridDisplay = "Style+Content（偏画风+偏内容）";
         private const string FeatureTypeStyleDisplay = "Style（偏画风）";
         private const string FeatureTypeContentDisplay = "Content（偏内容）";
+        private const int DefaultNumClusters = 40;
+        private const int DefaultMinClusterSize = 10;
+        private const int DefaultUmapNNeighbors = 15;
+        private const double DefaultUmapMinDist = 0.1d;
+        private const double DefaultUmapSpread = 1.0d;
+        private const string DefaultSelectedClusteringSpace = "高维向量（推荐）";
+        private const string DefaultSelectedAlgorithm = "KMeans";
+        private const string DefaultSelectedComputeDevice = "GPU";
         private const string CsdModelRelativePath = "Models/csd/csd_clip_model.onnx";
         private const string CsdModelDownloadUrl = "https://huggingface.co/yuxi-liu-wired/CSD/resolve/main/csd_clip_model.onnx";
         private const string CsdModelPageUrl = "https://huggingface.co/yuxi-liu-wired/CSD";
         private const string ClusterDistributionFileName = "cluster_distribution.png";
+        private static readonly string SettingsDirectory = Path.Combine(AppContext.BaseDirectory, "Config");
+        private static readonly string SettingsFilePath = Path.Combine(SettingsDirectory, "image_clustering.json");
+        private static readonly JsonSerializerOptions SettingsSerializerOptions = new()
+        {
+            AllowTrailingCommas = true,
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            WriteIndented = true
+        };
         private static readonly HttpClient CsdModelHttpClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
         private string _inputPath = string.Empty;
@@ -53,18 +71,46 @@ namespace CyanTools.ViewModel
         }
 
 
-        private int _numClusters = 40;
+        private int _numClusters = DefaultNumClusters;
         public int NumClusters
         {
             get => _numClusters;
             set => SetField(ref _numClusters, value);
         }
 
-        private int _minClusterSize = 10;
+        private bool _useBestKBySilhouette;
+        public bool UseBestKBySilhouette
+        {
+            get => _useBestKBySilhouette;
+            set => SetField(ref _useBestKBySilhouette, value);
+        }
+
+        private int _minClusterSize = DefaultMinClusterSize;
         public int MinClusterSize
         {
             get => _minClusterSize;
             set => SetField(ref _minClusterSize, value);
+        }
+
+        private int _umapNNeighbors = DefaultUmapNNeighbors;
+        public int UmapNNeighbors
+        {
+            get => _umapNNeighbors;
+            set => SetField(ref _umapNNeighbors, value);
+        }
+
+        private double _umapMinDist = DefaultUmapMinDist;
+        public double UmapMinDist
+        {
+            get => _umapMinDist;
+            set => SetField(ref _umapMinDist, value);
+        }
+
+        private double _umapSpread = DefaultUmapSpread;
+        public double UmapSpread
+        {
+            get => _umapSpread;
+            set => SetField(ref _umapSpread, value);
         }
 
         private double _progress;
@@ -90,7 +136,7 @@ namespace CyanTools.ViewModel
 
         public List<string> ClusteringSpaces { get; } = new() { "高维向量（推荐）", "UMAP 2D（兼容参考）" };
 
-        private string _selectedClusteringSpace = "高维向量（推荐）";
+        private string _selectedClusteringSpace = DefaultSelectedClusteringSpace;
         public string SelectedClusteringSpace
         {
             get => _selectedClusteringSpace;
@@ -99,7 +145,7 @@ namespace CyanTools.ViewModel
 
         public List<string> Algorithms { get; } = new() { "KMeans", "HDBSCAN" };
 
-        private string _selectedAlgorithm = "KMeans";
+        private string _selectedAlgorithm = DefaultSelectedAlgorithm;
         public string SelectedAlgorithm
         {
             get => _selectedAlgorithm;
@@ -118,7 +164,7 @@ namespace CyanTools.ViewModel
 
         public List<string> ComputeDevices { get; } = new() { "CPU", "GPU" };
 
-        private string _selectedComputeDevice = "GPU";
+        private string _selectedComputeDevice = DefaultSelectedComputeDevice;
         public string SelectedComputeDevice
         {
             get => _selectedComputeDevice;
@@ -150,6 +196,7 @@ namespace CyanTools.ViewModel
         public ICommand StartCommand { get; }
         public ICommand MoveFilesToTopLevelCommand { get; }
         public ICommand CheckCudaCommand { get; }
+        public ICommand ResetParametersCommand { get; }
 
         public ImageClusteringViewModel()
         {
@@ -159,6 +206,9 @@ namespace CyanTools.ViewModel
                 () => !string.IsNullOrEmpty(InputPath) && !string.IsNullOrEmpty(OutputPath) && !IsClustering);
             MoveFilesToTopLevelCommand = new RelayCommand(async () => await MoveFilesToTopLevelAsync(), () => !string.IsNullOrEmpty(InputPath) && !IsClustering);
             CheckCudaCommand = new RelayCommand(async () => await CheckOrInstallCudaAsync(), () => !IsClustering);
+            ResetParametersCommand = new RelayCommand(_ => ResetParametersToDefaults(), _ => !IsClustering);
+
+            LoadSettings();
         }
 
         public override Task RunAsync(PipelineContext context, CancellationToken token)
@@ -175,7 +225,11 @@ namespace CyanTools.ViewModel
                 InputPath = InputPath,
                 OutputPath = OutputPath,
                 NumClusters = NumClusters,
+                UseBestKBySilhouette = UseBestKBySilhouette,
                 MinClusterSize = MinClusterSize,
+                UmapNNeighbors = UmapNNeighbors,
+                UmapMinDist = UmapMinDist,
+                UmapSpread = UmapSpread,
                 SelectedAlgorithm = SelectedAlgorithm,
                 SelectedFeatureType = SelectedFeatureType,
                 SelectedClusteringSpace = SelectedClusteringSpace,
@@ -188,6 +242,116 @@ namespace CyanTools.ViewModel
             (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (MoveFilesToTopLevelCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (CheckCudaCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (ResetParametersCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+
+        private void ResetParametersToDefaults()
+        {
+            SelectedComputeDevice = DefaultSelectedComputeDevice;
+            SelectedFeatureType = FeatureTypeHybridDisplay;
+            SelectedAlgorithm = DefaultSelectedAlgorithm;
+            SelectedClusteringSpace = DefaultSelectedClusteringSpace;
+            NumClusters = DefaultNumClusters;
+            UseBestKBySilhouette = false;
+            MinClusterSize = DefaultMinClusterSize;
+            UmapNNeighbors = DefaultUmapNNeighbors;
+            UmapMinDist = DefaultUmapMinDist;
+            UmapSpread = DefaultUmapSpread;
+            AppendLog("参数已初始化为默认值。");
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                if (!File.Exists(SettingsFilePath))
+                {
+                    return;
+                }
+
+                var json = File.ReadAllText(SettingsFilePath);
+                var settings = JsonSerializer.Deserialize<ImageClusteringSettings>(json, SettingsSerializerOptions);
+                if (settings == null)
+                {
+                    return;
+                }
+
+                InputPath = settings.InputPath ?? string.Empty;
+                OutputPath = settings.OutputPath ?? string.Empty;
+                NumClusters = settings.NumClusters <= 0 ? DefaultNumClusters : settings.NumClusters;
+                UseBestKBySilhouette = settings.UseBestKBySilhouette;
+                MinClusterSize = settings.MinClusterSize <= 0 ? DefaultMinClusterSize : settings.MinClusterSize;
+                UmapNNeighbors = settings.UmapNNeighbors <= 0 ? DefaultUmapNNeighbors : settings.UmapNNeighbors;
+                UmapMinDist = settings.UmapMinDist;
+                UmapSpread = settings.UmapSpread <= 0d ? DefaultUmapSpread : settings.UmapSpread;
+                SelectedFeatureType = ToFeatureTypeDisplay(settings.SelectedFeatureType);
+                SelectedAlgorithm = Algorithms.Contains(settings.SelectedAlgorithm ?? string.Empty)
+                    ? settings.SelectedAlgorithm!
+                    : DefaultSelectedAlgorithm;
+                SelectedClusteringSpace = ClusteringSpaces.Contains(settings.SelectedClusteringSpace ?? string.Empty)
+                    ? settings.SelectedClusteringSpace!
+                    : DefaultSelectedClusteringSpace;
+                SelectedComputeDevice = ComputeDevices.Contains(settings.SelectedComputeDevice ?? string.Empty)
+                    ? settings.SelectedComputeDevice!
+                    : DefaultSelectedComputeDevice;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"加载图片聚类参数失败: {ex.Message}");
+            }
+        }
+
+        private async Task SaveSettingsAsync()
+        {
+            try
+            {
+                Directory.CreateDirectory(SettingsDirectory);
+                var settings = new ImageClusteringSettings
+                {
+                    InputPath = InputPath,
+                    OutputPath = OutputPath,
+                    NumClusters = NumClusters,
+                    UseBestKBySilhouette = UseBestKBySilhouette,
+                    MinClusterSize = MinClusterSize,
+                    UmapNNeighbors = UmapNNeighbors,
+                    UmapMinDist = UmapMinDist,
+                    UmapSpread = UmapSpread,
+                    SelectedFeatureType = SelectedFeatureType,
+                    SelectedAlgorithm = SelectedAlgorithm,
+                    SelectedClusteringSpace = SelectedClusteringSpace,
+                    SelectedComputeDevice = SelectedComputeDevice
+                };
+
+                var json = JsonSerializer.Serialize(settings, SettingsSerializerOptions);
+                var tempPath = SettingsFilePath + ".tmp";
+                await File.WriteAllTextAsync(tempPath, json);
+                File.Move(tempPath, SettingsFilePath, overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"保存图片聚类参数失败: {ex.Message}");
+            }
+        }
+
+        public async Task SaveStateOnCloseAsync()
+        {
+            await SaveSettingsAsync();
+        }
+
+        private sealed class ImageClusteringSettings
+        {
+            public string? InputPath { get; set; }
+            public string? OutputPath { get; set; }
+            public int NumClusters { get; set; } = DefaultNumClusters;
+            public bool UseBestKBySilhouette { get; set; }
+            public int MinClusterSize { get; set; } = DefaultMinClusterSize;
+            public int UmapNNeighbors { get; set; } = DefaultUmapNNeighbors;
+            public double UmapMinDist { get; set; } = DefaultUmapMinDist;
+            public double UmapSpread { get; set; } = DefaultUmapSpread;
+            public string? SelectedFeatureType { get; set; } = FeatureTypeHybridDisplay;
+            public string? SelectedAlgorithm { get; set; } = DefaultSelectedAlgorithm;
+            public string? SelectedClusteringSpace { get; set; } = DefaultSelectedClusteringSpace;
+            public string? SelectedComputeDevice { get; set; } = DefaultSelectedComputeDevice;
         }
 
         private void AppendLog(string message)
@@ -399,17 +563,9 @@ namespace CyanTools.ViewModel
                     {
                         try
                         {
-                            int nNeighbors = Math.Clamp(15, 2, Math.Max(2, dataPoints.Count - 1));
-                            AppendLog($"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors={nNeighbors}, n_components=2）: {SelectedFeatureType}");
-                            var umapOptions = new Utils.UmapReducer.Options
-                            {
-                                Metric = "cosine",
-                                RandomState = 42,
-                                NNeighbors = nNeighbors,
-                                NComponents = 2,
-                                MinDist = 0.1f,
-                                Spread = 1.0f
-                            };
+                            var umapOptions = BuildUmapOptions(dataPoints.Count);
+                            AppendLog(
+                                $"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors={umapOptions.NNeighbors}, n_components=2, min_dist={umapOptions.MinDist:F3}, spread={umapOptions.Spread:F3}）: {SelectedFeatureType}");
 
                             clusteringSpace = Utils.UmapReducer.ReduceToTwoDimensions(
                                 dataPoints,
@@ -435,9 +591,45 @@ namespace CyanTools.ViewModel
                     AppendLog($"使用高维向量直接聚类（维度={dataPoints[0].Length}）。");
                 }
 
+                int resolvedKMeansK = NumClusters;
+                if (SelectedAlgorithm == "KMeans")
+                {
+                    if (UseBestKBySilhouette)
+                    {
+                        if (clusteringSpace.Count < 3)
+                        {
+                            resolvedKMeansK = Math.Clamp(clusteringSpace.Count, 1, 2);
+                            AppendLog($"样本数量过少（{clusteringSpace.Count}），无法稳定评估轮廓系数，自动使用 K={resolvedKMeansK}。");
+                        }
+                        else
+                        {
+                            int minK = 2;
+                            int maxK = Math.Min(ResolveAutoKUpperBound(clusteringSpace.Count), clusteringSpace.Count - 1);
+                            var autoResult = Utils.SklearnKMeansClusterer.FindBestKBySilhouette(
+                                clusteringSpace,
+                                minK,
+                                maxK,
+                                randomState: 42,
+                                evaluationSampleSize: 600,
+                                log: AppendLog);
+
+                            resolvedKMeansK = autoResult.BestK;
+                            string sampleHint = autoResult.UsedSample
+                                ? $"，评估样本 {autoResult.EvaluationCount}/{clusteringSpace.Count}"
+                                : string.Empty;
+                            AppendLog(
+                                $"轮廓系数最优结果：K={resolvedKMeansK}，score={autoResult.BestScore:F4}，范围 {autoResult.MinK}-{autoResult.MaxK}{sampleHint}");
+                        }
+                    }
+                    else
+                    {
+                        AppendLog($"使用手动 K 值: {resolvedKMeansK}");
+                    }
+                }
+
                 int[] assignments = SelectedAlgorithm switch
                 {
-                    "KMeans" => Utils.SklearnKMeansClusterer.Cluster(clusteringSpace, NumClusters, randomState: 42),
+                    "KMeans" => Utils.SklearnKMeansClusterer.Cluster(clusteringSpace, resolvedKMeansK, randomState: 42),
                     "HDBSCAN" => Utils.HdbscanClusterer.Cluster(clusteringSpace, MinClusterSize),
                     _ => new int[dataPoints.Count]
                 };
@@ -458,7 +650,8 @@ namespace CyanTools.ViewModel
                         distributionSpace,
                         assignments,
                         outputRoot,
-                        ClusterDistributionFileName);
+                        ClusterDistributionFileName,
+                        imageResults.Select(r => r.FilePath).ToList());
                     AppendLog($"已生成聚类分布图: {distributionImagePath}");
                 }
                 catch (Exception ex)
@@ -466,40 +659,61 @@ namespace CyanTools.ViewModel
                     AppendLog($"生成聚类分布图失败: {ex.Message}");
                 }
 
-                if (SelectedAlgorithm == "KMeans")
+                var exportOrder = BuildClusterExportOrder(clusteringSpace, assignments);
+                var clusterLabels = exportOrder.Keys.Where(id => id >= 0).OrderBy(id => id).ToList();
+                bool hasNoise = exportOrder.ContainsKey(-1);
+
+                foreach (int clusterId in clusterLabels)
                 {
-                    for (int c = 0; c < NumClusters; c++)
-                    {
-                        Directory.CreateDirectory(Path.Combine(outputRoot, $"class_{c}"));
-                    }
+                    Directory.CreateDirectory(Path.Combine(outputRoot, $"class_{clusterId}"));
                 }
-                else if (SelectedAlgorithm == "HDBSCAN")
+                if (hasNoise)
                 {
-                    int clusterCount = assignments.Where(a => a >= 0).Distinct().Count();
-                    for (int c = 0; c < clusterCount; c++)
-                    {
-                        Directory.CreateDirectory(Path.Combine(outputRoot, $"class_{c}"));
-                    }
                     Directory.CreateDirectory(Path.Combine(outputRoot, "noise"));
                 }
 
-                for (int i = 0; i < imageResults.Count; i++)
+                int copiedCount = 0;
+                int totalToCopy = imageResults.Count;
+                foreach (int clusterId in clusterLabels)
                 {
                     token.ThrowIfCancellationRequested();
 
-                    int clusterId = assignments[i];
-                    string sourceFilePath = imageResults[i].FilePath;
-                    string targetDir = clusterId == -1
-                        ? Path.Combine(outputRoot, "noise")
-                        : Path.Combine(outputRoot, $"class_{clusterId}");
+                    string targetDir = Path.Combine(outputRoot, $"class_{clusterId}");
+                    var orderedIndices = exportOrder[clusterId];
+                    for (int rank = 0; rank < orderedIndices.Count; rank++)
+                    {
+                        token.ThrowIfCancellationRequested();
 
-                    Directory.CreateDirectory(targetDir);
-                    string targetFilePath = BuildUniqueTargetFilePath(targetDir, sourceFilePath, i);
-                    CopyFileWithRetry(sourceFilePath, targetFilePath);
-                    CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
+                        int sourceIndex = orderedIndices[rank];
+                        string sourceFilePath = imageResults[sourceIndex].FilePath;
+                        string targetFilePath = BuildRankedTargetFilePath(targetDir, sourceFilePath, rank, sourceIndex);
+                        CopyFileWithRetry(sourceFilePath, targetFilePath);
+                        CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
 
-                    Application.Current.Dispatcher.Invoke(() =>
-                        Progress = 75 + (double)(i + 1) / imageResults.Count * 25);
+                        copiedCount++;
+                        Application.Current.Dispatcher.Invoke(() =>
+                            Progress = 75 + (double)copiedCount / totalToCopy * 25);
+                    }
+                }
+
+                if (hasNoise)
+                {
+                    string noiseDir = Path.Combine(outputRoot, "noise");
+                    var noiseIndices = exportOrder[-1];
+                    for (int rank = 0; rank < noiseIndices.Count; rank++)
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        int sourceIndex = noiseIndices[rank];
+                        string sourceFilePath = imageResults[sourceIndex].FilePath;
+                        string targetFilePath = BuildRankedTargetFilePath(noiseDir, sourceFilePath, rank, sourceIndex);
+                        CopyFileWithRetry(sourceFilePath, targetFilePath);
+                        CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
+
+                        copiedCount++;
+                        Application.Current.Dispatcher.Invoke(() =>
+                            Progress = 75 + (double)copiedCount / totalToCopy * 25);
+                    }
                 }
 
                 Application.Current.Dispatcher.Invoke(() =>
@@ -536,17 +750,9 @@ namespace CyanTools.ViewModel
 
             try
             {
-                int nNeighbors = Math.Clamp(15, 2, Math.Max(2, dataPoints.Count - 1));
-                AppendLog($"开始生成分布图坐标（UMAP 2D, n_neighbors={nNeighbors}）");
-                var umapOptions = new Utils.UmapReducer.Options
-                {
-                    Metric = "cosine",
-                    RandomState = 42,
-                    NNeighbors = nNeighbors,
-                    NComponents = 2,
-                    MinDist = 0.1f,
-                    Spread = 1.0f
-                };
+                var umapOptions = BuildUmapOptions(dataPoints.Count);
+                AppendLog(
+                    $"开始生成分布图坐标（UMAP 2D, n_neighbors={umapOptions.NNeighbors}, min_dist={umapOptions.MinDist:F3}, spread={umapOptions.Spread:F3}）");
 
                 return Utils.UmapReducer.ReduceToTwoDimensions(dataPoints, umapOptions, token);
             }
@@ -555,6 +761,50 @@ namespace CyanTools.ViewModel
                 AppendLog($"分布图 UMAP 失败，回退 PCA。原因: {ex.Message}");
                 return Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(dataPoints);
             }
+        }
+
+        private Utils.UmapReducer.Options BuildUmapOptions(int sampleCount)
+        {
+            int safeSampleCount = Math.Max(sampleCount, 3);
+            int requestedNeighbors = UmapNNeighbors;
+            if (requestedNeighbors < 2)
+            {
+                requestedNeighbors = 2;
+            }
+
+            int resolvedNeighbors = Math.Clamp(requestedNeighbors, 2, Math.Max(2, safeSampleCount - 1));
+            if (resolvedNeighbors != UmapNNeighbors)
+            {
+                AppendLog($"UMAP 参数调整: n_neighbors={UmapNNeighbors} -> {resolvedNeighbors}（样本数限制）");
+            }
+
+            float minDist = (float)Math.Max(0d, UmapMinDist);
+            if (Math.Abs(minDist - UmapMinDist) > 1e-9)
+            {
+                AppendLog($"UMAP 参数调整: min_dist={UmapMinDist:F3} -> {minDist:F3}");
+            }
+
+            float spread = (float)Math.Max(1e-4d, UmapSpread);
+            if (Math.Abs(spread - UmapSpread) > 1e-9)
+            {
+                AppendLog($"UMAP 参数调整: spread={UmapSpread:F3} -> {spread:F3}");
+            }
+
+            return new Utils.UmapReducer.Options
+            {
+                Metric = "cosine",
+                RandomState = 42,
+                NNeighbors = resolvedNeighbors,
+                NComponents = 2,
+                MinDist = minDist,
+                Spread = spread
+            };
+        }
+
+        private static int ResolveAutoKUpperBound(int sampleCount)
+        {
+            int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount));
+            return Math.Clamp(bySqrt, 3, 20);
         }
 
         private static bool IsValidTwoDimensionalSpace(IReadOnlyList<float[]> points)
@@ -710,7 +960,93 @@ namespace CyanTools.ViewModel
             return projected;
         }
 
-        private static string BuildUniqueTargetFilePath(string targetDir, string sourceFilePath, int fallbackIndex)
+        private static Dictionary<int, List<int>> BuildClusterExportOrder(
+            IReadOnlyList<float[]> clusteringSpace,
+            IReadOnlyList<int> assignments)
+        {
+            if (clusteringSpace.Count != assignments.Count)
+            {
+                throw new InvalidOperationException("特征数量与聚类标签数量不一致。");
+            }
+
+            var clusterIndices = new Dictionary<int, List<int>>();
+            for (int i = 0; i < assignments.Count; i++)
+            {
+                int clusterId = assignments[i];
+                if (!clusterIndices.TryGetValue(clusterId, out var indices))
+                {
+                    indices = new List<int>();
+                    clusterIndices[clusterId] = indices;
+                }
+
+                indices.Add(i);
+            }
+
+            foreach (var entry in clusterIndices)
+            {
+                int clusterId = entry.Key;
+                var indices = entry.Value;
+                if (clusterId < 0)
+                {
+                    indices.Sort();
+                    continue;
+                }
+
+                float[] centroid = ComputeCentroid(clusteringSpace, indices);
+                indices.Sort((a, b) =>
+                {
+                    double da = ComputeSquaredDistance(clusteringSpace[a], centroid);
+                    double db = ComputeSquaredDistance(clusteringSpace[b], centroid);
+                    int cmp = da.CompareTo(db);
+                    return cmp != 0 ? cmp : a.CompareTo(b);
+                });
+            }
+
+            return clusterIndices;
+        }
+
+        private static float[] ComputeCentroid(IReadOnlyList<float[]> vectors, IReadOnlyList<int> indices)
+        {
+            if (indices.Count == 0)
+            {
+                return Array.Empty<float>();
+            }
+
+            int dimension = vectors[indices[0]].Length;
+            var sum = new double[dimension];
+            for (int i = 0; i < indices.Count; i++)
+            {
+                var vector = vectors[indices[i]];
+                for (int d = 0; d < dimension; d++)
+                {
+                    sum[d] += vector[d];
+                }
+            }
+
+            var centroid = new float[dimension];
+            double invCount = 1.0 / indices.Count;
+            for (int d = 0; d < dimension; d++)
+            {
+                centroid[d] = (float)(sum[d] * invCount);
+            }
+
+            return centroid;
+        }
+
+        private static double ComputeSquaredDistance(IReadOnlyList<float> vector, IReadOnlyList<float> centroid)
+        {
+            int dimension = Math.Min(vector.Count, centroid.Count);
+            double sum = 0;
+            for (int d = 0; d < dimension; d++)
+            {
+                double delta = vector[d] - centroid[d];
+                sum += delta * delta;
+            }
+
+            return sum;
+        }
+
+        private static string BuildRankedTargetFilePath(string targetDir, string sourceFilePath, int rank, int fallbackIndex)
         {
             string sourceName = Path.GetFileNameWithoutExtension(sourceFilePath);
             if (string.IsNullOrWhiteSpace(sourceName))
@@ -724,7 +1060,8 @@ namespace CyanTools.ViewModel
                 extension = ".jpg";
             }
 
-            string candidate = Path.Combine(targetDir, sourceName + extension);
+            string prefix = $"{Math.Max(rank, 0) + 1:D5}_";
+            string candidate = Path.Combine(targetDir, prefix + sourceName + extension);
             if (!File.Exists(candidate))
             {
                 return candidate;
@@ -732,7 +1069,7 @@ namespace CyanTools.ViewModel
 
             for (int i = 1; ; i++)
             {
-                candidate = Path.Combine(targetDir, $"{sourceName}_{i}{extension}");
+                candidate = Path.Combine(targetDir, $"{prefix}{sourceName}_{i}{extension}");
                 if (!File.Exists(candidate))
                 {
                     return candidate;

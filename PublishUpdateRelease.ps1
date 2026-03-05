@@ -458,10 +458,15 @@ Write-Host "输出文件: $zipArchivePath"
 
 Push-Location $BuildDir
 try {
-    $items = @(Get-ChildItem -Force | Select-Object -ExpandProperty Name)
+    $items = @()
+    $items += @(Get-ChildItem -Force -File | Select-Object -ExpandProperty Name)
+    if (Test-Path -LiteralPath "runtimes" -PathType Container) {
+        $items += "runtimes"
+    }
+    $items = @($items | Select-Object -Unique)
 
     if ($items.Count -eq 0) {
-        throw "目标目录下没有可打包内容：$BuildDir"
+        throw "目标目录下没有可打包内容（顶层文件或 runtimes 目录）：$BuildDir"
     }
 
     if ($null -ne $sevenZip) {

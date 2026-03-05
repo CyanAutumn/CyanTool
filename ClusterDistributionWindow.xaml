@@ -17,6 +17,11 @@
                        FontSize="14"
                        FontWeight="SemiBold"
                        TextWrapping="Wrap" />
+            <TextBlock x:Name="ZoomTextBlock"
+                       Margin="0,6,0,0"
+                       Foreground="#475467"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
             <TextBlock x:Name="ImagePathTextBlock"
                        Margin="0,6,0,0"
                        Foreground="#667085"
@@ -29,7 +34,14 @@
                 BorderThickness="1"
                 CornerRadius="6"
                 Background="White">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer x:Name="DistributionScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          PreviewMouseWheel="DistributionScrollViewer_PreviewMouseWheel"
+                          PreviewMouseDown="DistributionScrollViewer_PreviewMouseDown"
+                          PreviewMouseMove="DistributionScrollViewer_PreviewMouseMove"
+                          PreviewMouseUp="DistributionScrollViewer_PreviewMouseUp"
+                          LostMouseCapture="DistributionScrollViewer_LostMouseCapture">
                 <Image x:Name="DistributionImage" Stretch="Uniform" SnapsToDevicePixels="True" />
             </ScrollViewer>
         </Border>

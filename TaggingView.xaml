@@ -66,9 +66,9 @@
             </Grid>
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="通用阈值：" VerticalAlignment="Center"/>
-                <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
+                <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=LostFocus}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
                 <TextBlock Text="角色阈值：" VerticalAlignment="Center" Margin="15,0,0,0"/>
-                <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
+                <TextBox Text="{Binding CharacterThreshold, UpdateSourceTrigger=LostFocus}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
                 <Button Content="开始打标" Command="{Binding StartTaggingCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
                 <Button Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
                 <Button Content="检查/安装CUDA" Command="{Binding CheckCudaCommand}" IsEnabled="{Binding IsIdle}" Padding="10,5" Margin="10,0,0,0"/>
