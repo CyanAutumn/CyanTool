@@ -2,11 +2,43 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using UMAP;
 
 namespace CyanTools.Utils
 {
     public static class UmapReducer
     {
+        private const float PythonDefaultMinDist = 0.1f;
+        private const float PythonDefaultSpread = 1.0f;
+
+        private sealed class UmapRandomProvider : IProvideRandomValues
+        {
+            private readonly NumpyRandom _rng;
+
+            public UmapRandomProvider(int seed)
+            {
+                _rng = new NumpyRandom(seed);
+            }
+
+            public bool IsThreadSafe => false;
+
+            public double NextDouble() => _rng.NextDouble();
+
+            public float NextFloat() => (float)_rng.NextDouble();
+
+            public void NextFloats(Span<float> buffer)
+            {
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    buffer[i] = NextFloat();
+                }
+            }
+
+            public int NextInt(int exclusiveMax) => _rng.NextInt(exclusiveMax);
+
+            public int Next(int inclusiveMin, int exclusiveMax) => _rng.NextInt(inclusiveMin, exclusiveMax);
+        }
+
         public sealed class Options
         {
             public int NNeighbors { get; set; } = 15;
@@ -28,6 +60,96 @@ namespace CyanTools.Utils
         {
             options ??= new Options();
 
+            if (CanUsePackageReducer(options))
+            {
+                try
+                {
+                    return ReduceToTwoDimensionsWithPackage(dataPoints, options, token, progress);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+
+                }
+            }
+
+            return ReduceToTwoDimensionsLegacy(dataPoints, options, token, progress);
+        }
+
+        private static bool CanUsePackageReducer(Options options)
+        {
+            if (options.NComponents != 2)
+            {
+                return false;
+            }
+
+            bool defaultMinDist = Math.Abs(options.MinDist - PythonDefaultMinDist) <= 1e-6f;
+            bool defaultSpread = Math.Abs(options.Spread - PythonDefaultSpread) <= 1e-6f;
+            return defaultMinDist && defaultSpread;
+        }
+
+        private static List<float[]> ReduceToTwoDimensionsWithPackage(IReadOnlyList<float[]> dataPoints, Options options, CancellationToken token, Action<double>? progress)
+        {
+            if (dataPoints == null || dataPoints.Count == 0)
+            {
+                return new List<float[]>();
+            }
+
+            if (options.NComponents != 2)
+            {
+                throw new NotSupportedException("当前仅支持降维到 2 维（与参考项目一致）。");
+            }
+
+            int sampleCount = dataPoints.Count;
+            int dim = dataPoints[0]?.Length ?? 0;
+            if (dim == 0 || dataPoints.Any(v => v == null || v.Length != dim))
+            {
+                throw new ArgumentException("输入特征维度不一致或为空。", nameof(dataPoints));
+            }
+
+            int nNeighbors = Math.Clamp(options.NNeighbors, 2, Math.Max(2, sampleCount - 1));
+            int? nEpochs = options.NEpochs;
+            DistanceCalculation distanceFn = options.Metric.Equals("cosine", StringComparison.OrdinalIgnoreCase)
+                ? Umap.DistanceFunctions.CosineForNormalizedVectors
+                : Umap.DistanceFunctions.Euclidean;
+            IProvideRandomValues randomProvider = new UmapRandomProvider(options.RandomState);
+
+            progress?.Invoke(0);
+
+            var umap = new Umap(
+                distanceFn,
+                randomProvider,
+                options.NComponents,
+                nNeighbors,
+                nEpochs,
+                p => progress?.Invoke(Math.Clamp(p, 0f, 1f)));
+
+            float[][] vectors = dataPoints.Select(v => v.ToArray()).ToArray();
+            int epochs = umap.InitializeFit(vectors);
+            int totalEpochs = nEpochs ?? epochs;
+            for (int epoch = 0; epoch < totalEpochs; epoch++)
+            {
+                token.ThrowIfCancellationRequested();
+                umap.Step();
+                progress?.Invoke((double)(epoch + 1) / totalEpochs);
+            }
+
+            float[][] embedding = umap.GetEmbedding();
+            var result = new List<float[]>(embedding.Length);
+            for (int i = 0; i < embedding.Length; i++)
+            {
+                result.Add(new[] { embedding[i][0], embedding[i][1] });
+            }
+
+            progress?.Invoke(1.0);
+            return result;
+        }
+
+        private static List<float[]> ReduceToTwoDimensionsLegacy(IReadOnlyList<float[]> dataPoints, Options options, CancellationToken token, Action<double>? progress)
+        {
             if (dataPoints == null || dataPoints.Count == 0)
             {
                 return new List<float[]>();

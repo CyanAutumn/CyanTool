@@ -153,7 +153,7 @@ namespace CyanTools.ViewModel
             Logs.Clear();
             ProgressValue = 0;
             IsProcessing = true;
-            AppendLog("开始批量图片缩放...");
+            AppendLog("开始批量图片上下采...");
 
             var options = new ImageScalingOptions
             {

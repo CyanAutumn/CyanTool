@@ -102,6 +102,7 @@ namespace CyanTools.ViewModel
         private readonly RelayCommand _clearLogCommand;
         private readonly RelayCommand _browseOutputFolderCommand;
         private readonly RelayCommand _getPixivRefreshTokenCommand;
+        private readonly RelayCommand _openDanbooruManualCollectorCommand;
         private readonly RestClient _danbooruClient;
 
         private CancellationTokenSource? _cancellationTokenSource;
@@ -124,6 +125,7 @@ namespace CyanTools.ViewModel
         private DatasetDownloadMode _selectedMode = DatasetDownloadMode.ArtistId;
         private string _sessionOutputIdSegment = "unknown";
         private string _sessionOutputArtistSegment = "unknown_name";
+        private string _lastDanbooruListUrl = $"{DanbooruBaseUrl}/posts?tags=";
 
         public DatasetDownloaderViewModel()
         {
@@ -132,6 +134,7 @@ namespace CyanTools.ViewModel
             _clearLogCommand = new RelayCommand(_ => ClearLog());
             _browseOutputFolderCommand = new RelayCommand(_ => BrowseOutputFolder());
             _getPixivRefreshTokenCommand = new RelayCommand(async _ => await FetchPixivRefreshTokenAsync(), _ => !IsDownloading);
+            _openDanbooruManualCollectorCommand = new RelayCommand(async _ => await OpenDanbooruManualCollectorAsync(), _ => !IsDownloading);
 
             LoadSettings();
             LoadDanbooruToken();
@@ -409,6 +412,7 @@ namespace CyanTools.ViewModel
                     OnPropertyChanged(nameof(StartButtonText));
                     _startStopCommand.RaiseCanExecuteChanged();
                     _getPixivRefreshTokenCommand.RaiseCanExecuteChanged();
+                    _openDanbooruManualCollectorCommand.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -419,6 +423,7 @@ namespace CyanTools.ViewModel
         public ICommand ClearLogCommand => _clearLogCommand;
         public ICommand BrowseOutputFolderCommand => _browseOutputFolderCommand;
         public ICommand GetPixivRefreshTokenCommand => _getPixivRefreshTokenCommand;
+        public ICommand OpenDanbooruManualCollectorCommand => _openDanbooruManualCollectorCommand;
 
         private bool CanStartOrStop()
         {
@@ -501,6 +506,62 @@ namespace CyanTools.ViewModel
             {
                 AppendLog($"[Pixiv] 获取刷新令牌失败: {ex.Message}");
             }
+        }
+
+        private async Task OpenDanbooruManualCollectorAsync()
+        {
+            try
+            {
+                var startUrl = BuildDanbooruManualCollectorStartUrl();
+                var collectorWindow = new DanbooruManualCollectorWindow(startUrl)
+                {
+                    Owner = Application.Current?.MainWindow,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+
+                var result = collectorWindow.ShowDialog();
+                if (result != true)
+                {
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(collectorWindow.LastListUrl))
+                {
+                    _lastDanbooruListUrl = collectorWindow.LastListUrl;
+                }
+
+                if (collectorWindow.CollectedPostIds.Count == 0)
+                {
+                    AppendLog("[Danbooru] 手动获取未返回任何帖子 ID。");
+                    return;
+                }
+
+                SelectedMode = DatasetDownloadMode.PostId;
+                EnableDanbooru = true;
+                InputText = string.Join(" ", collectorWindow.CollectedPostIds);
+                AppendLog($"[Danbooru] 手动获取完成，检测到 {collectorWindow.CollectedPostIds.Count} 个帖子 ID，开始按 Danbooru 间隔下载。");
+
+                await StartOrStopAsync();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Danbooru] 打开手动获取窗口失败: {ex.Message}");
+            }
+        }
+
+        private string BuildDanbooruManualCollectorStartUrl()
+        {
+            if (SelectedMode == DatasetDownloadMode.Tag && !string.IsNullOrWhiteSpace(InputText))
+            {
+                return $"{DanbooruBaseUrl}/posts?tags={Uri.EscapeDataString(InputText)}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(_lastDanbooruListUrl))
+            {
+                return _lastDanbooruListUrl;
+            }
+
+            return $"{DanbooruBaseUrl}/posts?tags=";
         }
 
         private async Task<PixivTokenResponse> ExchangePixivAuthCodeAsync(string authCode, string codeVerifier, CancellationToken token)
@@ -1474,6 +1535,31 @@ namespace CyanTools.ViewModel
             return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
         }
 
+        private static string NormalizeDanbooruListUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return $"{DanbooruBaseUrl}/posts?tags=";
+            }
+
+            if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
+            {
+                return $"{DanbooruBaseUrl}/posts?tags=";
+            }
+
+            if (!string.Equals(uri.Host, "danbooru.donmai.us", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{DanbooruBaseUrl}/posts?tags=";
+            }
+
+            if (!uri.AbsolutePath.StartsWith("/posts", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{DanbooruBaseUrl}/posts?tags=";
+            }
+
+            return uri.ToString();
+        }
+
         private void BrowseOutputFolder()
         {
             var dialog = new CommonOpenFileDialog { IsFolderPicker = true };
@@ -1519,6 +1605,7 @@ namespace CyanTools.ViewModel
                 IncludeCharacter = settings.IncludeCharacter;
                 IncludeGeneral = settings.IncludeGeneral;
                 IncludeMeta = settings.IncludeMeta;
+                _lastDanbooruListUrl = NormalizeDanbooruListUrl(settings.DanbooruManualListUrl);
             }
             catch (Exception ex)
             {
@@ -1539,7 +1626,8 @@ namespace CyanTools.ViewModel
                     IncludeCopyright = IncludeCopyright,
                     IncludeCharacter = IncludeCharacter,
                     IncludeGeneral = IncludeGeneral,
-                    IncludeMeta = IncludeMeta
+                    IncludeMeta = IncludeMeta,
+                    DanbooruManualListUrl = _lastDanbooruListUrl
                 };
 
                 var json = System.Text.Json.JsonSerializer.Serialize(settings, SettingsSerializerOptions);
@@ -1734,6 +1822,7 @@ namespace CyanTools.ViewModel
             public bool IncludeCharacter { get; set; } = true;
             public bool IncludeGeneral { get; set; } = true;
             public bool IncludeMeta { get; set; } = true;
+            public string? DanbooruManualListUrl { get; set; }
         }
 
         private sealed class KemonoPost

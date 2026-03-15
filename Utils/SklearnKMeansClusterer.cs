@@ -6,6 +6,8 @@ namespace CyanTools.Utils
 {
     public static class SklearnKMeansClusterer
     {
+        private const int DefaultNInit = 10;
+
         public sealed class AutoKResult
         {
             public int BestK { get; set; }
@@ -16,7 +18,7 @@ namespace CyanTools.Utils
             public bool UsedSample { get; set; }
         }
 
-        public static int[] Cluster(IReadOnlyList<float[]> data, int numClusters, int randomState = 42)
+        public static int[] Cluster(IReadOnlyList<float[]> data, int numClusters, int randomState = 42, int nInit = DefaultNInit)
         {
             if (data == null || data.Count == 0)
             {
@@ -48,12 +50,22 @@ namespace CyanTools.Utils
                 }
             }
 
+            int resolvedNInit = Math.Max(1, nInit);
             var rng = new NumpyRandom(randomState);
+            int[]? bestLabels = null;
+            double bestInertia = double.PositiveInfinity;
 
+            for (int init = 0; init < resolvedNInit; init++)
+            {
+                var (_, labels, inertia) = RunKMeans(data, numClusters, dimension, rng);
+                if (bestLabels == null || inertia < bestInertia)
+                {
+                    bestLabels = labels;
+                    bestInertia = inertia;
+                }
+            }
 
-            var (centers, labels) = RunKMeans(data, numClusters, dimension, rng);
-            _ = centers;
-            return labels;
+            return bestLabels ?? Array.Empty<int>();
         }
 
         public static AutoKResult FindBestKBySilhouette(
@@ -150,7 +162,7 @@ namespace CyanTools.Utils
             };
         }
 
-        private static (double[,] centers, int[] labels) RunKMeans(IReadOnlyList<float[]> data, int k, int dimension, NumpyRandom rng)
+        private static (double[,] centers, int[] labels, double inertia) RunKMeans(IReadOnlyList<float[]> data, int k, int dimension, NumpyRandom rng)
         {
             int n = data.Count;
             int maxIter = 300;
@@ -173,31 +185,7 @@ namespace CyanTools.Utils
 
             for (int iter = 0; iter < maxIter; iter++)
             {
-
-                Array.Fill(distsToAssigned, 0);
-                for (int i = 0; i < n; i++)
-                {
-                    var p = data[i];
-                    double bestDist = double.PositiveInfinity;
-                    int bestCluster = 0;
-                    for (int c = 0; c < k; c++)
-                    {
-                        double dist = 0;
-                        for (int d = 0; d < dimension; d++)
-                        {
-                            double delta = p[d] - centers[c, d];
-                            dist += delta * delta;
-                        }
-
-                        if (dist < bestDist)
-                        {
-                            bestDist = dist;
-                            bestCluster = c;
-                        }
-                    }
-                    labels[i] = bestCluster;
-                    distsToAssigned[i] = bestDist;
-                }
+                AssignLabels(data, centers, labels, distsToAssigned);
 
 
                 var sums = new double[k, dimension];
@@ -268,7 +256,45 @@ namespace CyanTools.Utils
                 }
             }
 
-            return (centers, labels);
+            AssignLabels(data, centers, labels, distsToAssigned);
+            return (centers, labels, distsToAssigned.Sum());
+        }
+
+        private static void AssignLabels(
+            IReadOnlyList<float[]> data,
+            double[,] centers,
+            int[] labels,
+            double[] distsToAssigned)
+        {
+            int n = data.Count;
+            int k = centers.GetLength(0);
+            int dimension = centers.GetLength(1);
+
+            Array.Fill(distsToAssigned, 0);
+            for (int i = 0; i < n; i++)
+            {
+                var p = data[i];
+                double bestDist = double.PositiveInfinity;
+                int bestCluster = 0;
+                for (int c = 0; c < k; c++)
+                {
+                    double dist = 0;
+                    for (int d = 0; d < dimension; d++)
+                    {
+                        double delta = p[d] - centers[c, d];
+                        dist += delta * delta;
+                    }
+
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        bestCluster = c;
+                    }
+                }
+
+                labels[i] = bestCluster;
+                distsToAssigned[i] = bestDist;
+            }
         }
 
         private static int[] InitKMeansPlusPlus(IReadOnlyList<float[]> data, int k, NumpyRandom rng)

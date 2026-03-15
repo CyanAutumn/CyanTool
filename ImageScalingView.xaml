@@ -111,7 +111,7 @@
                              VerticalContentAlignment="Center"/>
                 </Grid>
 
-                <TextBlock Text="宽和高会自动修正为最接近的 64 倍数。勾选两个选项时执行顺序: 先上采样，再下采样。"
+                <TextBlock Text="宽和高会自动修正为最接近的 64 倍数。勾选两个选项时执行顺序: 先上采样，再下采样。命中跳过条件的图片不会输出到目标目录。"
                            Margin="0,6,0,0"
                            Foreground="Gray"
                            TextWrapping="Wrap"/>

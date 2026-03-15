@@ -20,13 +20,23 @@ namespace CyanTools.ViewModel
         public override string DisplayName => "图片聚类";
         private const string FeatureTypeHybridDisplay = "Style+Content（偏画风+偏内容）";
         private const string FeatureTypeStyleDisplay = "Style（偏画风）";
+        private const string FeatureTypeGrayStyleDisplay = "Style（灰度去色，更偏笔触）";
+        private const string FeatureTypeStyleColorDownweightDisplay = "Style（颜色降权，保留少量色彩）";
         private const string FeatureTypeContentDisplay = "Content（偏内容）";
+        private const string ClusteringSpaceRawDisplay = "高维向量（推荐）";
+        private const string ClusteringSpaceUmapDisplay = "UMAP 2D（兼容参考）";
+        private const string ClusteringSpaceStyleBrushDisplay = "高维 Style（更偏笔触）";
         private const int DefaultNumClusters = 40;
         private const int DefaultMinClusterSize = 10;
         private const int DefaultUmapNNeighbors = 15;
         private const double DefaultUmapMinDist = 0.1d;
         private const double DefaultUmapSpread = 1.0d;
-        private const string DefaultSelectedClusteringSpace = "高维向量（推荐）";
+        private const double OutlierIqrMultiplier = 3.0d;
+        private const int OutlierFilterMinClusterSize = 8;
+        private const double DefaultColorDownweightStyleRetention = 0.35d;
+        private const double DefaultMinCentroidSimilarity = 0.82d;
+        private const string DefaultSelectedFeatureType = FeatureTypeStyleDisplay;
+        private const string DefaultSelectedClusteringSpace = ClusteringSpaceUmapDisplay;
         private const string DefaultSelectedAlgorithm = "KMeans";
         private const string DefaultSelectedComputeDevice = "GPU";
         private const string CsdModelRelativePath = "Models/csd/csd_clip_model.onnx";
@@ -92,6 +102,59 @@ namespace CyanTools.ViewModel
             set => SetField(ref _minClusterSize, value);
         }
 
+        private bool _filterOutliersForExport;
+        public bool FilterOutliersForExport
+        {
+            get => _filterOutliersForExport;
+            set => SetField(ref _filterOutliersForExport, value);
+        }
+
+        private double _colorDownweightStyleRetention = DefaultColorDownweightStyleRetention;
+        public double ColorDownweightStyleRetention
+        {
+            get => _colorDownweightStyleRetention;
+            set
+            {
+                double clamped = Math.Clamp(value, 0d, 1d);
+                if (SetField(ref _colorDownweightStyleRetention, clamped))
+                {
+                    OnPropertyChanged(nameof(ColorDownweightStyleRetentionPercentText));
+                }
+            }
+        }
+
+        public string ColorDownweightStyleRetentionPercentText => $"{ColorDownweightStyleRetention * 100d:F0}%";
+
+        private bool _enableTwoStageStyleClustering;
+        public bool EnableTwoStageStyleClustering
+        {
+            get => _enableTwoStageStyleClustering;
+            set => SetField(ref _enableTwoStageStyleClustering, value);
+        }
+
+        private bool _useMinSimilarityForUncertain;
+        public bool UseMinSimilarityForUncertain
+        {
+            get => _useMinSimilarityForUncertain;
+            set => SetField(ref _useMinSimilarityForUncertain, value);
+        }
+
+        private double _minCentroidSimilarity = DefaultMinCentroidSimilarity;
+        public double MinCentroidSimilarity
+        {
+            get => _minCentroidSimilarity;
+            set
+            {
+                double clamped = Math.Clamp(value, 0d, 0.999d);
+                if (SetField(ref _minCentroidSimilarity, clamped))
+                {
+                    OnPropertyChanged(nameof(MinCentroidSimilarityPercentText));
+                }
+            }
+        }
+
+        public string MinCentroidSimilarityPercentText => $"{MinCentroidSimilarity * 100d:F0}%";
+
         private int _umapNNeighbors = DefaultUmapNNeighbors;
         public int UmapNNeighbors
         {
@@ -124,17 +187,33 @@ namespace CyanTools.ViewModel
         {
             FeatureTypeHybridDisplay,
             FeatureTypeStyleDisplay,
+            FeatureTypeGrayStyleDisplay,
+            FeatureTypeStyleColorDownweightDisplay,
             FeatureTypeContentDisplay
         };
 
-        private string _selectedFeatureType = FeatureTypeHybridDisplay;
+        private string _selectedFeatureType = DefaultSelectedFeatureType;
         public string SelectedFeatureType
         {
             get => _selectedFeatureType;
-            set => SetField(ref _selectedFeatureType, ToFeatureTypeDisplay(value));
+            set
+            {
+                if (SetField(ref _selectedFeatureType, ToFeatureTypeDisplay(value)))
+                {
+                    OnPropertyChanged(nameof(IsColorDownweightSelected));
+                }
+            }
         }
 
-        public List<string> ClusteringSpaces { get; } = new() { "高维向量（推荐）", "UMAP 2D（兼容参考）" };
+        public bool IsColorDownweightSelected =>
+            GetFeatureTypeKey(SelectedFeatureType) == "StyleColorDownweight";
+
+        public List<string> ClusteringSpaces { get; } = new()
+        {
+            ClusteringSpaceRawDisplay,
+            ClusteringSpaceUmapDisplay,
+            ClusteringSpaceStyleBrushDisplay
+        };
 
         private string _selectedClusteringSpace = DefaultSelectedClusteringSpace;
         public string SelectedClusteringSpace
@@ -143,7 +222,7 @@ namespace CyanTools.ViewModel
             set => SetField(ref _selectedClusteringSpace, value);
         }
 
-        public List<string> Algorithms { get; } = new() { "KMeans", "HDBSCAN" };
+        public List<string> Algorithms { get; } = new() { "KMeans", "SphericalKMeans", "HDBSCAN" };
 
         private string _selectedAlgorithm = DefaultSelectedAlgorithm;
         public string SelectedAlgorithm
@@ -159,7 +238,7 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public bool IsKMeansSelected => SelectedAlgorithm == "KMeans";
+        public bool IsKMeansSelected => SelectedAlgorithm == "KMeans" || SelectedAlgorithm == "SphericalKMeans";
         public bool IsHdbscanSelected => SelectedAlgorithm == "HDBSCAN";
 
         public List<string> ComputeDevices { get; } = new() { "CPU", "GPU" };
@@ -227,6 +306,11 @@ namespace CyanTools.ViewModel
                 NumClusters = NumClusters,
                 UseBestKBySilhouette = UseBestKBySilhouette,
                 MinClusterSize = MinClusterSize,
+                FilterOutliersForExport = FilterOutliersForExport,
+                ColorDownweightStyleRetention = ColorDownweightStyleRetention,
+                EnableTwoStageStyleClustering = EnableTwoStageStyleClustering,
+                UseMinSimilarityForUncertain = UseMinSimilarityForUncertain,
+                MinCentroidSimilarity = MinCentroidSimilarity,
                 UmapNNeighbors = UmapNNeighbors,
                 UmapMinDist = UmapMinDist,
                 UmapSpread = UmapSpread,
@@ -248,12 +332,17 @@ namespace CyanTools.ViewModel
         private void ResetParametersToDefaults()
         {
             SelectedComputeDevice = DefaultSelectedComputeDevice;
-            SelectedFeatureType = FeatureTypeHybridDisplay;
+            SelectedFeatureType = DefaultSelectedFeatureType;
             SelectedAlgorithm = DefaultSelectedAlgorithm;
             SelectedClusteringSpace = DefaultSelectedClusteringSpace;
             NumClusters = DefaultNumClusters;
             UseBestKBySilhouette = false;
             MinClusterSize = DefaultMinClusterSize;
+            FilterOutliersForExport = false;
+            ColorDownweightStyleRetention = DefaultColorDownweightStyleRetention;
+            EnableTwoStageStyleClustering = false;
+            UseMinSimilarityForUncertain = false;
+            MinCentroidSimilarity = DefaultMinCentroidSimilarity;
             UmapNNeighbors = DefaultUmapNNeighbors;
             UmapMinDist = DefaultUmapMinDist;
             UmapSpread = DefaultUmapSpread;
@@ -281,6 +370,17 @@ namespace CyanTools.ViewModel
                 NumClusters = settings.NumClusters <= 0 ? DefaultNumClusters : settings.NumClusters;
                 UseBestKBySilhouette = settings.UseBestKBySilhouette;
                 MinClusterSize = settings.MinClusterSize <= 0 ? DefaultMinClusterSize : settings.MinClusterSize;
+                FilterOutliersForExport = settings.FilterOutliersForExport;
+                ColorDownweightStyleRetention =
+                    settings.ColorDownweightStyleRetention < 0d || settings.ColorDownweightStyleRetention > 1d
+                        ? DefaultColorDownweightStyleRetention
+                        : settings.ColorDownweightStyleRetention;
+                EnableTwoStageStyleClustering = settings.EnableTwoStageStyleClustering;
+                UseMinSimilarityForUncertain = settings.UseMinSimilarityForUncertain;
+                MinCentroidSimilarity =
+                    settings.MinCentroidSimilarity < 0d || settings.MinCentroidSimilarity >= 1d
+                        ? DefaultMinCentroidSimilarity
+                        : settings.MinCentroidSimilarity;
                 UmapNNeighbors = settings.UmapNNeighbors <= 0 ? DefaultUmapNNeighbors : settings.UmapNNeighbors;
                 UmapMinDist = settings.UmapMinDist;
                 UmapSpread = settings.UmapSpread <= 0d ? DefaultUmapSpread : settings.UmapSpread;
@@ -313,6 +413,11 @@ namespace CyanTools.ViewModel
                     NumClusters = NumClusters,
                     UseBestKBySilhouette = UseBestKBySilhouette,
                     MinClusterSize = MinClusterSize,
+                    FilterOutliersForExport = FilterOutliersForExport,
+                    ColorDownweightStyleRetention = ColorDownweightStyleRetention,
+                    EnableTwoStageStyleClustering = EnableTwoStageStyleClustering,
+                    UseMinSimilarityForUncertain = UseMinSimilarityForUncertain,
+                    MinCentroidSimilarity = MinCentroidSimilarity,
                     UmapNNeighbors = UmapNNeighbors,
                     UmapMinDist = UmapMinDist,
                     UmapSpread = UmapSpread,
@@ -345,10 +450,15 @@ namespace CyanTools.ViewModel
             public int NumClusters { get; set; } = DefaultNumClusters;
             public bool UseBestKBySilhouette { get; set; }
             public int MinClusterSize { get; set; } = DefaultMinClusterSize;
+            public bool FilterOutliersForExport { get; set; }
+            public double ColorDownweightStyleRetention { get; set; } = DefaultColorDownweightStyleRetention;
+            public bool EnableTwoStageStyleClustering { get; set; }
+            public bool UseMinSimilarityForUncertain { get; set; }
+            public double MinCentroidSimilarity { get; set; } = DefaultMinCentroidSimilarity;
             public int UmapNNeighbors { get; set; } = DefaultUmapNNeighbors;
             public double UmapMinDist { get; set; } = DefaultUmapMinDist;
             public double UmapSpread { get; set; } = DefaultUmapSpread;
-            public string? SelectedFeatureType { get; set; } = FeatureTypeHybridDisplay;
+            public string? SelectedFeatureType { get; set; } = DefaultSelectedFeatureType;
             public string? SelectedAlgorithm { get; set; } = DefaultSelectedAlgorithm;
             public string? SelectedClusteringSpace { get; set; } = DefaultSelectedClusteringSpace;
             public string? SelectedComputeDevice { get; set; } = DefaultSelectedComputeDevice;
@@ -507,6 +617,19 @@ namespace CyanTools.ViewModel
 
                 bool useGpu = SelectedComputeDevice.Equals("GPU", StringComparison.OrdinalIgnoreCase);
                 AppendLog($"选择计算设备: {SelectedComputeDevice}");
+                bool useKMeansFamily = SelectedAlgorithm == "KMeans" || SelectedAlgorithm == "SphericalKMeans";
+                bool requestedTwoStageStyleClustering = EnableTwoStageStyleClustering;
+                bool useTwoStageStyleClustering = requestedTwoStageStyleClustering && useKMeansFamily;
+                if (requestedTwoStageStyleClustering && !useKMeansFamily)
+                {
+                    AppendLog("二阶段风格聚类当前仅支持 KMeans / SphericalKMeans，已忽略该选项。");
+                }
+
+                bool includeGrayStyle = UsesGrayStyleVectors(SelectedFeatureType, useTwoStageStyleClustering);
+                if (includeGrayStyle)
+                {
+                    AppendLog("已启用灰度 Style 分支：特征提取将额外进行一次灰度图推理，速度会变慢。");
+                }
 
                 var processor = new Utils.ImageClusteringProcessor(modelPath, useGpu, AppendLog);
                 var imageResults = processor.ProcessFolder(InputPath,
@@ -520,6 +643,7 @@ namespace CyanTools.ViewModel
                                 MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning));
                         }
                     },
+                    includeGrayStyle,
                     new[] { outputPathFull });
 
                 token.ThrowIfCancellationRequested();
@@ -536,39 +660,100 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                List<float[]> dataPoints = new(imageResults.Count);
-                foreach (var result in imageResults)
+                bool useStyleBrushSpace = SelectedClusteringSpace.Equals(ClusteringSpaceStyleBrushDisplay, StringComparison.Ordinal);
+                bool isSelectedStyleLike = IsStyleLikeFeatureType(SelectedFeatureType);
+                float colorRetention = (float)ColorDownweightStyleRetention;
+                List<float[]> dataPoints = BuildFeatureVectors(imageResults, SelectedFeatureType, colorRetention);
+                string effectiveFeatureType;
+                List<float[]> clusteringSourcePoints;
+                List<float[]>? coarseStagePoints = null;
+
+                if (useTwoStageStyleClustering)
                 {
-                    dataPoints.Add(BuildFeatureVector(result, SelectedFeatureType));
+                    effectiveFeatureType = ResolveTwoStageFineFeatureType(SelectedFeatureType);
+                    clusteringSourcePoints = BuildFeatureVectors(imageResults, effectiveFeatureType, colorRetention);
+                    coarseStagePoints = BuildFeatureVectors(imageResults, FeatureTypeGrayStyleDisplay, colorRetention);
+
+                    if (!isSelectedStyleLike)
+                    {
+                        AppendLog("二阶段风格聚类仅支持 Style 类特征，已忽略当前非 Style 特征选择，改用灰度 Style -> 彩色 Style。");
+                    }
+                    else if (GetFeatureTypeKey(SelectedFeatureType) == "GrayStyle")
+                    {
+                        AppendLog("当前使用二阶段风格聚类：先按灰度 Style 粗分，再用彩色 Style 细分，避免颜色完全丢失。");
+                    }
+                    else
+                    {
+                        AppendLog($"当前使用二阶段风格聚类：第一阶段灰度 Style，第二阶段 {effectiveFeatureType}。");
+                    }
+
+                    if (SelectedClusteringSpace.Equals(ClusteringSpaceUmapDisplay, StringComparison.Ordinal))
+                    {
+                        AppendLog("二阶段风格聚类固定使用高维 Style 向量分簇，UMAP 仅用于生成分布图。");
+                    }
+                }
+                else
+                {
+                    effectiveFeatureType = useStyleBrushSpace
+                        ? (isSelectedStyleLike ? SelectedFeatureType : FeatureTypeStyleDisplay)
+                        : SelectedFeatureType;
+                    clusteringSourcePoints = effectiveFeatureType.Equals(SelectedFeatureType, StringComparison.Ordinal)
+                        ? dataPoints
+                        : BuildFeatureVectors(imageResults, effectiveFeatureType, colorRetention);
+
+                    if (useStyleBrushSpace &&
+                        !isSelectedStyleLike)
+                    {
+                        AppendLog("高维 Style 模式会强制使用 Style 类特征进行聚类，忽略当前非 Style 特征选择。");
+                    }
+                    else if (effectiveFeatureType.Equals(FeatureTypeGrayStyleDisplay, StringComparison.Ordinal))
+                    {
+                        AppendLog("当前使用灰度 Style 分支聚类：颜色信息会被尽量压掉。");
+                    }
+                    else if (effectiveFeatureType.Equals(FeatureTypeStyleColorDownweightDisplay, StringComparison.Ordinal))
+                    {
+                        AppendLog($"当前使用颜色降权 Style：原彩色 Style 保留系数 {ColorDownweightStyleRetention:F2}。");
+                    }
                 }
 
-                bool useUmapSpace = SelectedAlgorithm == "HDBSCAN" ||
-                    SelectedClusteringSpace.Equals("UMAP 2D（兼容参考）", StringComparison.Ordinal);
+                if (SelectedAlgorithm == "SphericalKMeans")
+                {
+                    AppendLog("当前使用 SphericalKMeans：按向量方向（余弦相似）聚类，更适合归一化 embedding。");
+                }
+
+                bool useUmapSpace = !useTwoStageStyleClustering &&
+                    (SelectedAlgorithm == "HDBSCAN" ||
+                     SelectedClusteringSpace.Equals(ClusteringSpaceUmapDisplay, StringComparison.Ordinal));
 
                 if (SelectedAlgorithm == "HDBSCAN" &&
-                    SelectedClusteringSpace.Equals("高维向量（推荐）", StringComparison.Ordinal))
+                    SelectedClusteringSpace.Equals(ClusteringSpaceRawDisplay, StringComparison.Ordinal))
                 {
                     AppendLog("HDBSCAN 当前仅支持 2D 输入，已自动切换到 UMAP 2D 聚类空间。");
                 }
+                else if (SelectedAlgorithm == "HDBSCAN" && useStyleBrushSpace)
+                {
+                    AppendLog("HDBSCAN 当前不支持高维 Style 聚类，已自动切换到 Style 的 UMAP 2D。");
+                }
 
-                List<float[]> clusteringSpace = dataPoints;
+                List<float[]> clusteringSpace = clusteringSourcePoints;
                 if (useUmapSpace)
                 {
-                    if (dataPoints.Count < 3)
+                    if (clusteringSourcePoints.Count < 3)
                     {
-                        AppendLog($"样本数量过少（{dataPoints.Count}），跳过 UMAP，直接使用特征前两维。");
-                        clusteringSpace = ProjectToTwoDimensions(dataPoints);
+                        AppendLog($"样本数量过少（{clusteringSourcePoints.Count}），跳过 UMAP，直接使用特征前两维。");
+                        clusteringSpace = ProjectToTwoDimensions(clusteringSourcePoints);
                     }
                     else
                     {
                         try
                         {
-                            var umapOptions = BuildUmapOptions(dataPoints.Count);
+                            var umapOptions = BuildUmapOptions(clusteringSourcePoints.Count);
                             AppendLog(
-                                $"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors={umapOptions.NNeighbors}, n_components=2, min_dist={umapOptions.MinDist:F3}, spread={umapOptions.Spread:F3}）: {SelectedFeatureType}");
+                                $"开始 UMAP 降维（metric=cosine, seed=42, n_neighbors={umapOptions.NNeighbors}, n_components=2, min_dist={umapOptions.MinDist:F3}, spread={umapOptions.Spread:F3}）: {effectiveFeatureType}");
+                            AppendUmapImplementationLog(umapOptions);
 
                             clusteringSpace = Utils.UmapReducer.ReduceToTwoDimensions(
-                                dataPoints,
+                                clusteringSourcePoints,
                                 umapOptions,
                                 token,
                                 p => Application.Current.Dispatcher.Invoke(() => Progress = 50 + p * 25));
@@ -577,7 +762,7 @@ namespace CyanTools.ViewModel
                         {
 
                             AppendLog($"UMAP 失败，回退 PCA。原因: {ex.Message}");
-                            clusteringSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(dataPoints);
+                            clusteringSpace = Utils.FeatureSpaceReducer.ReduceToTwoDimensionsPca(clusteringSourcePoints);
                         }
                     }
 
@@ -588,11 +773,22 @@ namespace CyanTools.ViewModel
                 }
                 else
                 {
-                    AppendLog($"使用高维向量直接聚类（维度={dataPoints[0].Length}）。");
+                    if (useTwoStageStyleClustering)
+                    {
+                        AppendLog($"使用二阶段高维 Style 聚类（维度={clusteringSourcePoints[0].Length}），分布图会单独生成 UMAP 2D。");
+                    }
+                    else if (useStyleBrushSpace)
+                    {
+                        AppendLog($"使用高维 Style 向量直接聚类（维度={clusteringSourcePoints[0].Length}），分布图会单独生成 Style 的 UMAP 2D。");
+                    }
+                    else
+                    {
+                        AppendLog($"使用高维向量直接聚类（维度={clusteringSourcePoints[0].Length}）。");
+                    }
                 }
 
                 int resolvedKMeansK = NumClusters;
-                if (SelectedAlgorithm == "KMeans")
+                if (useKMeansFamily)
                 {
                     if (UseBestKBySilhouette)
                     {
@@ -605,20 +801,52 @@ namespace CyanTools.ViewModel
                         {
                             int minK = 2;
                             int maxK = Math.Min(ResolveAutoKUpperBound(clusteringSpace.Count), clusteringSpace.Count - 1);
-                            var autoResult = Utils.SklearnKMeansClusterer.FindBestKBySilhouette(
-                                clusteringSpace,
-                                minK,
-                                maxK,
-                                randomState: 42,
-                                evaluationSampleSize: 600,
-                                log: AppendLog);
+                            int bestK;
+                            double bestScore;
+                            int autoMinK;
+                            int autoMaxK;
+                            int evaluationCount;
+                            bool usedSample;
 
-                            resolvedKMeansK = autoResult.BestK;
-                            string sampleHint = autoResult.UsedSample
-                                ? $"，评估样本 {autoResult.EvaluationCount}/{clusteringSpace.Count}"
+                            if (SelectedAlgorithm == "SphericalKMeans")
+                            {
+                                var autoResult = Utils.SphericalKMeansClusterer.FindBestKBySilhouette(
+                                    clusteringSpace,
+                                    minK,
+                                    maxK,
+                                    randomState: 42,
+                                    evaluationSampleSize: 600,
+                                    log: AppendLog);
+                                bestK = autoResult.BestK;
+                                bestScore = autoResult.BestScore;
+                                autoMinK = autoResult.MinK;
+                                autoMaxK = autoResult.MaxK;
+                                evaluationCount = autoResult.EvaluationCount;
+                                usedSample = autoResult.UsedSample;
+                            }
+                            else
+                            {
+                                var autoResult = Utils.SklearnKMeansClusterer.FindBestKBySilhouette(
+                                    clusteringSpace,
+                                    minK,
+                                    maxK,
+                                    randomState: 42,
+                                    evaluationSampleSize: 600,
+                                    log: AppendLog);
+                                bestK = autoResult.BestK;
+                                bestScore = autoResult.BestScore;
+                                autoMinK = autoResult.MinK;
+                                autoMaxK = autoResult.MaxK;
+                                evaluationCount = autoResult.EvaluationCount;
+                                usedSample = autoResult.UsedSample;
+                            }
+
+                            resolvedKMeansK = bestK;
+                            string sampleHint = usedSample
+                                ? $"，评估样本 {evaluationCount}/{clusteringSpace.Count}"
                                 : string.Empty;
                             AppendLog(
-                                $"轮廓系数最优结果：K={resolvedKMeansK}，score={autoResult.BestScore:F4}，范围 {autoResult.MinK}-{autoResult.MaxK}{sampleHint}");
+                                $"轮廓系数最优结果：K={resolvedKMeansK}，score={bestScore:F4}，范围 {autoMinK}-{autoMaxK}{sampleHint}");
                         }
                     }
                     else
@@ -627,17 +855,39 @@ namespace CyanTools.ViewModel
                     }
                 }
 
-                int[] assignments = SelectedAlgorithm switch
+                int[] assignments;
+                if (useTwoStageStyleClustering)
                 {
-                    "KMeans" => Utils.SklearnKMeansClusterer.Cluster(clusteringSpace, resolvedKMeansK, randomState: 42),
-                    "HDBSCAN" => Utils.HdbscanClusterer.Cluster(clusteringSpace, MinClusterSize),
-                    _ => new int[dataPoints.Count]
-                };
+                    var twoStageResult = Utils.TwoStageStyleClusterer.Cluster(
+                        coarseStagePoints ?? throw new InvalidOperationException("二阶段聚类缺少灰度 Style 特征。"),
+                        clusteringSourcePoints,
+                        resolvedKMeansK,
+                        useSphericalKMeans: SelectedAlgorithm == "SphericalKMeans",
+                        randomState: 42);
+                    assignments = twoStageResult.Labels;
+                    AppendLog(
+                        $"二阶段聚类完成：粗分 {twoStageResult.CoarseClusterCount} 类，细分后得到 {twoStageResult.ProducedClusterCount} 类。");
+                    AppendLog($"二阶段分配: {DescribeTwoStageClusterResult(twoStageResult)}");
+                }
+                else
+                {
+                    assignments = SelectedAlgorithm switch
+                    {
+                        "KMeans" => Utils.SklearnKMeansClusterer.Cluster(clusteringSpace, resolvedKMeansK, randomState: 42),
+                        "SphericalKMeans" => Utils.SphericalKMeansClusterer.Cluster(clusteringSpace, resolvedKMeansK, randomState: 42),
+                        "HDBSCAN" => Utils.HdbscanClusterer.Cluster(clusteringSpace, MinClusterSize),
+                        _ => new int[clusteringSourcePoints.Count]
+                    };
+                }
 
                 Application.Current.Dispatcher.Invoke(() => Progress = 75);
 
-                string featureLower = GetFeatureTypeSlug(SelectedFeatureType);
-                string spaceLower = useUmapSpace ? "umap2d" : "raw";
+                string featureLower = useTwoStageStyleClustering
+                    ? $"{GetFeatureTypeSlug(FeatureTypeGrayStyleDisplay)}2{GetFeatureTypeSlug(effectiveFeatureType)}"
+                    : GetFeatureTypeSlug(effectiveFeatureType);
+                string spaceLower = useTwoStageStyleClustering
+                    ? "style2stage"
+                    : GetClusteringSpaceSlug(useUmapSpace, useStyleBrushSpace);
                 string title = $"{SelectedAlgorithm}_{featureLower}_{spaceLower}";
                 string outputRoot = Path.Combine(OutputPath, title);
                 PrepareOutputRoot(outputRoot);
@@ -645,7 +895,7 @@ namespace CyanTools.ViewModel
                 string? distributionImagePath = null;
                 try
                 {
-                    var distributionSpace = BuildDistributionSpace(dataPoints, clusteringSpace, useUmapSpace, token);
+                    var distributionSpace = BuildDistributionSpace(clusteringSourcePoints, clusteringSpace, useUmapSpace, token);
                     distributionImagePath = Utils.ClusterDistributionPlotter.SaveScatterPlot(
                         distributionSpace,
                         assignments,
@@ -659,9 +909,30 @@ namespace CyanTools.ViewModel
                     AppendLog($"生成聚类分布图失败: {ex.Message}");
                 }
 
-                var exportOrder = BuildClusterExportOrder(clusteringSpace, assignments);
+                var exportFilterOptions = new ClusterExportFilterOptions
+                {
+                    FilterByIqr = FilterOutliersForExport,
+                    FilterByMinSimilarity = UseMinSimilarityForUncertain,
+                    MinSimilarity = MinCentroidSimilarity
+                };
+                var exportPlan = BuildClusterExportPlan(clusteringSourcePoints, assignments, exportFilterOptions);
+                var exportOrder = exportPlan.ClusterIndices;
                 var clusterLabels = exportOrder.Keys.Where(id => id >= 0).OrderBy(id => id).ToList();
                 bool hasNoise = exportOrder.ContainsKey(-1);
+                bool hasUncertain = exportPlan.UncertainIndices.Count > 0;
+
+                if (FilterOutliersForExport || UseMinSimilarityForUncertain)
+                {
+                    string filterSummary = BuildExportFilterSummary(FilterOutliersForExport, UseMinSimilarityForUncertain, MinCentroidSimilarity);
+                    if (hasUncertain)
+                    {
+                        AppendLog($"导出过滤（{filterSummary}）：已将 {exportPlan.UncertainIndices.Count} 张样本移动到 uncertain。");
+                    }
+                    else
+                    {
+                        AppendLog($"导出过滤（{filterSummary}）：未检测到需要剔除的样本。");
+                    }
+                }
 
                 foreach (int clusterId in clusterLabels)
                 {
@@ -670,6 +941,10 @@ namespace CyanTools.ViewModel
                 if (hasNoise)
                 {
                     Directory.CreateDirectory(Path.Combine(outputRoot, "noise"));
+                }
+                if (hasUncertain)
+                {
+                    Directory.CreateDirectory(Path.Combine(outputRoot, "uncertain"));
                 }
 
                 int copiedCount = 0;
@@ -716,13 +991,33 @@ namespace CyanTools.ViewModel
                     }
                 }
 
+                if (hasUncertain)
+                {
+                    string uncertainDir = Path.Combine(outputRoot, "uncertain");
+                    var uncertainIndices = exportPlan.UncertainIndices;
+                    for (int rank = 0; rank < uncertainIndices.Count; rank++)
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        int sourceIndex = uncertainIndices[rank];
+                        string sourceFilePath = imageResults[sourceIndex].FilePath;
+                        string targetFilePath = BuildRankedTargetFilePath(uncertainDir, sourceFilePath, rank, sourceIndex);
+                        CopyFileWithRetry(sourceFilePath, targetFilePath);
+                        CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
+
+                        copiedCount++;
+                        Application.Current.Dispatcher.Invoke(() =>
+                            Progress = 75 + (double)copiedCount / totalToCopy * 25);
+                    }
+                }
+
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     AppendLog("图片聚类完成");
                     Progress = 100;
                     if (showDialogs)
                     {
-                        ShowClusteringCompletionDialog(outputRoot, distributionImagePath, imageResults.Count, assignments);
+                        ShowClusteringCompletionDialog(outputRoot, distributionImagePath, imageResults.Count, assignments, exportPlan.UncertainIndices.Count);
                     }
                 });
             }
@@ -753,6 +1048,7 @@ namespace CyanTools.ViewModel
                 var umapOptions = BuildUmapOptions(dataPoints.Count);
                 AppendLog(
                     $"开始生成分布图坐标（UMAP 2D, n_neighbors={umapOptions.NNeighbors}, min_dist={umapOptions.MinDist:F3}, spread={umapOptions.Spread:F3}）");
+                AppendUmapImplementationLog(umapOptions);
 
                 return Utils.UmapReducer.ReduceToTwoDimensions(dataPoints, umapOptions, token);
             }
@@ -801,6 +1097,22 @@ namespace CyanTools.ViewModel
             };
         }
 
+        private void AppendUmapImplementationLog(Utils.UmapReducer.Options options)
+        {
+            bool useReferenceCompatiblePath =
+                options.NComponents == 2 &&
+                Math.Abs(options.MinDist - 0.1f) <= 1e-6f &&
+                Math.Abs(options.Spread - 1.0f) <= 1e-6f;
+
+            if (useReferenceCompatiblePath)
+            {
+                AppendLog("UMAP 实现: 使用 UMAP.dll 路径，对齐参考脚本的默认 2D 配置。");
+                return;
+            }
+
+            AppendLog("UMAP 实现: 当前参数已偏离参考默认值，将回退到内置近似实现。");
+        }
+
         private static int ResolveAutoKUpperBound(int sampleCount)
         {
             int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount));
@@ -812,7 +1124,7 @@ namespace CyanTools.ViewModel
             return points.Count > 0 && points.All(v => v != null && v.Length == 2);
         }
 
-        private void ShowClusteringCompletionDialog(string outputRoot, string? distributionImagePath, int totalCount, IReadOnlyList<int> assignments)
+        private void ShowClusteringCompletionDialog(string outputRoot, string? distributionImagePath, int totalCount, IReadOnlyList<int> assignments, int uncertainCount)
         {
             int clusterCount = assignments.Where(a => a >= 0).Distinct().Count();
             int noiseCount = assignments.Count(a => a < 0);
@@ -820,6 +1132,10 @@ namespace CyanTools.ViewModel
             if (noiseCount > 0)
             {
                 summary += $"，噪声 {noiseCount} 张";
+            }
+            if (uncertainCount > 0)
+            {
+                summary += $"，离群 {uncertainCount} 张";
             }
 
             if (!string.IsNullOrWhiteSpace(distributionImagePath) && File.Exists(distributionImagePath))
@@ -837,7 +1153,7 @@ namespace CyanTools.ViewModel
             MessageBox.Show($"{summary}\n\n未能生成分布图。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        private static float[] BuildFeatureVector(ImageStyleResult result, string featureType)
+        private static float[] BuildFeatureVector(ImageStyleResult result, string featureType, float colorRetention)
         {
             if (result == null)
             {
@@ -847,6 +1163,8 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => NormalizeVectorCopy(result.StyleVector),
+                "GrayStyle" => NormalizeVectorCopy(result.GrayStyleVector),
+                "StyleColorDownweight" => BlendNormalizedVectors(result.StyleVector, result.GrayStyleVector, colorRetention),
                 "Content" => NormalizeVectorCopy(result.ContentVector),
                 "Style+Content" => ConcatNormalizedVectors(result.StyleVector, result.ContentVector),
                 _ => throw new InvalidOperationException($"未知特征类型: {featureType}")
@@ -861,6 +1179,27 @@ namespace CyanTools.ViewModel
             var merged = new float[a.Length + b.Length];
             Array.Copy(a, 0, merged, 0, a.Length);
             Array.Copy(b, 0, merged, a.Length, b.Length);
+            return NormalizeVectorCopy(merged);
+        }
+
+        private static float[] BlendNormalizedVectors(float[] first, float[] second, float firstWeight)
+        {
+            var a = NormalizeVectorCopy(first);
+            var b = NormalizeVectorCopy(second);
+
+            if (a.Length != b.Length)
+            {
+                throw new InvalidOperationException("向量维度不一致，无法进行颜色降权融合。");
+            }
+
+            float clampedFirstWeight = Math.Clamp(firstWeight, 0f, 1f);
+            float secondWeight = 1f - clampedFirstWeight;
+            var merged = new float[a.Length];
+            for (int i = 0; i < merged.Length; i++)
+            {
+                merged[i] = a[i] * clampedFirstWeight + b[i] * secondWeight;
+            }
+
             return NormalizeVectorCopy(merged);
         }
 
@@ -905,10 +1244,22 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => "style",
+                "GrayStyle" => "graystyle",
+                "StyleColorDownweight" => "stylelite",
                 "Content" => "content",
                 "Style+Content" => "hybrid",
                 _ => "unknown"
             };
+        }
+
+        private static string GetClusteringSpaceSlug(bool useUmapSpace, bool useStyleBrushSpace)
+        {
+            if (useUmapSpace)
+            {
+                return "umap2d";
+            }
+
+            return useStyleBrushSpace ? "stylehd" : "raw";
         }
 
         private static string GetFeatureTypeKey(string? featureType)
@@ -916,6 +1267,18 @@ namespace CyanTools.ViewModel
             if (string.IsNullOrWhiteSpace(featureType))
             {
                 return "Style+Content";
+            }
+
+            if (featureType.StartsWith("GrayStyle", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（灰度", StringComparison.OrdinalIgnoreCase))
+            {
+                return "GrayStyle";
+            }
+
+            if (featureType.StartsWith("StyleColorDownweight", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（颜色降权", StringComparison.OrdinalIgnoreCase))
+            {
+                return "StyleColorDownweight";
             }
 
             if (featureType.StartsWith("Style+Content", StringComparison.OrdinalIgnoreCase))
@@ -941,9 +1304,98 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => FeatureTypeStyleDisplay,
+                "GrayStyle" => FeatureTypeGrayStyleDisplay,
+                "StyleColorDownweight" => FeatureTypeStyleColorDownweightDisplay,
                 "Content" => FeatureTypeContentDisplay,
                 _ => FeatureTypeHybridDisplay
             };
+        }
+
+        private static bool UsesGrayStyleVectors(string featureType, bool useTwoStageStyleClustering = false)
+        {
+            if (useTwoStageStyleClustering)
+            {
+                return true;
+            }
+
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "GrayStyle" => true,
+                "StyleColorDownweight" => true,
+                _ => false
+            };
+        }
+
+        private static bool IsStyleLikeFeatureType(string featureType)
+        {
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "Style" => true,
+                "GrayStyle" => true,
+                "StyleColorDownweight" => true,
+                _ => false
+            };
+        }
+
+        private static string ResolveTwoStageFineFeatureType(string featureType)
+        {
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "StyleColorDownweight" => FeatureTypeStyleColorDownweightDisplay,
+                "GrayStyle" => FeatureTypeStyleDisplay,
+                "Style" => FeatureTypeStyleDisplay,
+                _ => FeatureTypeStyleDisplay
+            };
+        }
+
+        private static string DescribeTwoStageClusterResult(Utils.TwoStageStyleClusterer.Result result)
+        {
+            if (result.CoarseClusterCount == 0)
+            {
+                return "无有效样本。";
+            }
+
+            var parts = new List<string>(result.CoarseClusterCount);
+            for (int i = 0; i < result.CoarseClusterCount; i++)
+            {
+                int size = i < result.CoarseClusterSizes.Count ? result.CoarseClusterSizes[i] : 0;
+                int fine = i < result.FineClusterCounts.Count ? result.FineClusterCounts[i] : 0;
+                parts.Add($"粗类{i}: {size}张 -> {fine}类");
+            }
+
+            const int maxParts = 8;
+            if (parts.Count > maxParts)
+            {
+                return string.Join("，", parts.Take(maxParts)) + $"，其余 {parts.Count - maxParts} 个粗类已省略";
+            }
+
+            return string.Join("，", parts);
+        }
+
+        private static string BuildExportFilterSummary(bool filterByIqr, bool filterByMinSimilarity, double minSimilarity)
+        {
+            if (filterByIqr && filterByMinSimilarity)
+            {
+                return $"IQR + 最小相似度 {minSimilarity:F2}";
+            }
+
+            if (filterByMinSimilarity)
+            {
+                return $"最小相似度 {minSimilarity:F2}";
+            }
+
+            return "IQR";
+        }
+
+        private static List<float[]> BuildFeatureVectors(IReadOnlyList<ImageStyleResult> results, string featureType, float colorRetention)
+        {
+            var vectors = new List<float[]>(results.Count);
+            for (int i = 0; i < results.Count; i++)
+            {
+                vectors.Add(BuildFeatureVector(results[i], featureType, colorRetention));
+            }
+
+            return vectors;
         }
 
         private static List<float[]> ProjectToTwoDimensions(IReadOnlyList<float[]> dataPoints)
@@ -960,11 +1412,25 @@ namespace CyanTools.ViewModel
             return projected;
         }
 
-        private static Dictionary<int, List<int>> BuildClusterExportOrder(
-            IReadOnlyList<float[]> clusteringSpace,
-            IReadOnlyList<int> assignments)
+        private sealed class ClusterExportPlan
         {
-            if (clusteringSpace.Count != assignments.Count)
+            public Dictionary<int, List<int>> ClusterIndices { get; } = new();
+            public List<int> UncertainIndices { get; } = new();
+        }
+
+        private sealed class ClusterExportFilterOptions
+        {
+            public bool FilterByIqr { get; init; }
+            public bool FilterByMinSimilarity { get; init; }
+            public double MinSimilarity { get; init; }
+        }
+
+        private static ClusterExportPlan BuildClusterExportPlan(
+            IReadOnlyList<float[]> referenceSpace,
+            IReadOnlyList<int> assignments,
+            ClusterExportFilterOptions filterOptions)
+        {
+            if (referenceSpace.Count != assignments.Count)
             {
                 throw new InvalidOperationException("特征数量与聚类标签数量不一致。");
             }
@@ -982,6 +1448,7 @@ namespace CyanTools.ViewModel
                 indices.Add(i);
             }
 
+            var exportPlan = new ClusterExportPlan();
             foreach (var entry in clusterIndices)
             {
                 int clusterId = entry.Key;
@@ -989,20 +1456,118 @@ namespace CyanTools.ViewModel
                 if (clusterId < 0)
                 {
                     indices.Sort();
+                    exportPlan.ClusterIndices[clusterId] = indices;
                     continue;
                 }
 
-                float[] centroid = ComputeCentroid(clusteringSpace, indices);
-                indices.Sort((a, b) =>
+                List<int> retainedIndices = new(indices);
+                if (filterOptions.FilterByIqr || filterOptions.FilterByMinSimilarity)
                 {
-                    double da = ComputeSquaredDistance(clusteringSpace[a], centroid);
-                    double db = ComputeSquaredDistance(clusteringSpace[b], centroid);
+                    var (retained, outliers) = SplitClusterMembers(referenceSpace, indices, filterOptions);
+                    retainedIndices = retained;
+                    exportPlan.UncertainIndices.AddRange(outliers);
+                }
+
+                if (retainedIndices.Count == 0)
+                {
+                    continue;
+                }
+
+                float[] centroid = ComputeCentroid(referenceSpace, retainedIndices);
+                retainedIndices.Sort((a, b) =>
+                {
+                    double da = ComputeSquaredDistance(referenceSpace[a], centroid);
+                    double db = ComputeSquaredDistance(referenceSpace[b], centroid);
                     int cmp = da.CompareTo(db);
                     return cmp != 0 ? cmp : a.CompareTo(b);
                 });
+                exportPlan.ClusterIndices[clusterId] = retainedIndices;
             }
 
-            return clusterIndices;
+            exportPlan.UncertainIndices.Sort();
+            return exportPlan;
+        }
+
+        private static (List<int> retainedIndices, List<int> outlierIndices) SplitClusterMembers(
+            IReadOnlyList<float[]> referenceSpace,
+            IReadOnlyList<int> indices,
+            ClusterExportFilterOptions filterOptions)
+        {
+            if (indices.Count == 0)
+            {
+                return (new List<int>(), new List<int>());
+            }
+
+            float[] centroid = ComputeCentroid(referenceSpace, indices);
+            float[] normalizedCentroid = NormalizeVectorCopy(centroid);
+            var ranked = indices
+                .Select(index => new
+                {
+                    Index = index,
+                    Distance = Math.Sqrt(ComputeSquaredDistance(referenceSpace[index], centroid)),
+                    Similarity = ComputeCosineSimilarity(referenceSpace[index], normalizedCentroid)
+                })
+                .OrderBy(item => item.Distance)
+                .ThenBy(item => item.Index)
+                .ToList();
+
+            double distanceThreshold = double.PositiveInfinity;
+            if (filterOptions.FilterByIqr && indices.Count >= OutlierFilterMinClusterSize)
+            {
+                double[] distances = ranked.Select(item => item.Distance).ToArray();
+                double q1 = ComputePercentile(distances, 0.25d);
+                double q3 = ComputePercentile(distances, 0.75d);
+                double iqr = q3 - q1;
+                if (iqr > 1e-9d)
+                {
+                    distanceThreshold = q3 + OutlierIqrMultiplier * iqr;
+                }
+            }
+
+            var retained = ranked
+                .Where(item =>
+                    item.Distance <= distanceThreshold &&
+                    (!filterOptions.FilterByMinSimilarity || item.Similarity >= filterOptions.MinSimilarity))
+                .Select(item => item.Index)
+                .ToList();
+            var outliers = ranked
+                .Where(item =>
+                    item.Distance > distanceThreshold ||
+                    (filterOptions.FilterByMinSimilarity && item.Similarity < filterOptions.MinSimilarity))
+                .Select(item => item.Index)
+                .ToList();
+
+            if (outliers.Count == 0)
+            {
+                return (indices.ToList(), new List<int>());
+            }
+
+            return (retained, outliers);
+        }
+
+        private static double ComputePercentile(IReadOnlyList<double> sortedValues, double percentile)
+        {
+            if (sortedValues.Count == 0)
+            {
+                return 0d;
+            }
+
+            if (sortedValues.Count == 1)
+            {
+                return sortedValues[0];
+            }
+
+            double clamped = Math.Clamp(percentile, 0d, 1d);
+            double position = clamped * (sortedValues.Count - 1);
+            int lower = (int)Math.Floor(position);
+            int upper = (int)Math.Ceiling(position);
+            if (lower == upper)
+            {
+                return sortedValues[lower];
+            }
+
+            double weight = position - lower;
+            return sortedValues[lower] * (1d - weight) + sortedValues[upper] * weight;
         }
 
         private static float[] ComputeCentroid(IReadOnlyList<float[]> vectors, IReadOnlyList<int> indices)
@@ -1044,6 +1609,18 @@ namespace CyanTools.ViewModel
             }
 
             return sum;
+        }
+
+        private static double ComputeCosineSimilarity(IReadOnlyList<float> vector, IReadOnlyList<float> centroid)
+        {
+            int dimension = Math.Min(vector.Count, centroid.Count);
+            double dot = 0;
+            for (int d = 0; d < dimension; d++)
+            {
+                dot += vector[d] * centroid[d];
+            }
+
+            return dot;
         }
 
         private static string BuildRankedTargetFilePath(string targetDir, string sourceFilePath, int rank, int fallbackIndex)

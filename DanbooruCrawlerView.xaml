@@ -89,6 +89,7 @@
                 <StackPanel Grid.Row="9" Grid.Column="1" Orientation="Horizontal" Margin="5,5,5,0">
                     <Button Content="{Binding StartButtonText}" Command="{Binding StartStopCommand}" Width="100"/>
                     <Button Content="清空日志" Command="{Binding ClearLogCommand}" Margin="8,0,0,0" Width="90"/>
+                    <Button Content="Danbooru正则手动获取" Command="{Binding OpenDanbooruManualCollectorCommand}" Margin="8,0,0,0" Width="170"/>
                 </StackPanel>
             </Grid>
         </StackPanel>

@@ -3,7 +3,7 @@ using CyanTools.Navigation;
 
 namespace CyanTools
 {
-    [ToolPage("图片缩放", 115)]
+    [ToolPage("图片上下采", 115)]
     public partial class ImageScalingView : UserControl
     {
         public ImageScalingView()

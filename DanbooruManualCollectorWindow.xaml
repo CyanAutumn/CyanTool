@@ -1,0 +1,53 @@
+<Window x:Class="CyanTools.DanbooruManualCollectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Danbooru 正则手动获取"
+        Height="760"
+        Width="1240"
+        MinHeight="620"
+        MinWidth="940">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="URL:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox Grid.Column="1" x:Name="UrlTextBox" Margin="0,0,8,0"/>
+            <Button Grid.Column="2" x:Name="OpenButton" Content="当前页打开" Width="96" Margin="0,0,8,0" Click="OnOpenClicked"/>
+            <Button Grid.Column="3" x:Name="OpenListButton" Content="打开列表页" Width="96" Margin="0,0,8,0" Click="OnOpenListClicked"/>
+            <Button Grid.Column="4" x:Name="CloseTabButton" Content="关闭当前标签页" Width="112" Margin="0,0,8,0" Click="OnCloseCurrentTabClicked"/>
+            <Button Grid.Column="5" x:Name="ExtractAndDownloadButton" Content="提取并下载" Width="100" Click="OnExtractAndDownloadClicked"/>
+        </Grid>
+
+        <TextBlock Grid.Row="1"
+                   Text="用法：在列表页中键点击帖子链接打开新标签页，点“提取并下载”会按所有帖子标签页 ID 批量下载。"
+                   Foreground="Gray"
+                   Margin="0,0,0,8"/>
+
+        <TabControl Grid.Row="2" x:Name="BrowserTabControl" SelectionChanged="OnBrowserTabSelectionChanged"/>
+
+        <DockPanel Grid.Row="3" Margin="0,8,0,0">
+            <Button Content="关闭窗口" Width="96" DockPanel.Dock="Right" Click="OnCancelClicked"/>
+            <TextBlock x:Name="StatusTextBlock"
+                       Text="准备就绪"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="0,0,8,0"/>
+        </DockPanel>
+    </Grid>
+</Window>

@@ -65,6 +65,36 @@
                 </Grid>
 
                 <Grid Margin="0,5,0,0">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsColorDownweightSelected}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="颜色保留:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1"
+                            Minimum="0" Maximum="1"
+                            TickFrequency="0.05"
+                            IsSnapToTickEnabled="False"
+                            Value="{Binding ColorDownweightStyleRetention, Mode=TwoWay}"
+                            Margin="5,0"
+                            VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding ColorDownweightStyleRetentionPercentText}"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -80,6 +110,75 @@
                     </Grid.ColumnDefinitions>
                     <Label Content="聚类空间:" Grid.Column="0" VerticalAlignment="Center"/>
                     <ComboBox ItemsSource="{Binding ClusteringSpaces}" SelectedItem="{Binding SelectedClusteringSpace}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="导出过滤:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <CheckBox Content="IQR 离群过滤（导出到 uncertain）"
+                              IsChecked="{Binding FilterOutliersForExport, Mode=TwoWay}"
+                              Grid.Column="1"
+                              Margin="5,0"
+                              VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="风格增强:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <CheckBox Content="二阶段聚类（先灰度 Style 粗分，再彩色 Style 细分）"
+                              IsChecked="{Binding EnableTwoStageStyleClustering, Mode=TwoWay}"
+                              Grid.Column="1"
+                              Margin="5,0"
+                              VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="严格不确定:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <CheckBox Content="启用最小相似度阈值，不够像就进 uncertain"
+                              IsChecked="{Binding UseMinSimilarityForUncertain, Mode=TwoWay}"
+                              Grid.Column="1"
+                              Margin="5,0"
+                              VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Margin="0,5,0,0">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UseMinSimilarityForUncertain}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="最小相似度:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1"
+                            Minimum="0.55" Maximum="0.98"
+                            TickFrequency="0.01"
+                            IsSnapToTickEnabled="False"
+                            Value="{Binding MinCentroidSimilarity, Mode=TwoWay}"
+                            Margin="5,0"
+                            VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding MinCentroidSimilarityPercentText}"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"/>
                 </Grid>
 
                 <Grid Margin="0,5,0,0">

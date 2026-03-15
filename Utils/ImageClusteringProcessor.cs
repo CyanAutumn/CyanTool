@@ -74,6 +74,7 @@ namespace CyanTools.Utils
             string folderPath,
             Action<double> onProgress,
             Action<string> onError,
+            bool includeGrayStyle = false,
             IEnumerable<string>? excludedFolders = null)
         {
             try
@@ -104,14 +105,32 @@ namespace CyanTools.Utils
                     var imagePath = imageFiles[i];
                     try
                     {
-                        var inputTensor = PreprocessImage(imagePath);
+                        using var original = LoadImage(imagePath);
+                        var inputTensor = PreprocessImage(original, grayscale: false);
                         var (styleVec, contentVec) = ExtractEmbeddings(inputTensor);
                         if (styleVec.Length == 0 || contentVec.Length == 0)
                         {
                             throw new InvalidOperationException("模型输出为空，请检查 ONNX 输出名称是否与 style_output/content_output 一致。");
                         }
 
-                        results.Add(new ImageStyleResult { FilePath = imagePath, StyleVector = styleVec, ContentVector = contentVec });
+                        float[] grayStyleVec = Array.Empty<float>();
+                        if (includeGrayStyle)
+                        {
+                            var grayTensor = PreprocessImage(original, grayscale: true);
+                            (grayStyleVec, _) = ExtractEmbeddings(grayTensor);
+                            if (grayStyleVec.Length == 0)
+                            {
+                                throw new InvalidOperationException("灰度 Style 分支输出为空，请检查模型输出或预处理流程。");
+                            }
+                        }
+
+                        results.Add(new ImageStyleResult
+                        {
+                            FilePath = imagePath,
+                            StyleVector = styleVec,
+                            GrayStyleVector = grayStyleVec,
+                            ContentVector = contentVec
+                        });
                     }
                     catch (Exception ex)
                     {
@@ -249,14 +268,21 @@ namespace CyanTools.Utils
             return full.TrimEnd(Path.DirectorySeparatorChar);
         }
 
-        private DenseTensor<Float16> PreprocessImage(string imagePath) {
+        private static Image<Rgb24> LoadImage(string imagePath)
+        {
             byte[] imageBytes = File.ReadAllBytes(imagePath);
             using var ms = new MemoryStream(imageBytes);
-            using var original = Image.Load<Rgb24>(ms);
+            return Image.Load<Rgb24>(ms);
+        }
 
+        private DenseTensor<Float16> PreprocessImage(Image<Rgb24> original, bool grayscale) {
             int canvasSize = Math.Max(original.Width, original.Height);
             using var canvas = new Image<Rgb24>(canvasSize, canvasSize, new Rgb24(255, 255, 255));
             canvas.Mutate(ctx => ctx.DrawImage(original, new Point((canvasSize - original.Width) / 2, (canvasSize - original.Height) / 2), 1f));
+            if (grayscale)
+            {
+                canvas.Mutate(ctx => ctx.Grayscale());
+            }
 
 
             canvas.Mutate(ctx => ctx.Resize(new ResizeOptions {
@@ -337,6 +363,7 @@ namespace CyanTools.Utils
     {
         public string FilePath { get; set; } = string.Empty;
         public float[] StyleVector { get; set; } = Array.Empty<float>();
+        public float[] GrayStyleVector { get; set; } = Array.Empty<float>();
         public float[] ContentVector { get; set; } = Array.Empty<float>();
     }
 }
