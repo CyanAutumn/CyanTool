@@ -3,16 +3,20 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class ImageScalingViewModel : INotifyPropertyChanged
+    public class ImageScalingViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
+        private const string ToolDisplayName = "图片上下采";
+
         private string _inputPath = string.Empty;
         private string _outputPath = string.Empty;
         private bool _isUpsampleEnabled = true;
@@ -23,6 +27,7 @@ namespace CyanTools.ViewModel
         private int _downsampleTargetHeight = 1536;
         private bool _isProcessing;
         private double _progressValue;
+        private bool _isWorkflowMode;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -36,7 +41,14 @@ namespace CyanTools.ViewModel
         public string InputPath
         {
             get => _inputPath;
-            set => SetField(ref _inputPath, value);
+            set
+            {
+                var previousInput = _inputPath;
+                if (SetField(ref _inputPath, value))
+                {
+                    OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, ToolDisplayName);
+                }
+            }
         }
 
         public string OutputPath
@@ -111,6 +123,16 @@ namespace CyanTools.ViewModel
             set => SetField(ref _progressValue, value);
         }
 
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set => SetField(ref _isWorkflowMode, value);
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputPath; set => OutputPath = value ?? string.Empty; }
+
         public ImageScalingViewModel()
         {
             SelectInputCommand = new RelayCommand(_ => SelectFolder(path => InputPath = path), _ => !IsProcessing);
@@ -143,10 +165,39 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task StartProcessingAsync()
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
         {
-            if (!ValidateInput())
+            return ExecuteProcessingAsync(
+                showDialogs: false,
+                rethrowErrors: true,
+                pipelineLog: message => context.AppendLog($"[{ToolDisplayName}] {message}"),
+                token);
+        }
+
+        private Task StartProcessingAsync()
+        {
+            return ExecuteProcessingAsync(
+                showDialogs: true,
+                rethrowErrors: false,
+                pipelineLog: null,
+                CancellationToken.None);
+        }
+
+        private async Task ExecuteProcessingAsync(bool showDialogs, bool rethrowErrors, Action<string>? pipelineLog, CancellationToken token)
+        {
+            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, ToolDisplayName);
+            if (!ValidateInput(showDialogs, out string errorMessage))
             {
+                if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    AppendLog(errorMessage);
+                    pipelineLog?.Invoke(errorMessage);
+                    if (rethrowErrors)
+                    {
+                        throw new InvalidOperationException(errorMessage);
+                    }
+                }
+
                 return;
             }
 
@@ -154,6 +205,7 @@ namespace CyanTools.ViewModel
             ProgressValue = 0;
             IsProcessing = true;
             AppendLog("开始批量图片上下采...");
+            pipelineLog?.Invoke("开始批量图片上下采...");
 
             var options = new ImageScalingOptions
             {
@@ -171,13 +223,21 @@ namespace CyanTools.ViewModel
 
             try
             {
+                token.ThrowIfCancellationRequested();
                 await ImageScalingProcessor.ProcessFolderAsync(options, progress, AppendLog);
                 ProgressValue = 100;
                 AppendLog("处理完成。");
+                pipelineLog?.Invoke("处理完成。");
             }
             catch (Exception ex)
             {
-                AppendLog($"处理失败: {ex.Message}");
+                string failureMessage = $"处理失败: {ex.Message}";
+                AppendLog(failureMessage);
+                pipelineLog?.Invoke(failureMessage);
+                if (rethrowErrors)
+                {
+                    throw;
+                }
             }
             finally
             {
@@ -185,35 +245,38 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private bool ValidateInput()
+        private bool ValidateInput(bool showDialogs, out string errorMessage)
         {
+            errorMessage = string.Empty;
+
             if (string.IsNullOrWhiteSpace(InputPath))
             {
-                MessageBox.Show("请选择输入路径。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
+                errorMessage = "请选择输入路径。";
+            }
+            else if (!Directory.Exists(InputPath))
+            {
+                errorMessage = "输入路径不存在。";
+            }
+            else if (string.IsNullOrWhiteSpace(OutputPath))
+            {
+                errorMessage = "请选择输出路径。";
+            }
+            else if (string.Equals(Path.GetFullPath(InputPath), Path.GetFullPath(OutputPath), StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "输入路径和输出路径不能相同。";
+            }
+            else if (!IsUpsampleEnabled && !IsDownsampleEnabled)
+            {
+                errorMessage = "请至少勾选一个处理选项。";
             }
 
-            if (!Directory.Exists(InputPath))
+            if (!string.IsNullOrWhiteSpace(errorMessage))
             {
-                MessageBox.Show("输入路径不存在。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
+                if (showDialogs)
+                {
+                    MessageBox.Show(errorMessage, "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
 
-            if (string.IsNullOrWhiteSpace(OutputPath))
-            {
-                MessageBox.Show("请选择输出路径。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            if (string.Equals(Path.GetFullPath(InputPath), Path.GetFullPath(OutputPath), StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show("输入路径和输出路径不能相同。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            if (!IsUpsampleEnabled && !IsDownsampleEnabled)
-            {
-                MessageBox.Show("请至少勾选一个处理选项。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
 

@@ -1,26 +1,35 @@
-
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using ImageMagick;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 
 namespace CyanTools.Utils
 {
     public static class ImageFormatConverter
     {
-        private static readonly string[] SupportedExtensions = { ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".psd" };
+        private const int MaxParallelUpperBound = 8;
+        private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".psd"
+        };
 
         public static async Task ConvertAsync(string inputPath, string outputPath, string targetFormat, IProgress<double> progress)
         {
-            var files = Directory.GetFiles(inputPath)
-                .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLower()))
+            var files = Directory.GetFiles(inputPath, "*.*", SearchOption.TopDirectoryOnly)
+                .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
             if (files.Length == 0)
@@ -31,50 +40,65 @@ namespace CyanTools.Utils
 
             Directory.CreateDirectory(outputPath);
 
-            for (int i = 0; i < files.Length; i++)
+            if (files.Any(IsPsdFile))
             {
-                var file = files[i];
-                await Task.Run(async () =>
+                ConfigureMagickAcceleration();
+            }
+
+            int maxParallelism = Math.Clamp(Environment.ProcessorCount, 1, Math.Min(MaxParallelUpperBound, files.Length));
+            int completed = 0;
+            var outputLocks = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+
+            await Parallel.ForEachAsync(
+                files,
+                new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                async (file, cancellationToken) =>
                 {
+                    string outputFilePath = GetOutputFilePath(file, outputPath, targetFormat);
+                    SemaphoreSlim outputLock = outputLocks.GetOrAdd(outputFilePath, static _ => new SemaphoreSlim(1, 1));
+
+                    await outputLock.WaitAsync(cancellationToken);
                     try
                     {
-                        var fileNameWithoutExt = Path.GetFileNameWithoutExtension(file);
-                        var newFileName = $"{fileNameWithoutExt}.{targetFormat.ToLowerInvariant()}";
-                        var newFilePath = Path.Combine(outputPath, newFileName);
-                        var extension = Path.GetExtension(file).ToLowerInvariant();
-
-                        if (extension == ".psd")
-                        {
-                            using var image = new MagickImage(file);
-                            image.Format = GetMagickFormat(targetFormat);
-                            image.Write(newFilePath);
-                        }
-                        else
-                        {
-                            using var image = await Image.LoadAsync(file);
-                            var encoder = GetEncoder(targetFormat);
-                            await image.SaveAsync(newFilePath, encoder);
-                        }
-
-
-                        if (inputPath != outputPath)
-                        {
-                            var txtFile = Path.ChangeExtension(file, ".txt");
-                            if (File.Exists(txtFile))
-                            {
-                                var destTxtFile = Path.Combine(outputPath, Path.GetFileName(txtFile));
-                                File.Copy(txtFile, destTxtFile, true);
-                            }
-                        }
+                        await ConvertSingleFileAsync(file, inputPath, outputPath, targetFormat, outputFilePath, cancellationToken);
                     }
                     catch (Exception ex)
                     {
-
                         Console.WriteLine($"Failed to convert {file}: {ex.Message}");
                     }
+                    finally
+                    {
+                        outputLock.Release();
+                        int done = Interlocked.Increment(ref completed);
+                        progress.Report(done * 100.0 / files.Length);
+                    }
                 });
+        }
 
-                progress.Report((double)(i + 1) / files.Length * 100);
+        private static async Task ConvertSingleFileAsync(
+            string file,
+            string inputPath,
+            string outputPath,
+            string targetFormat,
+            string outputFilePath,
+            CancellationToken cancellationToken)
+        {
+            if (IsPsdFile(file))
+            {
+                using var image = new MagickImage(file);
+                image.Format = GetMagickFormat(targetFormat);
+                image.Write(outputFilePath);
+            }
+            else
+            {
+                using var image = await Image.LoadAsync(file, cancellationToken);
+                var encoder = GetEncoder(targetFormat);
+                await image.SaveAsync(outputFilePath, encoder, cancellationToken);
+            }
+
+            if (!string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
+            {
+                CopyCompanionText(file, outputPath);
             }
         }
 
@@ -99,6 +123,90 @@ namespace CyanTools.Utils
                 case "BMP": return MagickFormat.Bmp;
                 case "WEBP": return MagickFormat.WebP;
                 default: throw new NotSupportedException("Unsupported image format");
+            }
+        }
+
+        private static string GetOutputFilePath(string sourceFilePath, string outputPath, string targetFormat)
+        {
+            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(sourceFilePath);
+            var newFileName = $"{fileNameWithoutExt}.{targetFormat.ToLowerInvariant()}";
+            return Path.Combine(outputPath, newFileName);
+        }
+
+        private static bool IsPsdFile(string filePath)
+        {
+            return string.Equals(Path.GetExtension(filePath), ".psd", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void CopyCompanionText(string sourceImagePath, string outputFolder)
+        {
+            var sourceTxtPath = Path.ChangeExtension(sourceImagePath, ".txt");
+            if (!File.Exists(sourceTxtPath))
+            {
+                return;
+            }
+
+            var destinationTxtPath = Path.Combine(outputFolder, Path.GetFileName(sourceTxtPath));
+            File.Copy(sourceTxtPath, destinationTxtPath, true);
+        }
+
+        private static void ConfigureMagickAcceleration()
+        {
+
+            TrySetMagickResourceThreadLimit(1);
+            TryEnableOpenCl();
+        }
+
+        private static void TryEnableOpenCl()
+        {
+            try
+            {
+                var assembly = typeof(MagickImage).Assembly;
+                var magickNetType = assembly.GetType("ImageMagick.MagickNET");
+                var openCl = magickNetType?.GetProperty("OpenCL", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+                if (openCl == null)
+                {
+                    return;
+                }
+
+                var isEnabledProperty = openCl.GetType().GetProperty("IsEnabled", BindingFlags.Public | BindingFlags.Instance);
+                if (isEnabledProperty == null || !isEnabledProperty.CanWrite)
+                {
+                    return;
+                }
+
+                isEnabledProperty.SetValue(openCl, true);
+            }
+            catch
+            {
+
+            }
+        }
+
+        private static void TrySetMagickResourceThreadLimit(int threadLimit)
+        {
+            try
+            {
+                var assembly = typeof(MagickImage).Assembly;
+                var magickNetType = assembly.GetType("ImageMagick.MagickNET");
+                var resourceLimits = magickNetType?.GetProperty("ResourceLimits", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+                if (resourceLimits == null)
+                {
+                    return;
+                }
+
+                var threadProperty = resourceLimits.GetType().GetProperty("Thread", BindingFlags.Public | BindingFlags.Instance);
+                if (threadProperty == null || !threadProperty.CanWrite)
+                {
+                    return;
+                }
+
+                object convertedValue = Convert.ChangeType(threadLimit, threadProperty.PropertyType, CultureInfo.InvariantCulture);
+                threadProperty.SetValue(resourceLimits, convertedValue);
+            }
+            catch
+            {
+
             }
         }
     }

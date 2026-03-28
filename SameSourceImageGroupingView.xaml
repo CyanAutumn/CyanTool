@@ -4,8 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="820">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -28,16 +32,23 @@
                     <TextBox Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
                     <Button Content="浏览..." Command="{Binding SelectInputCommand}" Grid.Column="2" Padding="10,2"/>
                 </Grid>
-                <Grid Margin="0,5,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Label Content="输出文件夹:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
-                    <Button Content="浏览..." Command="{Binding SelectOutputCommand}" Grid.Column="2" Padding="10,2"/>
-                </Grid>
+                <StackPanel Margin="0,5,0,0">
+                    <Label Content="输出文件夹:" Grid.Column="0" VerticalAlignment="Center"
+                           Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="0" Margin="5,0" VerticalAlignment="Center"
+                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                        <Button Content="浏览..." Command="{Binding SelectOutputCommand}" Grid.Column="1" Padding="10,2"
+                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                    </Grid>
+                    <TextBlock Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                               Foreground="Gray" Margin="0,4,0,0"
+                               Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </StackPanel>
                 <TextBlock Text="程序会在输出目录下自动创建: 原图 / 被包含 / 缩略图 / 差分 / 未知"
                            Margin="0,6,0,0"
                            Foreground="Gray"

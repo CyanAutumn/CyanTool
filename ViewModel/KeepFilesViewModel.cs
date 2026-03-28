@@ -1,6 +1,5 @@
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Text;
@@ -63,6 +62,7 @@ namespace CyanTools.ViewModel
         private bool _keepJpeg = true;
         private bool _keepNpz = true;
         private bool _keepTxt = true;
+        private bool _keepChineseTxt = true;
 
         public bool KeepJpg
         {
@@ -155,6 +155,19 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool KeepChineseTxt
+        {
+            get => _keepChineseTxt;
+            set
+            {
+                if (_keepChineseTxt != value)
+                {
+                    _keepChineseTxt = value;
+                    OnPropertyChanged(nameof(KeepChineseTxt));
+                }
+            }
+        }
+
         public ICommand SelectFolderCommand { get; }
         public ICommand DeleteFilesCommand { get; }
 
@@ -179,7 +192,8 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            var extensionsToKeep = BuildExtensionsToKeep();
+            var options = BuildOptions();
+            var extensionsToKeep = KeepFilesRetentionPolicy.BuildExtensionsToKeep(options);
             if (extensionsToKeep.Count == 0)
             {
                 MessageBox.Show("请至少保留一种文件类型。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -195,11 +209,11 @@ namespace CyanTools.ViewModel
 
                 foreach (var file in files)
                 {
-                    var extension = Path.GetExtension(file);
-                    if (!extensionsToKeep.Contains(extension))
+                    var deleteReason = KeepFilesRetentionPolicy.GetDeleteReason(file, options);
+                    if (deleteReason != KeepFilesDeleteReason.None)
                     {
                         File.Delete(file);
-                        AppendLog($"已删除: {file}");
+                        AppendLog(BuildDeleteLog(file, deleteReason));
                         deletedCount++;
                     }
                 }
@@ -214,17 +228,26 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private HashSet<string> BuildExtensionsToKeep()
+        private KeepFilesOptions BuildOptions()
         {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (KeepJpg) set.Add(".jpg");
-            if (KeepPng) set.Add(".png");
-            if (KeepWebp) set.Add(".webp");
-            if (KeepBmp) set.Add(".bmp");
-            if (KeepJpeg) set.Add(".jpeg");
-            if (KeepNpz) set.Add(".npz");
-            if (KeepTxt) set.Add(".txt");
-            return set;
+            return new KeepFilesOptions
+            {
+                KeepJpg = KeepJpg,
+                KeepPng = KeepPng,
+                KeepWebp = KeepWebp,
+                KeepBmp = KeepBmp,
+                KeepJpeg = KeepJpeg,
+                KeepNpz = KeepNpz,
+                KeepTxt = KeepTxt,
+                KeepChineseTxt = KeepChineseTxt
+            };
+        }
+
+        private static string BuildDeleteLog(string filePath, KeepFilesDeleteReason deleteReason)
+        {
+            return deleteReason == KeepFilesDeleteReason.ChineseContentNotAllowed
+                ? $"已删除(含中文内容 txt): {filePath}"
+                : $"已删除: {filePath}";
         }
 
         private void AppendLog(string message)

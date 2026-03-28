@@ -28,7 +28,9 @@ namespace CyanTools.ViewModel
         public event Action? OnCanvasResetRequired;
         
         private readonly Dictionary<string, List<Rect>> _cachedEdits = new Dictionary<string, List<Rect>>();
+        private readonly Dictionary<string, string> _cachedTextEdits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private string? _currentFilePath;
+        private string _currentFolderPath = string.Empty;
 
         
         private BitmapImage? _originalBitmap;
@@ -72,6 +74,11 @@ namespace CyanTools.ViewModel
         private string _category3Path = "";
         private string _category4Path = "";
         private string _category5Path = "";
+        private bool _isCategory1Selected = true;
+        private bool _isCategory2Selected = true;
+        private bool _isCategory3Selected = true;
+        private bool _isCategory4Selected = true;
+        private bool _isCategory5Selected = true;
 
         
         public ObservableCollection<DatasetDataItem> DataItemsWithOperations { get; } = new ObservableCollection<DatasetDataItem>();
@@ -84,14 +91,20 @@ namespace CyanTools.ViewModel
             get => _selectedDataItem;
             set
             {
-                if (SetField(ref _selectedDataItem, value))
+                if (EqualityComparer<DatasetDataItem?>.Default.Equals(_selectedDataItem, value))
                 {
-                    SaveChangesToCache();
-                    LoadSelectedData();
-                    if (_selectedDataItem != null)
-                    {
-                        _currentIndex = DataItemsWithOperations.IndexOf(_selectedDataItem);
-                    }
+                    return;
+                }
+
+                SaveCurrentSelectionEditsToCache();
+
+                _selectedDataItem = value;
+                OnPropertyChanged();
+
+                LoadSelectedData();
+                if (_selectedDataItem != null)
+                {
+                    _currentIndex = DataItemsWithOperations.IndexOf(_selectedDataItem);
                 }
             }
         }
@@ -218,6 +231,36 @@ namespace CyanTools.ViewModel
             set => SetField(ref _category5Path, value);
         }
 
+        public bool IsCategory1Selected
+        {
+            get => _isCategory1Selected;
+            set => SetField(ref _isCategory1Selected, value);
+        }
+
+        public bool IsCategory2Selected
+        {
+            get => _isCategory2Selected;
+            set => SetField(ref _isCategory2Selected, value);
+        }
+
+        public bool IsCategory3Selected
+        {
+            get => _isCategory3Selected;
+            set => SetField(ref _isCategory3Selected, value);
+        }
+
+        public bool IsCategory4Selected
+        {
+            get => _isCategory4Selected;
+            set => SetField(ref _isCategory4Selected, value);
+        }
+
+        public bool IsCategory5Selected
+        {
+            get => _isCategory5Selected;
+            set => SetField(ref _isCategory5Selected, value);
+        }
+
         
         public ICommand SelectFolderCommand { get; }
         public ICommand SaveAllCommand { get; }
@@ -310,101 +353,112 @@ namespace CyanTools.ViewModel
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                string folderPath = dialog.FileName;
-                if (!string.IsNullOrEmpty(folderPath) && Directory.Exists(folderPath))
+                LoadFolder(dialog.FileName);
+            }
+        }
+
+        private void LoadFolder(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
+            {
+                return;
+            }
+
+            try
+            {
+                _currentFolderPath = folderPath;
+                _cachedEdits.Clear();
+                _cachedTextEdits.Clear();
+                CancelImageLoad();
+                _currentFilePath = null;
+                ResetState();
+                CurrentImageSource = null;
+                CurrentTextContent = "";
+                _selectedDataItem = null;
+                OnPropertyChanged(nameof(SelectedDataItem));
+                ResetTagEditor();
+                OnCanvasResetRequired?.Invoke();
+
+                var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
+                var itemsByBaseName = new Dictionary<string, DatasetDataItem>(StringComparer.OrdinalIgnoreCase);
+
+                var enumerationOptions = new EnumerationOptions
                 {
-                    try
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true
+                };
+
+                foreach (var file in Directory.EnumerateFiles(folderPath, "*", enumerationOptions))
+                {
+                    string extension = System.IO.Path.GetExtension(file);
+                    string relativePath = System.IO.Path.GetRelativePath(folderPath, file)
+                        .Replace(System.IO.Path.AltDirectorySeparatorChar, System.IO.Path.DirectorySeparatorChar);
+                    string baseKey = extension.Length > 0 && relativePath.Length > extension.Length
+                        ? relativePath.Substring(0, relativePath.Length - extension.Length)
+                        : System.IO.Path.GetFileNameWithoutExtension(relativePath);
+
+                    if (extension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
                     {
-                        SaveChangesToCache();
-
-                        _cachedEdits.Clear();
-                        _currentFilePath = null;
-                        ResetState();
-                        CurrentImageSource = null;
-                        CurrentTextContent = "";
-                        OnCanvasResetRequired?.Invoke();
-
-                        var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-                        var itemsByBaseName = new Dictionary<string, DatasetDataItem>(StringComparer.OrdinalIgnoreCase);
-
-                        var enumerationOptions = new EnumerationOptions
+                        if (!itemsByBaseName.TryGetValue(baseKey, out var item))
                         {
-                            RecurseSubdirectories = true,
-                            IgnoreInaccessible = true
-                        };
+                            item = new DatasetDataItem { BaseName = baseKey };
+                            itemsByBaseName.Add(baseKey, item);
+                        }
+                        item.TextPath = file;
+                        continue;
+                    }
 
-                        foreach (var file in Directory.EnumerateFiles(folderPath, "*", enumerationOptions))
+                    if (imageExtensions.Contains(extension))
+                    {
+                        if (!itemsByBaseName.TryGetValue(baseKey, out var item))
                         {
-                            string extension = System.IO.Path.GetExtension(file);
-                            string relativePath = System.IO.Path.GetRelativePath(folderPath, file)
-                                .Replace(System.IO.Path.AltDirectorySeparatorChar, System.IO.Path.DirectorySeparatorChar);
-                            string baseKey = extension.Length > 0 && relativePath.Length > extension.Length
-                                ? relativePath.Substring(0, relativePath.Length - extension.Length)
-                                : System.IO.Path.GetFileNameWithoutExtension(relativePath);
-
-                            if (extension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
-                            {
-                                if (!itemsByBaseName.TryGetValue(baseKey, out var item))
-                                {
-                                    item = new DatasetDataItem { BaseName = baseKey };
-                                    itemsByBaseName.Add(baseKey, item);
-                                }
-                                item.TextPath = file;
-                                continue;
-                            }
-
-                            if (imageExtensions.Contains(extension))
-                            {
-                                if (!itemsByBaseName.TryGetValue(baseKey, out var item))
-                                {
-                                    item = new DatasetDataItem { BaseName = baseKey };
-                                    itemsByBaseName.Add(baseKey, item);
-                                }
-
-                                if (string.IsNullOrEmpty(item.ImagePath))
-                                {
-                                    item.ImagePath = file;
-                                }
-                                else
-                                {
-                                    string uniqueKey = relativePath;
-                                    if (!itemsByBaseName.ContainsKey(uniqueKey))
-                                    {
-                                        itemsByBaseName.Add(uniqueKey, new DatasetDataItem { BaseName = uniqueKey, ImagePath = file });
-                                    }
-                                }
-                            }
+                            item = new DatasetDataItem { BaseName = baseKey };
+                            itemsByBaseName.Add(baseKey, item);
                         }
 
-                        DataItemsWithOperations.Clear();
-                        foreach (var item in itemsByBaseName.Values.OrderBy(i => i.BaseName, NaturalStringComparer.Instance))
+                        if (string.IsNullOrEmpty(item.ImagePath))
                         {
-                            DataItemsWithOperations.Add(item);
-                        }
-
-                        if (DataItemsWithOperations.Any())
-                        {
-                            _currentIndex = 0;
-                            SelectedDataItem = DataItemsWithOperations.First();
+                            item.ImagePath = file;
                         }
                         else
                         {
-                            SelectedDataItem = null;
+                            string uniqueKey = relativePath;
+                            if (!itemsByBaseName.ContainsKey(uniqueKey))
+                            {
+                                itemsByBaseName.Add(uniqueKey, new DatasetDataItem { BaseName = uniqueKey, ImagePath = file });
+                            }
                         }
-
-                        StartDatasetTagTranslation(DataItemsWithOperations.ToList());
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Windows.MessageBox.Show($"加载文件夹时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                     }
                 }
+
+                DataItemsWithOperations.Clear();
+                foreach (var item in itemsByBaseName.Values.OrderBy(i => i.BaseName, NaturalStringComparer.Instance))
+                {
+                    DataItemsWithOperations.Add(item);
+                }
+
+                if (DataItemsWithOperations.Any())
+                {
+                    _currentIndex = 0;
+                    SelectedDataItem = DataItemsWithOperations.First();
+                }
+                else
+                {
+                    _currentIndex = 0;
+                    SelectedDataItem = null;
+                }
+
+                StartDatasetTagTranslation(DataItemsWithOperations.ToList());
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"加载文件夹时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
         private void SaveAllChanges()
         {
-            SaveChangesToCache(); 
+            SaveCurrentSelectionEditsToCache();
 
             if (!DataItemsWithOperations.Any())
             {
@@ -416,10 +470,16 @@ namespace CyanTools.ViewModel
             {
                 int processedCount = 0;
                 int errorCount = 0;
+                int skippedCount = 0;
+                int uncheckedCategorySkippedCount = 0;
 
                 foreach (var item in DataItemsWithOperations.ToList())
                 {
-                    if (string.IsNullOrEmpty(item.Operation)) continue;
+                    bool hasPendingChanges = HasPendingChanges(item);
+                    if (string.IsNullOrEmpty(item.Operation) && !hasPendingChanges)
+                    {
+                        continue;
+                    }
 
                     try
                     {
@@ -427,8 +487,18 @@ namespace CyanTools.ViewModel
                         {
                             DeleteDataItemFiles(item);
                         }
+                        else if (string.IsNullOrEmpty(item.Operation))
+                        {
+                            SaveDataItemInPlace(item);
+                        }
                         else
                         {
+                            if (!IsCategorySelected(item.Operation))
+                            {
+                                uncheckedCategorySkippedCount++;
+                                continue;
+                            }
+
                             string targetFolder = GetCategoryFolder(item.Operation);
                             if (!string.IsNullOrEmpty(targetFolder) && Directory.Exists(targetFolder))
                             {
@@ -437,6 +507,7 @@ namespace CyanTools.ViewModel
                             else
                             {
                                 System.Windows.MessageBox.Show($"分类{item.Operation}的目标文件夹未设置或不存在。", "警告", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                                skippedCount++;
                                 continue;
                             }
                         }
@@ -450,19 +521,28 @@ namespace CyanTools.ViewModel
                     }
                 }
 
-                
-                DataItemsWithOperations.Clear();
-                SelectedDataItem = null;
-                CurrentImageSource = null;
-                CurrentTextContent = "";
-                _currentIndex = 0;
-                _currentFilePath = null;
-                _cachedEdits.Clear();
-                ResetState();
-                OnCanvasResetRequired?.Invoke();
+                if (processedCount == 0 && errorCount == 0 && skippedCount == 0)
+                {
+                    System.Windows.MessageBox.Show("没有需要保存的更改。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    return;
+                }
 
+                if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+                {
+                    LoadFolder(_currentFolderPath);
+                }
 
-                System.Windows.MessageBox.Show($"处理完成！\n\n成功处理: {processedCount} 条数据\n错误: {errorCount} 条数据", "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                string message = $"处理完成！\n\n成功处理: {processedCount} 条数据\n错误: {errorCount} 条数据";
+                if (skippedCount > 0)
+                {
+                    message += $"\n跳过: {skippedCount} 条数据";
+                }
+                if (uncheckedCategorySkippedCount > 0)
+                {
+                    message += $"\n未勾选分类而跳过: {uncheckedCategorySkippedCount} 条数据";
+                }
+
+                System.Windows.MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -477,6 +557,7 @@ namespace CyanTools.ViewModel
                 CancelImageLoad();
                 ClearCurrentImagePreview();
                 CurrentTextContent = "";
+                ResetTagEditor();
                 return;
             }
 
@@ -491,7 +572,7 @@ namespace CyanTools.ViewModel
             }
 
             ClearCurrentImagePreview();
-            LoadTextFromFile(SelectedDataItem.TextPath);
+            LoadTextForItem(SelectedDataItem);
         }
 
         private void ClearCurrentImagePreview()
@@ -530,6 +611,18 @@ namespace CyanTools.ViewModel
                 ResetTagEditor();
                 System.Windows.MessageBox.Show($"读取文本失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
+        }
+
+        private void LoadTextForItem(DatasetDataItem item)
+        {
+            string? filePath = GetDatasetTagTextPath(item);
+            if (!string.IsNullOrWhiteSpace(filePath) && _cachedTextEdits.TryGetValue(filePath, out string cachedContent))
+            {
+                LoadTagsFromText(cachedContent);
+                return;
+            }
+
+            LoadTextFromFile(filePath);
         }
 
         private void StartDatasetTagTranslation(IReadOnlyList<DatasetDataItem> items)
@@ -719,6 +812,38 @@ namespace CyanTools.ViewModel
 
             UpdateCurrentTextContentFromTokens();
             _ = RefreshTokenTranslationsAsync();
+        }
+
+        private void CommitPromptEditorState()
+        {
+            CommitEditingTags();
+            CommitPendingTags(true);
+            UpdateCurrentTextContentFromTokens();
+        }
+
+        private void CommitEditingTags()
+        {
+            for (int index = TagTokens.Count - 1; index >= 0; index--)
+            {
+                var token = TagTokens[index];
+                if (!token.IsEditing)
+                {
+                    continue;
+                }
+
+                var normalized = TagDictionaryService.NormalizeTag(token.EditingText);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    TagTokens.RemoveAt(index);
+                    continue;
+                }
+
+                token.Text = normalized;
+                token.EditingText = normalized;
+                token.IsEditing = false;
+                _ = _tagDictionaryService.UpsertCatalogTagAsync(normalized, "custom", _tagCancellation.Token);
+                _ = LoadTokenTranslationAsync(token);
+            }
         }
 
         private void ResetTagEditor()
@@ -962,8 +1087,7 @@ namespace CyanTools.ViewModel
             string? selectedContent = null;
             if (selectedItem != null)
             {
-                CommitPendingTags(true);
-                UpdateCurrentTextContentFromTokens();
+                CommitPromptEditorState();
                 selectedContent = CurrentTextContent ?? string.Empty;
             }
 
@@ -1163,8 +1287,7 @@ namespace CyanTools.ViewModel
             string? selectedContent = null;
             if (selectedItem != null)
             {
-                CommitPendingTags(true);
-                UpdateCurrentTextContentFromTokens();
+                CommitPromptEditorState();
                 selectedContent = CurrentTextContent ?? string.Empty;
             }
 
@@ -1835,63 +1958,74 @@ namespace CyanTools.ViewModel
                     File.Delete(associatedTxtPath);
                 }
             }
+
+            ClearCachedState(item);
         }
 
         private void MoveDataItemFiles(DatasetDataItem item, string targetFolder)
         {
+            bool hasRectEdits = TryGetCachedRects(item, out List<Rect> rectsToSave);
+            bool hasTextEdits = TryGetCachedTextContent(item, out _);
+
             if (!string.IsNullOrEmpty(item.ImagePath) && File.Exists(item.ImagePath))
             {
                 string sourceImagePath = item.ImagePath;
-                _cachedEdits.TryGetValue(sourceImagePath, out List<Rect>? rects);
-                List<Rect> rectsToSave = rects ?? new List<Rect>();
-                bool hasModifications = rectsToSave.Any();
-
                 string targetImagePath = System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(sourceImagePath));
 
-                if (hasModifications)
+                if (hasRectEdits)
                 {
                     if (!SaveImageWithRects(sourceImagePath, rectsToSave, targetImagePath))
                     {
                         throw new IOException($"保存修改后的图片失败: {System.IO.Path.GetFileName(sourceImagePath)}");
                     }
 
-                    ProcessAssociatedTxtFile(sourceImagePath, targetImagePath, true);
                     File.Delete(sourceImagePath);
-
-                    string sourceTxtPath = System.IO.Path.ChangeExtension(sourceImagePath, ".txt");
-                    if (File.Exists(sourceTxtPath))
-                    {
-                        File.Delete(sourceTxtPath);
-                    }
-
-                    return;
                 }
-
-                File.Move(sourceImagePath, targetImagePath);
-
-                string? sourceTxtToMove = item.TextPath;
-                if (string.IsNullOrEmpty(sourceTxtToMove))
+                else
                 {
-                    string sourceTxtPath = System.IO.Path.ChangeExtension(sourceImagePath, ".txt");
-                    if (File.Exists(sourceTxtPath))
+                    File.Move(sourceImagePath, targetImagePath);
+                }
+
+                string? sourceTxtPath = GetDatasetTagTextPath(item);
+                string targetTxtPath = BuildTargetTextPath(item, targetFolder, targetImagePath);
+
+                if (hasRectEdits || hasTextEdits)
+                {
+                    string finalPromptContent = hasRectEdits
+                        ? DatasetPromptHelper.BuildPromptContent(GetPromptContentForPersistence(item), new[] { DatasetPromptHelper.BlackBoxTag })
+                        : GetPromptContentForPersistence(item);
+
+                    WritePromptFile(targetTxtPath, finalPromptContent);
+                    DeleteSourceTextFile(sourceTxtPath, targetTxtPath);
+                    if (string.IsNullOrWhiteSpace(item.TextPath))
                     {
-                        sourceTxtToMove = sourceTxtPath;
+                        item.TextPath = targetTxtPath;
                     }
                 }
-
-                if (!string.IsNullOrEmpty(sourceTxtToMove) && File.Exists(sourceTxtToMove))
+                else if (!string.IsNullOrEmpty(sourceTxtPath) && File.Exists(sourceTxtPath))
                 {
-                    string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(sourceTxtToMove));
-                    File.Move(sourceTxtToMove, targetTxtPath);
+                    File.Move(sourceTxtPath, targetTxtPath);
                 }
 
+                ClearCachedState(item);
                 return;
             }
 
-            if (!string.IsNullOrEmpty(item.TextPath) && File.Exists(item.TextPath))
+            if (!string.IsNullOrEmpty(item.TextPath) && (File.Exists(item.TextPath) || hasTextEdits))
             {
                 string targetTxtPath = System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(item.TextPath));
-                File.Move(item.TextPath, targetTxtPath);
+
+                if (hasTextEdits)
+                {
+                    WritePromptFile(targetTxtPath, GetPromptContentForPersistence(item));
+                    DeleteSourceTextFile(item.TextPath, targetTxtPath);
+                }
+                else
+                {
+                    File.Move(item.TextPath, targetTxtPath);
+                }
+
+                ClearCachedState(item);
             }
         }
 
@@ -1923,8 +2057,7 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            CommitPendingTags(true);
-            UpdateCurrentTextContentFromTokens();
+            CommitPromptEditorState();
 
             string? targetPath = SelectedDataItem.TextPath;
             if (string.IsNullOrEmpty(targetPath))
@@ -1943,6 +2076,7 @@ namespace CyanTools.ViewModel
             try
             {
                 File.WriteAllText(targetPath, CurrentTextContent ?? string.Empty);
+                _cachedTextEdits.Remove(targetPath);
 
                 if (string.IsNullOrEmpty(SelectedDataItem.TextPath))
                 {
@@ -2054,6 +2188,19 @@ namespace CyanTools.ViewModel
             };
         }
 
+        private bool IsCategorySelected(string? category)
+        {
+            return category switch
+            {
+                "1" => IsCategory1Selected,
+                "2" => IsCategory2Selected,
+                "3" => IsCategory3Selected,
+                "4" => IsCategory4Selected,
+                "5" => IsCategory5Selected,
+                _ => true
+            };
+        }
+
         #endregion
 
         #region 键盘处理
@@ -2152,6 +2299,12 @@ namespace CyanTools.ViewModel
             return bitmap;
         }
 
+        private void SaveCurrentSelectionEditsToCache()
+        {
+            SaveChangesToCache();
+            SaveTextChangesToCache(_selectedDataItem);
+        }
+
         private void SaveChangesToCache()
         {
             if (string.IsNullOrEmpty(_currentFilePath)) return;
@@ -2164,6 +2317,201 @@ namespace CyanTools.ViewModel
             {
                 _cachedEdits.Remove(_currentFilePath);
             }
+        }
+
+        private void SaveTextChangesToCache(DatasetDataItem? item)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            string? cacheKey = GetDatasetTagTextPath(item);
+            if (string.IsNullOrWhiteSpace(cacheKey))
+            {
+                return;
+            }
+
+            CommitPromptEditorState();
+
+            string currentContent = CurrentTextContent ?? string.Empty;
+            bool fileExists = File.Exists(cacheKey);
+            if (!fileExists && string.IsNullOrWhiteSpace(currentContent))
+            {
+                _cachedTextEdits.Remove(cacheKey);
+                return;
+            }
+
+            if (fileExists)
+            {
+                try
+                {
+                    string existingContent = File.ReadAllText(cacheKey);
+                    if (DatasetPromptHelper.AreEquivalent(existingContent, currentContent))
+                    {
+                        _cachedTextEdits.Remove(cacheKey);
+                        return;
+                    }
+                }
+                catch
+                {
+                    _cachedTextEdits[cacheKey] = currentContent;
+                    return;
+                }
+            }
+
+            _cachedTextEdits[cacheKey] = currentContent;
+        }
+
+        private bool HasPendingChanges(DatasetDataItem item)
+        {
+            return TryGetCachedRects(item, out _) || TryGetCachedTextContent(item, out _);
+        }
+
+        private bool TryGetCachedRects(DatasetDataItem item, out List<Rect> rects)
+        {
+            rects = new List<Rect>();
+            if (string.IsNullOrWhiteSpace(item.ImagePath) ||
+                !_cachedEdits.TryGetValue(item.ImagePath, out List<Rect>? cachedRects) ||
+                cachedRects.Count == 0)
+            {
+                return false;
+            }
+
+            rects = new List<Rect>(cachedRects);
+            return true;
+        }
+
+        private bool TryGetCachedTextContent(DatasetDataItem item, out string content)
+        {
+            content = string.Empty;
+            string? textPath = GetDatasetTagTextPath(item);
+            return !string.IsNullOrWhiteSpace(textPath) && _cachedTextEdits.TryGetValue(textPath, out content);
+        }
+
+        private string GetPromptContentForPersistence(DatasetDataItem item)
+        {
+            if (TryGetCachedTextContent(item, out string cachedContent))
+            {
+                return cachedContent;
+            }
+
+            string? textPath = GetDatasetTagTextPath(item);
+            if (!string.IsNullOrWhiteSpace(textPath) && File.Exists(textPath))
+            {
+                return File.ReadAllText(textPath);
+            }
+
+            return string.Empty;
+        }
+
+        private void ClearCachedState(DatasetDataItem item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.ImagePath))
+            {
+                _cachedEdits.Remove(item.ImagePath);
+            }
+
+            string? textPath = GetDatasetTagTextPath(item);
+            if (!string.IsNullOrWhiteSpace(textPath))
+            {
+                _cachedTextEdits.Remove(textPath);
+            }
+        }
+
+        private static void WritePromptFile(string targetPath, string content)
+        {
+            string? directory = System.IO.Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(targetPath, content);
+        }
+
+        private static string BuildTargetTextPath(DatasetDataItem item, string targetFolder, string? targetImagePath = null)
+        {
+            if (!string.IsNullOrWhiteSpace(item.TextPath))
+            {
+                return System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileName(item.TextPath));
+            }
+
+            if (!string.IsNullOrWhiteSpace(targetImagePath))
+            {
+                return System.IO.Path.ChangeExtension(targetImagePath, ".txt");
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.ImagePath))
+            {
+                return System.IO.Path.Combine(targetFolder, System.IO.Path.GetFileNameWithoutExtension(item.ImagePath) + ".txt");
+            }
+
+            throw new InvalidOperationException("当前数据没有可用的文本路径。");
+        }
+
+        private static void DeleteSourceTextFile(string? sourceTextPath, string targetTextPath)
+        {
+            if (string.IsNullOrWhiteSpace(sourceTextPath) || !File.Exists(sourceTextPath))
+            {
+                return;
+            }
+
+            string sourceFullPath = System.IO.Path.GetFullPath(sourceTextPath);
+            string targetFullPath = System.IO.Path.GetFullPath(targetTextPath);
+            if (string.Equals(sourceFullPath, targetFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            File.Delete(sourceTextPath);
+        }
+
+        private void SaveDataItemInPlace(DatasetDataItem item)
+        {
+            bool hasRectEdits = TryGetCachedRects(item, out List<Rect> rectsToSave);
+            bool hasTextEdits = TryGetCachedTextContent(item, out _);
+
+            if (!hasRectEdits && !hasTextEdits)
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.ImagePath) && File.Exists(item.ImagePath))
+            {
+                if (hasRectEdits && !SaveImageWithRects(item.ImagePath, rectsToSave, item.ImagePath))
+                {
+                    throw new IOException($"保存修改后的图片失败: {System.IO.Path.GetFileName(item.ImagePath)}");
+                }
+
+                string targetTextPath = GetDatasetTagTextPath(item) ?? System.IO.Path.ChangeExtension(item.ImagePath, ".txt");
+                string finalPromptContent = hasRectEdits
+                    ? DatasetPromptHelper.BuildPromptContent(GetPromptContentForPersistence(item), new[] { DatasetPromptHelper.BlackBoxTag })
+                    : GetPromptContentForPersistence(item);
+
+                WritePromptFile(targetTextPath, finalPromptContent);
+                if (string.IsNullOrWhiteSpace(item.TextPath))
+                {
+                    item.TextPath = targetTextPath;
+                }
+
+                ClearCachedState(item);
+                return;
+            }
+
+            string? textPath = GetDatasetTagTextPath(item);
+            if (string.IsNullOrWhiteSpace(textPath))
+            {
+                throw new InvalidOperationException("当前数据没有可保存的文本路径。");
+            }
+
+            WritePromptFile(textPath, GetPromptContentForPersistence(item));
+            if (string.IsNullOrWhiteSpace(item.TextPath))
+            {
+                item.TextPath = textPath;
+            }
+
+            ClearCachedState(item);
         }
 
         private void LoadEditsFromCache()
@@ -2229,7 +2577,7 @@ namespace CyanTools.ViewModel
                 rtb.Render(drawingVisual);
                 rtb.Freeze();
 
-                PngBitmapEncoder encoder = new PngBitmapEncoder();
+                BitmapEncoder encoder = CreateBitmapEncoder(savePath);
                 encoder.Frames.Add(BitmapFrame.Create(rtb));
                 using (FileStream fs = new FileStream(savePath, FileMode.Create))
                 {
@@ -2244,54 +2592,17 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void ProcessAssociatedTxtFile(string sourceImagePath, string destImagePath, bool hasModifications)
+        private static BitmapEncoder CreateBitmapEncoder(string savePath)
         {
-            string sourceTxtPath = System.IO.Path.ChangeExtension(sourceImagePath, ".txt");
-            string destTxtPath = System.IO.Path.ChangeExtension(destImagePath, ".txt");
-            string promptToAdd = "black box";
-
-            string originalContent = "";
-            if (File.Exists(sourceTxtPath))
+            string extension = System.IO.Path.GetExtension(savePath).ToLowerInvariant();
+            return extension switch
             {
-                try
-                {
-                    originalContent = File.ReadAllText(sourceTxtPath).Trim();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"读取 .txt 文件失败: {ex.Message}");
-                    return; 
-                }
-            }
-
-            string finalContent = originalContent;
-
-            
-            if (hasModifications)
-            {
-                
-                if (!finalContent.Contains(promptToAdd))
-                {
-                    if (!string.IsNullOrEmpty(finalContent) && !finalContent.EndsWith(","))
-                    {
-                        finalContent += ", ";
-                    }
-                    finalContent += promptToAdd;
-                }
-            }
-
-            
-            if (!string.IsNullOrEmpty(finalContent))
-            {
-                try
-                {
-                    File.WriteAllText(destTxtPath, finalContent);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"写入 .txt 文件失败: {ex.Message}");
-                }
-            }
+                ".jpg" => new JpegBitmapEncoder { QualityLevel = 95 },
+                ".jpeg" => new JpegBitmapEncoder { QualityLevel = 95 },
+                ".bmp" => new BmpBitmapEncoder(),
+                ".gif" => new GifBitmapEncoder(),
+                _ => new PngBitmapEncoder()
+            };
         }
 
         #endregion

@@ -6,9 +6,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
@@ -21,8 +23,10 @@ namespace CyanTools.ViewModel
         public override string ToString() => Name;
     }
 
-    public class RealEsrganViewModel : INotifyPropertyChanged
+    public class RealEsrganViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
+        private const string ToolDisplayName = "图片超分";
+
         private string _inputDirectory;
         private string _outputDirectory;
         private string _selectedRealEsrganModel;
@@ -32,6 +36,7 @@ namespace CyanTools.ViewModel
         private bool _shouldOpenOutputDirectory = true;
         private bool _isIdle = true;
         private string _selectedTool;
+        private bool _isWorkflowMode;
 
         private int _selectedWaifu2xNoiseLevel;
         private bool _waifu2xUsePhotoModel;
@@ -42,7 +47,18 @@ namespace CyanTools.ViewModel
         
         private const int MaxLogLines = 1000;
 
-        public string InputDirectory { get => _inputDirectory; set => SetField(ref _inputDirectory, value); }
+        public string InputDirectory
+        {
+            get => _inputDirectory;
+            set
+            {
+                var previousInput = _inputDirectory;
+                if (SetField(ref _inputDirectory, value))
+                {
+                    OutputDirectory = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputDirectory, previousInput, value, ToolDisplayName);
+                }
+            }
+        }
         public string OutputDirectory { get => _outputDirectory; set => SetField(ref _outputDirectory, value); }
         public string SelectedRealEsrganModel { get => _selectedRealEsrganModel; set => SetField(ref _selectedRealEsrganModel, value); }
         public ObservableCollection<string> RealEsrganModels { get; }
@@ -53,6 +69,7 @@ namespace CyanTools.ViewModel
         public int TileSize { get => _tileSize; set => SetField(ref _tileSize, value); }
         public bool ShouldOpenOutputDirectory { get => _shouldOpenOutputDirectory; set => SetField(ref _shouldOpenOutputDirectory, value); }
         public bool IsIdle { get => _isIdle; set => SetField(ref _isIdle, value); }
+        public bool IsWorkflowMode { get => _isWorkflowMode; set => SetField(ref _isWorkflowMode, value); }
         
         public ObservableCollection<string> LogLines { get; }
 
@@ -76,6 +93,9 @@ namespace CyanTools.ViewModel
         public int SelectedWaifu2xNoiseLevel { get => _selectedWaifu2xNoiseLevel; set => SetField(ref _selectedWaifu2xNoiseLevel, value); }
         public bool Waifu2xUsePhotoModel { get => _waifu2xUsePhotoModel; set => SetField(ref _waifu2xUsePhotoModel, value); }
         public int Waifu2xCropSize { get => _waifu2xCropSize; set => SetField(ref _waifu2xCropSize, value); }
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputDirectory ?? string.Empty; set => InputDirectory = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputDirectory ?? string.Empty; set => OutputDirectory = value ?? string.Empty; }
 
         public ICommand BrowseInputCommand { get; }
         public ICommand BrowseOutputCommand { get; }
@@ -152,16 +172,40 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task StartProcessing()
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
         {
+            return ExecuteProcessingAsync(
+                allowOpenOutputDirectory: false,
+                rethrowErrors: true,
+                pipelineLog: message => context.AppendLog($"[{ToolDisplayName}] {message}"),
+                token);
+        }
+
+        private Task StartProcessing()
+        {
+            return ExecuteProcessingAsync(
+                allowOpenOutputDirectory: !IsWorkflowMode && ShouldOpenOutputDirectory,
+                rethrowErrors: false,
+                pipelineLog: null,
+                CancellationToken.None);
+        }
+
+        private async Task ExecuteProcessingAsync(bool allowOpenOutputDirectory, bool rethrowErrors, Action<string>? pipelineLog, CancellationToken token)
+        {
+            OutputDirectory = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputDirectory, InputDirectory, ToolDisplayName);
             IsIdle = false;
             (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
             LogLines.Clear();
-            var progress = new Progress<string>(AddLog);
+            var progress = new Progress<string>(message =>
+            {
+                AddLog(message);
+                pipelineLog?.Invoke(message);
+            });
 
             bool success = false;
             try
             {
+                token.ThrowIfCancellationRequested();
                 if (SelectedTool == "Real-ESRGAN")
                 {
                     await _realEsrganProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedRealEsrganModel, SelectedScale, SelectedGpu.Id, TileSize, progress);
@@ -172,16 +216,23 @@ namespace CyanTools.ViewModel
                 }
                 success = true;
                 AddLog("处理完成。");
+                pipelineLog?.Invoke("处理完成。");
             }
             catch (Exception ex)
             {
-                AddLog("发生错误: " + ex.Message);
+                string errorMessage = "发生错误: " + ex.Message;
+                AddLog(errorMessage);
+                pipelineLog?.Invoke(errorMessage);
+                if (rethrowErrors)
+                {
+                    throw;
+                }
             }
             finally
             {
                 IsIdle = true;
                 (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                if (success && ShouldOpenOutputDirectory && !string.IsNullOrWhiteSpace(OutputDirectory) && Directory.Exists(OutputDirectory))
+                if (success && allowOpenOutputDirectory && !string.IsNullOrWhiteSpace(OutputDirectory) && Directory.Exists(OutputDirectory))
                 {
                     Process.Start("explorer.exe", OutputDirectory);
                 }

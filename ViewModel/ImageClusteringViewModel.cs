@@ -15,7 +15,7 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class ImageClusteringViewModel : PipelineNodeViewModelBase
+    public class ImageClusteringViewModel : PipelineNodeViewModelBase, IPipelineDirectoryNode
     {
         public override string DisplayName => "图片聚类";
         private const string FeatureTypeHybridDisplay = "Style+Content（偏画风+偏内容）";
@@ -60,8 +60,10 @@ namespace CyanTools.ViewModel
             get => _inputPath;
             set
             {
+                string previousInput = _inputPath;
                 if (SetField(ref _inputPath, value))
                 {
+                    OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, DisplayName);
                     RefreshCommandStates();
                 }
             }
@@ -258,6 +260,7 @@ namespace CyanTools.ViewModel
         }
 
         private bool _isClustering;
+        private bool _isWorkflowMode;
         public bool IsClustering
         {
             get => _isClustering;
@@ -269,6 +272,16 @@ namespace CyanTools.ViewModel
                 }
             }
         }
+
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set => SetField(ref _isWorkflowMode, value);
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputPath; set => OutputPath = value ?? string.Empty; }
 
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
@@ -282,7 +295,7 @@ namespace CyanTools.ViewModel
             SelectInputCommand = new RelayCommand(_ => SelectInputFolder());
             SelectOutputCommand = new RelayCommand(_ => SelectOutputFolder());
             StartCommand = new RelayCommand(async () => await RunClusteringAsync(showDialogs: true, CancellationToken.None),
-                () => !string.IsNullOrEmpty(InputPath) && !string.IsNullOrEmpty(OutputPath) && !IsClustering);
+                () => !string.IsNullOrEmpty(InputPath) && !IsClustering);
             MoveFilesToTopLevelCommand = new RelayCommand(async () => await MoveFilesToTopLevelAsync(), () => !string.IsNullOrEmpty(InputPath) && !IsClustering);
             CheckCudaCommand = new RelayCommand(async () => await CheckOrInstallCudaAsync(), () => !IsClustering);
             ResetParametersCommand = new RelayCommand(_ => ResetParametersToDefaults(), _ => !IsClustering);
@@ -563,6 +576,7 @@ namespace CyanTools.ViewModel
 
         private async Task RunClusteringAsync(bool showDialogs, CancellationToken token)
         {
+            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DisplayName);
             if (IsClustering)
             {
                 return;

@@ -4,8 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -40,15 +44,21 @@
                     </StackPanel>
                     
                     <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="输出文件夹:" Margin="0,0,0,5"/>
+                        <TextBlock Text="输出文件夹:" Margin="0,0,0,5"
+                                   Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Name="OutputFolderTextBox" Text="{Binding OutputFolder}" Height="25"/>
-                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" Command="{Binding BrowseOutputFolderCommand}"/>
+                            <TextBox Grid.Column="0" Name="OutputFolderTextBox" Text="{Binding OutputFolder}" Height="25"
+                                     Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" Command="{Binding BrowseOutputFolderCommand}"
+                                    Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         </Grid>
+                        <TextBlock Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                                   Foreground="Gray" Margin="0,4,0,0"
+                                   Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </StackPanel>
                     
                     <GroupBox Header="人物检测" Margin="0,0,0,10">

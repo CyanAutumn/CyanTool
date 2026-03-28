@@ -30,9 +30,28 @@
         <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
         <Button Grid.Row="0" Grid.Column="2" Content="..." Command="{Binding BrowseInputCommand}" Margin="5" Padding="10,2"/>
 
-        <Label Grid.Row="1" Grid.Column="0" Content="输出目录:" VerticalAlignment="Center"/>
-        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
-        <Button Grid.Row="1" Grid.Column="2" Content="..." Command="{Binding BrowseOutputCommand}" Margin="5" Padding="10,2"/>
+        <Grid Grid.Row="1" Margin="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Label Grid.Column="0" Content="输出目录:" VerticalAlignment="Center"
+                       Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                <TextBox Grid.Column="1" Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"
+                         Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                <Button Grid.Column="2" Content="..." Command="{Binding BrowseOutputCommand}" Margin="5" Padding="10,2"
+                        Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+            </Grid>
+            <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Margin="5,2,5,5" Foreground="Gray"
+                       Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                       Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        </Grid>
 
         <Label Grid.Row="2" Grid.Column="0" Content="选择工具:" VerticalAlignment="Center"/>
         <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding AvailableTools}" SelectedItem="{Binding SelectedTool}" Margin="5"/>

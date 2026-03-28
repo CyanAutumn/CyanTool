@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using SixLabors.ImageSharp;
@@ -16,13 +17,16 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace CyanTools.ViewModel
 {
-    public class ThreeStageViewModel : INotifyPropertyChanged
+    public class ThreeStageViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
+        private const string ToolDisplayName = "图片三分法";
+
         private string _inputFolder = "";
         private string _outputFolder = "";
         private string _progressText = "就绪";
         private double _progressPercentage = 0;
         private bool _isProcessing = false;
+        private bool _isWorkflowMode;
 
         private CancellationTokenSource? _cancellationTokenSource;
         private ThreeStageProcessor _processor;
@@ -36,7 +40,7 @@ namespace CyanTools.ViewModel
 
             BrowseInputFolderCommand = new RelayCommand(BrowseInputFolder);
             BrowseOutputFolderCommand = new RelayCommand(BrowseOutputFolder);
-            StartProcessingCommand = new RelayCommand(StartProcessing, () => !_isProcessing && !string.IsNullOrEmpty(InputFolder) && !string.IsNullOrEmpty(OutputFolder));
+            StartProcessingCommand = new RelayCommand(StartProcessing, () => !_isProcessing && !string.IsNullOrEmpty(InputFolder));
             StopProcessingCommand = new RelayCommand(StopProcessing, () => _isProcessing);
             ClearLogCommand = new RelayCommand(ClearLog);
 
@@ -66,8 +70,15 @@ namespace CyanTools.ViewModel
             get => _inputFolder;
             set
             {
+                if (_inputFolder == value)
+                {
+                    return;
+                }
+
+                var previousInput = _inputFolder;
                 _inputFolder = value;
                 OnPropertyChanged();
+                OutputFolder = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputFolder, previousInput, value, ToolDisplayName);
                 (StartProcessingCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
@@ -82,6 +93,20 @@ namespace CyanTools.ViewModel
                 (StartProcessingCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
+
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set
+            {
+                _isWorkflowMode = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputFolder; set => InputFolder = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputFolder; set => OutputFolder = value ?? string.Empty; }
         
         public string ProgressText
         {
@@ -151,12 +176,55 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
+        {
+            return ExecuteProcessingAsync(
+                showDialogs: false,
+                externalToken: token,
+                pipelineLog: message => context.AppendLog($"[{ToolDisplayName}] {message}"));
+        }
+
         private async void StartProcessing()
+        {
+            await ExecuteProcessingAsync(showDialogs: true, externalToken: CancellationToken.None, pipelineLog: null);
+        }
+
+        private async Task ExecuteProcessingAsync(bool showDialogs, CancellationToken externalToken, Action<string>? pipelineLog)
         {
             try
             {
+                OutputFolder = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputFolder, InputFolder, ToolDisplayName);
+                if (string.IsNullOrWhiteSpace(InputFolder) || !Directory.Exists(InputFolder))
+                {
+                    const string inputInvalidMessage = "输入文件夹无效。";
+                    AddLog(inputInvalidMessage);
+                    pipelineLog?.Invoke(inputInvalidMessage);
+                    ProgressText = inputInvalidMessage;
+                    if (!showDialogs)
+                    {
+                        throw new DirectoryNotFoundException(inputInvalidMessage);
+                    }
+
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(OutputFolder))
+                {
+                    AddLog("输出文件夹无效。");
+                    pipelineLog?.Invoke("输出文件夹无效。");
+                    ProgressText = "输出文件夹无效";
+                    if (!showDialogs)
+                    {
+                        throw new InvalidOperationException("输出文件夹无效。");
+                    }
+
+                    return;
+                }
+
                 _isProcessing = true;
-                _cancellationTokenSource = new CancellationTokenSource();
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
+                CancellationToken token = _cancellationTokenSource.Token;
 
                 (StartProcessingCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 (StopProcessingCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -168,6 +236,9 @@ namespace CyanTools.ViewModel
                 AddLog("开始三分法处理...");
                 AddLog($"输入文件夹: {InputFolder}");
                 AddLog($"输出文件夹: {OutputFolder}");
+                pipelineLog?.Invoke("开始三分法处理...");
+                pipelineLog?.Invoke($"输入文件夹: {InputFolder}");
+                pipelineLog?.Invoke($"输出文件夹: {OutputFolder}");
 
                 var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp" };
                 var imageFiles = Directory.GetFiles(InputFolder, "*.*", SearchOption.TopDirectoryOnly)
@@ -177,32 +248,44 @@ namespace CyanTools.ViewModel
                 if (imageFiles.Count == 0)
                 {
                     AddLog("在输入文件夹中未找到图片文件！");
+                    pipelineLog?.Invoke("在输入文件夹中未找到图片文件！");
+                    if (!showDialogs)
+                    {
+                        throw new InvalidOperationException("在输入文件夹中未找到图片文件！");
+                    }
+
                     return;
                 }
 
                 AddLog($"找到 {imageFiles.Count} 个图片文件");
+                pipelineLog?.Invoke($"找到 {imageFiles.Count} 个图片文件");
                 Directory.CreateDirectory(OutputFolder);
 
-                var progress = new Progress<string>(AddLog);
+                var progress = new Progress<string>(message =>
+                {
+                    AddLog(message);
+                    pipelineLog?.Invoke(message);
+                });
                 int processedCount = 0;
 
                 await Task.Run(async () =>
                 {
                     foreach (var imageFile in imageFiles)
                     {
-                        if (_cancellationTokenSource.Token.IsCancellationRequested) break;
+                        token.ThrowIfCancellationRequested();
 
                         try
                         {
-                            Application.Current.Dispatcher.Invoke(() => AddLog($"处理文件: {Path.GetFileName(imageFile)}"));
+                            AddLog($"处理文件: {Path.GetFileName(imageFile)}");
+                            pipelineLog?.Invoke($"处理文件: {Path.GetFileName(imageFile)}");
                             using var image = Image.Load<Rgb24>(imageFile);
                             var meta = new Dictionary<string, object> { ["filename"] = Path.GetFileName(imageFile) };
                             var inputItem = new ImageItem(image, meta);
-                            var results = await _processor.ProcessImageAsync(inputItem, progress, _cancellationTokenSource.Token);
+                            var results = await _processor.ProcessImageAsync(inputItem, progress, token);
 
                             foreach (var result in results)
                             {
-                                if (_cancellationTokenSource.Token.IsCancellationRequested) break;
+                                token.ThrowIfCancellationRequested();
                                 var outputFilename = result.Meta.TryGetValue("filename", out var fn) ? fn.ToString() : $"{Path.GetFileNameWithoutExtension(imageFile)}_processed{Path.GetExtension(imageFile)}";
                                 var outputPath = Path.Combine(OutputFolder, outputFilename!);
                                 result.Image.Save(outputPath);
@@ -220,30 +303,56 @@ namespace CyanTools.ViewModel
                                 ProgressText = $"已处理 {processedCount}/{imageFiles.Count} 个文件";
                                 AddLog($"完成处理: {Path.GetFileName(imageFile)}");
                             });
+                            pipelineLog?.Invoke($"完成处理: {Path.GetFileName(imageFile)}");
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
                         }
                         catch (Exception ex)
                         {
-                            Application.Current.Dispatcher.Invoke(() => AddLog($"处理文件 {Path.GetFileName(imageFile)} 时出错: {ex.Message}"));
+                            AddLog($"处理文件 {Path.GetFileName(imageFile)} 时出错: {ex.Message}");
+                            pipelineLog?.Invoke($"处理文件 {Path.GetFileName(imageFile)} 时出错: {ex.Message}");
                         }
                     }
-                });
+                }, token);
 
-                if (_cancellationTokenSource.Token.IsCancellationRequested)
+                if (token.IsCancellationRequested)
                 {
                     AddLog("处理已取消");
+                    pipelineLog?.Invoke("处理已取消");
                     ProgressText = "处理已取消";
                 }
                 else
                 {
                     AddLog($"处理完成！共处理 {processedCount} 个文件");
+                    pipelineLog?.Invoke($"处理完成！共处理 {processedCount} 个文件");
                     ProgressText = $"处理完成 ({processedCount}/{imageFiles.Count})";
                     ProgressPercentage = 100;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                AddLog("处理已取消");
+                pipelineLog?.Invoke("处理已取消");
+                ProgressText = "处理已取消";
+                if (!showDialogs)
+                {
+                    throw;
                 }
             }
             catch (Exception ex)
             {
                 AddLog($"处理过程中发生错误: {ex.Message}");
-                MessageBox.Show($"处理过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                pipelineLog?.Invoke($"处理过程中发生错误: {ex.Message}");
+                if (showDialogs)
+                {
+                    MessageBox.Show($"处理过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    throw;
+                }
             }
             finally
             {

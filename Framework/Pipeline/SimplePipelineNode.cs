@@ -23,8 +23,26 @@ namespace CyanTools.Pipeline
 
         public override Task RunAsync(PipelineContext context, CancellationToken token)
         {
+            if (Inner is IPipelineRunnableViewModel runnableViewModel)
+            {
+                return runnableViewModel.RunFromPipelineAsync(context, token);
+            }
+
             LogToPipeline($"{DisplayName} 暂未接入管道执行逻辑");
             return Task.CompletedTask;
+        }
+
+        public override IPipelineDirectoryNode? GetDirectoryAutomationNode()
+        {
+            return Inner as IPipelineDirectoryNode;
+        }
+
+        public override void SetWorkflowEditorMode(bool isWorkflowMode)
+        {
+            if (Inner is IPipelineDirectoryNode directoryNode)
+            {
+                directoryNode.IsWorkflowMode = isWorkflowMode;
+            }
         }
 
         public override PipelineNodeViewModelBase Clone()

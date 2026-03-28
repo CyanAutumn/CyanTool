@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -23,6 +24,7 @@ namespace CyanTools.ViewModel
         private bool _downloadersUnlocked;
         private bool _isLoadingWorkflow;
         private string? _selectedWorkflowName;
+        private bool _isRefreshingWorkflowPaths;
 
         public PipelineSchedulerViewModel()
         {
@@ -32,6 +34,7 @@ namespace CyanTools.ViewModel
             PipelineNodes = new ObservableCollection<PipelineNodeViewModelBase>();
             LogLines = new ObservableCollection<string>();
             Workflows = new ObservableCollection<string>(Pipeline.WorkflowStorage.ListWorkflows());
+            PipelineNodes.CollectionChanged += OnPipelineNodesCollectionChanged;
 
             AddNodeCommand = new RelayCommand(AddNode, () => SelectedAvailableNode != null && !IsRunning);
             RemoveNodeCommand = new RelayCommand(RemoveSelectedNode, () => SelectedPipelineNode != null && !IsRunning);
@@ -181,6 +184,7 @@ namespace CyanTools.ViewModel
             IsRunning = true;
             _cts = new CancellationTokenSource();
             LogLines.Clear();
+            RefreshWorkflowPaths();
 
             var context = new PipelineContext(AppendLog);
             try
@@ -287,12 +291,17 @@ namespace CyanTools.ViewModel
             try
             {
                 var nodes = Pipeline.WorkflowStorage.Load(name, _downloadersUnlocked);
+                foreach (var existingNode in PipelineNodes.ToList())
+                {
+                    DetachNode(existingNode);
+                }
                 PipelineNodes.Clear();
                 foreach (var node in nodes)
                 {
                     PipelineNodes.Add(node);
                 }
 
+                RefreshWorkflowPaths();
                 SelectedPipelineNode = PipelineNodes.FirstOrDefault();
                 AppendLog($"已载入工作流: {name}");
             }
@@ -330,6 +339,75 @@ namespace CyanTools.ViewModel
             (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (CancelCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (SaveWorkflowCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeleteWorkflowCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+
+        private void OnPipelineNodesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (PipelineNodeViewModelBase node in e.OldItems)
+                {
+                    DetachNode(node);
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (PipelineNodeViewModelBase node in e.NewItems)
+                {
+                    AttachNode(node);
+                }
+            }
+
+            RefreshWorkflowPaths();
+            RaiseCommandStates();
+        }
+
+        private void AttachNode(PipelineNodeViewModelBase node)
+        {
+            node.PropertyChanged -= OnPipelineNodePropertyChanged;
+            node.PropertyChanged += OnPipelineNodePropertyChanged;
+            node.SetWorkflowEditorMode(true);
+        }
+
+        private void DetachNode(PipelineNodeViewModelBase node)
+        {
+            node.PropertyChanged -= OnPipelineNodePropertyChanged;
+        }
+
+        private void OnPipelineNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_isLoadingWorkflow || _isRefreshingWorkflowPaths || IsRunning)
+            {
+                return;
+            }
+
+            RefreshWorkflowPaths();
+        }
+
+        private void RefreshWorkflowPaths()
+        {
+            if (_isLoadingWorkflow || _isRefreshingWorkflowPaths)
+            {
+                return;
+            }
+
+            _isRefreshingWorkflowPaths = true;
+            try
+            {
+                foreach (var node in PipelineNodes)
+                {
+                    node.SetWorkflowEditorMode(true);
+                }
+
+                PipelineWorkflowPathPlanner.ApplyWorkflowPaths(PipelineNodes);
+            }
+            finally
+            {
+                _isRefreshingWorkflowPaths = false;
+            }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

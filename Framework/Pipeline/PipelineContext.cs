@@ -10,5 +10,15 @@ namespace CyanTools.Pipeline
         }
 
         public Action<string> AppendLog { get; }
+        public string CurrentInputPath { get; private set; } = string.Empty;
+        public string CurrentOutputPath { get; private set; } = string.Empty;
+        public int CurrentNodeSequence { get; private set; }
+
+        public void UpdateEffectivePaths(string? inputPath, string? outputPath, int currentNodeSequence)
+        {
+            CurrentInputPath = inputPath ?? string.Empty;
+            CurrentOutputPath = outputPath ?? string.Empty;
+            CurrentNodeSequence = currentNodeSequence;
+        }
     }
 }

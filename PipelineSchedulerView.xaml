@@ -15,6 +15,9 @@
         <DataTemplate DataType="{x:Type viewModel:RealEsrganPipelineNode}">
             <local:RealEsrganView DataContext="{Binding Inner}" />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModel:ImageScalingPipelineNode}">
+            <local:ImageScalingView DataContext="{Binding Inner}" />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewModel:ImageBucketingPipelineNode}">
             <local:ImageBucketingView DataContext="{Binding Inner}" />
         </DataTemplate>
@@ -35,6 +38,12 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewModel:ConvertImageFormatPipelineNode}">
             <local:ConvertImageFormatView DataContext="{Binding Inner}" />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModel:ConvertTransparentChannelPipelineNode}">
+            <local:ConvertTransparentChannelView DataContext="{Binding Inner}" />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModel:SameSourceImageGroupingViewModel}">
+            <local:SameSourceImageGroupingView DataContext="{Binding}" />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewModel:TaggingPipelineNode}">
             <local:TaggingView DataContext="{Binding Inner}" />

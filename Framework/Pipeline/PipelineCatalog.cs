@@ -39,6 +39,7 @@ namespace CyanTools.Pipeline
 
             Register(new PipelineNodeDescriptor("图片聚类", typeof(ImageClusteringViewModel), () => new ImageClusteringViewModel()));
             Register(new PipelineNodeDescriptor("图片超分", typeof(RealEsrganPipelineNode), () => new RealEsrganPipelineNode()));
+            Register(new PipelineNodeDescriptor("图片上下采", typeof(ImageScalingPipelineNode), () => new ImageScalingPipelineNode()));
             Register(new PipelineNodeDescriptor("图片分辨率归类", typeof(ImageBucketingPipelineNode), () => new ImageBucketingPipelineNode()));
             Register(new PipelineNodeDescriptor("图片三分法", typeof(ThreeStagePipelineNode), () => new ThreeStagePipelineNode()));
             Register(new PipelineNodeDescriptor("分辨率筛选", typeof(ResolutionFilterPipelineNode), () => new ResolutionFilterPipelineNode()));
@@ -46,6 +47,8 @@ namespace CyanTools.Pipeline
             Register(new PipelineNodeDescriptor("导出视频帧", typeof(ExportVideoFramePipelineNode), () => new ExportVideoFramePipelineNode()));
             Register(new PipelineNodeDescriptor("高斯模糊", typeof(GaussianBlurPipelineNode), () => new GaussianBlurPipelineNode()));
             Register(new PipelineNodeDescriptor("格式转换", typeof(ConvertImageFormatPipelineNode), () => new ConvertImageFormatPipelineNode()));
+            Register(new PipelineNodeDescriptor("转换透明通道", typeof(ConvertTransparentChannelPipelineNode), () => new ConvertTransparentChannelPipelineNode()));
+            Register(new PipelineNodeDescriptor("同源图片归类", typeof(SameSourceImageGroupingViewModel), () => new SameSourceImageGroupingViewModel()));
             Register(new PipelineNodeDescriptor("图片打标", typeof(TaggingPipelineNode), () => new TaggingPipelineNode()));
             Register(new PipelineNodeDescriptor("训练集配平", typeof(TrainingSetBalancerPipelineNode), () => new TrainingSetBalancerPipelineNode()));
             Register(new PipelineNodeDescriptor("图片重命名", typeof(ImageRenamePipelineNode), () => new ImageRenamePipelineNode()));

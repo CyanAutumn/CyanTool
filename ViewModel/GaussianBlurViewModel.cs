@@ -2,24 +2,40 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 
 namespace CyanTools.ViewModel
 {
-    public class GaussianBlurViewModel : INotifyPropertyChanged
+    public class GaussianBlurViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
+        private const string ToolDisplayName = "高斯模糊";
+
         private string _inputPath;
         private string _outputPath;
         private int _blurRadius = 5;
         private string _statusText;
+        private bool _isWorkflowMode;
 
         public string InputPath
         {
             get => _inputPath;
-            set { _inputPath = value; OnPropertyChanged(); }
+            set
+            {
+                if (_inputPath == value)
+                {
+                    return;
+                }
+
+                var previousInput = _inputPath;
+                _inputPath = value;
+                OnPropertyChanged();
+                OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, ToolDisplayName);
+            }
         }
 
         public string OutputPath
@@ -39,6 +55,16 @@ namespace CyanTools.ViewModel
             get => _statusText;
             set { _statusText = value; OnPropertyChanged(); }
         }
+
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set { _isWorkflowMode = value; OnPropertyChanged(); }
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputPath ?? string.Empty; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputPath ?? string.Empty; set => OutputPath = value ?? string.Empty; }
 
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
@@ -81,17 +107,43 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task ProcessImages()
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
         {
+            return ExecuteProcessingAsync(
+                rethrowErrors: true,
+                pipelineLog: message => context.AppendLog($"[{ToolDisplayName}] {message}"),
+                token);
+        }
+
+        private Task ProcessImages()
+        {
+            return ExecuteProcessingAsync(rethrowErrors: false, pipelineLog: null, CancellationToken.None);
+        }
+
+        private async Task ExecuteProcessingAsync(bool rethrowErrors, Action<string>? pipelineLog, CancellationToken token)
+        {
+            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, ToolDisplayName);
             if (string.IsNullOrEmpty(InputPath) || string.IsNullOrEmpty(OutputPath))
             {
                 StatusText = "请选择输入和输出文件夹。";
+                pipelineLog?.Invoke(StatusText);
+                if (rethrowErrors)
+                {
+                    throw new InvalidOperationException(StatusText);
+                }
+
                 return;
             }
 
             if (!Directory.Exists(InputPath))
             {
                 StatusText = "输入文件夹不存在。";
+                pipelineLog?.Invoke(StatusText);
+                if (rethrowErrors)
+                {
+                    throw new DirectoryNotFoundException(StatusText);
+                }
+
                 return;
             }
 
@@ -105,9 +157,11 @@ namespace CyanTools.ViewModel
             {
                 await Task.Run(() =>
                 {
+                    token.ThrowIfCancellationRequested();
                     var files = Directory.GetFiles(InputPath, "*.*", SearchOption.TopDirectoryOnly);
                     foreach (var file in files)
                     {
+                        token.ThrowIfCancellationRequested();
                         var extension = Path.GetExtension(file).ToLower();
                         if (extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".bmp")
                         {
@@ -115,12 +169,18 @@ namespace CyanTools.ViewModel
                             ImageProcessor.ApplyGaussianBlur(file, outputFileName, BlurRadius);
                         }
                     }
-                });
+                }, token);
                 StatusText = "处理完成。";
+                pipelineLog?.Invoke(StatusText);
             }
             catch (Exception ex)
             {
                 StatusText = $"处理失败: {ex.Message}";
+                pipelineLog?.Invoke(StatusText);
+                if (rethrowErrors)
+                {
+                    throw;
+                }
             }
         }
 

@@ -65,6 +65,13 @@
                 </StackPanel>
             </Grid>
             <StackPanel Orientation="Horizontal">
+                <TextBlock Text="当存在同名txt时：" VerticalAlignment="Center"/>
+                <ComboBox Width="120"
+                          Margin="5,0,15,0"
+                          IsEnabled="{Binding IsIdle}"
+                          ItemsSource="{Binding ExistingTxtConflictOptions}"
+                          SelectedItem="{Binding SelectedExistingTxtConflictOption}"
+                          DisplayMemberPath="DisplayName"/>
                 <TextBlock Text="通用阈值：" VerticalAlignment="Center"/>
                 <TextBox Text="{Binding GeneralThreshold, UpdateSourceTrigger=LostFocus}" Width="50" Margin="5,0" VerticalContentAlignment="Center"/>
                 <TextBlock Text="角色阈值：" VerticalAlignment="Center" Margin="15,0,0,0"/>

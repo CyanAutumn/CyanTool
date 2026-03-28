@@ -30,6 +30,7 @@
                 <CheckBox Content="jpeg" Margin="5" IsChecked="{Binding KeepJpeg}"/>
                 <CheckBox Content="npz" Margin="5" IsChecked="{Binding KeepNpz}"/>
                 <CheckBox Content="txt" Margin="5" IsChecked="{Binding KeepTxt}"/>
+                <CheckBox Content=".txt(中文内容)" Margin="5" IsChecked="{Binding KeepChineseTxt}"/>
             </StackPanel>
         </GroupBox>
 

@@ -40,6 +40,11 @@ namespace CyanTools.ViewModel
         public ImageBucketingPipelineNode() : base("图片分辨率归类") { }
     }
 
+    public sealed class ImageScalingPipelineNode : CyanTools.Pipeline.SimplePipelineNode<ImageScalingViewModel>
+    {
+        public ImageScalingPipelineNode() : base("图片上下采") { }
+    }
+
     public sealed class ThreeStagePipelineNode : CyanTools.Pipeline.SimplePipelineNode<ThreeStageViewModel>
     {
         public ThreeStagePipelineNode() : base("图片三分法") { }
@@ -68,6 +73,11 @@ namespace CyanTools.ViewModel
     public sealed class ConvertImageFormatPipelineNode : CyanTools.Pipeline.SimplePipelineNode<ConvertImageFormatViewModel>
     {
         public ConvertImageFormatPipelineNode() : base("格式转换") { }
+    }
+
+    public sealed class ConvertTransparentChannelPipelineNode : CyanTools.Pipeline.SimplePipelineNode<ConvertTransparentChannelViewModel>
+    {
+        public ConvertTransparentChannelPipelineNode() : base("转换透明通道") { }
     }
 
     public sealed class TaggingPipelineNode : CyanTools.Pipeline.SimplePipelineNode<TaggingViewModel>

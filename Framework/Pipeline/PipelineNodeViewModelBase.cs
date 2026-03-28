@@ -48,6 +48,20 @@ namespace CyanTools.Pipeline
             _pipelineLogger?.Invoke(message);
         }
 
+        public virtual IPipelineDirectoryNode? GetDirectoryAutomationNode()
+        {
+            return this as IPipelineDirectoryNode;
+        }
+
+        public virtual void SetWorkflowEditorMode(bool isWorkflowMode)
+        {
+            var directoryNode = GetDirectoryAutomationNode();
+            if (directoryNode != null)
+            {
+                directoryNode.IsWorkflowMode = isWorkflowMode;
+            }
+        }
+
         public abstract Task RunAsync(PipelineContext context, CancellationToken token);
         public abstract PipelineNodeViewModelBase Clone();
     }

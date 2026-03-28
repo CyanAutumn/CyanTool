@@ -23,6 +23,12 @@ namespace CyanTools.ViewModel
         public string InputFormat { get; set; } = "NHWC";
     }
 
+    public class ExistingTxtConflictOption
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public ExistingTxtHandlingMode Mode { get; set; } = ExistingTxtHandlingMode.Overwrite;
+    }
+
     public class TaggingViewModel : INotifyPropertyChanged
     {
         private string _inputDirectory;
@@ -42,6 +48,7 @@ namespace CyanTools.ViewModel
         private bool _includeRating = false;
         private bool _includeModel = false;
         private bool _preferGpu = true;
+        private ExistingTxtConflictOption _selectedExistingTxtConflictOption;
 
         private readonly TaggingProcessor _taggingProcessor;
         private const int MaxLogLines = 1000;
@@ -54,7 +61,9 @@ namespace CyanTools.ViewModel
 
         public ObservableCollection<string> LogLines { get; }
         public ObservableCollection<TaggerModel> TaggerModels { get; }
+        public ObservableCollection<ExistingTxtConflictOption> ExistingTxtConflictOptions { get; }
         public TaggerModel SelectedTaggerModel { get => _selectedTaggerModel; set => SetField(ref _selectedTaggerModel, value); }
+        public ExistingTxtConflictOption SelectedExistingTxtConflictOption { get => _selectedExistingTxtConflictOption; set => SetField(ref _selectedExistingTxtConflictOption, value); }
         public string PriorityTags { get => _priorityTags; set => SetField(ref _priorityTags, value); }
         public string CustomTags { get => _customTags; set => SetField(ref _customTags, value); }
         public bool IncludeGeneral { get => _includeGeneral; set => SetField(ref _includeGeneral, value); }
@@ -94,6 +103,14 @@ namespace CyanTools.ViewModel
                 new TaggerModel { DisplayName = "cl_tagger_1_02", ModelUrl = "https://huggingface.co/cella110n/cl_tagger/resolve/main/cl_tagger_1_02/model.onnx", TagsUrl = "https://huggingface.co/cella110n/cl_tagger/raw/main/cl_tagger_1_02/tag_mapping.json", InputSize = 448, InputFormat = "NCHW" }
             };
             SelectedTaggerModel = TaggerModels.FirstOrDefault();
+            ExistingTxtConflictOptions = new ObservableCollection<ExistingTxtConflictOption>
+            {
+                new ExistingTxtConflictOption { DisplayName = "跳过", Mode = ExistingTxtHandlingMode.Skip },
+                new ExistingTxtConflictOption { DisplayName = "去重后添加", Mode = ExistingTxtHandlingMode.MergeUnique },
+                new ExistingTxtConflictOption { DisplayName = "替换", Mode = ExistingTxtHandlingMode.Overwrite }
+            };
+            SelectedExistingTxtConflictOption = ExistingTxtConflictOptions.FirstOrDefault(option => option.Mode == ExistingTxtHandlingMode.Overwrite)
+                                               ?? ExistingTxtConflictOptions.FirstOrDefault();
 
             BrowseInputCommand = new RelayCommand(_ => BrowseForFolder(path => InputDirectory = path));
             StartTaggingCommand = new RelayCommand(async _ => await StartProcessing(), _ => IsIdle && !string.IsNullOrWhiteSpace(InputDirectory));
@@ -382,7 +399,17 @@ namespace CyanTools.ViewModel
                 await Task.Run(async () =>
                 {
                     await _taggingProcessor.InitializeAsync(SelectedTaggerModel.ModelUrl, SelectedTaggerModel.TagsUrl, SelectedTaggerModel.DisplayName, PreferGpu, progress);
-                    await _taggingProcessor.ProcessDirectoryAsync(InputDirectory, GeneralThreshold, CharacterThreshold, SelectedTaggerModel.InputSize, SelectedTaggerModel.InputFormat, categoryOptions, priorityTags, customTags, progress);
+                    await _taggingProcessor.ProcessDirectoryAsync(
+                        InputDirectory,
+                        GeneralThreshold,
+                        CharacterThreshold,
+                        SelectedTaggerModel.InputSize,
+                        SelectedTaggerModel.InputFormat,
+                        categoryOptions,
+                        priorityTags,
+                        customTags,
+                        SelectedExistingTxtConflictOption?.Mode ?? ExistingTxtHandlingMode.Overwrite,
+                        progress);
                 });
                 AddLog("Tagging complete.");
             }

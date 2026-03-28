@@ -300,60 +300,94 @@
             <GroupBox Grid.Row="0" Header="分类目录" Margin="0,0,0,5">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
+                        <TextBlock Text="勾选后“保存所有更改”才会处理对应分类"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,5"
+                                   TextWrapping="Wrap"/>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28"/>
                                 <ColumnDefinition Width="30"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="35"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="1" Command="{Binding SetCategoryCommand}" CommandParameter="1" Width="25" Height="25"/>
-                            <TextBox Grid.Column="1" Text="{Binding Category1Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
-                            <Button Grid.Column="2" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="1" Width="30" Height="25"/>
+                            <CheckBox Grid.Column="0"
+                                      IsChecked="{Binding IsCategory1Selected}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      ToolTip="勾选后本次保存会处理分类1"/>
+                            <Button Grid.Column="1" Content="1" Command="{Binding SetCategoryCommand}" CommandParameter="1" Width="25" Height="25"/>
+                            <TextBox Grid.Column="2" Text="{Binding Category1Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                            <Button Grid.Column="3" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="1" Width="30" Height="25"/>
                         </Grid>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28"/>
                                 <ColumnDefinition Width="30"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="35"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="2" Command="{Binding SetCategoryCommand}" CommandParameter="2" Width="25" Height="25"/>
-                            <TextBox Grid.Column="1" Text="{Binding Category2Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
-                            <Button Grid.Column="2" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="2" Width="30" Height="25"/>
+                            <CheckBox Grid.Column="0"
+                                      IsChecked="{Binding IsCategory2Selected}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      ToolTip="勾选后本次保存会处理分类2"/>
+                            <Button Grid.Column="1" Content="2" Command="{Binding SetCategoryCommand}" CommandParameter="2" Width="25" Height="25"/>
+                            <TextBox Grid.Column="2" Text="{Binding Category2Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                            <Button Grid.Column="3" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="2" Width="30" Height="25"/>
                         </Grid>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28"/>
                                 <ColumnDefinition Width="30"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="35"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="3" Command="{Binding SetCategoryCommand}" CommandParameter="3" Width="25" Height="25"/>
-                            <TextBox Grid.Column="1" Text="{Binding Category3Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
-                            <Button Grid.Column="2" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="3" Width="30" Height="25"/>
+                            <CheckBox Grid.Column="0"
+                                      IsChecked="{Binding IsCategory3Selected}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      ToolTip="勾选后本次保存会处理分类3"/>
+                            <Button Grid.Column="1" Content="3" Command="{Binding SetCategoryCommand}" CommandParameter="3" Width="25" Height="25"/>
+                            <TextBox Grid.Column="2" Text="{Binding Category3Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                            <Button Grid.Column="3" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="3" Width="30" Height="25"/>
                         </Grid>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28"/>
                                 <ColumnDefinition Width="30"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="35"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="4" Command="{Binding SetCategoryCommand}" CommandParameter="4" Width="25" Height="25"/>
-                            <TextBox Grid.Column="1" Text="{Binding Category4Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
-                            <Button Grid.Column="2" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="4" Width="30" Height="25"/>
+                            <CheckBox Grid.Column="0"
+                                      IsChecked="{Binding IsCategory4Selected}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      ToolTip="勾选后本次保存会处理分类4"/>
+                            <Button Grid.Column="1" Content="4" Command="{Binding SetCategoryCommand}" CommandParameter="4" Width="25" Height="25"/>
+                            <TextBox Grid.Column="2" Text="{Binding Category4Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                            <Button Grid.Column="3" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="4" Width="30" Height="25"/>
                         </Grid>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28"/>
                                 <ColumnDefinition Width="30"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="35"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="5" Command="{Binding SetCategoryCommand}" CommandParameter="5" Width="25" Height="25"/>
-                            <TextBox Grid.Column="1" Text="{Binding Category5Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
-                            <Button Grid.Column="2" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="5" Width="30" Height="25"/>
+                            <CheckBox Grid.Column="0"
+                                      IsChecked="{Binding IsCategory5Selected}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      ToolTip="勾选后本次保存会处理分类5"/>
+                            <Button Grid.Column="1" Content="5" Command="{Binding SetCategoryCommand}" CommandParameter="5" Width="25" Height="25"/>
+                            <TextBox Grid.Column="2" Text="{Binding Category5Path, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                            <Button Grid.Column="3" Content="..." Command="{Binding SelectCategoryFolderCommand}" CommandParameter="5" Width="30" Height="25"/>
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>

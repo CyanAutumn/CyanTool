@@ -723,7 +723,17 @@ namespace CyanTools.Utils
             }
         }
 
-        public async Task ProcessDirectoryAsync(string inputPath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat, TagCategoryOptions categoryOptions, IEnumerable<string> priorityTags, IEnumerable<string> customTags, IProgress<string> progress)
+        public async Task ProcessDirectoryAsync(
+            string inputPath,
+            float generalThreshold,
+            float characterThreshold,
+            int inputSize,
+            string inputFormat,
+            TagCategoryOptions categoryOptions,
+            IEnumerable<string> priorityTags,
+            IEnumerable<string> customTags,
+            ExistingTxtHandlingMode existingTxtHandlingMode,
+            IProgress<string> progress)
         {
             var imageFiles = Directory.GetFiles(inputPath, "*.*", SearchOption.TopDirectoryOnly)
                                       .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
@@ -737,23 +747,39 @@ namespace CyanTools.Utils
             var customList = customTags?.Where(tag => !string.IsNullOrWhiteSpace(tag)).Select(tag => tag.Trim()).ToList() ?? new List<string>();
 
             int processedCount = 0;
+            int skippedCount = 0;
             foreach (var imageFile in imageFiles)
             {
                 try
                 {
+                    string txtFile = Path.ChangeExtension(imageFile, ".txt");
+                    bool hasExistingTxt = File.Exists(txtFile);
+                    if (existingTxtHandlingMode == ExistingTxtHandlingMode.Skip && hasExistingTxt)
+                    {
+                        skippedCount++;
+                        progress.Report($"Skipped [{processedCount + skippedCount}/{imageFiles.Count}]: {Path.GetFileName(imageFile)} (同名txt已存在)");
+                        continue;
+                    }
+
                     var tags = await Task.Run(() => ProcessImage(imageFile, generalThreshold, characterThreshold, inputSize, inputFormat, categoryOptions, priorityList));
                     var finalTags = MergeCustomTags(customList, tags);
-                    string txtFile = Path.ChangeExtension(imageFile, ".txt");
+
+                    if (existingTxtHandlingMode == ExistingTxtHandlingMode.MergeUnique && hasExistingTxt)
+                    {
+                        var existingText = await File.ReadAllTextAsync(txtFile);
+                        finalTags = MergeExistingAndGeneratedTags(existingText, finalTags);
+                    }
+
                     File.WriteAllText(txtFile, string.Join(", ", finalTags));
                     processedCount++;
-                    progress.Report($"Processed [{processedCount}/{imageFiles.Count}]: {Path.GetFileName(imageFile)}");
+                    progress.Report($"Processed [{processedCount + skippedCount}/{imageFiles.Count}]: {Path.GetFileName(imageFile)}");
                 }
                 catch (Exception ex)
                 {
                     progress.Report($"Error processing {Path.GetFileName(imageFile)}: {ex.Message}");
                 }
             }
-            progress.Report($"Tagging complete. Processed {processedCount} images.");
+            progress.Report($"Tagging complete. Processed {processedCount} images, skipped {skippedCount} images.");
         }
         
         private List<TagInfo> ProcessImage(string imagePath, float generalThreshold, float characterThreshold, int inputSize, string inputFormat, TagCategoryOptions categoryOptions, IReadOnlyList<string> priorityTags) {
@@ -1009,6 +1035,57 @@ namespace CyanTools.Utils
             }
 
             return result;
+        }
+
+        private static List<string> MergeExistingAndGeneratedTags(string existingTxtContent, IReadOnlyList<string> generatedTags)
+        {
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tag in ParseTags(existingTxtContent))
+            {
+                var normalized = NormalizeTag(tag);
+                if (seen.Add(normalized))
+                {
+                    result.Add(tag);
+                }
+            }
+
+            if (generatedTags != null)
+            {
+                foreach (var tag in generatedTags)
+                {
+                    if (string.IsNullOrWhiteSpace(tag))
+                    {
+                        continue;
+                    }
+
+                    var normalized = NormalizeTag(tag);
+                    if (seen.Add(normalized))
+                    {
+                        result.Add(tag.Trim());
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private static IEnumerable<string> ParseTags(string content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                yield break;
+            }
+
+            var separators = new[] { ',', ';', '\n', '\r', '\uFF0C', '\uFF1B' };
+            foreach (var part in content.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!string.IsNullOrWhiteSpace(part))
+                {
+                    yield return part.Trim();
+                }
+            }
         }
 
         private static string NormalizeTag(string tag)

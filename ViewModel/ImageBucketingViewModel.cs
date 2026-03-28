@@ -7,14 +7,19 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 
 namespace CyanTools.ViewModel
 {
-    public class ImageBucketingViewModel : INotifyPropertyChanged
+    public class ImageBucketingViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
+        private const string ToolDisplayName = "图片分辨率归类";
+
         private readonly BackgroundWorker _worker;
         private readonly StringBuilder _logBuilder = new StringBuilder();
 
@@ -28,6 +33,7 @@ namespace CyanTools.ViewModel
         private double _progressValue;
         private bool _isProgressIndeterminate;
         private bool _isProcessing;
+        private bool _isWorkflowMode;
 
         public ImageBucketingViewModel()
         {
@@ -52,8 +58,10 @@ namespace CyanTools.ViewModel
             {
                 if (_inputFolder != value)
                 {
+                    var previousInput = _inputFolder;
                     _inputFolder = value;
                     OnPropertyChanged(nameof(InputFolder));
+                    OutputFolder = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputFolder, previousInput, value, ToolDisplayName);
                 }
             }
         }
@@ -176,6 +184,23 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set
+            {
+                if (_isWorkflowMode != value)
+                {
+                    _isWorkflowMode = value;
+                    OnPropertyChanged(nameof(IsWorkflowMode));
+                }
+            }
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputFolder ?? string.Empty; set => InputFolder = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputFolder ?? string.Empty; set => OutputFolder = value ?? string.Empty; }
+
         public ICommand BrowseInputFolderCommand { get; }
         public ICommand BrowseOutputFolderCommand { get; }
         public ICommand StartClassificationCommand { get; }
@@ -210,7 +235,8 @@ namespace CyanTools.ViewModel
 
         private void StartClassification()
         {
-            if (!ValidateInput(out var parameters))
+            OutputFolder = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputFolder, InputFolder, ToolDisplayName);
+            if (!ValidateInput(showDialogs: true, out var parameters, out _))
             {
                 return;
             }
@@ -225,65 +251,133 @@ namespace CyanTools.ViewModel
             _worker.RunWorkerAsync(parameters);
         }
 
-        private bool ValidateInput(out ClassificationParameters parameters)
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
+        {
+            return ExecutePipelineClassificationAsync(
+                message => context.AppendLog($"[{ToolDisplayName}] {message}"),
+                token);
+        }
+
+        private async Task ExecutePipelineClassificationAsync(Action<string>? pipelineLog, CancellationToken token)
+        {
+            OutputFolder = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputFolder, InputFolder, ToolDisplayName);
+            if (!ValidateInput(showDialogs: false, out var parameters, out string errorMessage))
+            {
+                if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    AppendLog(errorMessage);
+                    pipelineLog?.Invoke(errorMessage);
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return;
+            }
+
+            Directory.CreateDirectory(parameters.OutputFolder);
+            _logBuilder.Clear();
+            LogText = string.Empty;
+            ProgressValue = 0;
+            IsProgressIndeterminate = true;
+            IsProcessing = true;
+            AppendLog("开始图片分类...");
+            pipelineLog?.Invoke("开始图片分类...");
+
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                ClassificationResult result = await Task.Run(() =>
+                    RunClassificationWork(parameters, (progress, message) =>
+                    {
+                        if (progress > 0)
+                        {
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                IsProgressIndeterminate = false;
+                                ProgressValue = Math.Min(progress, 100);
+                            });
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(message))
+                        {
+                            AppendLog(message);
+                            pipelineLog?.Invoke(message);
+                        }
+                    }), token);
+
+                IsProgressIndeterminate = false;
+                ProgressValue = 100;
+                LogClassificationSummary(result);
+                pipelineLog?.Invoke("分类完成。");
+            }
+            finally
+            {
+                IsProcessing = false;
+                IsProgressIndeterminate = false;
+            }
+        }
+
+        private bool ValidateInput(bool showDialogs, out ClassificationParameters parameters, out string errorMessage)
         {
             parameters = null;
+            errorMessage = string.Empty;
 
             if (string.IsNullOrWhiteSpace(InputFolder))
             {
-                MessageBox.Show("请选择输入文件夹。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
+                errorMessage = "请选择输入文件夹。";
+            }
+            else if (!Directory.Exists(InputFolder))
+            {
+                errorMessage = "输入文件夹不存在。";
+            }
+            else if (string.IsNullOrWhiteSpace(OutputFolder))
+            {
+                errorMessage = "请选择输出文件夹。";
+            }
+            else
+            {
+                var supportedExtensions = new[] { "*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif" };
+                var imageFiles = supportedExtensions.SelectMany(ext =>
+                    Directory.GetFiles(InputFolder, ext, SearchOption.TopDirectoryOnly)).ToArray();
+
+                if (imageFiles.Length == 0)
+                {
+                    errorMessage = "在输入文件夹中未找到支持的图片文件。";
+                }
+                else if (!int.TryParse(DivisibleText, out int divisible) || divisible < 8 || divisible > 128)
+                {
+                    errorMessage = "分辨率步长必须是 8-128 之间的整数。";
+                }
+                else if (!double.TryParse(MaxArErrorText, out double maxArError) || maxArError < 0.1 || maxArError > 10)
+                {
+                    errorMessage = "最大宽高比误差必须是 0.1-10 之间的数值。";
+                }
+                else if (!int.TryParse(DimLimitText, out int dimLimit) || dimLimit < 256 || dimLimit > 4096)
+                {
+                    errorMessage = "最大尺寸限制必须是 256-4096 之间的整数。";
+                }
+                else
+                {
+                    parameters = new ClassificationParameters
+                    {
+                        InputFolder = InputFolder,
+                        OutputFolder = OutputFolder,
+                        Divisible = divisible,
+                        MaxArError = maxArError,
+                        DimLimit = dimLimit,
+                        Debug = IsDebugEnabled
+                    };
+                }
             }
 
-            if (!Directory.Exists(InputFolder))
+            if (!string.IsNullOrWhiteSpace(errorMessage))
             {
-                MessageBox.Show("输入文件夹不存在。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                if (showDialogs)
+                {
+                    MessageBox.Show(errorMessage, "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
                 return false;
             }
-
-            if (string.IsNullOrWhiteSpace(OutputFolder))
-            {
-                MessageBox.Show("请选择输出文件夹。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            var supportedExtensions = new[] { "*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif" };
-            var imageFiles = supportedExtensions.SelectMany(ext =>
-                Directory.GetFiles(InputFolder, ext, SearchOption.TopDirectoryOnly)).ToArray();
-
-            if (imageFiles.Length == 0)
-            {
-                MessageBox.Show("在输入文件夹中未找到支持的图片文件。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            if (!int.TryParse(DivisibleText, out int divisible) || divisible < 8 || divisible > 128)
-            {
-                MessageBox.Show("分辨率步长必须是 8-128 之间的整数。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            if (!double.TryParse(MaxArErrorText, out double maxArError) || maxArError < 0.1 || maxArError > 10)
-            {
-                MessageBox.Show("最大宽高比误差必须是 0.1-10 之间的数值。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            if (!int.TryParse(DimLimitText, out int dimLimit) || dimLimit < 256 || dimLimit > 4096)
-            {
-                MessageBox.Show("最大尺寸限制必须是 256-4096 之间的整数。", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            parameters = new ClassificationParameters
-            {
-                InputFolder = InputFolder,
-                OutputFolder = OutputFolder,
-                Divisible = divisible,
-                MaxArError = maxArError,
-                DimLimit = dimLimit,
-                Debug = IsDebugEnabled
-            };
 
             return true;
         }
@@ -295,93 +389,98 @@ namespace CyanTools.ViewModel
 
             try
             {
-                worker.ReportProgress(10, "正在加载图片...");
-                var imageData = new Dictionary<string, SixLabors.ImageSharp.Size>();
-                var dicFileName = new Dictionary<string, string>();
-                int fileIndex = 10000;
-
-                var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-                var imageFiles = supportedExtensions.SelectMany(ext =>
-                    Directory.GetFiles(parameters.InputFolder, $"*{ext}", SearchOption.TopDirectoryOnly)).ToArray();
-
-                int processedFiles = 0;
-                foreach (var filePath in imageFiles)
-                {
-                    try
-                    {
-                        using var image = Image.Load<Rgba32>(filePath);
-                        imageData[fileIndex.ToString()] = image.Size;
-                        dicFileName[fileIndex.ToString()] = Path.GetFileName(filePath);
-                        fileIndex++;
-                    }
-                    catch (Exception ex)
-                    {
-                        worker.ReportProgress(0, $"处理 {Path.GetFileName(filePath)} 时出错: {ex.Message}");
-                    }
-
-                    processedFiles++;
-                    int progress = (int)((processedFiles / (double)imageFiles.Length) * 30) + 10;
-                    worker.ReportProgress(progress, $"已处理 {processedFiles}/{imageFiles.Length} 张图片");
-                }
-
-                worker.ReportProgress(40, "正在创建分类桶...");
-
-                var bucketManager = new BucketManager(imageData,
-                    divisible: parameters.Divisible,
-                    maxArError: parameters.MaxArError,
-                    dimLimit: parameters.DimLimit,
-                    debug: parameters.Debug);
-
-                worker.ReportProgress(60, "正在将图片分类到各个桶中...");
-
-                int totalImages = bucketManager.Buckets.Values.Sum(bucket => bucket.Count);
-                int copiedImages = 0;
-
-                foreach (var bucketId in bucketManager.Buckets.Keys.OrderByDescending(b => bucketManager.Buckets[b].Count))
-                {
-                    var resolution = bucketManager.Resolutions[bucketId];
-                    var outPath = Path.Combine(parameters.OutputFolder, $"{resolution.Width}x{resolution.Height}");
-                    Directory.CreateDirectory(outPath);
-
-                    worker.ReportProgress(0, $"正在处理分辨率 {resolution.Width}x{resolution.Height} ({bucketManager.Buckets[bucketId].Count} 张图片)");
-
-                    foreach (var fileIndexStr in bucketManager.Buckets[bucketId])
-                    {
-                        var fileName = dicFileName[fileIndexStr];
-                        var fileSrcPath = Path.Combine(parameters.InputFolder, fileName);
-                        var destPath = Path.Combine(outPath, fileName);
-
-                        try
-                        {
-                            File.Copy(fileSrcPath, destPath, true);
-                            copiedImages++;
-
-                            if (parameters.Debug)
-                            {
-                                worker.ReportProgress(0, $"复制: {fileName} -> {resolution.Width}x{resolution.Height}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            worker.ReportProgress(0, $"复制 {fileName} 时出错: {ex.Message}");
-                        }
-
-                        int progress = totalImages == 0 ? 100 : (int)((copiedImages / (double)totalImages) * 30) + 60;
-                        worker.ReportProgress(progress);
-                    }
-                }
-
-                e.Result = new ClassificationResult
-                {
-                    TotalImages = totalImages,
-                    BucketCount = bucketManager.Buckets.Count,
-                    BucketManager = bucketManager
-                };
+                e.Result = RunClassificationWork(parameters, (progress, message) => worker.ReportProgress(progress, message));
             }
             catch (Exception ex)
             {
                 throw new Exception($"分类失败: {ex.Message}", ex);
             }
+        }
+
+        private ClassificationResult RunClassificationWork(ClassificationParameters parameters, Action<int, string?> reportProgress)
+        {
+            reportProgress(10, "正在加载图片...");
+            var imageData = new Dictionary<string, SixLabors.ImageSharp.Size>();
+            var dicFileName = new Dictionary<string, string>();
+            int fileIndex = 10000;
+
+            var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
+            var imageFiles = supportedExtensions.SelectMany(ext =>
+                Directory.GetFiles(parameters.InputFolder, $"*{ext}", SearchOption.TopDirectoryOnly)).ToArray();
+
+            int processedFiles = 0;
+            foreach (var filePath in imageFiles)
+            {
+                try
+                {
+                    using var image = Image.Load<Rgba32>(filePath);
+                    imageData[fileIndex.ToString()] = image.Size;
+                    dicFileName[fileIndex.ToString()] = Path.GetFileName(filePath);
+                    fileIndex++;
+                }
+                catch (Exception ex)
+                {
+                    reportProgress(0, $"处理 {Path.GetFileName(filePath)} 时出错: {ex.Message}");
+                }
+
+                processedFiles++;
+                int progress = (int)((processedFiles / (double)imageFiles.Length) * 30) + 10;
+                reportProgress(progress, $"已处理 {processedFiles}/{imageFiles.Length} 张图片");
+            }
+
+            reportProgress(40, "正在创建分类桶...");
+
+            var bucketManager = new BucketManager(imageData,
+                divisible: parameters.Divisible,
+                maxArError: parameters.MaxArError,
+                dimLimit: parameters.DimLimit,
+                debug: parameters.Debug);
+
+            reportProgress(60, "正在将图片分类到各个桶中...");
+
+            int totalImages = bucketManager.Buckets.Values.Sum(bucket => bucket.Count);
+            int copiedImages = 0;
+
+            foreach (var bucketId in bucketManager.Buckets.Keys.OrderByDescending(b => bucketManager.Buckets[b].Count))
+            {
+                var resolution = bucketManager.Resolutions[bucketId];
+                var outPath = Path.Combine(parameters.OutputFolder, $"{resolution.Width}x{resolution.Height}");
+                Directory.CreateDirectory(outPath);
+
+                reportProgress(0, $"正在处理分辨率 {resolution.Width}x{resolution.Height} ({bucketManager.Buckets[bucketId].Count} 张图片)");
+
+                foreach (var fileIndexStr in bucketManager.Buckets[bucketId])
+                {
+                    var fileName = dicFileName[fileIndexStr];
+                    var fileSrcPath = Path.Combine(parameters.InputFolder, fileName);
+                    var destPath = Path.Combine(outPath, fileName);
+
+                    try
+                    {
+                        File.Copy(fileSrcPath, destPath, true);
+                        copiedImages++;
+
+                        if (parameters.Debug)
+                        {
+                            reportProgress(0, $"复制: {fileName} -> {resolution.Width}x{resolution.Height}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        reportProgress(0, $"复制 {fileName} 时出错: {ex.Message}");
+                    }
+
+                    int progress = totalImages == 0 ? 100 : (int)((copiedImages / (double)totalImages) * 30) + 60;
+                    reportProgress(progress, null);
+                }
+            }
+
+            return new ClassificationResult
+            {
+                TotalImages = totalImages,
+                BucketCount = bucketManager.Buckets.Count,
+                BucketManager = bucketManager
+            };
         }
 
         private void Worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -421,28 +520,45 @@ namespace CyanTools.ViewModel
             ProgressValue = 100;
             if (e.Result is ClassificationResult result)
             {
-                AppendLog("分类完成!");
-                AppendLog($"总计处理图片: {result.TotalImages} 张");
-                AppendLog($"创建分类桶数量: {result.BucketCount} 个");
-                AppendLog("");
-                AppendLog("各分辨率分布:");
-
-                foreach (var bucketId in result.BucketManager.Buckets.Keys.OrderByDescending(b => result.BucketManager.Buckets[b].Count))
-                {
-                    var resolution = result.BucketManager.Resolutions[bucketId];
-                    var count = result.BucketManager.Buckets[bucketId].Count;
-                    AppendLog($"  {resolution.Width}x{resolution.Height}: {count} 张图片");
-                }
+                LogClassificationSummary(result);
 
                 MessageBox.Show($"分类完成!\n\n总计图片: {result.TotalImages} 张\n创建分类: {result.BucketCount} 个",
                     "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
+        private void LogClassificationSummary(ClassificationResult result)
+        {
+            AppendLog("分类完成!");
+            AppendLog($"总计处理图片: {result.TotalImages} 张");
+            AppendLog($"创建分类桶数量: {result.BucketCount} 个");
+            AppendLog("");
+            AppendLog("各分辨率分布:");
+
+            foreach (var bucketId in result.BucketManager.Buckets.Keys.OrderByDescending(b => result.BucketManager.Buckets[b].Count))
+            {
+                var resolution = result.BucketManager.Resolutions[bucketId];
+                var count = result.BucketManager.Buckets[bucketId].Count;
+                AppendLog($"  {resolution.Width}x{resolution.Height}: {count} 张图片");
+            }
+        }
+
         private void AppendLog(string message)
         {
-            _logBuilder.AppendLine($"[{DateTime.Now:HH:mm:ss}] {message}");
-            LogText = _logBuilder.ToString();
+            void Update()
+            {
+                _logBuilder.AppendLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+                LogText = _logBuilder.ToString();
+            }
+
+            if (Application.Current?.Dispatcher?.CheckAccess() == true)
+            {
+                Update();
+            }
+            else
+            {
+                Application.Current?.Dispatcher?.Invoke(Update);
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

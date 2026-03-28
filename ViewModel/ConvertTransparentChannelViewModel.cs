@@ -3,26 +3,42 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class ConvertTransparentChannelViewModel : INotifyPropertyChanged
+    public class ConvertTransparentChannelViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
+        private const string ToolDisplayName = "转换透明通道";
+
         private string _inputPath;
         private string _outputPath;
         private double _progressValue;
         private bool _isProcessing;
+        private bool _isWorkflowMode;
 
         public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
 
         public string InputPath
         {
             get => _inputPath;
-            set { _inputPath = value; OnPropertyChanged(); }
+            set
+            {
+                if (_inputPath == value)
+                {
+                    return;
+                }
+
+                var previousInput = _inputPath;
+                _inputPath = value;
+                OnPropertyChanged();
+                OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, ToolDisplayName);
+            }
         }
 
         public string OutputPath
@@ -47,6 +63,20 @@ namespace CyanTools.ViewModel
                 CommandManager.InvalidateRequerySuggested();
             }
         }
+
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set
+            {
+                _isWorkflowMode = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputPath ?? string.Empty; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputPath ?? string.Empty; set => OutputPath = value ?? string.Empty; }
 
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
@@ -78,17 +108,56 @@ namespace CyanTools.ViewModel
             SelectPath(path => OutputPath = path);
         }
 
-        private async Task StartConversionAsync()
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
         {
+            return ExecuteConversionAsync(
+                showDialogs: false,
+                rethrowErrors: true,
+                pipelineLog: message => context.AppendLog($"[{ToolDisplayName}] {message}"),
+                token);
+        }
+
+        private Task StartConversionAsync()
+        {
+            return ExecuteConversionAsync(
+                showDialogs: true,
+                rethrowErrors: false,
+                pipelineLog: null,
+                CancellationToken.None);
+        }
+
+        private async Task ExecuteConversionAsync(bool showDialogs, bool rethrowErrors, Action<string>? pipelineLog, CancellationToken token)
+        {
+            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, ToolDisplayName);
             if (string.IsNullOrWhiteSpace(InputPath) || string.IsNullOrWhiteSpace(OutputPath))
             {
-                System.Windows.MessageBox.Show("请选择输入和输出路径。", "提示");
+                const string validationMessage = "请选择输入和输出路径。";
+                pipelineLog?.Invoke(validationMessage);
+                if (showDialogs)
+                {
+                    System.Windows.MessageBox.Show(validationMessage, "提示");
+                }
+                else if (rethrowErrors)
+                {
+                    throw new InvalidOperationException(validationMessage);
+                }
+
                 return;
             }
 
             if (!Directory.Exists(InputPath))
             {
-                System.Windows.MessageBox.Show("输入路径不存在。", "提示");
+                const string inputMissingMessage = "输入路径不存在。";
+                pipelineLog?.Invoke(inputMissingMessage);
+                if (showDialogs)
+                {
+                    System.Windows.MessageBox.Show(inputMissingMessage, "提示");
+                }
+                else if (rethrowErrors)
+                {
+                    throw new DirectoryNotFoundException(inputMissingMessage);
+                }
+
                 return;
             }
 
@@ -97,15 +166,25 @@ namespace CyanTools.ViewModel
             Logs.Clear();
 
             var progress = new Progress<double>(value => ProgressValue = value);
-            Action<string> logAction = message => App.Current.Dispatcher.Invoke(() => Logs.Add(message));
+            Action<string> logAction = message =>
+            {
+                App.Current.Dispatcher.Invoke(() => Logs.Add(message));
+                pipelineLog?.Invoke(message);
+            };
 
             try
             {
-                await Task.Run(() => TransparentChannelConverter.Convert(InputPath, OutputPath, progress, logAction));
+                token.ThrowIfCancellationRequested();
+                await Task.Run(() => TransparentChannelConverter.Convert(InputPath, OutputPath, progress, logAction), token);
             }
             catch (Exception ex)
             {
-                logAction($"转换失败: {ex.Message}");
+                string failureMessage = $"转换失败: {ex.Message}";
+                logAction(failureMessage);
+                if (rethrowErrors)
+                {
+                    throw;
+                }
             }
             finally
             {

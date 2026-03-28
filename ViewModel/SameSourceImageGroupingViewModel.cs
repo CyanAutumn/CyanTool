@@ -10,7 +10,7 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class SameSourceImageGroupingViewModel : PipelineNodeViewModelBase
+    public class SameSourceImageGroupingViewModel : PipelineNodeViewModelBase, IPipelineDirectoryNode
     {
         public override string DisplayName => "同源图片归类";
 
@@ -20,8 +20,10 @@ namespace CyanTools.ViewModel
             get => _inputPath;
             set
             {
+                string previousInput = _inputPath;
                 if (SetField(ref _inputPath, value))
                 {
+                    OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, DisplayName);
                     RefreshCommandStates();
                 }
             }
@@ -223,6 +225,7 @@ namespace CyanTools.ViewModel
         }
 
         private bool _isProcessing;
+        private bool _isWorkflowMode;
         public bool IsProcessing
         {
             get => _isProcessing;
@@ -235,6 +238,16 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set => SetField(ref _isWorkflowMode, value);
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+        public string PipelineInputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => OutputPath; set => OutputPath = value ?? string.Empty; }
+
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
         public ICommand StartCommand { get; }
@@ -244,7 +257,7 @@ namespace CyanTools.ViewModel
             SelectInputCommand = new RelayCommand(SelectInputFolder, () => !IsProcessing);
             SelectOutputCommand = new RelayCommand(SelectOutputFolder, () => !IsProcessing);
             StartCommand = new RelayCommand(async () => await RunGroupingAsync(showDialogs: true, CancellationToken.None),
-                () => !string.IsNullOrEmpty(InputPath) && !string.IsNullOrEmpty(OutputPath) && !IsProcessing);
+                () => !string.IsNullOrEmpty(InputPath) && !IsProcessing);
         }
 
         public override Task RunAsync(PipelineContext context, CancellationToken token)
@@ -339,6 +352,7 @@ namespace CyanTools.ViewModel
 
         private async Task RunGroupingAsync(bool showDialogs, CancellationToken token)
         {
+            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DisplayName);
             if (IsProcessing)
             {
                 return;
