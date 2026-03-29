@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
 
     <Version>1.0.0.14</Version>
     <AssemblyVersion>1.0.0.14</AssemblyVersion>
@@ -19,6 +20,13 @@
     <Folder Include="ViewModel" />
     <Folder Include="Model" />
     <Folder Include="Utils" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Utils\TaggingProcessor-DESKTOP-AIAI78G.cs" />
+    <Compile Remove="ViewModel\TaggingViewModel-DESKTOP-AIAI78G.cs" />
+    <None Remove="TaggingView-DESKTOP-AIAI78G.xaml" />
+    <Page Remove="TaggingView-DESKTOP-AIAI78G.xaml" />
   </ItemGroup>
 
   

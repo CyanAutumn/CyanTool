@@ -7,26 +7,7 @@ namespace CyanTools.Utils
     {
         public static string BuildDefaultOutputDirectory(string? inputPath, string? toolName)
         {
-            if (string.IsNullOrWhiteSpace(inputPath) || string.IsNullOrWhiteSpace(toolName))
-            {
-                return string.Empty;
-            }
-
-            try
-            {
-                string normalizedInput = Path.GetFullPath(inputPath.Trim());
-                string? parentDirectory = Directory.GetParent(normalizedInput)?.FullName;
-                if (string.IsNullOrWhiteSpace(parentDirectory))
-                {
-                    return string.Empty;
-                }
-
-                return Path.Combine(parentDirectory, toolName.Trim());
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            return SiblingDirectoryPathBuilder.Build(inputPath, toolName);
         }
 
         public static string FillWhenEmpty(string? currentOutputPath, string? inputPath, string? toolName)

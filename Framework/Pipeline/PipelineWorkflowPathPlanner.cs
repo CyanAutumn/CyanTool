@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using CyanTools.Utils;
 
 namespace CyanTools.Pipeline
 {
@@ -15,25 +16,7 @@ namespace CyanTools.Pipeline
                 return string.Empty;
             }
 
-            string normalizedInput = NormalizePath(inputPath);
-            if (string.IsNullOrWhiteSpace(normalizedInput))
-            {
-                return string.Empty;
-            }
-
-            string? parentDirectory = Directory.GetParent(normalizedInput)?.FullName;
-            if (string.IsNullOrWhiteSpace(parentDirectory))
-            {
-                return string.Empty;
-            }
-
-            string safeNodeName = SanitizePathSegment(nodeName.Trim());
-            if (string.IsNullOrWhiteSpace(safeNodeName))
-            {
-                return string.Empty;
-            }
-
-            return Path.Combine(parentDirectory, $"{sequence:D2}-{safeNodeName}");
+            return SiblingDirectoryPathBuilder.Build(inputPath, $"{sequence:D2}-{nodeName.Trim()}");
         }
 
         public static PipelineWorkflowResolvedPaths ApplyNodePaths(PipelineNodeViewModelBase node, string? inheritedInputPath, int sequence)
@@ -109,12 +92,6 @@ namespace CyanTools.Pipeline
             }
 
             return Path.GetFullPath(path.Trim());
-        }
-
-        private static string SanitizePathSegment(string value)
-        {
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            return string.Join(string.Empty, value.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries)).Trim();
         }
     }
 }

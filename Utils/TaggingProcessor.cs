@@ -754,7 +754,7 @@ namespace CyanTools.Utils
                 {
                     string txtFile = Path.ChangeExtension(imageFile, ".txt");
                     bool hasExistingTxt = File.Exists(txtFile);
-                    if (existingTxtHandlingMode == ExistingTxtHandlingMode.Skip && hasExistingTxt)
+                    if (TagTextMergeHelper.ShouldSkipExistingTxt(hasExistingTxt, existingTxtHandlingMode))
                     {
                         skippedCount++;
                         progress.Report($"Skipped [{processedCount + skippedCount}/{imageFiles.Count}]: {Path.GetFileName(imageFile)} (同名txt已存在)");
@@ -763,14 +763,10 @@ namespace CyanTools.Utils
 
                     var tags = await Task.Run(() => ProcessImage(imageFile, generalThreshold, characterThreshold, inputSize, inputFormat, categoryOptions, priorityList));
                     var finalTags = MergeCustomTags(customList, tags);
+                    var existingText = hasExistingTxt ? await File.ReadAllTextAsync(txtFile) : null;
+                    var resolvedTags = TagTextMergeHelper.ResolveTags(existingText, finalTags, existingTxtHandlingMode);
 
-                    if (existingTxtHandlingMode == ExistingTxtHandlingMode.MergeUnique && hasExistingTxt)
-                    {
-                        var existingText = await File.ReadAllTextAsync(txtFile);
-                        finalTags = MergeExistingAndGeneratedTags(existingText, finalTags);
-                    }
-
-                    File.WriteAllText(txtFile, string.Join(", ", finalTags));
+                    File.WriteAllText(txtFile, string.Join(", ", resolvedTags));
                     processedCount++;
                     progress.Report($"Processed [{processedCount + skippedCount}/{imageFiles.Count}]: {Path.GetFileName(imageFile)}");
                 }
@@ -1036,58 +1032,6 @@ namespace CyanTools.Utils
 
             return result;
         }
-
-        private static List<string> MergeExistingAndGeneratedTags(string existingTxtContent, IReadOnlyList<string> generatedTags)
-        {
-            var result = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var tag in ParseTags(existingTxtContent))
-            {
-                var normalized = NormalizeTag(tag);
-                if (seen.Add(normalized))
-                {
-                    result.Add(tag);
-                }
-            }
-
-            if (generatedTags != null)
-            {
-                foreach (var tag in generatedTags)
-                {
-                    if (string.IsNullOrWhiteSpace(tag))
-                    {
-                        continue;
-                    }
-
-                    var normalized = NormalizeTag(tag);
-                    if (seen.Add(normalized))
-                    {
-                        result.Add(tag.Trim());
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        private static IEnumerable<string> ParseTags(string content)
-        {
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                yield break;
-            }
-
-            var separators = new[] { ',', ';', '\n', '\r', '\uFF0C', '\uFF1B' };
-            foreach (var part in content.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (!string.IsNullOrWhiteSpace(part))
-                {
-                    yield return part.Trim();
-                }
-            }
-        }
-
         private static string NormalizeTag(string tag)
         {
             if (string.IsNullOrWhiteSpace(tag))

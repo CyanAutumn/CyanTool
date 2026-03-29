@@ -43,7 +43,7 @@ namespace CyanTools.Utils
             }
 
             return tagText
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Split(new[] { ',', ';', '\n', '\r', '\uFF0C', '\uFF1B' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .Select(tag => tag.Trim())
                 .ToList();
