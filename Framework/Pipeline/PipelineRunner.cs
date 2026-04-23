@@ -18,10 +18,22 @@ namespace CyanTools.Pipeline
                 token.ThrowIfCancellationRequested();
                 nodeSequence++;
 
+                IPipelineRuntimeOutputNode? runtimeOutputNode = node.GetRuntimeOutputNode();
+                runtimeOutputNode?.ResetRuntimeOutputPath();
+
                 PipelineWorkflowResolvedPaths resolvedPaths = PipelineWorkflowPathPlanner.ApplyNodePaths(node, inheritedInputPath, nodeSequence);
                 context.UpdateEffectivePaths(resolvedPaths.EffectiveInputPath, resolvedPaths.EffectiveOutputPath, nodeSequence);
 
-                if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveOutputPath))
+                context.AppendLog($"开始执行: {node.DisplayName}");
+                node.AttachLogger(context.AppendLog);
+
+                await node.RunAsync(context, token).ConfigureAwait(false);
+
+                if (runtimeOutputNode != null && runtimeOutputNode.TryGetRuntimeOutputPath(out string runtimeOutputPath))
+                {
+                    inheritedInputPath = System.IO.Path.GetFullPath(runtimeOutputPath);
+                }
+                else if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveOutputPath))
                 {
                     inheritedInputPath = resolvedPaths.EffectiveOutputPath;
                 }
@@ -29,11 +41,6 @@ namespace CyanTools.Pipeline
                 {
                     inheritedInputPath = resolvedPaths.EffectiveInputPath;
                 }
-
-                context.AppendLog($"开始执行: {node.DisplayName}");
-                node.AttachLogger(context.AppendLog);
-
-                await node.RunAsync(context, token).ConfigureAwait(false);
 
                 context.AppendLog($"完成: {node.DisplayName}");
             }

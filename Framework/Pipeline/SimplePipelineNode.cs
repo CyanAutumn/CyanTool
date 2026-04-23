@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,6 +16,11 @@ namespace CyanTools.Pipeline
         {
             _displayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
             Inner = new TViewModel();
+
+            if (Inner is INotifyPropertyChanged notifyPropertyChanged)
+            {
+                notifyPropertyChanged.PropertyChanged += OnInnerPropertyChanged;
+            }
         }
 
         public TViewModel Inner { get; }
@@ -35,6 +41,16 @@ namespace CyanTools.Pipeline
         public override IPipelineDirectoryNode? GetDirectoryAutomationNode()
         {
             return Inner as IPipelineDirectoryNode;
+        }
+
+        public override IPipelineRuntimeOutputNode? GetRuntimeOutputNode()
+        {
+            return Inner as IPipelineRuntimeOutputNode;
+        }
+
+        private void OnInnerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            OnPropertyChanged(e.PropertyName);
         }
 
         public override void SetWorkflowEditorMode(bool isWorkflowMode)

@@ -181,6 +181,15 @@ namespace CyanTools.ViewModel
                 return;
             }
 
+            if (!PipelineWorkflowValidation.TryValidateSingletonFirstNode(
+                PipelineNodes,
+                node => node is DatasetDownloaderPipelineNode,
+                "数据集下载器",
+                AppendLog))
+            {
+                return;
+            }
+
             IsRunning = true;
             _cts = new CancellationTokenSource();
             LogLines.Clear();

@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using CyanTools.Model;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using Newtonsoft.Json;
@@ -31,7 +32,7 @@ namespace CyanTools.ViewModel
         PostId
     }
 
-    public sealed class DatasetDownloaderViewModel : INotifyPropertyChanged
+    public sealed class DatasetDownloaderViewModel : INotifyPropertyChanged, IPipelineRunnableViewModel, IPipelineRuntimeOutputNode
     {
         private const string DanbooruBaseUrl = "https://danbooru.donmai.us";
         private const int DanbooruPageSize = 200;
@@ -106,7 +107,10 @@ namespace CyanTools.ViewModel
         private readonly RestClient _danbooruClient;
 
         private CancellationTokenSource? _cancellationTokenSource;
+        private PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot? _activeRunOutputRootSnapshot;
+        private Action<string>? _pipelineLogSink;
         private string? _pixivAccessToken;
+        private string _runtimeOutputPath = string.Empty;
         private string _inputText = string.Empty;
         private string _danbooruToken = string.Empty;
         private string _pixivRefreshToken = string.Empty;
@@ -449,7 +453,11 @@ namespace CyanTools.ViewModel
             IsDownloading = true;
             try
             {
-                await RunSelectedTasksAsync(_cancellationTokenSource.Token);
+                await ExecuteDownloadAsync(
+                    _cancellationTokenSource.Token,
+                    pipelineLog: null,
+                    rethrowErrors: false,
+                    validateWorkflowOutput: false);
                 AppendLog("所有任务结束。");
             }
             catch (OperationCanceledException)
@@ -466,6 +474,26 @@ namespace CyanTools.ViewModel
                 _cancellationTokenSource = null;
                 IsDownloading = false;
             }
+        }
+
+        public void ResetRuntimeOutputPath()
+        {
+            _runtimeOutputPath = string.Empty;
+        }
+
+        public bool TryGetRuntimeOutputPath(out string path)
+        {
+            path = _runtimeOutputPath;
+            return !string.IsNullOrWhiteSpace(path);
+        }
+
+        public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
+        {
+            return ExecuteDownloadAsync(
+                token,
+                message => context.AppendLog($"[数据集下载器] {message}"),
+                rethrowErrors: true,
+                validateWorkflowOutput: true);
         }
 
         private async Task FetchPixivRefreshTokenAsync()
@@ -602,18 +630,95 @@ namespace CyanTools.ViewModel
             return tokenResponse;
         }
 
-        private async Task RunSelectedTasksAsync(CancellationToken token)
+        private async Task ExecuteDownloadAsync(
+            CancellationToken token,
+            Action<string>? pipelineLog,
+            bool rethrowErrors,
+            bool validateWorkflowOutput)
         {
             var input = (InputText ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(input))
-            {
-                AppendLog("请输入 ID/标签。");
-                return;
-            }
+            ResetRuntimeOutputPath();
 
+            Action<string>? previousPipelineLogSink = _pipelineLogSink;
+            PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot? previousRunOutputRootSnapshot = _activeRunOutputRootSnapshot;
+            _pipelineLogSink = pipelineLog;
+            _activeRunOutputRootSnapshot = new PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(input))
+                {
+                    const string emptyInputMessage = "请输入 ID/标签。";
+                    AppendLog(emptyInputMessage);
+                    if (rethrowErrors)
+                    {
+                        throw new InvalidOperationException(emptyInputMessage);
+                    }
+
+                    return;
+                }
+
+                await PrepareSessionOutputSegmentsAsync(input, token);
+
+                string resolvedOutputRoot = ResolveCurrentRunOutputRoot();
+                pipelineLog?.Invoke($"解析后的输出路径: {resolvedOutputRoot}");
+
+                if (!HasSelectedTasks())
+                {
+                    const string noTasksMessage = "没有可执行的来源任务。";
+                    AppendLog(noTasksMessage);
+                    if (rethrowErrors)
+                    {
+                        throw new InvalidOperationException(noTasksMessage);
+                    }
+
+                    return;
+                }
+
+                await RunSelectedTasksAsync(input, token);
+
+                if (!validateWorkflowOutput)
+                {
+                    return;
+                }
+
+                try
+                {
+                    _runtimeOutputPath = PipelineRuntimeOutputDirectoryValidator.ValidateAndGetPublishPath(
+                        resolvedOutputRoot,
+                        "数据集下载器");
+                }
+                catch (DirectoryNotFoundException ex)
+                {
+                    pipelineLog?.Invoke(ex.Message);
+                    throw;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    pipelineLog?.Invoke(ex.Message);
+                    throw;
+                }
+            }
+            finally
+            {
+                _activeRunOutputRootSnapshot = previousRunOutputRootSnapshot;
+                _pipelineLogSink = previousPipelineLogSink;
+            }
+        }
+
+        private bool HasSelectedTasks()
+        {
+            return EnableDanbooru || (EnablePixiv && !IsTagOrPostMode) || (EnableKemono && !IsTagOrPostMode);
+        }
+
+        private async Task PrepareSessionOutputSegmentsAsync(string input, CancellationToken token)
+        {
             _sessionOutputIdSegment = SanitizePathSegment(input, "unknown");
             _sessionOutputArtistSegment = await ResolveArtistSegmentForOutputAsync(input, token);
+        }
 
+        private async Task RunSelectedTasksAsync(string input, CancellationToken token)
+        {
             var tasks = new List<Task>();
             if (EnableDanbooru)
             {
@@ -628,12 +733,6 @@ namespace CyanTools.ViewModel
             if (EnableKemono && !IsTagOrPostMode)
             {
                 tasks.Add(RunKemonoAsync(input, token));
-            }
-
-            if (tasks.Count == 0)
-            {
-                AppendLog("没有可执行的来源任务。");
-                return;
             }
 
             await Task.WhenAll(tasks);
@@ -1496,7 +1595,12 @@ namespace CyanTools.ViewModel
 
         private string ResolveSourceOutputDirectory(string source, string key)
         {
-            return ResolveOutputDirectoryRoot();
+            return _activeRunOutputRootSnapshot?.ResolveOnce(ResolveOutputDirectoryRoot) ?? ResolveOutputDirectoryRoot();
+        }
+
+        private string ResolveCurrentRunOutputRoot()
+        {
+            return _activeRunOutputRootSnapshot?.ResolveOnce(ResolveOutputDirectoryRoot) ?? Path.GetFullPath(ResolveOutputDirectoryRoot());
         }
 
         private string ApplyOutputDirectoryPlaceholders(string pattern)
@@ -1576,6 +1680,7 @@ namespace CyanTools.ViewModel
 
         private void AppendLog(string message)
         {
+            _pipelineLogSink?.Invoke(message);
             Application.Current?.Dispatcher.Invoke(() =>
             {
                 LogText += $"{DateTime.Now:HH:mm:ss} - {message}\n";

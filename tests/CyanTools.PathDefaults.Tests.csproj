@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Utils/SameSourceImageGroupingProcessor.cs" Link="Utils/SameSourceImageGroupingProcessor.cs" />
+    <Compile Include="../Utils/InputDirectoryCleanupHelper.cs" Link="Utils/InputDirectoryCleanupHelper.cs" />
+    <Compile Include="../Utils/SiblingDirectoryPathBuilder.cs" Link="Utils/SiblingDirectoryPathBuilder.cs" />
+    <Compile Include="../Utils/TagTextMergeHelper.cs" Link="Utils/TagTextMergeHelper.cs" />
+    <Compile Include="../Utils/ToolOutputDirectoryDefaults.cs" Link="Utils/ToolOutputDirectoryDefaults.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineContext.cs" Link="Framework/Pipeline/PipelineContext.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineSnapshotProvider.cs" Link="Framework/Pipeline/IPipelineSnapshotProvider.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineNodeViewModelBase.cs" Link="Framework/Pipeline/PipelineNodeViewModelBase.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineRunner.cs" Link="Framework/Pipeline/PipelineRunner.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineDirectoryBehavior.cs" Link="Framework/Pipeline/PipelineDirectoryBehavior.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineDirectoryNode.cs" Link="Framework/Pipeline/IPipelineDirectoryNode.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineRuntimeOutputNode.cs" Link="Framework/Pipeline/IPipelineRuntimeOutputNode.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineRunnableViewModel.cs" Link="Framework/Pipeline/IPipelineRunnableViewModel.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineRuntimeOutputDirectoryValidator.cs" Link="Framework/Pipeline/PipelineRuntimeOutputDirectoryValidator.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineSnapshotHelper.cs" Link="Framework/Pipeline/PipelineSnapshotHelper.cs" />
+    <Compile Include="../Framework/Pipeline/SimplePipelineNode.cs" Link="Framework/Pipeline/SimplePipelineNode.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineWorkflowValidation.cs" Link="Framework/Pipeline/PipelineWorkflowValidation.cs" />
+    <Compile Include="../Framework/Pipeline/PipelineWorkflowPathPlanner.cs" Link="Framework/Pipeline/PipelineWorkflowPathPlanner.cs" />
+  </ItemGroup>
+</Project>
