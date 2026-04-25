@@ -3,16 +3,30 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel.TrainingSet"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid>
         <DockPanel>
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
-                <Button Content="选择文件夹" Command="{Binding BrowseFolderCommand}" Margin="5"/>
-                <Button Content="一键配平" Command="{Binding BalanceCommand}" Margin="5"/>
-                <Button Content="应用" Command="{Binding ApplyRenamingCommand}" Margin="5"/>
-                <TextBox Text="{Binding SelectedFolderPath, UpdateSourceTrigger=PropertyChanged}" Width="400" Margin="5" IsReadOnly="True"/>
+            <StackPanel DockPanel.Dock="Top" Margin="5">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5,0"/>
+                    <TextBox Text="{Binding SelectedFolderPath, UpdateSourceTrigger=LostFocus}"
+                             IsReadOnly="{Binding HasInheritedInputPath}"
+                             Width="400" Margin="5"/>
+                    <Button Content="..." Command="{Binding BrowseFolderCommand}" Margin="5"
+                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                    <Button Content="一键配平" Command="{Binding BalanceCommand}" Margin="5"/>
+                    <Button Content="应用" Command="{Binding ApplyRenamingCommand}" Margin="5"/>
+                </StackPanel>
+                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Foreground="Gray" Margin="5,0,5,5"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </StackPanel>
             <DataGrid ItemsSource="{Binding FolderItems}" AutoGenerateColumns="False" CanUserAddRows="False" Margin="5">
                 <DataGrid.Columns>

@@ -5,15 +5,18 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 
 namespace CyanTools.ViewModel
 {
-    public class KeepFilesViewModel : INotifyPropertyChanged
+    public class KeepFilesViewModel : INotifyPropertyChanged, IPipelineDirectoryNode
     {
         private string _folderPath;
         private string _logText = string.Empty;
         private readonly StringBuilder _logBuilder = new StringBuilder();
+        private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
 
         public KeepFilesViewModel()
         {
@@ -54,6 +57,36 @@ namespace CyanTools.ViewModel
                 }
             }
         }
+
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set
+            {
+                if (_isWorkflowMode != value)
+                {
+                    _isWorkflowMode = value;
+                    OnPropertyChanged(nameof(IsWorkflowMode));
+                }
+            }
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set
+            {
+                if (_hasInheritedInputPath != value)
+                {
+                    _hasInheritedInputPath = value;
+                    OnPropertyChanged(nameof(HasInheritedInputPath));
+                }
+            }
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.InPlace;
+        public string PipelineInputPath { get => FolderPath ?? string.Empty; set => FolderPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => FolderPath ?? string.Empty; set => FolderPath = value ?? string.Empty; }
 
         private bool _keepJpg = true;
         private bool _keepPng = true;
@@ -175,7 +208,8 @@ namespace CyanTools.ViewModel
         {
             var dialog = new CommonOpenFileDialog
             {
-                IsFolderPicker = true
+                IsFolderPicker = true,
+                Title = "选择输入路径"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -188,7 +222,7 @@ namespace CyanTools.ViewModel
         {
             if (string.IsNullOrWhiteSpace(FolderPath) || !Directory.Exists(FolderPath))
             {
-                MessageBox.Show("请先选择一个有效的文件夹。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("请先输入有效的输入路径。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -205,7 +239,7 @@ namespace CyanTools.ViewModel
                 var files = Directory.GetFiles(FolderPath);
                 int deletedCount = 0;
                 _logBuilder.Clear();
-                AppendLog($"开始处理文件夹: {FolderPath}");
+                AppendLog($"开始处理输入路径: {FolderPath}");
 
                 foreach (var file in files)
                 {

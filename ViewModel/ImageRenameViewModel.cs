@@ -7,12 +7,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class ImageRenameViewModel : INotifyPropertyChanged
+    public class ImageRenameViewModel : INotifyPropertyChanged, IPipelineDirectoryNode
     {
         private static readonly HashSet<string> SupportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -25,6 +26,8 @@ namespace CyanTools.ViewModel
         private int _numberPadding = 4;
         private bool _isRenaming;
         private bool _isRefreshing;
+        private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
 
         public ObservableCollection<RenamePreviewItem> PreviewItems { get; } = new ObservableCollection<RenamePreviewItem>();
 
@@ -114,11 +117,44 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set
+            {
+                if (_isWorkflowMode == value)
+                {
+                    return;
+                }
+
+                _isWorkflowMode = value;
+                OnPropertyChanged(nameof(IsWorkflowMode));
+            }
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set
+            {
+                if (_hasInheritedInputPath == value)
+                {
+                    return;
+                }
+
+                _hasInheritedInputPath = value;
+                OnPropertyChanged(nameof(HasInheritedInputPath));
+            }
+        }
+
         public int FileCount => PreviewItems.Count;
 
         public bool HasConflicts => PreviewItems.Any(item => item.HasConflict);
 
         public string SampleFileName => BuildNewFileName(StartIndex, ".png");
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.InPlace;
+        public string PipelineInputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
 
         public ICommand SelectInputPathCommand { get; }
         public ICommand RefreshPreviewCommand { get; }

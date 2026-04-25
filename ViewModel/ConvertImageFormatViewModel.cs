@@ -24,6 +24,8 @@ namespace CyanTools.ViewModel
         private double _progressValue;
         private bool _isConverting;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
 
         public string InputPath
         {
@@ -75,6 +77,18 @@ namespace CyanTools.ViewModel
         {
             get => _isWorkflowMode;
             set { _isWorkflowMode = value; OnPropertyChanged(nameof(IsWorkflowMode)); }
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set { _hasInheritedInputPath = value; OnPropertyChanged(nameof(HasInheritedInputPath)); }
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set { _shouldClearInputDirectoryAfterCompletion = value; OnPropertyChanged(nameof(ShouldClearInputDirectoryAfterCompletion)); }
         }
 
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
@@ -155,11 +169,13 @@ namespace CyanTools.ViewModel
             pipelineLog?.Invoke("开始格式转换。");
 
             var progress = new Progress<double>(value => ProgressValue = value);
+            bool success = false;
 
             try
             {
                 token.ThrowIfCancellationRequested();
                 await ImageFormatConverter.ConvertAsync(InputPath, OutputPath, SelectedFormat, progress);
+                success = true;
                 pipelineLog?.Invoke("格式转换完成。");
             }
             catch (Exception ex)
@@ -178,9 +194,25 @@ namespace CyanTools.ViewModel
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(pipelineLog);
+                }
+
                 IsConverting = false;
                 ProgressValue = 100;
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string>? logAction)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
+            logAction?.Invoke(result.Message);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

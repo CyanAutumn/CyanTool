@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using CyanTools;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -29,7 +30,7 @@ namespace CyanTools.ViewModel
         public ExistingTxtHandlingMode Mode { get; set; } = ExistingTxtHandlingMode.Overwrite;
     }
 
-    public class TaggingViewModel : INotifyPropertyChanged
+    public class TaggingViewModel : INotifyPropertyChanged, IPipelineDirectoryNode
     {
         private string _inputDirectory;
         private float _generalThreshold = 0.35f;
@@ -49,6 +50,8 @@ namespace CyanTools.ViewModel
         private bool _includeModel = false;
         private bool _preferGpu = true;
         private ExistingTxtConflictOption _selectedExistingTxtConflictOption;
+        private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
 
         private readonly TaggingProcessor _taggingProcessor;
         private const int MaxLogLines = 1000;
@@ -75,6 +78,11 @@ namespace CyanTools.ViewModel
         public bool IncludeRating { get => _includeRating; set => SetField(ref _includeRating, value); }
         public bool IncludeModel { get => _includeModel; set => SetField(ref _includeModel, value); }
         public bool PreferGpu { get => _preferGpu; set => SetField(ref _preferGpu, value); }
+        public bool IsWorkflowMode { get => _isWorkflowMode; set => SetField(ref _isWorkflowMode, value); }
+        public bool HasInheritedInputPath { get => _hasInheritedInputPath; set => SetField(ref _hasInheritedInputPath, value); }
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.InPlace;
+        public string PipelineInputPath { get => InputDirectory ?? string.Empty; set => InputDirectory = value ?? string.Empty; }
+        public string PipelineOutputPath { get => InputDirectory ?? string.Empty; set => InputDirectory = value ?? string.Empty; }
 
         public ICommand BrowseInputCommand { get; }
         public ICommand StartTaggingCommand { get; }

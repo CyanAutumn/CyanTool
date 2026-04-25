@@ -7,19 +7,44 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 using CyanTools.Model.Training;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel.TrainingSet
 {
-    public class TrainingSetBalancerViewModel : INotifyPropertyChanged
+    public class TrainingSetBalancerViewModel : INotifyPropertyChanged, IPipelineDirectoryNode
     {
         private string _selectedFolderPath;
+        private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
         public string SelectedFolderPath
         {
             get => _selectedFolderPath;
-            set => SetField(ref _selectedFolderPath, value);
+            set
+            {
+                if (SetField(ref _selectedFolderPath, value))
+                {
+                    LoadFolderData();
+                }
+            }
         }
+
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set => SetField(ref _isWorkflowMode, value);
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set => SetField(ref _hasInheritedInputPath, value);
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.InPlace;
+        public string PipelineInputPath { get => SelectedFolderPath ?? string.Empty; set => SelectedFolderPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => SelectedFolderPath ?? string.Empty; set => SelectedFolderPath = value ?? string.Empty; }
 
         public ObservableCollection<FolderInfo> FolderItems { get; } = new ObservableCollection<FolderInfo>();
 
@@ -38,7 +63,7 @@ namespace CyanTools.ViewModel.TrainingSet
         {
             if (string.IsNullOrEmpty(SelectedFolderPath) || !Directory.Exists(SelectedFolderPath) || !FolderItems.Any())
             {
-                MessageBox.Show("请先选择一个包含子文件夹的有效目录。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("请先选择一个包含子目录的有效输入路径。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -78,7 +103,7 @@ namespace CyanTools.ViewModel.TrainingSet
 
                     if (Directory.Exists(newFullPath))
                     {
-                        MessageBox.Show($"无法重命名 '{originalFolderName}' 为 '{newFolderName}'，因为目标文件夹已存在。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show($"无法重命名 '{originalFolderName}' 为 '{newFolderName}'，因为目标路径已存在。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                         continue;
                     }
 
@@ -121,13 +146,12 @@ namespace CyanTools.ViewModel.TrainingSet
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "请选择一个文件夹"
+                Title = "选择输入路径"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 SelectedFolderPath = dialog.FileName;
-                LoadFolderData();
             }
         }
 

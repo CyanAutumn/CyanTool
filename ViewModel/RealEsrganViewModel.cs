@@ -34,9 +34,11 @@ namespace CyanTools.ViewModel
         private GpuInfo _selectedGpu;
         private int _tileSize;
         private bool _shouldOpenOutputDirectory = true;
+        private bool _shouldClearInputDirectoryAfterCompletion;
         private bool _isIdle = true;
         private string _selectedTool;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
 
         private int _selectedWaifu2xNoiseLevel;
         private bool _waifu2xUsePhotoModel;
@@ -68,8 +70,10 @@ namespace CyanTools.ViewModel
         public ObservableCollection<GpuInfo> Gpus { get; }
         public int TileSize { get => _tileSize; set => SetField(ref _tileSize, value); }
         public bool ShouldOpenOutputDirectory { get => _shouldOpenOutputDirectory; set => SetField(ref _shouldOpenOutputDirectory, value); }
+        public bool ShouldClearInputDirectoryAfterCompletion { get => _shouldClearInputDirectoryAfterCompletion; set => SetField(ref _shouldClearInputDirectoryAfterCompletion, value); }
         public bool IsIdle { get => _isIdle; set => SetField(ref _isIdle, value); }
         public bool IsWorkflowMode { get => _isWorkflowMode; set => SetField(ref _isWorkflowMode, value); }
+        public bool HasInheritedInputPath { get => _hasInheritedInputPath; set => SetField(ref _hasInheritedInputPath, value); }
         
         public ObservableCollection<string> LogLines { get; }
 
@@ -232,11 +236,28 @@ namespace CyanTools.ViewModel
             {
                 IsIdle = true;
                 (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(pipelineLog);
+                }
+
                 if (success && allowOpenOutputDirectory && !string.IsNullOrWhiteSpace(OutputDirectory) && Directory.Exists(OutputDirectory))
                 {
                     Process.Start("explorer.exe", OutputDirectory);
                 }
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string>? pipelineLog)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputDirectory, new[] { OutputDirectory });
+            AddLog(result.Message);
+            pipelineLog?.Invoke(result.Message);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

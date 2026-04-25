@@ -19,7 +19,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <GroupBox Header="文件夹选择" Grid.Row="0" Margin="5">
+        <GroupBox Header="路径选择" Grid.Row="0" Margin="5">
             <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -27,12 +27,23 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Label Content="输入文件夹:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
-                    <Button Content="浏览..." Command="{Binding SelectInputCommand}" Grid.Column="2" Padding="10,2"/>
+                    <Label Content="输入路径:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             IsReadOnly="{Binding HasInheritedInputPath}"
+                             Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                    <Button Content="..." Command="{Binding SelectInputCommand}" Grid.Column="2" Padding="10,2"
+                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                 </Grid>
+                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Foreground="Gray" Margin="0,4,0,0"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <CheckBox Content="执行完成后清空输入路径文件夹"
+                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
+                          Margin="0,6,0,0"
+                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
                 <StackPanel Margin="0,5,0,0">
-                    <Label Content="输出文件夹:" Grid.Column="0" VerticalAlignment="Center"
+                    <Label Content="输出路径:" Grid.Column="0" VerticalAlignment="Center"
                            Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -42,10 +53,10 @@
                         <TextBox Grid.Column="0" Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                  VerticalAlignment="Center"
                                  Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                        <Button Grid.Column="1" Content="浏览..." Command="{Binding SelectOutputCommand}" Padding="10,2"
+                        <Button Grid.Column="1" Content="..." Command="{Binding SelectOutputCommand}" Padding="10,2"
                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                     </Grid>
-                    <TextBlock Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                    <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
                                Foreground="Gray" Margin="0,4,0,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </StackPanel>

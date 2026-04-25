@@ -29,9 +29,25 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5"/>
-                    <TextBox Grid.Column="1" Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
-                    <Button Grid.Column="2" Content="选择..." Command="{Binding SelectInputCommand}" Margin="5" Padding="10,2"/>
+                    <TextBox Grid.Column="1"
+                             Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             IsReadOnly="{Binding HasInheritedInputPath}"
+                             Margin="5" />
+                    <Button Grid.Column="2"
+                            Content="..."
+                            Command="{Binding SelectInputCommand}"
+                            Margin="5"
+                            Padding="10,2"
+                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                 </Grid>
+                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Foreground="Gray" Margin="5,2,5,0"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <CheckBox Content="执行完成后清空输入路径文件夹"
+                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
+                          Margin="5,6,5,0"
+                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
                 <StackPanel>
                     <TextBlock Text="输出路径:" Margin="5"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
@@ -42,10 +58,10 @@
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0" Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="5"
                                  Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                        <Button Grid.Column="1" Content="选择..." Command="{Binding SelectOutputCommand}" Margin="5" Padding="10,2"
+                        <Button Grid.Column="1" Content="..." Command="{Binding SelectOutputCommand}" Margin="5" Padding="10,2"
                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                     </Grid>
-                    <TextBlock Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                    <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
                                Foreground="Gray" Margin="5,2,5,5"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </StackPanel>

@@ -6,5 +6,6 @@ namespace CyanTools.Pipeline
         string PipelineInputPath { get; set; }
         string PipelineOutputPath { get; set; }
         bool IsWorkflowMode { get; set; }
+        bool HasInheritedInputPath { get; set; }
     }
 }

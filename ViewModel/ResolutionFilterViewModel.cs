@@ -7,11 +7,13 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using CyanTools.Pipeline;
 using CyanTools.Utils;
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class ResolutionFilterViewModel : INotifyPropertyChanged
+    public class ResolutionFilterViewModel : INotifyPropertyChanged, IPipelineDirectoryNode
     {
         private string _inputPath;
         private bool _isHeightFilterEnabled;
@@ -23,6 +25,8 @@ namespace CyanTools.ViewModel
         private int _minResolutionHeight = 1024;
         private double _progressValue;
         private bool _isStartButtonEnabled = true;
+        private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
 
         public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
 
@@ -86,11 +90,43 @@ namespace CyanTools.ViewModel
             set { _isStartButtonEnabled = value; OnPropertyChanged(nameof(IsStartButtonEnabled)); }
         }
 
+        public bool IsWorkflowMode
+        {
+            get => _isWorkflowMode;
+            set { _isWorkflowMode = value; OnPropertyChanged(nameof(IsWorkflowMode)); }
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set { _hasInheritedInputPath = value; OnPropertyChanged(nameof(HasInheritedInputPath)); }
+        }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.InPlace;
+        public string PipelineInputPath { get => InputPath ?? string.Empty; set => InputPath = value ?? string.Empty; }
+        public string PipelineOutputPath { get => InputPath ?? string.Empty; set => InputPath = value ?? string.Empty; }
+
+        public ICommand BrowseInputCommand { get; }
         public ICommand StartCommand { get; }
 
         public ResolutionFilterViewModel()
         {
+            BrowseInputCommand = new RelayCommand(BrowseInputPath);
             StartCommand = new RelayCommand(async () => await StartProcessing(), () => IsStartButtonEnabled);
+        }
+
+        private void BrowseInputPath()
+        {
+            var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "选择输入路径"
+            };
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                InputPath = dialog.FileName;
+            }
         }
 
         private async Task StartProcessing()

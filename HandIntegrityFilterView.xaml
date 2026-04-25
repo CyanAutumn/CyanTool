@@ -18,38 +18,42 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock Text="输入目录:"/>
+            <TextBlock Text="输入路径:"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox Grid.Column="0" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
-                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
+                <Button Grid.Column="1" Content="..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
             </Grid>
+            <CheckBox Content="执行完成后清空输入路径文件夹"
+                      IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion}"
+                      Margin="0,6,0,0"
+                      ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,10">
-            <TextBlock Text="坏图输出目录:"/>
+            <TextBlock Text="输出路径:"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox Grid.Column="0" Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
-                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseOutputCommand}" Padding="10,5"/>
+                <Button Grid.Column="1" Content="..." Command="{Binding BrowseOutputCommand}" Padding="10,5"/>
             </Grid>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Margin="0,0,0,10">
-            <TextBlock Text="好图输出目录:"/>
+            <TextBlock Text="好图输出路径:"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox Grid.Column="0" Text="{Binding GoodOutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
-                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseGoodOutputCommand}" Padding="10,5"/>
+                <Button Grid.Column="1" Content="..." Command="{Binding BrowseGoodOutputCommand}" Padding="10,5"/>
             </Grid>
             <TextBlock Text="留空则不输出好图" Foreground="Gray" Margin="0,5,0,0"/>
         </StackPanel>

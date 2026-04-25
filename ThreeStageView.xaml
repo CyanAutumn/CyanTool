@@ -32,19 +32,29 @@
                     <TextBlock Text="处理选项" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
                     
                     <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="输入文件夹:" Margin="0,0,0,5"/>
+                        <TextBlock Text="输入路径:" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Name="InputFolderTextBox" Text="{Binding InputFolder}" Height="25"/>
-                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" Command="{Binding BrowseInputFolderCommand}"/>
+                            <TextBox Grid.Column="0" Name="InputFolderTextBox" Text="{Binding InputFolder}" Height="25"
+                                     IsReadOnly="{Binding HasInheritedInputPath}"/>
+                            <Button Grid.Column="1" Content="..." Width="60" Margin="5,0,0,0" Command="{Binding BrowseInputFolderCommand}"
+                                    Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         </Grid>
+                        <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                                   Foreground="Gray" Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <CheckBox Content="执行完成后清空输入路径文件夹"
+                                  IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion}"
+                                  Margin="0,6,0,0"
+                                  ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
                     </StackPanel>
                     
                     <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="输出文件夹:" Margin="0,0,0,5"
+                        <TextBlock Text="输出路径:" Margin="0,0,0,5"
                                    Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -53,10 +63,10 @@
                             </Grid.ColumnDefinitions>
                             <TextBox Grid.Column="0" Name="OutputFolderTextBox" Text="{Binding OutputFolder}" Height="25"
                                      Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                            <Button Grid.Column="1" Content="浏览" Width="60" Margin="5,0,0,0" Command="{Binding BrowseOutputFolderCommand}"
+                            <Button Grid.Column="1" Content="..." Width="60" Margin="5,0,0,0" Command="{Binding BrowseOutputFolderCommand}"
                                     Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         </Grid>
-                        <TextBlock Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                        <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
                                    Foreground="Gray" Margin="0,4,0,0"
                                    Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </StackPanel>

@@ -67,6 +67,8 @@ namespace CyanTools.Pipeline
 
         private static string ResolveEffectiveInputPath(IPipelineDirectoryNode node, string? inheritedInputPath)
         {
+            node.HasInheritedInputPath = !string.IsNullOrWhiteSpace(inheritedInputPath);
+
             string source = string.IsNullOrWhiteSpace(inheritedInputPath)
                 ? node.PipelineInputPath
                 : inheritedInputPath;

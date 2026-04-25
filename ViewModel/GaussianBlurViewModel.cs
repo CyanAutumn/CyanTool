@@ -4,10 +4,10 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Win32;
 using System.Windows.Input;
 using CyanTools.Pipeline;
 using CyanTools.Utils;
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
@@ -20,6 +20,8 @@ namespace CyanTools.ViewModel
         private int _blurRadius = 5;
         private string _statusText;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
 
         public string InputPath
         {
@@ -62,6 +64,18 @@ namespace CyanTools.ViewModel
             set { _isWorkflowMode = value; OnPropertyChanged(); }
         }
 
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set { _hasInheritedInputPath = value; OnPropertyChanged(); }
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set { _shouldClearInputDirectoryAfterCompletion = value; OnPropertyChanged(); }
+        }
+
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
         public string PipelineInputPath { get => InputPath ?? string.Empty; set => InputPath = value ?? string.Empty; }
         public string PipelineOutputPath { get => OutputPath ?? string.Empty; set => OutputPath = value ?? string.Empty; }
@@ -79,31 +93,27 @@ namespace CyanTools.ViewModel
 
         private void SelectInputFolder()
         {
-            var dialog = new OpenFileDialog
+            var dialog = new CommonOpenFileDialog
             {
-                ValidateNames = false,
-                CheckFileExists = false,
-                CheckPathExists = true,
-                FileName = "文件夹选择."
+                IsFolderPicker = true,
+                Title = "选择输入路径"
             };
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                InputPath = Path.GetDirectoryName(dialog.FileName);
+                InputPath = dialog.FileName;
             }
         }
 
         private void SelectOutputFolder()
         {
-            var dialog = new OpenFileDialog
+            var dialog = new CommonOpenFileDialog
             {
-                ValidateNames = false,
-                CheckFileExists = false,
-                CheckPathExists = true,
-                FileName = "文件夹选择."
+                IsFolderPicker = true,
+                Title = "选择输出路径"
             };
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                OutputPath = Path.GetDirectoryName(dialog.FileName);
+                OutputPath = dialog.FileName;
             }
         }
 
@@ -125,7 +135,7 @@ namespace CyanTools.ViewModel
             OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, ToolDisplayName);
             if (string.IsNullOrEmpty(InputPath) || string.IsNullOrEmpty(OutputPath))
             {
-                StatusText = "请选择输入和输出文件夹。";
+                StatusText = "请选择输入路径和输出路径。";
                 pipelineLog?.Invoke(StatusText);
                 if (rethrowErrors)
                 {
@@ -137,7 +147,7 @@ namespace CyanTools.ViewModel
 
             if (!Directory.Exists(InputPath))
             {
-                StatusText = "输入文件夹不存在。";
+                StatusText = "输入路径不存在。";
                 pipelineLog?.Invoke(StatusText);
                 if (rethrowErrors)
                 {
@@ -153,6 +163,7 @@ namespace CyanTools.ViewModel
             }
 
             StatusText = "正在处理...";
+            bool success = false;
             try
             {
                 await Task.Run(() =>
@@ -170,6 +181,7 @@ namespace CyanTools.ViewModel
                         }
                     }
                 }, token);
+                success = true;
                 StatusText = "处理完成。";
                 pipelineLog?.Invoke(StatusText);
             }
@@ -182,6 +194,25 @@ namespace CyanTools.ViewModel
                     throw;
                 }
             }
+            finally
+            {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(pipelineLog);
+                }
+            }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string>? pipelineLog)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
+            StatusText = $"{StatusText} {result.Message}".Trim();
+            pipelineLog?.Invoke(result.Message);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

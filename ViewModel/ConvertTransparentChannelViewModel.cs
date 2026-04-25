@@ -21,6 +21,8 @@ namespace CyanTools.ViewModel
         private double _progressValue;
         private bool _isProcessing;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
 
         public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
 
@@ -70,6 +72,26 @@ namespace CyanTools.ViewModel
             set
             {
                 _isWorkflowMode = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set
+            {
+                _hasInheritedInputPath = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set
+            {
+                _shouldClearInputDirectoryAfterCompletion = value;
                 OnPropertyChanged();
             }
         }
@@ -171,11 +193,13 @@ namespace CyanTools.ViewModel
                 App.Current.Dispatcher.Invoke(() => Logs.Add(message));
                 pipelineLog?.Invoke(message);
             };
+            bool success = false;
 
             try
             {
                 token.ThrowIfCancellationRequested();
                 await Task.Run(() => TransparentChannelConverter.Convert(InputPath, OutputPath, progress, logAction), token);
+                success = true;
             }
             catch (Exception ex)
             {
@@ -188,9 +212,25 @@ namespace CyanTools.ViewModel
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(logAction);
+                }
+
                 ProgressValue = 100;
                 IsProcessing = false;
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string> logAction)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
+            logAction(result.Message);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

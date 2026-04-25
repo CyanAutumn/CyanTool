@@ -16,15 +16,19 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <Label Grid.Row="0" Content="目标文件夹:" VerticalAlignment="Center"/>
+        <Label Grid.Row="0" Content="输入路径:" VerticalAlignment="Center"/>
         <Grid Grid.Row="0" Grid.Column="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox Text="{Binding TargetDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
-            <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseDirectoryCommand}" Margin="5" Padding="10,2"/>
+            <Button Grid.Column="1" Content="..." Command="{Binding BrowseDirectoryCommand}" Margin="5" Padding="10,2"/>
         </Grid>
 
         <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="5">

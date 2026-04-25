@@ -29,12 +29,14 @@ namespace CyanTools.ViewModel
     public class HandIntegrityFilterViewModel : INotifyPropertyChanged
     {
         private static readonly HttpClient HttpClient = new HttpClient();
+        private const string ToolDisplayName = "手指完整性筛选";
 
         private string _inputDirectory = string.Empty;
         private string _outputDirectory = string.Empty;
         private string _goodOutputDirectory = string.Empty;
         private bool _includeSubfolders = true;
         private bool _copyCompanionText = true;
+        private bool _shouldClearInputDirectoryAfterCompletion;
         private bool _isIdle = true;
         private double _progressValue;
         private float _detectorConfidence = 0.25f;
@@ -62,11 +64,24 @@ namespace CyanTools.ViewModel
         public ObservableCollection<ModelOption> DetectorModels { get; } = new ObservableCollection<ModelOption>();
         public ObservableCollection<ModelOption> LandmarkModels { get; } = new ObservableCollection<ModelOption>();
 
-        public string InputDirectory { get => _inputDirectory; set => SetField(ref _inputDirectory, value); }
+        public string InputDirectory
+        {
+            get => _inputDirectory;
+            set
+            {
+                var previousInput = _inputDirectory;
+                if (SetField(ref _inputDirectory, value))
+                {
+                    OutputDirectory = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputDirectory, previousInput, value, ToolDisplayName);
+                }
+            }
+        }
+
         public string OutputDirectory { get => _outputDirectory; set => SetField(ref _outputDirectory, value); }
         public string GoodOutputDirectory { get => _goodOutputDirectory; set => SetField(ref _goodOutputDirectory, value); }
         public bool IncludeSubfolders { get => _includeSubfolders; set => SetField(ref _includeSubfolders, value); }
         public bool CopyCompanionText { get => _copyCompanionText; set => SetField(ref _copyCompanionText, value); }
+        public bool ShouldClearInputDirectoryAfterCompletion { get => _shouldClearInputDirectoryAfterCompletion; set => SetField(ref _shouldClearInputDirectoryAfterCompletion, value); }
         public bool IsIdle { get => _isIdle; set => SetField(ref _isIdle, value); }
         public double ProgressValue { get => _progressValue; set => SetField(ref _progressValue, value); }
         public float DetectorConfidence { get => _detectorConfidence; set => SetField(ref _detectorConfidence, value); }
@@ -95,8 +110,6 @@ namespace CyanTools.ViewModel
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
             _detectorModelsDirectory = Path.Combine(baseDir, "Models", "hand_detection");
             _landmarkModelsDirectory = Path.Combine(baseDir, "Models", "hand_landmark");
-            OutputDirectory = Path.Combine(baseDir, "output", "bad_hands");
-            GoodOutputDirectory = Path.Combine(baseDir, "output", "good_hands");
 
             DetectorModels.Add(new ModelOption("anime_hand_detection v1.0 s (精度优先)", "hand_detect_v1.0_s.onnx", "https://huggingface.co/deepghs/anime_hand_detection/resolve/main/hand_detect_v1.0_s/model.onnx"));
             DetectorModels.Add(new ModelOption("anime_hand_detection v1.0 n (速度优先)", "hand_detect_v1.0_n.onnx", "https://huggingface.co/deepghs/anime_hand_detection/resolve/main/hand_detect_v1.0_n/model.onnx"));
@@ -105,9 +118,9 @@ namespace CyanTools.ViewModel
             LandmarkModels.Add(new ModelOption("MediaPipe Hands 2023Feb (21点)", "handpose_estimation_mediapipe_2023feb.onnx", "https://huggingface.co/opencv/handpose_estimation_mediapipe/resolve/main/handpose_estimation_mediapipe_2023feb.onnx"));
             SelectedLandmarkModel = LandmarkModels[0];
 
-            BrowseInputCommand = new RelayCommand(_ => BrowseForFolder(path => InputDirectory = path));
-            BrowseOutputCommand = new RelayCommand(_ => BrowseForFolder(path => OutputDirectory = path));
-            BrowseGoodOutputCommand = new RelayCommand(_ => BrowseForFolder(path => GoodOutputDirectory = path));
+            BrowseInputCommand = new RelayCommand(_ => BrowseForFolder(path => InputDirectory = path, "选择输入路径"));
+            BrowseOutputCommand = new RelayCommand(_ => BrowseForFolder(path => OutputDirectory = path, "选择输出路径"));
+            BrowseGoodOutputCommand = new RelayCommand(_ => BrowseForFolder(path => GoodOutputDirectory = path, "选择好图输出路径"));
             StartCommand = new RelayCommand(async _ => await StartProcessing(), _ => IsIdle);
             ClearLogCommand = new RelayCommand(_ => LogLines.Clear(), _ => IsIdle);
         }
@@ -124,9 +137,14 @@ namespace CyanTools.ViewModel
             });
         }
 
-        private void BrowseForFolder(Action<string> setPathAction)
+        private void BrowseForFolder(Action<string> setPathAction, string title)
         {
-            var dialog = new CommonOpenFileDialog { IsFolderPicker = true };
+            var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = title
+            };
+
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 setPathAction(dialog.FileName);
@@ -140,6 +158,7 @@ namespace CyanTools.ViewModel
             (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
             ProgressValue = 0;
             LogLines.Clear();
+            OutputDirectory = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputDirectory, InputDirectory, ToolDisplayName);
 
             var detectorPath = await EnsureModelAsync(SelectedDetectorModel, _detectorModelsDirectory, "手部检测模型");
             if (detectorPath == null)
@@ -185,10 +204,12 @@ namespace CyanTools.ViewModel
 
             var processor = new HandIntegrityFilter();
             var progress = new Progress<double>(value => ProgressValue = value);
+            bool success = false;
 
             try
             {
                 await Task.Run(() => processor.ProcessAsync(options, progress, AddLog));
+                success = true;
             }
             catch (Exception ex)
             {
@@ -196,11 +217,29 @@ namespace CyanTools.ViewModel
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion();
+                }
+
                 ProgressValue = 100;
                 IsIdle = true;
                 (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion()
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(
+                InputDirectory,
+                new[] { OutputDirectory, GoodOutputDirectory });
+            AddLog(result.Message);
         }
 
         private async Task<string?> EnsureModelAsync(ModelOption option, string modelsDirectory, string description)

@@ -18,6 +18,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -26,11 +28,24 @@
             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <Label Grid.Row="0" Grid.Column="0" Content="输入目录:" VerticalAlignment="Center"/>
-        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
-        <Button Grid.Row="0" Grid.Column="2" Content="..." Command="{Binding BrowseInputCommand}" Margin="5" Padding="10,2"/>
+        <Label Grid.Row="0" Grid.Column="0" Content="输入路径:" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="0" Grid.Column="1"
+                 Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}"
+                 IsReadOnly="{Binding HasInheritedInputPath}"
+                 Margin="5"/>
+        <Button Grid.Row="0" Grid.Column="2" Content="..." Command="{Binding BrowseInputCommand}" Margin="5" Padding="10,2"
+                Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="5,2,5,5" Foreground="Gray"
+                   Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                   TextWrapping="Wrap"
+                   Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
+                  Content="执行完成后清空输入路径文件夹"
+                  IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion}"
+                  Margin="5,0,5,5"
+                  ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
 
-        <Grid Grid.Row="1" Margin="0">
+        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -41,7 +56,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Column="0" Content="输出目录:" VerticalAlignment="Center"
+                <Label Grid.Column="0" Content="输出路径:" VerticalAlignment="Center"
                        Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                 <TextBox Grid.Column="1" Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="5"
                          Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
@@ -49,15 +64,15 @@
                         Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
             </Grid>
             <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Margin="5,2,5,5" Foreground="Gray"
-                       Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                       Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
                        Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
 
-        <Label Grid.Row="2" Grid.Column="0" Content="选择工具:" VerticalAlignment="Center"/>
-        <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding AvailableTools}" SelectedItem="{Binding SelectedTool}" Margin="5"/>
+        <Label Grid.Row="4" Grid.Column="0" Content="选择工具:" VerticalAlignment="Center"/>
+        <ComboBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding AvailableTools}" SelectedItem="{Binding SelectedTool}" Margin="5"/>
 
 
-        <Grid x:Name="RealEsrganOptionsGrid" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Visibility="{Binding IsRealEsrganSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid x:Name="RealEsrganOptionsGrid" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Visibility="{Binding IsRealEsrganSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -100,7 +115,7 @@
         </Grid>
 
 
-        <Grid x:Name="Waifu2xOptionsGrid" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Visibility="{Binding IsWaifu2xSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid x:Name="Waifu2xOptionsGrid" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Visibility="{Binding IsWaifu2xSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -124,7 +139,7 @@
             <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Waifu2xCropSize, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
         </Grid>
 
-        <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3">
+        <Grid Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -136,9 +151,9 @@
             <Button Grid.Column="3" Content="清空日志" Command="{Binding ClearLogCommand}" IsEnabled="{Binding IsIdle}" Margin="15,0,0,0"/>
         </Grid>
 
-        <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Content="开始超分" Command="{Binding StartCommand}" IsEnabled="{Binding IsIdle}" Margin="5" Padding="10,5" FontWeight="Bold"/>
+        <Button Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Content="开始超分" Command="{Binding StartCommand}" IsEnabled="{Binding IsIdle}" Margin="5" Padding="10,5" FontWeight="Bold"/>
 
-        <ListBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" ItemsSource="{Binding LogLines}"
+        <ListBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3" ItemsSource="{Binding LogLines}"
                  VirtualizingStackPanel.IsVirtualizing="True"
                  VirtualizingStackPanel.VirtualizationMode="Recycling"
                  BorderThickness="1"

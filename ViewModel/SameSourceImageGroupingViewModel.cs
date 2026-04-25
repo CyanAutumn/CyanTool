@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Collections.Generic;
 using CyanTools.Pipeline;
 using CyanTools.Utils;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -42,173 +43,17 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private bool _syncDanbooruTagsToRoot = true;
-        public bool SyncDanbooruTagsToRoot
+        private const string DefaultBackend = "auto";
+        private readonly string[] _backendOptions = { "auto", "cpu", "cuda" };
+
+        private string _computeBackend = DefaultBackend;
+        public string ComputeBackend
         {
-            get => _syncDanbooruTagsToRoot;
-            set => SetField(ref _syncDanbooruTagsToRoot, value);
+            get => _computeBackend;
+            set => SetField(ref _computeBackend, value);
         }
 
-        private bool _includeSubfolders = true;
-        public bool IncludeSubfolders
-        {
-            get => _includeSubfolders;
-            set => SetField(ref _includeSubfolders, value);
-        }
-
-        private bool _enablePatchHash = true;
-        public bool EnablePatchHash
-        {
-            get => _enablePatchHash;
-            set => SetField(ref _enablePatchHash, value);
-        }
-
-        private bool _enableHashMatch;
-        public bool EnableHashMatch
-        {
-            get => _enableHashMatch;
-            set => SetField(ref _enableHashMatch, value);
-        }
-
-        private bool _enableOrbMatch = true;
-        public bool EnableOrbMatch
-        {
-            get => _enableOrbMatch;
-            set => SetField(ref _enableOrbMatch, value);
-        }
-
-        private bool _skipMatchedNonRoot = true;
-        public bool SkipMatchedNonRoot
-        {
-            get => _skipMatchedNonRoot;
-            set => SetField(ref _skipMatchedNonRoot, value);
-        }
-
-        private int _phashThreshold = 12;
-        public int PhashThreshold
-        {
-            get => _phashThreshold;
-            set => SetField(ref _phashThreshold, value);
-        }
-
-        private int _patchPhashThreshold = 16;
-        public int PatchPhashThreshold
-        {
-            get => _patchPhashThreshold;
-            set => SetField(ref _patchPhashThreshold, value);
-        }
-
-        private int _lowResHashThreshold = 12;
-        public int LowResHashThreshold
-        {
-            get => _lowResHashThreshold;
-            set => SetField(ref _lowResHashThreshold, value);
-        }
-
-        private int _orbFeatures = 2000;
-        public int OrbFeatures
-        {
-            get => _orbFeatures;
-            set => SetField(ref _orbFeatures, value);
-        }
-
-        private int _orbMaxSize = 1024;
-        public int OrbMaxSize
-        {
-            get => _orbMaxSize;
-            set => SetField(ref _orbMaxSize, value);
-        }
-
-        private int _minGoodMatches = 25;
-        public int MinGoodMatches
-        {
-            get => _minGoodMatches;
-            set => SetField(ref _minGoodMatches, value);
-        }
-
-        private int _minInliers = 20;
-        public int MinInliers
-        {
-            get => _minInliers;
-            set => SetField(ref _minInliers, value);
-        }
-
-        private double _minInlierRatio = 0.30;
-        public double MinInlierRatio
-        {
-            get => _minInlierRatio;
-            set => SetField(ref _minInlierRatio, value);
-        }
-
-        private double _cropAreaRatioThreshold = 0.90;
-        public double CropAreaRatioThreshold
-        {
-            get => _cropAreaRatioThreshold;
-            set => SetField(ref _cropAreaRatioThreshold, value);
-        }
-
-        private double _lowResRatioThreshold = 0.85;
-        public double LowResRatioThreshold
-        {
-            get => _lowResRatioThreshold;
-            set => SetField(ref _lowResRatioThreshold, value);
-        }
-
-        private double _editedDiffRatioThreshold = 0.15;
-        public double EditedDiffRatioThreshold
-        {
-            get => _editedDiffRatioThreshold;
-            set => SetField(ref _editedDiffRatioThreshold, value);
-        }
-
-        private int _diffCheckSize = 512;
-        public int DiffCheckSize
-        {
-            get => _diffCheckSize;
-            set => SetField(ref _diffCheckSize, value);
-        }
-
-        private int _diffPixelThreshold = 20;
-        public int DiffPixelThreshold
-        {
-            get => _diffPixelThreshold;
-            set => SetField(ref _diffPixelThreshold, value);
-        }
-
-        private bool _enableTemplateMatch = true;
-        public bool EnableTemplateMatch
-        {
-            get => _enableTemplateMatch;
-            set => SetField(ref _enableTemplateMatch, value);
-        }
-
-        private double _templateMatchThreshold = 0.85;
-        public double TemplateMatchThreshold
-        {
-            get => _templateMatchThreshold;
-            set => SetField(ref _templateMatchThreshold, value);
-        }
-
-        private int _templateMaxSize = 1024;
-        public int TemplateMaxSize
-        {
-            get => _templateMaxSize;
-            set => SetField(ref _templateMaxSize, value);
-        }
-
-        private int _templateMinSize = 64;
-        public int TemplateMinSize
-        {
-            get => _templateMinSize;
-            set => SetField(ref _templateMinSize, value);
-        }
-
-        private int _maxCandidatesPerImage = 600;
-        public int MaxCandidatesPerImage
-        {
-            get => _maxCandidatesPerImage;
-            set => SetField(ref _maxCandidatesPerImage, value);
-        }
+        public IReadOnlyList<string> ComputeBackendOptions => _backendOptions;
 
         private double _progress;
         public double Progress
@@ -226,6 +71,8 @@ namespace CyanTools.ViewModel
 
         private bool _isProcessing;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
         public bool IsProcessing
         {
             get => _isProcessing;
@@ -242,6 +89,18 @@ namespace CyanTools.ViewModel
         {
             get => _isWorkflowMode;
             set => SetField(ref _isWorkflowMode, value);
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set => SetField(ref _hasInheritedInputPath, value);
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set => SetField(ref _shouldClearInputDirectoryAfterCompletion, value);
         }
 
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
@@ -272,30 +131,8 @@ namespace CyanTools.ViewModel
             {
                 InputPath = InputPath,
                 OutputPath = OutputPath,
-                SyncDanbooruTagsToRoot = SyncDanbooruTagsToRoot,
-                IncludeSubfolders = IncludeSubfolders,
-                EnablePatchHash = EnablePatchHash,
-                EnableHashMatch = EnableHashMatch,
-                EnableOrbMatch = EnableOrbMatch,
-                SkipMatchedNonRoot = SkipMatchedNonRoot,
-                PhashThreshold = PhashThreshold,
-                PatchPhashThreshold = PatchPhashThreshold,
-                LowResHashThreshold = LowResHashThreshold,
-                OrbFeatures = OrbFeatures,
-                OrbMaxSize = OrbMaxSize,
-                MinGoodMatches = MinGoodMatches,
-                MinInliers = MinInliers,
-                MinInlierRatio = MinInlierRatio,
-                CropAreaRatioThreshold = CropAreaRatioThreshold,
-                LowResRatioThreshold = LowResRatioThreshold,
-                EditedDiffRatioThreshold = EditedDiffRatioThreshold,
-                DiffCheckSize = DiffCheckSize,
-                DiffPixelThreshold = DiffPixelThreshold,
-                EnableTemplateMatch = EnableTemplateMatch,
-                TemplateMatchThreshold = TemplateMatchThreshold,
-                TemplateMaxSize = TemplateMaxSize,
-                TemplateMinSize = TemplateMinSize,
-                MaxCandidatesPerImage = MaxCandidatesPerImage
+                ComputeBackend = ComputeBackend,
+                ShouldClearInputDirectoryAfterCompletion = ShouldClearInputDirectoryAfterCompletion
             };
         }
 
@@ -327,7 +164,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择输入文件夹"
+                Title = "选择输入路径"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -341,7 +178,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择输出文件夹"
+                Title = "选择输出路径"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -361,19 +198,25 @@ namespace CyanTools.ViewModel
             IsProcessing = true;
             Progress = 0;
             Log = string.Empty;
+            bool success = false;
 
             try
             {
                 var progress = CreateProgressReporter();
-                await Task.Run(() => RunGroupingWork(showDialogs, token, progress), token);
+                success = await Task.Run(() => RunGroupingWork(showDialogs, token, progress), token);
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion();
+                }
+
                 IsProcessing = false;
             }
         }
 
-        private void RunGroupingWork(bool showDialogs, CancellationToken token, IProgress<double> progress)
+        private bool RunGroupingWork(bool showDialogs, CancellationToken token, IProgress<double> progress)
         {
             try
             {
@@ -381,24 +224,24 @@ namespace CyanTools.ViewModel
 
                 if (string.IsNullOrWhiteSpace(InputPath) || !Directory.Exists(InputPath))
                 {
-                    AppendLog("输入文件夹无效。");
+                    AppendLog("输入路径无效。");
                     if (showDialogs)
                     {
                         Application.Current.Dispatcher.Invoke(() =>
-                            MessageBox.Show("输入文件夹无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
+                            MessageBox.Show("输入路径无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
-                    return;
+                    return false;
                 }
 
                 if (string.IsNullOrWhiteSpace(OutputPath))
                 {
-                    AppendLog("输出文件夹无效。");
+                    AppendLog("输出路径无效。");
                     if (showDialogs)
                     {
                         Application.Current.Dispatcher.Invoke(() =>
-                            MessageBox.Show("输出文件夹无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
+                            MessageBox.Show("输出路径无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
-                    return;
+                    return false;
                 }
 
                 string inputFull = Path.GetFullPath(InputPath);
@@ -407,41 +250,18 @@ namespace CyanTools.ViewModel
                 bool outputInsideInput = outputFull.StartsWith(inputWithSlash, StringComparison.OrdinalIgnoreCase);
                 if (string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase) || outputInsideInput)
                 {
-                    AppendLog("输出目录不能与输入目录相同，且不能位于输入目录内。请选择独立输出目录，避免修改输入目录。");
+                    AppendLog("输出路径不能与输入路径相同，且不能位于输入路径内。请选择独立输出路径，避免修改输入路径。");
                     if (showDialogs)
                     {
                         Application.Current.Dispatcher.Invoke(() =>
-                            MessageBox.Show("输出目录不能与输入目录相同，且不能位于输入目录内。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
+                            MessageBox.Show("输出路径不能与输入路径相同，且不能位于输入路径内。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
-                    return;
+                    return false;
                 }
 
                 var options = new SameSourceGroupingOptions
                 {
-                    SyncDanbooruTagsToRoot = SyncDanbooruTagsToRoot,
-                    IncludeSubfolders = IncludeSubfolders,
-                    EnablePatchHash = EnablePatchHash,
-                    EnableHashMatch = EnableHashMatch,
-                    EnableOrbMatch = EnableOrbMatch,
-                    SkipMatchedNonRoot = SkipMatchedNonRoot,
-                    PhashThreshold = PhashThreshold,
-                    PatchPhashThreshold = PatchPhashThreshold,
-                    LowResHashThreshold = LowResHashThreshold,
-                    OrbFeatures = OrbFeatures,
-                    OrbMaxSize = OrbMaxSize,
-                    MinGoodMatches = MinGoodMatches,
-                    MinInliers = MinInliers,
-                    MinInlierRatio = MinInlierRatio,
-                    CropAreaRatioThreshold = CropAreaRatioThreshold,
-                    LowResRatioThreshold = LowResRatioThreshold,
-                    EditedDiffRatioThreshold = EditedDiffRatioThreshold,
-                    DiffCheckSize = DiffCheckSize,
-                    DiffPixelThreshold = DiffPixelThreshold,
-                    EnableTemplateMatch = EnableTemplateMatch,
-                    TemplateMatchThreshold = TemplateMatchThreshold,
-                    TemplateMaxSize = TemplateMaxSize,
-                    TemplateMinSize = TemplateMinSize,
-                    MaxCandidatesPerImage = MaxCandidatesPerImage
+                    ComputeBackend = string.IsNullOrWhiteSpace(ComputeBackend) ? DefaultBackend : ComputeBackend
                 };
 
                 SameSourceImageGroupingProcessor.Process(InputPath, OutputPath, options, progress, AppendLog, token);
@@ -454,10 +274,12 @@ namespace CyanTools.ViewModel
                         MessageBox.Show("同源图片归类完成！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 });
+                return true;
             }
             catch (OperationCanceledException)
             {
                 AppendLog("任务已取消。");
+                return false;
             }
             catch (Exception ex)
             {
@@ -467,11 +289,23 @@ namespace CyanTools.ViewModel
                     Application.Current.Dispatcher.Invoke(() =>
                         MessageBox.Show($"处理失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
                 }
+                return false;
             }
             finally
             {
                 Application.Current.Dispatcher.Invoke(RefreshCommandStates);
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion()
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
+            AppendLog(result.Message);
         }
 
         private IProgress<double> CreateProgressReporter()

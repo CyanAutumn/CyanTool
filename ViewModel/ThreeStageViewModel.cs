@@ -27,6 +27,8 @@ namespace CyanTools.ViewModel
         private double _progressPercentage = 0;
         private bool _isProcessing = false;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
 
         private CancellationTokenSource? _cancellationTokenSource;
         private ThreeStageProcessor _processor;
@@ -100,6 +102,26 @@ namespace CyanTools.ViewModel
             set
             {
                 _isWorkflowMode = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set
+            {
+                _hasInheritedInputPath = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set
+            {
+                _shouldClearInputDirectoryAfterCompletion = value;
                 OnPropertyChanged();
             }
         }
@@ -191,12 +213,13 @@ namespace CyanTools.ViewModel
 
         private async Task ExecuteProcessingAsync(bool showDialogs, CancellationToken externalToken, Action<string>? pipelineLog)
         {
+            bool success = false;
             try
             {
                 OutputFolder = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputFolder, InputFolder, ToolDisplayName);
                 if (string.IsNullOrWhiteSpace(InputFolder) || !Directory.Exists(InputFolder))
                 {
-                    const string inputInvalidMessage = "输入文件夹无效。";
+                    const string inputInvalidMessage = "输入路径无效。";
                     AddLog(inputInvalidMessage);
                     pipelineLog?.Invoke(inputInvalidMessage);
                     ProgressText = inputInvalidMessage;
@@ -210,12 +233,12 @@ namespace CyanTools.ViewModel
 
                 if (string.IsNullOrWhiteSpace(OutputFolder))
                 {
-                    AddLog("输出文件夹无效。");
-                    pipelineLog?.Invoke("输出文件夹无效。");
-                    ProgressText = "输出文件夹无效";
+                    AddLog("输出路径无效。");
+                    pipelineLog?.Invoke("输出路径无效。");
+                    ProgressText = "输出路径无效";
                     if (!showDialogs)
                     {
-                        throw new InvalidOperationException("输出文件夹无效。");
+                        throw new InvalidOperationException("输出路径无效。");
                     }
 
                     return;
@@ -234,11 +257,11 @@ namespace CyanTools.ViewModel
                 ProgressText = "准备处理...";
 
                 AddLog("开始三分法处理...");
-                AddLog($"输入文件夹: {InputFolder}");
-                AddLog($"输出文件夹: {OutputFolder}");
+                AddLog($"输入路径: {InputFolder}");
+                AddLog($"输出路径: {OutputFolder}");
                 pipelineLog?.Invoke("开始三分法处理...");
-                pipelineLog?.Invoke($"输入文件夹: {InputFolder}");
-                pipelineLog?.Invoke($"输出文件夹: {OutputFolder}");
+                pipelineLog?.Invoke($"输入路径: {InputFolder}");
+                pipelineLog?.Invoke($"输出路径: {OutputFolder}");
 
                 var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp" };
                 var imageFiles = Directory.GetFiles(InputFolder, "*.*", SearchOption.TopDirectoryOnly)
@@ -247,11 +270,11 @@ namespace CyanTools.ViewModel
 
                 if (imageFiles.Count == 0)
                 {
-                    AddLog("在输入文件夹中未找到图片文件！");
-                    pipelineLog?.Invoke("在输入文件夹中未找到图片文件！");
+                    AddLog("在输入路径中未找到图片文件！");
+                    pipelineLog?.Invoke("在输入路径中未找到图片文件！");
                     if (!showDialogs)
                     {
-                        throw new InvalidOperationException("在输入文件夹中未找到图片文件！");
+                        throw new InvalidOperationException("在输入路径中未找到图片文件！");
                     }
 
                     return;
@@ -329,6 +352,7 @@ namespace CyanTools.ViewModel
                     pipelineLog?.Invoke($"处理完成！共处理 {processedCount} 个文件");
                     ProgressText = $"处理完成 ({processedCount}/{imageFiles.Count})";
                     ProgressPercentage = 100;
+                    success = true;
                 }
             }
             catch (OperationCanceledException)
@@ -356,12 +380,29 @@ namespace CyanTools.ViewModel
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(pipelineLog);
+                }
+
                 _isProcessing = false;
                 _cancellationTokenSource?.Dispose();
                 _cancellationTokenSource = null;
                 (StartProcessingCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 (StopProcessingCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string>? pipelineLog)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputFolder, new[] { OutputFolder });
+            AddLog(result.Message);
+            pipelineLog?.Invoke(result.Message);
         }
 
         private void StopProcessing()

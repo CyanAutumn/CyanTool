@@ -34,6 +34,8 @@ namespace CyanTools.ViewModel
         private bool _isProgressIndeterminate;
         private bool _isProcessing;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
 
         public ImageBucketingViewModel()
         {
@@ -197,6 +199,32 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set
+            {
+                if (_hasInheritedInputPath != value)
+                {
+                    _hasInheritedInputPath = value;
+                    OnPropertyChanged(nameof(HasInheritedInputPath));
+                }
+            }
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set
+            {
+                if (_shouldClearInputDirectoryAfterCompletion != value)
+                {
+                    _shouldClearInputDirectoryAfterCompletion = value;
+                    OnPropertyChanged(nameof(ShouldClearInputDirectoryAfterCompletion));
+                }
+            }
+        }
+
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
         public string PipelineInputPath { get => InputFolder ?? string.Empty; set => InputFolder = value ?? string.Empty; }
         public string PipelineOutputPath { get => OutputFolder ?? string.Empty; set => OutputFolder = value ?? string.Empty; }
@@ -210,7 +238,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择包含图片的输入文件夹"
+                Title = "选择输入路径"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -224,7 +252,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择分类后图片的输出文件夹"
+                Title = "选择输出路径"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -281,6 +309,7 @@ namespace CyanTools.ViewModel
             IsProcessing = true;
             AppendLog("开始图片分类...");
             pipelineLog?.Invoke("开始图片分类...");
+            bool success = false;
 
             try
             {
@@ -308,9 +337,15 @@ namespace CyanTools.ViewModel
                 ProgressValue = 100;
                 LogClassificationSummary(result);
                 pipelineLog?.Invoke("分类完成。");
+                success = true;
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(pipelineLog);
+                }
+
                 IsProcessing = false;
                 IsProgressIndeterminate = false;
             }
@@ -323,15 +358,15 @@ namespace CyanTools.ViewModel
 
             if (string.IsNullOrWhiteSpace(InputFolder))
             {
-                errorMessage = "请选择输入文件夹。";
+                errorMessage = "请选择输入路径。";
             }
             else if (!Directory.Exists(InputFolder))
             {
-                errorMessage = "输入文件夹不存在。";
+                errorMessage = "输入路径不存在。";
             }
             else if (string.IsNullOrWhiteSpace(OutputFolder))
             {
-                errorMessage = "请选择输出文件夹。";
+                errorMessage = "请选择输出路径。";
             }
             else
             {
@@ -341,7 +376,7 @@ namespace CyanTools.ViewModel
 
                 if (imageFiles.Length == 0)
                 {
-                    errorMessage = "在输入文件夹中未找到支持的图片文件。";
+                    errorMessage = "在输入路径中未找到支持的图片文件。";
                 }
                 else if (!int.TryParse(DivisibleText, out int divisible) || divisible < 8 || divisible > 128)
                 {
@@ -521,10 +556,23 @@ namespace CyanTools.ViewModel
             if (e.Result is ClassificationResult result)
             {
                 LogClassificationSummary(result);
+                TryClearInputDirectoryAfterCompletion(null);
 
                 MessageBox.Show($"分类完成!\n\n总计图片: {result.TotalImages} 张\n创建分类: {result.BucketCount} 个",
                     "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string>? pipelineLog)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputFolder, new[] { OutputFolder });
+            AppendLog(result.Message);
+            pipelineLog?.Invoke(result.Message);
         }
 
         private void LogClassificationSummary(ClassificationResult result)

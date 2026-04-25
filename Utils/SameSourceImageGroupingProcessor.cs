@@ -1,90 +1,84 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Numerics;
-using System.Threading;
+using System.Security.Cryptography;
+using System.Text;
+using System.Runtime.InteropServices;
+using Newtonsoft.Json;
 using OpenCvSharp;
-using OpenCvSharp.Features2D;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace CyanTools.Utils
 {
     public sealed class SameSourceGroupingOptions
     {
-        public bool SyncDanbooruTagsToRoot { get; set; } = true;
-        public bool IncludeSubfolders { get; set; } = true;
-        public bool EnablePatchHash { get; set; } = true;
-        public bool EnableHashMatch { get; set; } = false;
-        public bool EnableOrbMatch { get; set; } = true;
-        public int PatchGrid { get; set; } = 5;
-        public int PhashThreshold { get; set; } = 12;
-        public int PatchPhashThreshold { get; set; } = 16;
-        public int LowResHashThreshold { get; set; } = 12;
-        public int OrbFeatures { get; set; } = 2000;
-        public int OrbMaxSize { get; set; } = 1024;
-        public float LoweRatio { get; set; } = 0.75f;
-        public int MinGoodMatches { get; set; } = 25;
-        public int MinInliers { get; set; } = 20;
-        public double MinInlierRatio { get; set; } = 0.30;
-        public double RansacReprojThreshold { get; set; } = 3.0;
-        public double CropAreaRatioThreshold { get; set; } = 0.90;
-        public double LowResRatioThreshold { get; set; } = 0.85;
-        public double EditedDiffRatioThreshold { get; set; } = 0.15;
-        public int DiffCheckSize { get; set; } = 512;
-        public int DiffPixelThreshold { get; set; } = 20;
-        public bool EnableTemplateMatch { get; set; } = true;
-        public double TemplateMatchThreshold { get; set; } = 0.85;
-        public int TemplateMaxSize { get; set; } = 1024;
-        public int TemplateMinSize { get; set; } = 64;
-        public bool SkipMatchedNonRoot { get; set; } = true;
-        public int MaxCandidatesPerImage { get; set; } = 600;
-        public int MaxDegreeOfParallelism { get; set; } = Math.Max(1, Environment.ProcessorCount - 1);
+        public string ComputeBackend { get; set; } = "auto";
     }
 
     public static class SameSourceImageGroupingProcessor
     {
-        private const string RootFolderName = "原图";
-        private const string CropFolderName = "被包含";
-        private const string LowResFolderName = "缩略图";
-        private const string EditedFolderName = "差分";
-        private const string UnknownFolderName = "未知";
-        private const double CandidateAspectRatioTolerance = 0.22;
-        private const double DirectLowResAspectRatioTolerance = 0.08;
-        private const double DirectLowResDiffRatioThreshold = 0.12;
-        private const int DirectLowResCompareSize = 320;
-        private const double MinInlierCoverageRatioForMatch = 0.05;
-        private const double MinMappedAreaRatioForMatch = 0.08;
+        private const double ThumbnailRatioTolerance = 0.03;
+        private const int ThumbnailPreviewSize = 32;
+        private const double ThumbnailPreviewMeanDiffThreshold = 0.20;
+        private const double ThumbnailPreviewCorrelationThreshold = 0.55;
+        private const double ContainmentRecallThreshold = 0.75;
+        private const double ContainmentMatchThreshold = 0.87;
+        private const double ContainmentRecallFallbackScore = 0.70;
+        private const double ContainmentRecallFallbackMargin = 0.20;
+        private const double ContainmentMatchFallbackScore = 0.70;
+        private const double ContainmentMatchFallbackMargin = 0.20;
+        private const double DifferenceMaxChangedRatio = 0.10;
 
-        private static readonly HashSet<string> SupportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private static readonly string[] ContainmentRecallScales = BuildScaleRange(100, 250, 10);
+        private static readonly string[] ContainmentMatchScales = BuildScaleRange(100, 250, 5);
+
+        private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tif", ".tiff"
+            ".jpg", ".jpeg", ".png", ".webp", ".bmp"
         };
 
-        private enum RelationType
+        private static readonly Dictionary<string, string> OutputFolders = new(StringComparer.OrdinalIgnoreCase)
         {
-            Same,
-            Crop,
-            LowRes,
-            Edited,
-            Unknown
-        }
+            ["original"] = "原图",
+            ["thumbnail"] = "缩略图",
+            ["duplicate"] = "副本",
+            ["contained"] = "被包含",
+            ["difference"] = "差分",
+            ["other"] = "其他"
+        };
 
-        private readonly struct CandidateMatch
+        public static string ResolveComputeBackend(string requestedDevice)
         {
-            public CandidateMatch(int index, int hashDistance)
+            string normalized = string.IsNullOrWhiteSpace(requestedDevice)
+                ? "auto"
+                : requestedDevice.Trim().ToLowerInvariant();
+
+            if (normalized is not ("auto" or "cpu" or "cuda"))
             {
-                Index = index;
-                HashDistance = hashDistance;
+                throw new ArgumentOutOfRangeException(nameof(requestedDevice), $"unsupported device: {requestedDevice}");
             }
 
-            public int Index { get; }
-            public int HashDistance { get; }
+            bool cudaAvailable = IsCudaBackendAvailable();
+            return normalized switch
+            {
+                "cpu" => "cpu",
+                "cuda" when cudaAvailable => "cuda",
+                "cuda" => throw new InvalidOperationException("CUDA backend requested but unavailable. Please use auto or cpu."),
+                _ => cudaAvailable ? "cuda" : "cpu"
+            };
         }
 
-        public static void Process(string inputPath, string outputPath, SameSourceGroupingOptions options,
-            IProgress<double>? progress, Action<string>? logAction, CancellationToken token)
+        public static void Process(
+            string inputPath,
+            string outputPath,
+            SameSourceGroupingOptions options,
+            IProgress<double>? progress,
+            Action<string>? logAction,
+            CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(inputPath) || !Directory.Exists(inputPath))
             {
@@ -101,1553 +95,904 @@ namespace CyanTools.Utils
 
             if (string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase))
             {
-                logAction?.Invoke("输出目录不能与输入目录相同。");
-                return;
+                throw new InvalidOperationException("输出目录不能与输入目录相同。");
             }
 
             if (IsSubPath(inputFull, outputFull))
             {
-                logAction?.Invoke("输出目录不能位于输入目录内。");
-                return;
+                throw new InvalidOperationException("输出目录不能位于输入目录内。");
             }
 
-            Directory.CreateDirectory(outputFull);
+            string computeBackend = ResolveComputeBackend(options?.ComputeBackend ?? "auto");
+            logAction?.Invoke($"使用计算后端: {computeBackend}");
 
-            var excludedRoots = BuildExcludedRoots(inputFull, outputFull);
-
-            logAction?.Invoke("扫描图片文件...");
-            var files = EnumerateImageFiles(inputFull, options.IncludeSubfolders, excludedRoots).ToList();
-            if (files.Count == 0)
-            {
-                logAction?.Invoke("未找到支持的图片文件。");
-                return;
-            }
-
-            logAction?.Invoke($"发现图片数量: {files.Count}");
-
-            progress?.Report(0);
-            token.ThrowIfCancellationRequested();
-
-            var items = ExtractImageItems(files, options, progress, logAction, token).OrderBy(i => i.Path, StringComparer.OrdinalIgnoreCase).ToList();
-            if (items.Count == 0)
-            {
-                logAction?.Invoke("没有可处理的图片。");
-                return;
-            }
-
-            logAction?.Invoke($"成功读取图片数量: {items.Count}");
-
-            if (!options.EnableHashMatch && !options.EnableOrbMatch && !options.EnableTemplateMatch)
-            {
-                logAction?.Invoke("未启用任何匹配步骤，请至少勾选一种匹配方式。");
-                return;
-            }
-
-            token.ThrowIfCancellationRequested();
-            logAction?.Invoke("建立哈希索引...");
-            var hashIndex = BuildHashIndex(items);
-
-            token.ThrowIfCancellationRequested();
-            logAction?.Invoke("开始匹配同源图片...");
-
-            using var orb = ORB.Create(options.OrbFeatures);
-            using var featureCache = new OrbFeatureCache();
-            int matchedPairs = MatchSameSource(items, hashIndex, options, orb, featureCache, progress, logAction, token, out var unionFind);
-
-            logAction?.Invoke($"匹配完成，确认同源对数: {matchedPairs}");
-
-            token.ThrowIfCancellationRequested();
-            logAction?.Invoke("汇总分组并输出文件...");
-
-            CopyGroupedFiles(items, unionFind, outputFull, options, orb, featureCache, progress, logAction, token);
+            ClassificationResult result = ClassifyDirectory(inputFull, progress, logAction, token, computeBackend);
+            ExportGroups(result, outputFull, progress, logAction, token);
 
             progress?.Report(100);
             logAction?.Invoke("处理完成。");
         }
 
-        private static IEnumerable<string> EnumerateImageFiles(string inputFull, bool includeSubfolders, IReadOnlyList<string> excludedRoots)
+        private static ClassificationResult ClassifyDirectory(
+            string inputDir,
+            IProgress<double>? progress,
+            Action<string>? logAction,
+            CancellationToken token,
+            string computeBackend)
         {
-            var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            foreach (var file in Directory.EnumerateFiles(inputFull, "*.*", searchOption))
-            {
-                string fullPath = Path.GetFullPath(file);
-                if (IsUnderAnyRoot(fullPath, excludedRoots))
-                {
-                    continue;
-                }
+            var stageTimings = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            Stopwatch totalWatch = Stopwatch.StartNew();
 
-                if (SupportedExtensions.Contains(Path.GetExtension(fullPath)))
-                {
-                    yield return fullPath;
-                }
-            }
-        }
+            token.ThrowIfCancellationRequested();
+            logAction?.Invoke("读取图片元数据...");
+            Stopwatch stageWatch = Stopwatch.StartNew();
+            Dictionary<string, LoadedImage> images = LoadImageRecords(inputDir, logAction, token);
+            stageTimings["load_records"] = stageWatch.Elapsed.TotalSeconds;
+            progress?.Report(15);
 
-        private static List<string> BuildExcludedRoots(string inputFull, string outputFull)
-        {
-            var roots = new List<string>();
-            if (string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase))
+            token.ThrowIfCancellationRequested();
+            logAction?.Invoke("生成缩略图预览和灰度视图...");
+            stageWatch.Restart();
+            foreach (LoadedImage image in images.Values)
             {
-                roots.Add(Path.Combine(inputFull, RootFolderName));
-                roots.Add(Path.Combine(inputFull, CropFolderName));
-                roots.Add(Path.Combine(inputFull, LowResFolderName));
-                roots.Add(Path.Combine(inputFull, EditedFolderName));
-                roots.Add(Path.Combine(inputFull, UnknownFolderName));
-
-                roots.Add(Path.Combine(inputFull, "被包含图片"));
-                roots.Add(Path.Combine(inputFull, "略缩图"));
-            }
-            else if (IsSubPath(inputFull, outputFull))
-            {
-                roots.Add(outputFull);
+                image.EnsureDerivedViews();
             }
 
-            return roots;
-        }
+            stageTimings["load_rgb_arrays"] = stageWatch.Elapsed.TotalSeconds;
+            progress?.Report(25);
 
-        private static bool IsUnderAnyRoot(string filePath, IReadOnlyList<string> roots)
-        {
-            foreach (var root in roots)
-            {
-                if (IsSubPath(root, filePath))
-                {
-                    return true;
-                }
-            }
+            var parentMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var classMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var scoreMap = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            var reasonMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            return false;
-        }
-
-        private static bool IsSubPath(string basePath, string filePath)
-        {
-            if (string.IsNullOrWhiteSpace(basePath))
-            {
-                return false;
-            }
-
-            string normalizedBase = basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            return filePath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static List<ImageItem> ExtractImageItems(List<string> files, SameSourceGroupingOptions options,
-            IProgress<double>? progress, Action<string>? logAction, CancellationToken token)
-        {
-            var items = new ConcurrentBag<ImageItem>();
-            int total = files.Count;
-            int processed = 0;
-
-            var parallelOptions = new ParallelOptions
-            {
-                MaxDegreeOfParallelism = options.MaxDegreeOfParallelism,
-                CancellationToken = token
-            };
-
-            Parallel.ForEach(files, parallelOptions, file =>
-            {
-                parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-
-                try
-                {
-                    using var mat = Cv2.ImRead(file, ImreadModes.Color);
-                    if (mat.Empty())
-                    {
-                        logAction?.Invoke($"无法读取图片: {file}");
-                        return;
-                    }
-
-                    var fullHash = ComputePHash64(mat);
-                    var patchHashes = options.EnablePatchHash ? ComputePatchHashes(mat, options.PatchGrid) : Array.Empty<ulong>();
-                    double sharpness = ComputeSharpness(mat);
-                    long fileSize = new FileInfo(file).Length;
-
-                    items.Add(new ImageItem(file, mat.Width, mat.Height, fileSize, sharpness, fullHash, patchHashes));
-                }
-                catch (Exception ex)
-                {
-                    logAction?.Invoke($"读取失败: {file} ({ex.Message})");
-                }
-                finally
-                {
-                    int done = Interlocked.Increment(ref processed);
-                    progress?.Report(35.0 * done / total);
-                }
-            });
-
-            return items.ToList();
-        }
-
-        private static Dictionary<ushort, List<int>> BuildHashIndex(IReadOnlyList<ImageItem> items)
-        {
-            var index = new Dictionary<ushort, List<int>>();
-            for (int i = 0; i < items.Count; i++)
-            {
-                var parts = new HashSet<ushort>();
-                foreach (var hash in items[i].AllHashes)
-                {
-                    foreach (var part in GetHashParts(hash))
-                    {
-                        parts.Add(part);
-                    }
-                }
-
-                foreach (var part in parts)
-                {
-                    if (!index.TryGetValue(part, out var list))
-                    {
-                        list = new List<int>();
-                        index[part] = list;
-                    }
-
-                    list.Add(i);
-                }
-            }
-
-            return index;
-        }
-
-        private static int MatchSameSource(IReadOnlyList<ImageItem> items, Dictionary<ushort, List<int>> hashIndex,
-            SameSourceGroupingOptions options, ORB orb, OrbFeatureCache featureCache, IProgress<double>? progress,
-            Action<string>? logAction, CancellationToken token, out DisjointSet unionFind)
-        {
-            int total = items.Count;
-            unionFind = new DisjointSet(total);
-            int matchedPairs = 0;
-            int maxCandidates = Math.Max(0, options.MaxCandidatesPerImage);
-            bool[] skipAsSource = options.SkipMatchedNonRoot ? new bool[total] : Array.Empty<bool>();
-            const int maxTrimmedLogs = 3;
-            int trimmedLogCount = 0;
-            var logWatch = Stopwatch.StartNew();
-            var progressWatch = Stopwatch.StartNew();
-            TimeSpan logInterval = TimeSpan.FromSeconds(5);
-            bool enableHashMatch = options.EnableHashMatch;
-            bool enableOrbMatch = options.EnableOrbMatch;
-            bool enableTemplateMatch = options.EnableTemplateMatch;
-
-            for (int i = 0; i < total; i++)
+            try
             {
                 token.ThrowIfCancellationRequested();
+                logAction?.Invoke("缩略图判定...");
+                stageWatch.Restart();
+                ClassifyThumbnails(images, parentMap, classMap, scoreMap, reasonMap, token);
+                stageTimings["thumbnail"] = stageWatch.Elapsed.TotalSeconds;
+                progress?.Report(40);
 
-                if (options.SkipMatchedNonRoot && skipAsSource[i])
-                {
-                    progress?.Report(35 + 45.0 * (i + 1) / total);
-                    continue;
-                }
-
-                var candidates = GatherCandidates(i, items[i], hashIndex);
-                var candidateList = new List<CandidateMatch>();
-                foreach (var j in candidates)
-                {
-                    if (j <= i)
-                    {
-                        continue;
-                    }
-
-                    if (IsHashNear(items[i], items[j], options, out int minDistance))
-                    {
-                        candidateList.Add(new CandidateMatch(j, minDistance));
-                    }
-                }
-
-                if (candidateList.Count == 0)
-                {
-                    AddFallbackCandidatesByGeometry(i, items, options, candidateList);
-                }
-
-                if (candidateList.Count == 0)
-                {
-                    progress?.Report(35 + 45.0 * (i + 1) / total);
-                    continue;
-                }
-
-                if (maxCandidates > 0 && candidateList.Count > maxCandidates)
-                {
-                    int originalCount = candidateList.Count;
-                    candidateList.Sort((a, b) =>
-                    {
-                        int cmp = a.HashDistance.CompareTo(b.HashDistance);
-                        return cmp != 0 ? cmp : a.Index.CompareTo(b.Index);
-                    });
-                    candidateList.RemoveRange(maxCandidates, candidateList.Count - maxCandidates);
-
-                    if (trimmedLogCount < maxTrimmedLogs)
-                    {
-                        logAction?.Invoke($"候选过多 ({originalCount})，仅保留最相近的 {candidateList.Count} 个进行匹配。");
-                        trimmedLogCount++;
-                        if (trimmedLogCount == maxTrimmedLogs)
-                        {
-                            logAction?.Invoke("候选过多提示已自动省略...");
-                        }
-                    }
-                }
-
-                try
-                {
-                    OrbFeatureData? featuresA = null;
-
-                    for (int c = 0; c < candidateList.Count; c++)
-                    {
-                        int j = candidateList[c].Index;
-                        token.ThrowIfCancellationRequested();
-
-                        if (unionFind.Find(i) == unionFind.Find(j))
-                        {
-                            continue;
-                        }
-
-                        bool matched = false;
-
-                        if (enableHashMatch)
-                        {
-                            unionFind.Union(i, j);
-                            matchedPairs++;
-                            matched = true;
-                        }
-                        else if (IsLowResMatchByHash(items[i], items[j], options)
-                            || IsLowResMatchByResize(items[i], items[j], options, logAction))
-                        {
-                            unionFind.Union(i, j);
-                            matchedPairs++;
-                            matched = true;
-                        }
-
-                        if (!matched && enableOrbMatch && featuresA == null)
-                        {
-                            featuresA = featureCache.GetOrCreate(i, () =>
-                                ComputeOrbFeaturesFromFile(items[i], orb, options, logAction));
-                        }
-
-                        if (!matched && enableOrbMatch && featuresA != null && !featuresA.Descriptors.Empty())
-                        {
-                            var featuresB = featureCache.GetOrCreate(j, () =>
-                                ComputeOrbFeaturesFromFile(items[j], orb, options, logAction));
-
-                            if (featuresB != null && !featuresB.Descriptors.Empty())
-                            {
-                                if (TryEstimateHomography(featuresA, featuresB, options, out var homography, out _, out _,
-                                    out double inlierCoverageA, out double inlierCoverageB))
-                                {
-                                    double mappedAreaRatio = ComputeMappedAreaRatio(featuresA.ScaledSize, featuresB.ScaledSize, homography);
-                                    bool geometryValid = inlierCoverageA >= MinInlierCoverageRatioForMatch
-                                                         && inlierCoverageB >= MinInlierCoverageRatioForMatch
-                                                         && mappedAreaRatio >= MinMappedAreaRatioForMatch;
-                                    homography.Dispose();
-
-                                    if (geometryValid)
-                                    {
-                                        unionFind.Union(i, j);
-                                        matchedPairs++;
-                                        matched = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!matched && enableTemplateMatch)
-                        {
-                            if (TryTemplateMatchCrop(items[i], items[j], options, logAction))
-                            {
-                                unionFind.Union(i, j);
-                                matchedPairs++;
-                                matched = true;
-                            }
-                        }
-
-                        if (matched)
-                        {
-                            if (MarkNonRootAfterMatch(i, j, items, skipAsSource, options))
-                            {
-                                break;
-                            }
-                        }
-
-                        if (progress != null && progressWatch.ElapsedMilliseconds >= 500)
-                        {
-                            double ratio = (double)(c + 1) / candidateList.Count;
-                            progress.Report(35 + 45.0 * ((i + ratio) / total));
-                            progressWatch.Restart();
-                        }
-
-                        if (logAction != null && logWatch.Elapsed >= logInterval)
-                        {
-                            logAction($"匹配中: {i + 1}/{total}, 候选 {c + 1}/{candidateList.Count}, 已确认 {matchedPairs}");
-                            logWatch.Restart();
-                        }
-                    }
-
-                }
-                catch (Exception ex)
-                {
-                    logAction?.Invoke($"匹配失败: {items[i].Path} ({ex.Message})");
-                }
-
-                progress?.Report(35 + 45.0 * (i + 1) / total);
-            }
-
-            return matchedPairs;
-        }
-
-        private static HashSet<int> GatherCandidates(int index, ImageItem item, Dictionary<ushort, List<int>> hashIndex)
-        {
-            var candidates = new HashSet<int>();
-            foreach (var hash in item.AllHashes)
-            {
-                foreach (var part in GetHashParts(hash))
-                {
-                    if (!hashIndex.TryGetValue(part, out var list))
-                    {
-                        continue;
-                    }
-
-                    foreach (var idx in list)
-                    {
-                        if (idx != index)
-                        {
-                            candidates.Add(idx);
-                        }
-                    }
-                }
-            }
-
-            return candidates;
-        }
-
-        private static void AddFallbackCandidatesByGeometry(int index, IReadOnlyList<ImageItem> items,
-            SameSourceGroupingOptions options, List<CandidateMatch> candidateList)
-        {
-            for (int j = index + 1; j < items.Count; j++)
-            {
-                if (!CouldBeContainmentOrLowRes(items[index], items[j], options))
-                {
-                    continue;
-                }
-
-                int score = BuildGeometryCandidateScore(items[index], items[j]);
-                candidateList.Add(new CandidateMatch(j, score));
-            }
-        }
-
-        private static bool CouldBeContainmentOrLowRes(ImageItem a, ImageItem b, SameSourceGroupingOptions options)
-        {
-            int smaller = Math.Min(a.PixelCount, b.PixelCount);
-            int larger = Math.Max(a.PixelCount, b.PixelCount);
-            if (larger <= 0)
-            {
-                return false;
-            }
-
-            double areaRatio = (double)smaller / larger;
-            if (areaRatio >= 0.99 || areaRatio < 0.03)
-            {
-                return false;
-            }
-
-            double aspectRatioDiff = GetAspectRatioDiff(a, b);
-            if (aspectRatioDiff <= CandidateAspectRatioTolerance)
-            {
-                return true;
-            }
-
-            return areaRatio < options.CropAreaRatioThreshold;
-        }
-
-        private static int BuildGeometryCandidateScore(ImageItem a, ImageItem b)
-        {
-            int smaller = Math.Min(a.PixelCount, b.PixelCount);
-            int larger = Math.Max(a.PixelCount, b.PixelCount);
-            double areaRatio = larger <= 0 ? 1.0 : (double)smaller / larger;
-            double aspectDiff = GetAspectRatioDiff(a, b);
-            int areaPenalty = (int)Math.Round((1.0 - areaRatio) * 1000);
-            int aspectPenalty = (int)Math.Round(aspectDiff * 500);
-            return 10_000 + areaPenalty + aspectPenalty;
-        }
-
-        private static double GetAspectRatioDiff(ImageItem a, ImageItem b)
-        {
-            double ratioA = (double)a.Width / Math.Max(1, a.Height);
-            double ratioB = (double)b.Width / Math.Max(1, b.Height);
-            return Math.Abs(ratioA - ratioB) / Math.Max(ratioA, ratioB);
-        }
-
-        private static bool MarkNonRootAfterMatch(int indexA, int indexB, IReadOnlyList<ImageItem> items,
-            bool[] skipAsSource, SameSourceGroupingOptions options)
-        {
-            if (!options.SkipMatchedNonRoot || skipAsSource.Length == 0)
-            {
-                return false;
-            }
-
-            int preferred = SelectPreferredIndex(indexA, indexB, items);
-            int skipIndex = preferred == indexA ? indexB : indexA;
-            if (!skipAsSource[skipIndex])
-            {
-                skipAsSource[skipIndex] = true;
-            }
-
-            return skipIndex == indexA;
-        }
-
-        private static int SelectPreferredIndex(int indexA, int indexB, IReadOnlyList<ImageItem> items)
-        {
-            var a = items[indexA];
-            var b = items[indexB];
-
-            if (a.PixelCount != b.PixelCount)
-            {
-                return a.PixelCount > b.PixelCount ? indexA : indexB;
-            }
-
-            int sharpnessCompare = a.Sharpness.CompareTo(b.Sharpness);
-            if (sharpnessCompare != 0)
-            {
-                return sharpnessCompare > 0 ? indexA : indexB;
-            }
-
-            if (a.FileSize != b.FileSize)
-            {
-                return a.FileSize > b.FileSize ? indexA : indexB;
-            }
-
-            return indexA;
-        }
-
-        private static bool IsHashNear(ImageItem a, ImageItem b, SameSourceGroupingOptions options, out int minDistance)
-        {
-            int fullThreshold = Math.Max(options.PhashThreshold, options.LowResHashThreshold);
-            minDistance = HammingDistance(a.FullHash, b.FullHash);
-            if (minDistance <= fullThreshold)
-            {
-                return true;
-            }
-
-            if (!options.EnablePatchHash)
-            {
-                return false;
-            }
-
-            foreach (var hashA in a.AllHashes)
-            {
-                foreach (var hashB in b.AllHashes)
-                {
-                    int threshold = (hashA == a.FullHash && hashB == b.FullHash)
-                        ? fullThreshold
-                        : options.PatchPhashThreshold;
-
-                    int distance = HammingDistance(hashA, hashB);
-                    if (distance < minDistance)
-                    {
-                        minDistance = distance;
-                    }
-
-                    if (distance <= threshold)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsLowResMatchByHash(ImageItem a, ImageItem b, SameSourceGroupingOptions options)
-        {
-            if (HammingDistance(a.FullHash, b.FullHash) > options.LowResHashThreshold)
-            {
-                return false;
-            }
-
-            int smaller = Math.Min(a.PixelCount, b.PixelCount);
-            int larger = Math.Max(a.PixelCount, b.PixelCount);
-            return smaller < larger * options.LowResRatioThreshold;
-        }
-
-        private static bool IsLowResMatchByResize(ImageItem a, ImageItem b, SameSourceGroupingOptions options, Action<string>? logAction)
-        {
-            int smaller = Math.Min(a.PixelCount, b.PixelCount);
-            int larger = Math.Max(a.PixelCount, b.PixelCount);
-            if (smaller >= larger * options.LowResRatioThreshold)
-            {
-                return false;
-            }
-
-            if (GetAspectRatioDiff(a, b) > DirectLowResAspectRatioTolerance)
-            {
-                return false;
-            }
-
-            if (HammingDistance(a.FullHash, b.FullHash) <= options.LowResHashThreshold)
-            {
-                return true;
-            }
-
-            using var grayA = Cv2.ImRead(a.Path, ImreadModes.Grayscale);
-            using var grayB = Cv2.ImRead(b.Path, ImreadModes.Grayscale);
-            if (grayA.Empty() || grayB.Empty())
-            {
-                if (grayA.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片灰度: {a.Path}");
-                }
-
-                if (grayB.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片灰度: {b.Path}");
-                }
-
-                return false;
-            }
-
-            int width = Math.Max(1, Math.Min(DirectLowResCompareSize, Math.Min(grayA.Width, grayB.Width)));
-            int height = Math.Max(1, Math.Min(DirectLowResCompareSize, Math.Min(grayA.Height, grayB.Height)));
-            var compareSize = new Size(width, height);
-
-            using var resizedA = new Mat();
-            using var resizedB = new Mat();
-            Cv2.Resize(grayA, resizedA, compareSize, 0, 0, InterpolationFlags.Area);
-            Cv2.Resize(grayB, resizedB, compareSize, 0, 0, InterpolationFlags.Area);
-
-            using var diff = new Mat();
-            Cv2.Absdiff(resizedA, resizedB, diff);
-            using var thresh = new Mat();
-            Cv2.Threshold(diff, thresh, options.DiffPixelThreshold, 255, ThresholdTypes.Binary);
-            double diffRatio = Cv2.CountNonZero(thresh) / (double)(compareSize.Width * compareSize.Height);
-
-            return diffRatio <= DirectLowResDiffRatioThreshold;
-        }
-
-        private static bool TryTemplateMatchCrop(ImageItem a, ImageItem b, SameSourceGroupingOptions options, Action<string>? logAction)
-        {
-            ImageItem larger = a.PixelCount >= b.PixelCount ? a : b;
-            ImageItem smaller = a.PixelCount >= b.PixelCount ? b : a;
-
-            double areaRatio = (double)smaller.PixelCount / Math.Max(1, larger.PixelCount);
-            if (areaRatio >= options.CropAreaRatioThreshold)
-            {
-                return false;
-            }
-
-            if (smaller.Width < options.TemplateMinSize || smaller.Height < options.TemplateMinSize)
-            {
-                return false;
-            }
-
-            using var largeGray = Cv2.ImRead(larger.Path, ImreadModes.Grayscale);
-            using var smallGray = Cv2.ImRead(smaller.Path, ImreadModes.Grayscale);
-            if (largeGray.Empty() || smallGray.Empty())
-            {
-                if (largeGray.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片灰度: {larger.Path}");
-                }
-                if (smallGray.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片灰度: {smaller.Path}");
-                }
-                return false;
-            }
-
-            int maxDim = Math.Max(largeGray.Width, largeGray.Height);
-            if (options.TemplateMaxSize > 0 && maxDim > options.TemplateMaxSize)
-            {
-                double scale = (double)options.TemplateMaxSize / maxDim;
-                int largeWidth = Math.Max(1, (int)Math.Round(largeGray.Width * scale));
-                int largeHeight = Math.Max(1, (int)Math.Round(largeGray.Height * scale));
-                int smallWidth = Math.Max(1, (int)Math.Round(smallGray.Width * scale));
-                int smallHeight = Math.Max(1, (int)Math.Round(smallGray.Height * scale));
-
-                using var largeResized = new Mat();
-                using var smallResized = new Mat();
-                Cv2.Resize(largeGray, largeResized, new Size(largeWidth, largeHeight), 0, 0, InterpolationFlags.Area);
-                Cv2.Resize(smallGray, smallResized, new Size(smallWidth, smallHeight), 0, 0, InterpolationFlags.Area);
-
-                return TemplateMatch(largeResized, smallResized, options.TemplateMatchThreshold);
-            }
-
-            return TemplateMatch(largeGray, smallGray, options.TemplateMatchThreshold);
-        }
-
-        private static bool TemplateMatch(Mat largeGray, Mat smallGray, double threshold)
-        {
-            if (smallGray.Width > largeGray.Width || smallGray.Height > largeGray.Height)
-            {
-                return false;
-            }
-
-            using var result = new Mat();
-            Cv2.MatchTemplate(largeGray, smallGray, result, TemplateMatchModes.CCoeffNormed);
-            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out _);
-            return maxVal >= threshold;
-        }
-
-        private static void CopyGroupedFiles(IReadOnlyList<ImageItem> items, DisjointSet unionFind,
-            string outputPath, SameSourceGroupingOptions options, ORB orb, OrbFeatureCache featureCache,
-            IProgress<double>? progress, Action<string>? logAction, CancellationToken token)
-        {
-            var groups = new Dictionary<int, List<int>>();
-            for (int i = 0; i < items.Count; i++)
-            {
-                int root = unionFind.Find(i);
-                if (!groups.TryGetValue(root, out var list))
-                {
-                    list = new List<int>();
-                    groups[root] = list;
-                }
-
-                list.Add(i);
-            }
-
-            var groupList = groups.Values.OrderByDescending(g => g.Count).ToList();
-            int totalGroups = groupList.Count;
-            int processedImages = 0;
-            int totalImages = items.Count;
-            int groupIndex = 1;
-            var relationOutputDirs = BuildRelationOutputDirectories(outputPath);
-
-            for (int g = 0; g < groupList.Count; g++)
-            {
                 token.ThrowIfCancellationRequested();
+                logAction?.Invoke("副本判定...");
+                stageWatch.Restart();
+                ClassifyDuplicates(images, parentMap, classMap, scoreMap, reasonMap, token);
+                stageTimings["duplicate"] = stageWatch.Elapsed.TotalSeconds;
+                progress?.Report(55);
 
-                var group = groupList[g];
-                int rootIndex = SelectRootIndex(group, items);
-                var rootItem = items[rootIndex];
+                token.ThrowIfCancellationRequested();
+                logAction?.Invoke("被包含候选召回...");
+                stageWatch.Restart();
+                var candidateMap = BuildContainmentCandidates(images, parentMap, ContainmentRecallScales, token);
+                stageTimings["containment_candidates"] = stageWatch.Elapsed.TotalSeconds;
+                progress?.Report(70);
 
-                string groupId = BuildGroupId(rootItem);
-                groupIndex = FindNextAvailableGroupIndex(relationOutputDirs.Root, groupIndex);
-                string baseName = $"原图{groupIndex}";
+                token.ThrowIfCancellationRequested();
+                logAction?.Invoke("被包含精判...");
+                stageWatch.Restart();
+                ApplyContainmentMatches(images, parentMap, classMap, scoreMap, reasonMap, candidateMap, ContainmentMatchScales, token);
+                stageTimings["containment_match"] = stageWatch.Elapsed.TotalSeconds;
+                progress?.Report(82);
 
-                logAction?.Invoke($"[{g + 1}/{totalGroups}] 组 {baseName} (hash {groupId})，数量 {group.Count}");
+                token.ThrowIfCancellationRequested();
+                logAction?.Invoke("差分判定...");
+                stageWatch.Restart();
+                ClassifyDifferences(images, parentMap, classMap, scoreMap, reasonMap, token);
+                stageTimings["difference"] = stageWatch.Elapsed.TotalSeconds;
+                progress?.Report(90);
 
-                string? mergedDanbooruTags = options.SyncDanbooruTagsToRoot
-                    ? BuildMergedDanbooruTags(group, items, logAction)
-                    : null;
-
-                var rootFeatures = featureCache.GetOrCreate(rootIndex, () =>
-                    ComputeOrbFeaturesFromFile(rootItem, orb, options, logAction));
-
-                Mat? rootGrayScaled = null;
-                if (options.EditedDiffRatioThreshold > 0 && rootFeatures != null && !rootFeatures.Descriptors.Empty())
+                var entries = new Dictionary<string, ClassificationEntry>(StringComparer.OrdinalIgnoreCase);
+                foreach ((string name, LoadedImage image) in images.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
                 {
-                    using var rootGray = Cv2.ImRead(rootItem.Path, ImreadModes.Grayscale);
-                    if (!rootGray.Empty())
+                    string? parentName = parentMap.GetValueOrDefault(name);
+                    if (parentName is null)
                     {
-                        rootGrayScaled = ResizeToSize(rootGray, rootFeatures.ScaledSize);
+                        entries[name] = new ClassificationEntry(
+                            image.Path,
+                            "original",
+                            null,
+                            name,
+                            1.0,
+                            "group_anchor");
                     }
                     else
                     {
-                        logAction?.Invoke($"无法读取原图灰度: {rootItem.Path}");
+                        entries[name] = new ClassificationEntry(
+                            image.Path,
+                            classMap[name],
+                            parentName,
+                            ResolveRoot(name, parentMap),
+                            scoreMap[name],
+                            reasonMap[name]);
                     }
                 }
 
-                var relationCounts = new Dictionary<RelationType, int>
+                var classCounts = entries.Values
+                    .GroupBy(entry => entry.ClassName, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+                return new ClassificationResult(
+                    entries,
+                    classCounts,
+                    computeBackend,
+                    stageTimings,
+                    totalWatch.Elapsed.TotalSeconds);
+            }
+            finally
+            {
+                foreach (LoadedImage image in images.Values)
                 {
-                    [RelationType.Same] = 0,
-                    [RelationType.Crop] = 0,
-                    [RelationType.LowRes] = 0,
-                    [RelationType.Edited] = 0,
-                    [RelationType.Unknown] = 0
+                    image.Dispose();
+                }
+            }
+        }
+
+        private static Dictionary<string, LoadedImage> LoadImageRecords(string inputDir, Action<string>? logAction, CancellationToken token)
+        {
+            string cacheDir = Path.Combine(inputDir, ".image_relation_pipeline_cache");
+            string cachePath = Path.Combine(cacheDir, "records.json");
+            Dictionary<string, CachedRecord> existingCache = LoadRecordCache(cachePath);
+            var updatedCache = new Dictionary<string, CachedRecord>(StringComparer.OrdinalIgnoreCase);
+            var records = new Dictionary<string, LoadedImage>(StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<string> files = Directory.EnumerateFiles(inputDir, "*.*", SearchOption.TopDirectoryOnly)
+                .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+
+            foreach (string file in files)
+            {
+                token.ThrowIfCancellationRequested();
+
+                FileInfo info = new(file);
+                string fileName = Path.GetFileName(file);
+                long mtimeNs = info.LastWriteTimeUtc.Ticks * 100;
+                CachedRecord? cached = existingCache.GetValueOrDefault(fileName);
+
+                LoadedImage image = LoadImage(file, cached, info.Length, mtimeNs);
+                records[fileName] = image;
+                updatedCache[fileName] = new CachedRecord
+                {
+                    FileSize = info.Length,
+                    MtimeNs = mtimeNs,
+                    Width = image.Width,
+                    Height = image.Height,
+                    PixelSha256 = image.PixelSha256
                 };
+            }
 
-                string rootTargetPath = Path.Combine(relationOutputDirs.Root, $"{baseName}{Path.GetExtension(rootItem.Path)}");
-                string? actualRootPath = CopyWithCompanion(rootItem.Path, rootTargetPath, logAction);
-                processedImages++;
+            Directory.CreateDirectory(cacheDir);
+            File.WriteAllText(cachePath, JsonConvert.SerializeObject(updatedCache, Formatting.Indented), Encoding.UTF8);
+            logAction?.Invoke($"发现图片数量: {records.Count}");
+            return records;
+        }
 
-                if (!string.IsNullOrWhiteSpace(actualRootPath)
-                    && options.SyncDanbooruTagsToRoot
-                    && !string.IsNullOrWhiteSpace(mergedDanbooruTags))
+        private static LoadedImage LoadImage(string filePath, CachedRecord? cached, long fileSize, long mtimeNs)
+        {
+            using Image<Rgb24> image = SixLabors.ImageSharp.Image.Load<Rgb24>(filePath);
+            image.Mutate(x => x.AutoOrient());
+
+            byte[] pixels = new byte[image.Width * image.Height * 3];
+            image.CopyPixelDataTo(pixels);
+
+            string pixelSha256 = cached is not null
+                                 && cached.FileSize == fileSize
+                                 && cached.MtimeNs == mtimeNs
+                                 && cached.Width == image.Width
+                                 && cached.Height == image.Height
+                                 && !string.IsNullOrWhiteSpace(cached.PixelSha256)
+                ? cached.PixelSha256
+                : ComputePixelSha256(pixels);
+
+            using Mat rgbMat = new(image.Height, image.Width, MatType.CV_8UC3, pixels);
+            Mat stored = rgbMat.Clone();
+            return new LoadedImage(filePath, image.Width, image.Height, pixelSha256, stored);
+        }
+
+        private static Dictionary<string, CachedRecord> LoadRecordCache(string cachePath)
+        {
+            if (!File.Exists(cachePath))
+            {
+                return new Dictionary<string, CachedRecord>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            string json = File.ReadAllText(cachePath, Encoding.UTF8);
+            return JsonConvert.DeserializeObject<Dictionary<string, CachedRecord>>(json)
+                   ?? new Dictionary<string, CachedRecord>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void ClassifyThumbnails(
+            IReadOnlyDictionary<string, LoadedImage> images,
+            IDictionary<string, string> parentMap,
+            IDictionary<string, string> classMap,
+            IDictionary<string, double> scoreMap,
+            IDictionary<string, string> reasonMap,
+            CancellationToken token)
+        {
+            foreach (string parentName in GetOrderedNames(images))
+            {
+                token.ThrowIfCancellationRequested();
+                if (parentMap.ContainsKey(parentName))
                 {
-                    WriteCompanionTags(actualRootPath, mergedDanbooruTags, logAction);
+                    continue;
                 }
 
-                int modifyIndex = 1;
-                foreach (var idx in group)
+                LoadedImage parent = images[parentName];
+                foreach (string childName in GetOrderedNames(images))
                 {
-                    if (idx == rootIndex)
+                    if (childName == parentName || parentMap.ContainsKey(childName))
                     {
                         continue;
                     }
 
-                    token.ThrowIfCancellationRequested();
-
-                    var item = items[idx];
-                    RelationType relation = RelationType.Unknown;
-
-                    var otherFeatures = featureCache.GetOrCreate(idx, () =>
-                        ComputeOrbFeaturesFromFile(item, orb, options, logAction));
-
-                    Mat? otherGrayScaled = null;
-                    if (options.EditedDiffRatioThreshold > 0 && rootGrayScaled != null && otherFeatures != null && !otherFeatures.Descriptors.Empty())
+                    LoadedImage child = images[childName];
+                    if (parent.Area <= child.Area)
                     {
-                        using var otherGray = Cv2.ImRead(item.Path, ImreadModes.Grayscale);
-                        if (!otherGray.Empty())
-                        {
-                            otherGrayScaled = ResizeToSize(otherGray, otherFeatures.ScaledSize);
-                        }
-                        else
-                        {
-                            logAction?.Invoke($"无法读取图片灰度: {item.Path}");
-                        }
+                        continue;
                     }
 
-                    if (rootFeatures != null && otherFeatures != null
-                        && !rootFeatures.Descriptors.Empty() && !otherFeatures.Descriptors.Empty())
+                    double ratioDelta = RatioDelta(parent, child);
+                    if (ratioDelta > ThumbnailRatioTolerance)
                     {
-                        relation = ClassifyRelation(rootItem, rootFeatures, item, otherFeatures, options, rootGrayScaled, otherGrayScaled);
+                        continue;
                     }
 
-                    otherGrayScaled?.Dispose();
-                    relationCounts[relation] += 1;
-
-                    string targetDir = ResolveRelationOutputDirectory(relationOutputDirs, relation);
-                    string relationSuffix = relation switch
+                    (double previewMeanDiff, double previewCorrelation) = ThumbnailPreviewMetrics(parent.ThumbnailPreview!, child.ThumbnailPreview!);
+                    if (previewMeanDiff > ThumbnailPreviewMeanDiffThreshold
+                        || previewCorrelation < ThumbnailPreviewCorrelationThreshold)
                     {
-                        RelationType.Crop => "被包含",
-                        RelationType.LowRes => "缩略图",
-                        RelationType.Edited => "差分",
-                        RelationType.Same => "未知",
-                        RelationType.Unknown => "未知",
-                        _ => "未知"
-                    };
-                    string modifySuffix = modifyIndex == 1 ? $"{baseName}{relationSuffix}" : $"{baseName}{relationSuffix}{modifyIndex}";
-                    string targetPath = Path.Combine(targetDir, $"{modifySuffix}{Path.GetExtension(item.Path)}");
-                    _ = CopyWithCompanion(item.Path, targetPath, logAction);
+                        continue;
+                    }
 
-                    modifyIndex++;
-                    processedImages++;
-                }
-
-                rootGrayScaled?.Dispose();
-
-                logAction?.Invoke($"  关系统计: 同图 {relationCounts[RelationType.Same]}, 裁剪 {relationCounts[RelationType.Crop]}, 低清 {relationCounts[RelationType.LowRes]}, 差分 {relationCounts[RelationType.Edited]}, 未知 {relationCounts[RelationType.Unknown]}");
-
-                progress?.Report(80 + 20.0 * processedImages / totalImages);
-                groupIndex++;
-            }
-        }
-
-        private static int SelectRootIndex(List<int> group, IReadOnlyList<ImageItem> items)
-        {
-            return group
-                .OrderByDescending(i => items[i].PixelCount)
-                .ThenByDescending(i => items[i].Sharpness)
-                .ThenByDescending(i => items[i].FileSize)
-                .First();
-        }
-
-        private static string BuildGroupId(ImageItem item)
-        {
-            string hashPart = $"{(uint)(item.FullHash >> 32):X8}";
-            return $"{hashPart}_{item.Width}x{item.Height}";
-        }
-
-        private static int FindNextAvailableGroupIndex(string rootOutputPath, int startIndex)
-        {
-            int index = Math.Max(1, startIndex);
-            while (true)
-            {
-                string baseName = $"原图{index}";
-                bool hasImage = SupportedExtensions.Any(ext =>
-                    File.Exists(Path.Combine(rootOutputPath, $"{baseName}{ext}")));
-                bool hasTxt = File.Exists(Path.Combine(rootOutputPath, $"{baseName}.txt"));
-
-                if (!hasImage && !hasTxt)
-                {
-                    return index;
-                }
-
-                index++;
-            }
-        }
-
-        private static RelationOutputDirectories BuildRelationOutputDirectories(string outputPath)
-        {
-            string rootDir = Path.Combine(outputPath, RootFolderName);
-            string cropDir = Path.Combine(outputPath, CropFolderName);
-            string lowResDir = Path.Combine(outputPath, LowResFolderName);
-            string editedDir = Path.Combine(outputPath, EditedFolderName);
-            string unknownDir = Path.Combine(outputPath, UnknownFolderName);
-
-            Directory.CreateDirectory(rootDir);
-            Directory.CreateDirectory(cropDir);
-            Directory.CreateDirectory(lowResDir);
-            Directory.CreateDirectory(editedDir);
-            Directory.CreateDirectory(unknownDir);
-
-            return new RelationOutputDirectories(rootDir, cropDir, lowResDir, editedDir, unknownDir);
-        }
-
-        private static string ResolveRelationOutputDirectory(RelationOutputDirectories directories, RelationType relation)
-        {
-            return relation switch
-            {
-                RelationType.Crop => directories.Crop,
-                RelationType.LowRes => directories.LowRes,
-                RelationType.Edited => directories.Edited,
-                RelationType.Same => directories.Unknown,
-                RelationType.Unknown => directories.Unknown,
-                _ => directories.Unknown
-            };
-        }
-
-        private static string? CopyWithCompanion(string sourceImagePath, string targetImagePath, Action<string>? logAction)
-        {
-            string finalImagePath;
-            try
-            {
-                finalImagePath = EnsureUniqueFilePath(targetImagePath);
-                string? targetDir = Path.GetDirectoryName(finalImagePath);
-                if (!string.IsNullOrWhiteSpace(targetDir))
-                {
-                    Directory.CreateDirectory(targetDir);
-                }
-
-                File.Copy(sourceImagePath, finalImagePath, overwrite: false);
-            }
-            catch (Exception ex)
-            {
-                logAction?.Invoke($"复制失败: {sourceImagePath} ({ex.Message})");
-                return null;
-            }
-
-            string companion = Path.ChangeExtension(sourceImagePath, ".txt");
-            if (File.Exists(companion))
-            {
-                string targetTxt = EnsureUniqueFilePath(Path.ChangeExtension(finalImagePath, ".txt"));
-                try
-                {
-                    File.Copy(companion, targetTxt, overwrite: false);
-                }
-                catch (Exception ex)
-                {
-                    logAction?.Invoke($"复制TXT失败: {companion} ({ex.Message})");
+                    (double meanDiff, double correlation) = ThumbnailMetrics(parent.Rgb, child.Rgb);
+                    if (meanDiff <= 0.12 && correlation >= 0.72)
+                    {
+                        parentMap[childName] = parentName;
+                        classMap[childName] = "thumbnail";
+                        scoreMap[childName] = correlation;
+                        reasonMap[childName] = $"ratio_delta={ratioDelta:F4}, mean_diff={meanDiff:F4}, corr={correlation:F4}";
+                    }
                 }
             }
-
-            return finalImagePath;
         }
 
-        private static string EnsureUniqueFilePath(string path)
+        private static void ClassifyDuplicates(
+            IReadOnlyDictionary<string, LoadedImage> images,
+            IDictionary<string, string> parentMap,
+            IDictionary<string, string> classMap,
+            IDictionary<string, double> scoreMap,
+            IDictionary<string, string> reasonMap,
+            CancellationToken token)
         {
-            if (!File.Exists(path))
+            List<string> orderedNames = GetOrderedNames(images);
+            foreach (string parentName in orderedNames)
             {
-                return path;
-            }
-
-            string directory = Path.GetDirectoryName(path) ?? string.Empty;
-            string name = Path.GetFileNameWithoutExtension(path);
-            string extension = Path.GetExtension(path);
-
-            int index = 1;
-            string candidate;
-            do
-            {
-                candidate = Path.Combine(directory, $"{name}_{index}{extension}");
-                index++;
-            } while (File.Exists(candidate));
-
-            return candidate;
-        }
-
-        private static string? BuildMergedDanbooruTags(IEnumerable<int> group, IReadOnlyList<ImageItem> items, Action<string>? logAction)
-        {
-            var merged = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var idx in group)
-            {
-                string txtPath = Path.ChangeExtension(items[idx].Path, ".txt");
-                if (!File.Exists(txtPath))
+                token.ThrowIfCancellationRequested();
+                if (parentMap.ContainsKey(parentName))
                 {
                     continue;
                 }
 
-                try
+                LoadedImage parent = images[parentName];
+                foreach (string childName in orderedNames)
                 {
-                    string content = File.ReadAllText(txtPath);
-                    var tags = ParseDanbooruTags(content);
-                    foreach (var tag in tags)
+                    if (childName == parentName || parentMap.ContainsKey(childName))
                     {
-                        if (seen.Add(tag))
-                        {
-                            merged.Add(tag);
-                        }
+                        continue;
                     }
-                }
-                catch (Exception ex)
-                {
-                    logAction?.Invoke($"读取TXT失败: {txtPath} ({ex.Message})");
+
+                    LoadedImage child = images[childName];
+                    if (child.Width != parent.Width || child.Height != parent.Height)
+                    {
+                        continue;
+                    }
+
+                    if (!string.Equals(child.PixelSha256, parent.PixelSha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    parentMap[childName] = parentName;
+                    classMap[childName] = "duplicate";
+                    scoreMap[childName] = 1.0;
+                    reasonMap[childName] = "same_dimensions_and_pixel_hash";
                 }
             }
-
-            return merged.Count == 0 ? null : string.Join(",", merged);
         }
 
-        private static List<string> ParseDanbooruTags(string content)
+        private static List<(string ChildName, List<string> CandidateParents)> BuildContainmentCandidates(
+            IReadOnlyDictionary<string, LoadedImage> images,
+            IDictionary<string, string> parentMap,
+            string[] scaleCandidates,
+            CancellationToken token)
         {
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                return new List<string>();
-            }
+            List<string> activeNames = GetActiveNames(images, parentMap);
+            var result = new List<(string ChildName, List<string> CandidateParents)>();
 
-            var rawTokens = content
-                .Split(new[] { ',', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(t => t.Trim())
-                .Where(t => !string.IsNullOrWhiteSpace(t))
-                .ToList();
-
-            if (rawTokens.Count < 3)
+            foreach (string childName in activeNames.AsEnumerable().Reverse())
             {
-                return new List<string>();
-            }
-
-            int validCount = rawTokens.Count(IsLikelyDanbooruTagToken);
-            double validRatio = (double)validCount / rawTokens.Count;
-            if (validCount < 3 || validRatio < 0.85)
-            {
-                return new List<string>();
-            }
-
-            var result = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var token in rawTokens)
-            {
-                if (!IsLikelyDanbooruTagToken(token))
+                token.ThrowIfCancellationRequested();
+                if (parentMap.ContainsKey(childName))
                 {
                     continue;
                 }
 
-                if (seen.Add(token))
+                LoadedImage child = images[childName];
+                var scoredCandidates = new List<(string ParentName, double Score)>();
+                foreach (string parentName in activeNames)
                 {
-                    result.Add(token);
+                    if (parentName == childName || parentMap.ContainsKey(parentName))
+                    {
+                        continue;
+                    }
+
+                    LoadedImage parent = images[parentName];
+                    if (parent.Area <= child.Area)
+                    {
+                        continue;
+                    }
+
+                    if (parent.Width < child.Width || parent.Height < child.Height)
+                    {
+                        continue;
+                    }
+
+                    double coarseScore = ContainmentBestScore(
+                        parent.ContainmentRecallGray!,
+                        parent.ContainmentRecallScale,
+                        child.ContainmentRecallGray!,
+                        child.ContainmentRecallScale,
+                        scaleCandidates,
+                        out _);
+
+                    scoredCandidates.Add((parentName, coarseScore));
+                }
+
+                if (scoredCandidates.Count == 0)
+                {
+                    continue;
+                }
+
+                scoredCandidates.Sort((left, right) =>
+                {
+                    int scoreCompare = right.Score.CompareTo(left.Score);
+                    return scoreCompare != 0 ? scoreCompare : string.Compare(left.ParentName, right.ParentName, StringComparison.OrdinalIgnoreCase);
+                });
+
+                List<string> candidates = scoredCandidates
+                    .Where(candidate => candidate.Score >= ContainmentRecallThreshold)
+                    .Select(candidate => candidate.ParentName)
+                    .ToList();
+
+                if (candidates.Count == 0)
+                {
+                    double bestScore = scoredCandidates[0].Score;
+                    double secondBestScore = scoredCandidates.Count > 1 ? scoredCandidates[1].Score : 0.0;
+                    if (IsClearBestMatch(bestScore, secondBestScore, ContainmentRecallFallbackScore, ContainmentRecallFallbackMargin))
+                    {
+                        candidates.Add(scoredCandidates[0].ParentName);
+                    }
+                }
+
+                if (candidates.Count > 0)
+                {
+                    result.Add((childName, candidates));
                 }
             }
 
             return result;
         }
 
-        private static bool IsLikelyDanbooruTagToken(string token)
+        private static void ApplyContainmentMatches(
+            IReadOnlyDictionary<string, LoadedImage> images,
+            IDictionary<string, string> parentMap,
+            IDictionary<string, string> classMap,
+            IDictionary<string, double> scoreMap,
+            IDictionary<string, string> reasonMap,
+            IReadOnlyList<(string ChildName, List<string> CandidateParents)> candidateMap,
+            string[] scaleCandidates,
+            CancellationToken token)
         {
-            if (string.IsNullOrWhiteSpace(token) || token.Length > 80)
+            foreach ((string childName, List<string> candidateParents) in candidateMap)
             {
-                return false;
-            }
-
-            bool hasLetterOrDigit = false;
-            foreach (char c in token)
-            {
-                if (char.IsWhiteSpace(c))
-                {
-                    return false;
-                }
-
-                if (char.IsLetterOrDigit(c))
-                {
-                    hasLetterOrDigit = true;
-                    continue;
-                }
-
-                if (c is '_' or '-' or ':' or '(' or ')' or '.' or '\'' or '/')
+                token.ThrowIfCancellationRequested();
+                if (parentMap.ContainsKey(childName))
                 {
                     continue;
                 }
 
-                return false;
-            }
+                LoadedImage child = images[childName];
+                string? bestParentName = null;
+                double bestScore = 0.0;
+                double secondBestScore = 0.0;
+                double bestScale = 1.0;
 
-            return hasLetterOrDigit;
+                foreach (string parentName in candidateParents)
+                {
+                    if (parentMap.ContainsKey(parentName))
+                    {
+                        continue;
+                    }
+
+                    LoadedImage parent = images[parentName];
+                    double score = ContainmentBestScore(
+                        parent.ContainmentGray!,
+                        parent.ContainmentScale,
+                        child.ContainmentGray!,
+                        child.ContainmentScale,
+                        scaleCandidates,
+                        out double scale);
+
+                    if (score > bestScore)
+                    {
+                        secondBestScore = bestScore;
+                        bestScore = score;
+                        bestParentName = parentName;
+                        bestScale = scale;
+                    }
+                    else if (score > secondBestScore)
+                    {
+                        secondBestScore = score;
+                    }
+                }
+
+                if (bestParentName is not null && (bestScore >= ContainmentMatchThreshold
+                                                   || IsClearBestMatch(bestScore, secondBestScore, ContainmentMatchFallbackScore, ContainmentMatchFallbackMargin)))
+                {
+                    parentMap[childName] = bestParentName;
+                    classMap[childName] = "contained";
+                    scoreMap[childName] = bestScore;
+                    reasonMap[childName] = $"match_template_score={bestScore:F4}, runner_up_score={secondBestScore:F4}, scale={bestScale:F2}";
+                }
+            }
         }
 
-        private static void WriteCompanionTags(string imagePath, string tags, Action<string>? logAction)
+        private static void ClassifyDifferences(
+            IReadOnlyDictionary<string, LoadedImage> images,
+            IDictionary<string, string> parentMap,
+            IDictionary<string, string> classMap,
+            IDictionary<string, double> scoreMap,
+            IDictionary<string, string> reasonMap,
+            CancellationToken token)
         {
-            if (string.IsNullOrWhiteSpace(imagePath) || string.IsNullOrWhiteSpace(tags))
+            foreach (string parentName in GetActiveNames(images, parentMap))
+            {
+                token.ThrowIfCancellationRequested();
+                if (parentMap.ContainsKey(parentName))
+                {
+                    continue;
+                }
+
+                LoadedImage parent = images[parentName];
+                foreach (string childName in GetActiveNames(images, parentMap))
+                {
+                    if (childName == parentName || parentMap.ContainsKey(childName))
+                    {
+                        continue;
+                    }
+
+                    LoadedImage child = images[childName];
+                    if (child.Width != parent.Width || child.Height != parent.Height)
+                    {
+                        continue;
+                    }
+
+                    (double meanDiff, double changedRatio) = DifferenceMetrics(parent.Rgb, child.Rgb);
+                    if (changedRatio > 0.0 && changedRatio <= DifferenceMaxChangedRatio && meanDiff <= 0.05)
+                    {
+                        parentMap[childName] = parentName;
+                        classMap[childName] = "difference";
+                        scoreMap[childName] = 1.0 - changedRatio;
+                        reasonMap[childName] = $"mean_diff={meanDiff:F4}, changed_ratio={changedRatio:F4}";
+                    }
+                }
+            }
+        }
+
+        private static void ExportGroups(
+            ClassificationResult result,
+            string outputDir,
+            IProgress<double>? progress,
+            Action<string>? logAction,
+            CancellationToken token)
+        {
+            Directory.CreateDirectory(outputDir);
+            foreach (string folderName in OutputFolders.Values)
+            {
+                string folderPath = Path.Combine(outputDir, folderName);
+                if (Directory.Exists(folderPath))
+                {
+                    Directory.Delete(folderPath, recursive: true);
+                }
+
+                Directory.CreateDirectory(folderPath);
+            }
+
+            string manifestPath = Path.Combine(outputDir, "manifest.json");
+            if (File.Exists(manifestPath))
+            {
+                File.Delete(manifestPath);
+            }
+
+            var groupedCounters = new Dictionary<(string GroupId, string ClassName), int>();
+            var manifestRows = new List<object>();
+            int processed = 0;
+
+            foreach ((string name, ClassificationEntry entry) in result.Entries.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                token.ThrowIfCancellationRequested();
+
+                string destinationPath;
+                if (string.Equals(entry.ClassName, "original", StringComparison.OrdinalIgnoreCase))
+                {
+                    destinationPath = Path.Combine(outputDir, OutputFolders["original"], Path.GetFileName(entry.SrcPath));
+                }
+                else
+                {
+                    string folderName = OutputFolders.GetValueOrDefault(entry.ClassName, OutputFolders["other"]);
+                    ClassificationEntry groupOriginal = result.Entries[entry.GroupId];
+                    string groupLabel = Path.GetFileNameWithoutExtension(groupOriginal.SrcPath);
+                    (string GroupId, string ClassName) counterKey = (entry.GroupId, entry.ClassName);
+                    groupedCounters[counterKey] = groupedCounters.GetValueOrDefault(counterKey) + 1;
+                    int index = groupedCounters[counterKey];
+                    string fileName = $"{groupLabel}_{folderName}{index}{Path.GetExtension(entry.SrcPath)}";
+                    destinationPath = Path.Combine(outputDir, folderName, fileName);
+                }
+
+                File.Copy(entry.SrcPath, destinationPath, overwrite: true);
+                CopySidecarTxt(entry.SrcPath, destinationPath);
+
+                manifestRows.Add(new
+                {
+                    src_path = entry.SrcPath,
+                    group_id = entry.GroupId,
+                    @class = entry.ClassName,
+                    parent_path = entry.ParentName is null ? null : result.Entries[entry.ParentName].SrcPath,
+                    score = entry.Score,
+                    reason = entry.Reason
+                });
+
+                processed++;
+                progress?.Report(90 + 10.0 * processed / Math.Max(1, result.Entries.Count));
+            }
+
+            File.WriteAllText(manifestPath, JsonConvert.SerializeObject(manifestRows, Formatting.Indented), Encoding.UTF8);
+            logAction?.Invoke($"导出完成，结果数量: {result.Entries.Count}");
+        }
+
+        private static void CopySidecarTxt(string sourcePath, string destinationPath)
+        {
+            string sourceTxt = Path.ChangeExtension(sourcePath, ".txt");
+            if (!File.Exists(sourceTxt))
             {
                 return;
             }
 
-            try
-            {
-                string txtPath = Path.ChangeExtension(imagePath, ".txt");
-                File.WriteAllText(txtPath, tags);
-            }
-            catch (Exception ex)
-            {
-                logAction?.Invoke($"写入标签TXT失败: {imagePath} ({ex.Message})");
-            }
+            string destinationTxt = Path.ChangeExtension(destinationPath, ".txt");
+            File.Copy(sourceTxt, destinationTxt, overwrite: true);
         }
 
-        private sealed record RelationOutputDirectories(string Root, string Crop, string LowRes, string Edited, string Unknown);
-
-        private static RelationType ClassifyRelation(ImageItem rootItem, OrbFeatureData rootFeatures, ImageItem otherItem,
-            OrbFeatureData otherFeatures, SameSourceGroupingOptions options, Mat? rootGrayScaled, Mat? otherGrayScaled)
+        private static List<string> GetOrderedNames(IReadOnlyDictionary<string, LoadedImage> images)
         {
-            if (!TryEstimateHomography(rootFeatures, otherFeatures, options, out var homography, out _, out _, out _, out _))
+            return images.Keys
+                .OrderByDescending(name => images[name].Area)
+                .ThenBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static List<string> GetActiveNames(IReadOnlyDictionary<string, LoadedImage> images, IDictionary<string, string> parentMap)
+        {
+            return GetOrderedNames(images)
+                .Where(name => !parentMap.ContainsKey(name))
+                .ToList();
+        }
+
+        private static string ResolveRoot(string name, IDictionary<string, string> parentMap)
+        {
+            string current = name;
+            while (parentMap.TryGetValue(current, out string? parent))
             {
-                if (IsLowResMatchByHash(rootItem, otherItem, options)
-                    || IsLowResMatchByResize(rootItem, otherItem, options, null))
+                current = parent;
+            }
+
+            return current;
+        }
+
+        private static double RatioDelta(LoadedImage parent, LoadedImage child)
+        {
+            return Math.Abs(parent.AspectRatio - child.AspectRatio) / parent.AspectRatio;
+        }
+
+        private static (double MeanDiff, double Correlation) ThumbnailMetrics(Mat parentRgb, Mat childRgb)
+        {
+            using Mat resized = new();
+            Cv2.Resize(parentRgb, resized, new OpenCvSharp.Size(childRgb.Width, childRgb.Height), 0, 0, InterpolationFlags.Area);
+
+            using Mat diff = new();
+            Cv2.Absdiff(resized, childRgb, diff);
+            Scalar diffMean = Cv2.Mean(diff);
+            double meanDiff = (diffMean.Val0 + diffMean.Val1 + diffMean.Val2) / (3.0 * 255.0);
+
+            using Mat parentGray = new();
+            using Mat childGray = new();
+            Cv2.CvtColor(resized, parentGray, ColorConversionCodes.RGB2GRAY);
+            Cv2.CvtColor(childRgb, childGray, ColorConversionCodes.RGB2GRAY);
+
+            return (meanDiff, ComputeCorrelation(ReadMatBytes(parentGray), ReadMatBytes(childGray)));
+        }
+
+        private static (double MeanDiff, double Correlation) ThumbnailPreviewMetrics(byte[] parentPreview, byte[] childPreview)
+        {
+            double meanDiff = 0;
+            for (int i = 0; i < parentPreview.Length; i++)
+            {
+                meanDiff += Math.Abs(parentPreview[i] - childPreview[i]) / 255.0;
+            }
+
+            meanDiff /= Math.Max(1, parentPreview.Length);
+            return (meanDiff, ComputeCorrelation(parentPreview, childPreview));
+        }
+
+        private static (double MeanDiff, double ChangedRatio) DifferenceMetrics(Mat leftRgb, Mat rightRgb)
+        {
+            using Mat diff = new();
+            Cv2.Absdiff(leftRgb, rightRgb, diff);
+            using Mat gray = new();
+            Cv2.CvtColor(diff, gray, ColorConversionCodes.RGB2GRAY);
+
+            byte[] bytes = ReadMatBytes(gray);
+            double meanDiff = bytes.Length == 0 ? 0.0 : bytes.Average(value => value) / 255.0;
+            double changedRatio = bytes.Length == 0 ? 0.0 : bytes.Count(value => value > 16) / (double)bytes.Length;
+            return (meanDiff, changedRatio);
+        }
+
+        private static double ContainmentBestScore(
+            Mat parentGray,
+            double parentScale,
+            Mat childGray,
+            double childScale,
+            IEnumerable<string> scaleCandidates,
+            out double bestScale)
+        {
+            double bestScore = 0.0;
+            bestScale = 1.0;
+            double scaleFactor = parentScale / childScale;
+            double maxOriginalScale = Math.Min(
+                parentGray.Width / (double)childGray.Width,
+                parentGray.Height / (double)childGray.Height) / scaleFactor;
+            maxOriginalScale = Math.Max(1.0, maxOriginalScale);
+
+            foreach (string scaleText in scaleCandidates)
+            {
+                double originalScale = double.Parse(scaleText, System.Globalization.CultureInfo.InvariantCulture);
+                if (originalScale > maxOriginalScale)
                 {
-                    return RelationType.LowRes;
+                    break;
                 }
 
-                if (options.EnableTemplateMatch && TryTemplateMatchCrop(rootItem, otherItem, options, null))
-                {
-                    return RelationType.Crop;
-                }
-
-                return RelationType.Unknown;
-            }
-
-            using (homography)
-            {
-                var (isCrop, _) = IsCrop(rootFeatures.ScaledSize, otherFeatures.ScaledSize, homography, options.CropAreaRatioThreshold);
-                if (isCrop)
-                {
-                    return RelationType.Crop;
-                }
-
-                bool isLowRes = otherItem.PixelCount < rootItem.PixelCount * options.LowResRatioThreshold;
-                if (isLowRes)
-                {
-                    return RelationType.LowRes;
-                }
-
-                if (options.EditedDiffRatioThreshold > 0 && rootGrayScaled != null && otherGrayScaled != null)
-                {
-                    double diffRatio = ComputeDiffRatio(rootGrayScaled, otherGrayScaled, homography, options);
-                    if (diffRatio >= options.EditedDiffRatioThreshold)
-                    {
-                        return RelationType.Edited;
-                    }
-                }
-            }
-
-            return RelationType.Same;
-        }
-
-        private static (bool isCrop, Rect mappedBox) IsCrop(Size sizeA, Size sizeB, Mat homographyBToA, double areaRatioThreshold)
-        {
-            var cornersB = new[]
-            {
-                new Point2f(0, 0),
-                new Point2f(sizeB.Width - 1, 0),
-                new Point2f(sizeB.Width - 1, sizeB.Height - 1),
-                new Point2f(0, sizeB.Height - 1)
-            };
-
-            Point2f[] projected = Cv2.PerspectiveTransform(cornersB, homographyBToA);
-
-            float minX = projected.Min(p => p.X);
-            float minY = projected.Min(p => p.Y);
-            float maxX = projected.Max(p => p.X);
-            float maxY = projected.Max(p => p.Y);
-
-            var box = new Rect(
-                (int)Math.Floor(minX),
-                (int)Math.Floor(minY),
-                (int)Math.Ceiling(maxX - minX),
-                (int)Math.Ceiling(maxY - minY)
-            );
-
-            double areaBox = Math.Max(0, box.Width) * Math.Max(0, box.Height);
-            double areaA = Math.Max(1, sizeA.Width * sizeA.Height);
-
-            bool isCrop = areaBox / areaA < areaRatioThreshold;
-            return (isCrop, box);
-        }
-
-        private static double ComputeDiffRatio(Mat grayA, Mat grayB, Mat homographyBToA, SameSourceGroupingOptions options)
-        {
-            using var warped = new Mat();
-            Cv2.WarpPerspective(grayB, warped, homographyBToA, new Size(grayA.Width, grayA.Height), InterpolationFlags.Linear, BorderTypes.Constant);
-
-            var targetSize = GetDiffSize(grayA, options.DiffCheckSize);
-            using var resizedA = new Mat();
-            using var resizedB = new Mat();
-            Cv2.Resize(grayA, resizedA, targetSize, 0, 0, InterpolationFlags.Area);
-            Cv2.Resize(warped, resizedB, targetSize, 0, 0, InterpolationFlags.Area);
-
-            using var diff = new Mat();
-            Cv2.Absdiff(resizedA, resizedB, diff);
-            using var thresh = new Mat();
-            Cv2.Threshold(diff, thresh, options.DiffPixelThreshold, 255, ThresholdTypes.Binary);
-
-            double nonZero = Cv2.CountNonZero(thresh);
-            return nonZero / (targetSize.Width * targetSize.Height);
-        }
-
-        private static Mat ResizeToSize(Mat src, Size targetSize)
-        {
-            var dst = new Mat();
-            Cv2.Resize(src, dst, targetSize, 0, 0, InterpolationFlags.Area);
-            return dst;
-        }
-
-        private static Size GetDiffSize(Mat img, int maxSize)
-        {
-            if (maxSize <= 0)
-            {
-                return new Size(img.Width, img.Height);
-            }
-
-            int maxDim = Math.Max(img.Width, img.Height);
-            if (maxDim <= maxSize)
-            {
-                return new Size(img.Width, img.Height);
-            }
-
-            double scale = (double)maxSize / maxDim;
-            int width = Math.Max(1, (int)Math.Round(img.Width * scale));
-            int height = Math.Max(1, (int)Math.Round(img.Height * scale));
-            return new Size(width, height);
-        }
-
-        private static OrbFeatureData ComputeOrbFeatures(Mat bgr, ORB orb, SameSourceGroupingOptions options)
-        {
-            using var gray = new Mat();
-            Cv2.CvtColor(bgr, gray, ColorConversionCodes.BGR2GRAY);
-
-            double scale = 1.0;
-            Size targetSize = gray.Size();
-            Mat? resized = null;
-
-            if (options.OrbMaxSize > 0)
-            {
-                int maxDim = Math.Max(gray.Width, gray.Height);
-                if (maxDim > options.OrbMaxSize)
-                {
-                    scale = (double)options.OrbMaxSize / maxDim;
-                    int width = Math.Max(1, (int)Math.Round(gray.Width * scale));
-                    int height = Math.Max(1, (int)Math.Round(gray.Height * scale));
-                    targetSize = new Size(width, height);
-                    resized = new Mat();
-                    Cv2.Resize(gray, resized, targetSize, 0, 0, InterpolationFlags.Area);
-                }
-            }
-
-            var descriptors = new Mat();
-            var input = resized ?? gray;
-            orb.DetectAndCompute(input, null, out KeyPoint[] keyPoints, descriptors);
-            resized?.Dispose();
-
-            return new OrbFeatureData(keyPoints, descriptors, scale, targetSize);
-        }
-
-        private static OrbFeatureData? ComputeOrbFeaturesFromFile(ImageItem item, ORB orb, SameSourceGroupingOptions options, Action<string>? logAction)
-        {
-            try
-            {
-                using var img = Cv2.ImRead(item.Path, ImreadModes.Color);
-                if (img.Empty())
-                {
-                    logAction?.Invoke($"无法读取图片: {item.Path}");
-                    return null;
-                }
-
-                return ComputeOrbFeatures(img, orb, options);
-            }
-            catch (Exception ex)
-            {
-                logAction?.Invoke($"读取失败: {item.Path} ({ex.Message})");
-                return null;
-            }
-        }
-
-        private static bool TryEstimateHomography(OrbFeatureData featuresA, OrbFeatureData featuresB, SameSourceGroupingOptions options,
-            out Mat? homography, out int inliers, out int matchCount, out double inlierCoverageA, out double inlierCoverageB)
-        {
-            homography = null;
-            inliers = 0;
-            matchCount = 0;
-            inlierCoverageA = 0;
-            inlierCoverageB = 0;
-
-            if (featuresA.Descriptors.Empty() || featuresB.Descriptors.Empty())
-            {
-                return false;
-            }
-
-            using var matcher = new BFMatcher(NormTypes.Hamming, crossCheck: false);
-            var knn = matcher.KnnMatch(featuresA.Descriptors, featuresB.Descriptors, k: 2);
-
-            var good = new List<DMatch>();
-            foreach (var pair in knn)
-            {
-                if (pair.Length < 2)
+                double effectiveScale = originalScale * scaleFactor;
+                int scaledWidth = Math.Max(1, (int)Math.Round(childGray.Width * effectiveScale));
+                int scaledHeight = Math.Max(1, (int)Math.Round(childGray.Height * effectiveScale));
+                if (scaledWidth > parentGray.Width || scaledHeight > parentGray.Height)
                 {
                     continue;
                 }
 
-                if (pair[0].Distance < options.LoweRatio * pair[1].Distance)
+                using Mat scaledChild = new();
+                Cv2.Resize(childGray, scaledChild, new OpenCvSharp.Size(scaledWidth, scaledHeight), 0, 0, InterpolationFlags.Linear);
+                using Mat result = new();
+                Cv2.MatchTemplate(parentGray, scaledChild, result, TemplateMatchModes.CCoeffNormed);
+                Cv2.MinMaxLoc(result, out _, out double maxScore, out _, out _);
+
+                if (maxScore > bestScore)
                 {
-                    good.Add(pair[0]);
+                    bestScore = maxScore;
+                    bestScale = originalScale;
                 }
             }
 
-            matchCount = good.Count;
-            if (good.Count < options.MinGoodMatches)
+            return bestScore;
+        }
+
+        private static bool IsClearBestMatch(double bestScore, double secondBestScore, double minimumScore, double minimumMargin)
+        {
+            return bestScore >= minimumScore && (bestScore - secondBestScore) >= minimumMargin;
+        }
+
+        private static bool IsSubPath(string basePath, string candidatePath)
+        {
+            string normalizedBase = basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                                    + Path.DirectorySeparatorChar;
+            return candidatePath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCudaBackendAvailable()
+        {
+            try
+            {
+                string buildInfo = Cv2.GetBuildInformation();
+                return buildInfo.IndexOf("NVIDIA CUDA", StringComparison.OrdinalIgnoreCase) >= 0
+                       && buildInfo.IndexOf("YES", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch
             {
                 return false;
             }
-
-            var ptsA = good.Select(m => featuresA.KeyPoints[m.QueryIdx].Pt).Select(p => new Point2f(p.X, p.Y)).ToArray();
-            var ptsB = good.Select(m => featuresB.KeyPoints[m.TrainIdx].Pt).Select(p => new Point2f(p.X, p.Y)).ToArray();
-
-            using var mask = new Mat();
-            homography = Cv2.FindHomography(InputArray.Create(ptsB), InputArray.Create(ptsA), HomographyMethods.Ransac,
-                options.RansacReprojThreshold, mask);
-
-            if (homography.Empty())
-            {
-                homography.Dispose();
-                homography = null;
-                return false;
-            }
-
-            var inlierPointsA = new List<Point2f>();
-            var inlierPointsB = new List<Point2f>();
-            for (int i = 0; i < mask.Rows; i++)
-            {
-                if (mask.At<byte>(i, 0) != 0)
-                {
-                    inliers++;
-                    var m = good[i];
-                    var pointA = featuresA.KeyPoints[m.QueryIdx].Pt;
-                    var pointB = featuresB.KeyPoints[m.TrainIdx].Pt;
-                    inlierPointsA.Add(new Point2f(pointA.X, pointA.Y));
-                    inlierPointsB.Add(new Point2f(pointB.X, pointB.Y));
-                }
-            }
-
-            inlierCoverageA = ComputePointCoverage(inlierPointsA, featuresA.ScaledSize);
-            inlierCoverageB = ComputePointCoverage(inlierPointsB, featuresB.ScaledSize);
-
-            double inlierRatio = (double)inliers / good.Count;
-            if (inliers < options.MinInliers || inlierRatio < options.MinInlierRatio)
-            {
-                homography.Dispose();
-                homography = null;
-                return false;
-            }
-
-            return true;
         }
 
-        private static double ComputePointCoverage(IReadOnlyList<Point2f> points, Size size)
+        private static string ComputePixelSha256(byte[] pixels)
         {
-            if (points == null || points.Count < 4)
-            {
-                return 0;
-            }
-
-            float minX = points.Min(p => p.X);
-            float minY = points.Min(p => p.Y);
-            float maxX = points.Max(p => p.X);
-            float maxY = points.Max(p => p.Y);
-
-            double width = Math.Max(0, maxX - minX);
-            double height = Math.Max(0, maxY - minY);
-            double areaBox = width * height;
-            double areaAll = Math.Max(1, size.Width * size.Height);
-            return areaBox / areaAll;
+            byte[] hash = SHA256.HashData(pixels);
+            return Convert.ToHexString(hash).ToLowerInvariant();
         }
 
-        private static double ComputeMappedAreaRatio(Size sizeA, Size sizeB, Mat homographyBToA)
+        private static byte[] BuildThumbnailPreview(Mat rgb)
         {
-            var (_, mappedBox) = IsCrop(sizeA, sizeB, homographyBToA, 0.0);
-            double areaBox = Math.Max(0, mappedBox.Width) * Math.Max(0, mappedBox.Height);
-            double areaA = Math.Max(1, sizeA.Width * sizeA.Height);
-            return areaBox / areaA;
+            using Mat gray = new();
+            using Mat preview = new();
+            Cv2.CvtColor(rgb, gray, ColorConversionCodes.RGB2GRAY);
+            Cv2.Resize(gray, preview, new OpenCvSharp.Size(ThumbnailPreviewSize, ThumbnailPreviewSize), 0, 0, InterpolationFlags.Area);
+            return ReadMatBytes(preview);
         }
 
-        private static ulong ComputePHash64(Mat bgr)
+        private static (Mat Gray, double Scale) PrepareContainmentGray(Mat rgb, int maxDim)
         {
-            using var gray = new Mat();
-            Cv2.CvtColor(bgr, gray, ColorConversionCodes.BGR2GRAY);
+            using Mat gray = new();
+            Cv2.CvtColor(rgb, gray, ColorConversionCodes.RGB2GRAY);
 
-            using var resized = new Mat();
-            Cv2.Resize(gray, resized, new Size(32, 32), 0, 0, InterpolationFlags.Area);
-
-            using var f = new Mat();
-            resized.ConvertTo(f, MatType.CV_32F);
-
-            using var dct = new Mat();
-            Cv2.Dct(f, dct);
-
-            float[] vals = new float[64];
-            int idx = 0;
-            for (int y = 0; y < 8; y++)
+            int width = gray.Width;
+            int height = gray.Height;
+            double scale = Math.Min(1.0, maxDim / (double)Math.Max(width, height));
+            if (scale >= 1.0)
             {
-                for (int x = 0; x < 8; x++)
-                {
-                    vals[idx++] = dct.At<float>(y, x);
-                }
+                return (gray.Clone(), 1.0);
             }
 
-            float[] ac = new float[63];
-            Array.Copy(vals, 1, ac, 0, 63);
-            Array.Sort(ac);
-            float median = ac[31];
-
-            ulong hash = 0;
-            idx = 0;
-            for (int y = 0; y < 8; y++)
-            {
-                for (int x = 0; x < 8; x++)
-                {
-                    float v = vals[idx++];
-                    hash = (hash << 1) | (v > median ? 1UL : 0UL);
-                }
-            }
-
-            return hash;
+            int targetWidth = Math.Max(1, (int)Math.Round(width * scale));
+            int targetHeight = Math.Max(1, (int)Math.Round(height * scale));
+            Mat resized = new();
+            Cv2.Resize(gray, resized, new OpenCvSharp.Size(targetWidth, targetHeight), 0, 0, InterpolationFlags.Area);
+            return (resized, scale);
         }
 
-        private static ulong[] ComputePatchHashes(Mat bgr, int grid)
+        private static double ComputeCorrelation(IReadOnlyList<byte> left, IReadOnlyList<byte> right)
         {
-            if (grid < 2)
+            if (left.Count == 0 || right.Count == 0 || left.Count != right.Count)
             {
-                return Array.Empty<ulong>();
+                return 0.0;
             }
 
-            int maxGrid = Math.Min(bgr.Width, bgr.Height);
-            if (grid > maxGrid)
+            double leftMean = left.Average(value => value);
+            double rightMean = right.Average(value => value);
+            double numerator = 0.0;
+            double leftVariance = 0.0;
+            double rightVariance = 0.0;
+
+            for (int i = 0; i < left.Count; i++)
             {
-                grid = Math.Max(2, maxGrid);
+                double leftCentered = left[i] - leftMean;
+                double rightCentered = right[i] - rightMean;
+                numerator += leftCentered * rightCentered;
+                leftVariance += leftCentered * leftCentered;
+                rightVariance += rightCentered * rightCentered;
             }
 
-            int cellWidth = Math.Max(1, bgr.Width / grid);
-            int cellHeight = Math.Max(1, bgr.Height / grid);
-
-            var hashes = new List<ulong>();
-            AppendPatchHashes(bgr, 0, 0, cellWidth, cellHeight, hashes);
-
-            int offsetX = cellWidth / 2;
-            int offsetY = cellHeight / 2;
-            if (offsetX > 0 && offsetY > 0)
+            double denominator = Math.Sqrt(leftVariance * rightVariance);
+            if (denominator <= 1e-12)
             {
-                AppendPatchHashes(bgr, offsetX, offsetY, cellWidth, cellHeight, hashes);
+                return left.SequenceEqual(right) ? 1.0 : 0.0;
             }
 
-            return hashes.ToArray();
+            return numerator / denominator;
         }
 
-        private static void AppendPatchHashes(Mat bgr, int startX, int startY, int cellWidth, int cellHeight, List<ulong> hashes)
+        private static byte[] ReadMatBytes(Mat mat)
         {
-            for (int y = startY; y + cellHeight <= bgr.Height; y += cellHeight)
+            if (mat.Empty())
             {
-                for (int x = startX; x + cellWidth <= bgr.Width; x += cellWidth)
-                {
-                    using var roi = new Mat(bgr, new Rect(x, y, cellWidth, cellHeight));
-                    hashes.Add(ComputePHash64(roi));
-                }
-            }
-        }
-
-        private static double ComputeSharpness(Mat bgr)
-        {
-            using var gray = new Mat();
-            Cv2.CvtColor(bgr, gray, ColorConversionCodes.BGR2GRAY);
-
-            using var lap = new Mat();
-            Cv2.Laplacian(gray, lap, MatType.CV_64F);
-
-            Cv2.MeanStdDev(lap, out _, out var stddev);
-            double sigma = stddev.Val0;
-            return sigma * sigma;
-        }
-
-        private static ushort[] GetHashParts(ulong hash)
-        {
-            return new[]
-            {
-                (ushort)(hash >> 48),
-                (ushort)(hash >> 32),
-                (ushort)(hash >> 16),
-                (ushort)hash
-            };
-        }
-
-        private static int HammingDistance(ulong a, ulong b)
-        {
-            return BitOperations.PopCount(a ^ b);
-        }
-
-        private sealed class OrbFeatureCache : IDisposable
-        {
-            private readonly Dictionary<int, OrbFeatureData> _cache = new Dictionary<int, OrbFeatureData>();
-
-            public OrbFeatureData? GetOrCreate(int index, Func<OrbFeatureData?> factory)
-            {
-                if (_cache.TryGetValue(index, out var existing))
-                {
-                    return existing;
-                }
-
-                var created = factory();
-                if (created != null)
-                {
-                    _cache[index] = created;
-                }
-
-                return created;
+                return Array.Empty<byte>();
             }
 
-            public void Dispose()
+            int byteCount = checked((int)(mat.Total() * mat.ElemSize()));
+            if (byteCount == 0)
             {
-                foreach (var entry in _cache.Values)
-                {
-                    entry.Dispose();
-                }
-
-                _cache.Clear();
+                return Array.Empty<byte>();
             }
+
+            byte[] bytes = new byte[byteCount];
+            Marshal.Copy(mat.Data, bytes, 0, byteCount);
+            return bytes;
         }
 
-        private sealed class OrbFeatureData : IDisposable
+        private static string[] BuildScaleRange(int startPercent, int endPercent, int stepPercent)
         {
-            public OrbFeatureData(KeyPoint[] keyPoints, Mat descriptors, double scale, Size scaledSize)
-            {
-                KeyPoints = keyPoints;
-                Descriptors = descriptors;
-                Scale = scale;
-                ScaledSize = scaledSize;
-            }
-
-            public KeyPoint[] KeyPoints { get; }
-            public Mat Descriptors { get; }
-            public double Scale { get; }
-            public Size ScaledSize { get; }
-
-            public void Dispose()
-            {
-                Descriptors.Dispose();
-            }
+            return Enumerable.Range(0, ((endPercent - startPercent) / stepPercent) + 1)
+                .Select(index => ((startPercent + index * stepPercent) / 100.0).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))
+                .ToArray();
         }
 
-        private sealed class ImageItem
+        private sealed class LoadedImage : IDisposable
         {
-            public ImageItem(string path, int width, int height, long fileSize, double sharpness, ulong fullHash, ulong[] patchHashes)
+            public LoadedImage(string path, int width, int height, string pixelSha256, Mat rgb)
             {
                 Path = path;
+                Name = System.IO.Path.GetFileName(path);
                 Width = width;
                 Height = height;
-                FileSize = fileSize;
-                Sharpness = sharpness;
-                FullHash = fullHash;
-                PatchHashes = patchHashes;
-
-                AllHashes = patchHashes.Length == 0
-                    ? new[] { fullHash }
-                    : new[] { fullHash }.Concat(patchHashes).ToArray();
+                PixelSha256 = pixelSha256;
+                Rgb = rgb;
             }
 
             public string Path { get; }
+            public string Name { get; }
             public int Width { get; }
             public int Height { get; }
-            public long FileSize { get; }
-            public double Sharpness { get; }
-            public ulong FullHash { get; }
-            public ulong[] PatchHashes { get; }
-            public ulong[] AllHashes { get; }
+            public string PixelSha256 { get; }
+            public Mat Rgb { get; }
+            public long Area => (long)Width * Height;
+            public double AspectRatio => Width / (double)Height;
 
-            public int PixelCount => Width * Height;
+            public byte[]? ThumbnailPreview { get; private set; }
+            public Mat? ContainmentGray { get; private set; }
+            public double ContainmentScale { get; private set; }
+            public Mat? ContainmentRecallGray { get; private set; }
+            public double ContainmentRecallScale { get; private set; }
+
+            public void EnsureDerivedViews()
+            {
+                ThumbnailPreview ??= BuildThumbnailPreview(Rgb);
+
+                if (ContainmentGray is null)
+                {
+                    (ContainmentGray, ContainmentScale) = PrepareContainmentGray(Rgb, 1200);
+                }
+
+                if (ContainmentRecallGray is null)
+                {
+                    (ContainmentRecallGray, ContainmentRecallScale) = PrepareContainmentGray(Rgb, 256);
+                }
+            }
+
+            public void Dispose()
+            {
+                Rgb.Dispose();
+                ContainmentGray?.Dispose();
+                ContainmentRecallGray?.Dispose();
+            }
         }
+
+        private sealed class CachedRecord
+        {
+            [JsonProperty("file_size")]
+            public long FileSize { get; set; }
+
+            [JsonProperty("mtime_ns")]
+            public long MtimeNs { get; set; }
+
+            [JsonProperty("width")]
+            public int Width { get; set; }
+
+            [JsonProperty("height")]
+            public int Height { get; set; }
+
+            [JsonProperty("pixel_sha256")]
+            public string PixelSha256 { get; set; } = string.Empty;
+        }
+
+        private sealed record ClassificationEntry(
+            string SrcPath,
+            string ClassName,
+            string? ParentName,
+            string GroupId,
+            double Score,
+            string Reason);
+
+        private sealed record ClassificationResult(
+            Dictionary<string, ClassificationEntry> Entries,
+            Dictionary<string, int> ClassCounts,
+            string ComputeBackend,
+            Dictionary<string, double> StageTimings,
+            double TotalElapsed);
     }
 }

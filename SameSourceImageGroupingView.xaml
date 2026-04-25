@@ -7,7 +7,7 @@
              xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="820">
-    <UserControl.Resources>
+        <UserControl.Resources>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
     <Grid>
@@ -15,12 +15,11 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <GroupBox Header="文件夹选择" Grid.Row="0" Margin="5">
+        <GroupBox Header="路径选择" Grid.Row="0" Margin="5">
             <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -28,12 +27,23 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Label Content="输入文件夹:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
-                    <Button Content="浏览..." Command="{Binding SelectInputCommand}" Grid.Column="2" Padding="10,2"/>
+                    <Label Content="输入路径:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             IsReadOnly="{Binding HasInheritedInputPath}"
+                             Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
+                    <Button Content="..." Command="{Binding SelectInputCommand}" Grid.Column="2" Padding="10,2"
+                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                 </Grid>
+                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Foreground="Gray" Margin="0,4,0,0"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <CheckBox Content="执行完成后清空输入路径文件夹"
+                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
+                          Margin="0,6,0,0"
+                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
                 <StackPanel Margin="0,5,0,0">
-                    <Label Content="输出文件夹:" Grid.Column="0" VerticalAlignment="Center"
+                    <Label Content="输出路径:" Grid.Column="0" VerticalAlignment="Center"
                            Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -42,175 +52,54 @@
                         </Grid.ColumnDefinitions>
                         <TextBox Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="0" Margin="5,0" VerticalAlignment="Center"
                                  Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                        <Button Content="浏览..." Command="{Binding SelectOutputCommand}" Grid.Column="1" Padding="10,2"
+                        <Button Content="..." Command="{Binding SelectOutputCommand}" Grid.Column="1" Padding="10,2"
                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                     </Grid>
-                    <TextBlock Text="工作流模式下输出目录自动生成：父目录/NN-节点名"
+                    <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
                                Foreground="Gray" Margin="0,4,0,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </StackPanel>
-                <TextBlock Text="程序会在输出目录下自动创建: 原图 / 被包含 / 缩略图 / 差分 / 未知"
+                <TextBlock Text="程序会在输出路径自动生成: 原图 / 缩略图 / 副本 / 被包含 / 差分 / 其他"
                            Margin="0,6,0,0"
                            Foreground="Gray"
                            TextWrapping="Wrap"/>
-                <TextBlock Text="输出目录必须与输入目录分离，不能放在输入目录里"
+                <TextBlock Text="输出路径必须与输入路径分离，不能放在输入路径里"
                            Margin="0,2,0,0"
                            Foreground="Gray"
                            TextWrapping="Wrap"/>
             </StackPanel>
         </GroupBox>
 
-        <GroupBox Header="过程设置" Grid.Row="1" Margin="5">
+        <GroupBox Header="计算设备" Grid.Row="1" Margin="5">
             <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <CheckBox Content="包含子文件夹" IsChecked="{Binding IncludeSubfolders}" Margin="0,0,20,0"/>
-                    <CheckBox Content="匹配后跳过较小图(加速,可能漏检)" IsChecked="{Binding SkipMatchedNonRoot}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <CheckBox Content="启用裁剪候选(分块Hash)" IsChecked="{Binding EnablePatchHash}" Margin="0,0,20,0"/>
-                    <CheckBox Content="启用哈希直接判定(快,可能误判)" IsChecked="{Binding EnableHashMatch}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <CheckBox Content="启用ORB几何匹配" IsChecked="{Binding EnableOrbMatch}" Margin="0,0,20,0"/>
-                    <CheckBox Content="启用模板匹配" IsChecked="{Binding EnableTemplateMatch}"/>
-                </StackPanel>
-
-                <Expander Header="输出分类设置" IsExpanded="True" Margin="0,6,0,0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <CheckBox Content="同步Danbooru标签到原图txt" IsChecked="{Binding SyncDanbooruTagsToRoot}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Expander>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="设备:" Grid.Column="0" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding ComputeBackendOptions}"
+                              SelectedItem="{Binding ComputeBackend, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              Grid.Column="1"
+                              Margin="5,0"/>
+                </Grid>
+                <TextBlock Text="auto：优先尝试 GPU，失败时回退到 CPU；cuda：必须可用；cpu：强制 CPU。"
+                           Foreground="Gray"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0"/>
             </StackPanel>
         </GroupBox>
 
-        <GroupBox Header="参数设置" Grid.Row="2" Margin="5">
-            <StackPanel>
-                <Grid Margin="0,5,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                    </Grid.ColumnDefinitions>
-                    <Label Content="pHash阈值:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding PhashThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                    <Label Content="裁剪Hash阈值:" Grid.Column="2" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding PatchPhashThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                </Grid>
-
-                <Grid Margin="0,5,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                    </Grid.ColumnDefinitions>
-                    <Label Content="裁剪面积阈值:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding CropAreaRatioThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                    <Label Content="低清比例阈值:" Grid.Column="2" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding LowResRatioThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                    <Label Content="修改差异阈值:" Grid.Column="4" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding EditedDiffRatioThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="5" Margin="5,0"/>
-                </Grid>
-
-                <Expander Header="高级参数" IsExpanded="False" Margin="0,5,0,0">
-                    <StackPanel>
-                        <Grid Margin="0,5,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-                            <Label Content="ORB最大边:" Grid.Column="0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding OrbMaxSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                            <Label Content="ORB特征数:" Grid.Column="2" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding OrbFeatures, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                        </Grid>
-
-                        <Grid Margin="0,5,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-                            <Label Content="最少匹配数:" Grid.Column="0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding MinGoodMatches, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                            <Label Content="最少内点数:" Grid.Column="2" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding MinInliers, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                        </Grid>
-
-                        <Grid Margin="0,5,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-                            <Label Content="低清Hash阈值:" Grid.Column="0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding LowResHashThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                            <Label Content="模板阈值:" Grid.Column="2" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding TemplateMatchThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                        </Grid>
-
-                        <Grid Margin="0,5,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-                            <Label Content="模板最大边:" Grid.Column="0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding TemplateMaxSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                            <Label Content="模板最小边:" Grid.Column="2" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding TemplateMinSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                        </Grid>
-
-                        <Grid Margin="0,5,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-                            <Label Content="内点比例阈值:" Grid.Column="0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding MinInlierRatio, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                            <Label Content="差异检测尺寸:" Grid.Column="2" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding DiffCheckSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="3" Margin="5,0"/>
-                            <Label Content="差异像素阈值:" Grid.Column="4" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding DiffPixelThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="5" Margin="5,0"/>
-                        </Grid>
-
-                        <Grid Margin="0,5,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-                            <Label Content="单图候选上限(0不限):" Grid.Column="0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding MaxCandidatesPerImage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="5,0"/>
-                        </Grid>
-                    </StackPanel>
-                </Expander>
-            </StackPanel>
-        </GroupBox>
-
-        <StackPanel Grid.Row="3" Margin="5">
+        <StackPanel Grid.Row="2" Margin="5">
             <Button Content="开始归类" Command="{Binding StartCommand}" Padding="5"/>
         </StackPanel>
 
-        <GroupBox Header="日志和结果" Grid.Row="4" Margin="5">
+        <GroupBox Header="日志和结果" Grid.Row="3" Margin="5">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <TextBox Text="{Binding Log}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="100"/>
+                <TextBox Text="{Binding Log}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="120"/>
             </ScrollViewer>
         </GroupBox>
 
-        <ProgressBar Value="{Binding Progress}" Maximum="100" Grid.Row="5" Margin="5" Height="20"/>
+        <ProgressBar Value="{Binding Progress}" Maximum="100" Grid.Row="4" Margin="5" Height="20"/>
     </Grid>
 </UserControl>

@@ -28,6 +28,8 @@ namespace CyanTools.ViewModel
         private bool _isProcessing;
         private double _progressValue;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -129,6 +131,18 @@ namespace CyanTools.ViewModel
             set => SetField(ref _isWorkflowMode, value);
         }
 
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set => SetField(ref _hasInheritedInputPath, value);
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set => SetField(ref _shouldClearInputDirectoryAfterCompletion, value);
+        }
+
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
         public string PipelineInputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
         public string PipelineOutputPath { get => OutputPath; set => OutputPath = value ?? string.Empty; }
@@ -220,11 +234,13 @@ namespace CyanTools.ViewModel
             };
 
             var progress = new Progress<double>(value => ProgressValue = value);
+            bool success = false;
 
             try
             {
                 token.ThrowIfCancellationRequested();
                 await ImageScalingProcessor.ProcessFolderAsync(options, progress, AppendLog);
+                success = true;
                 ProgressValue = 100;
                 AppendLog("处理完成。");
                 pipelineLog?.Invoke("处理完成。");
@@ -241,8 +257,25 @@ namespace CyanTools.ViewModel
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion(pipelineLog);
+                }
+
                 IsProcessing = false;
             }
+        }
+
+        private void TryClearInputDirectoryAfterCompletion(Action<string>? pipelineLog)
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
+            AppendLog(result.Message);
+            pipelineLog?.Invoke(result.Message);
         }
 
         private bool ValidateInput(bool showDialogs, out string errorMessage)

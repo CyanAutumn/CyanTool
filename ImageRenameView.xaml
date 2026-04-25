@@ -3,9 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -15,16 +19,26 @@
         </Grid.RowDefinitions>
 
         <GroupBox Header="路径选择" Grid.Row="0" Margin="0,0,0,10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5" />
-                <TextBox Grid.Column="1" Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
-                <Button Grid.Column="2" Content="选择..." Command="{Binding SelectInputPathCommand}" Margin="5" Padding="12,4" />
-            </Grid>
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5" />
+                    <TextBox Grid.Column="1"
+                             Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
+                             IsReadOnly="{Binding HasInheritedInputPath}"
+                             Margin="5" />
+                    <Button Grid.Column="2" Content="..." Command="{Binding SelectInputPathCommand}" Margin="5" Padding="12,4"
+                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
+                </Grid>
+                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Foreground="Gray" Margin="5,0,5,5"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </StackPanel>
         </GroupBox>
 
         <GroupBox Header="命名规则" Grid.Row="1" Margin="0,0,0,10">

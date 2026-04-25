@@ -261,6 +261,8 @@ namespace CyanTools.ViewModel
 
         private bool _isClustering;
         private bool _isWorkflowMode;
+        private bool _hasInheritedInputPath;
+        private bool _shouldClearInputDirectoryAfterCompletion;
         public bool IsClustering
         {
             get => _isClustering;
@@ -277,6 +279,18 @@ namespace CyanTools.ViewModel
         {
             get => _isWorkflowMode;
             set => SetField(ref _isWorkflowMode, value);
+        }
+
+        public bool HasInheritedInputPath
+        {
+            get => _hasInheritedInputPath;
+            set => SetField(ref _hasInheritedInputPath, value);
+        }
+
+        public bool ShouldClearInputDirectoryAfterCompletion
+        {
+            get => _shouldClearInputDirectoryAfterCompletion;
+            set => SetField(ref _shouldClearInputDirectoryAfterCompletion, value);
         }
 
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
@@ -330,7 +344,8 @@ namespace CyanTools.ViewModel
                 SelectedAlgorithm = SelectedAlgorithm,
                 SelectedFeatureType = SelectedFeatureType,
                 SelectedClusteringSpace = SelectedClusteringSpace,
-                SelectedComputeDevice = SelectedComputeDevice
+                SelectedComputeDevice = SelectedComputeDevice,
+                ShouldClearInputDirectoryAfterCompletion = ShouldClearInputDirectoryAfterCompletion
             };
         }
 
@@ -585,6 +600,7 @@ namespace CyanTools.ViewModel
             IsClustering = true;
             Progress = 0;
             Log = string.Empty;
+            bool success = false;
 
             try
             {
@@ -593,15 +609,31 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                await Task.Run(() => RunClusteringWork(showDialogs, token), token);
+                success = await Task.Run(() => RunClusteringWork(showDialogs, token), token);
             }
             finally
             {
+                if (success)
+                {
+                    TryClearInputDirectoryAfterCompletion();
+                }
+
                 IsClustering = false;
             }
         }
 
-        private void RunClusteringWork(bool showDialogs, CancellationToken token)
+        private void TryClearInputDirectoryAfterCompletion()
+        {
+            if (!ShouldClearInputDirectoryAfterCompletion)
+            {
+                return;
+            }
+
+            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
+            AppendLog(result.Message);
+        }
+
+        private bool RunClusteringWork(bool showDialogs, CancellationToken token)
         {
             try
             {
@@ -614,19 +646,19 @@ namespace CyanTools.ViewModel
                 string outputPathFull = NormalizeDirectoryPath(OutputPath);
                 if (inputPathFull.Equals(outputPathFull, StringComparison.OrdinalIgnoreCase))
                 {
-                    const string samePathMessage = "输入目录与输出目录不能相同，请将输出目录设置为其它路径。";
+                    const string samePathMessage = "输入路径与输出路径不能相同，请将输出路径设置为其它路径。";
                     AppendLog(samePathMessage);
                     if (showDialogs)
                     {
                         Application.Current.Dispatcher.Invoke(() =>
                             MessageBox.Show(samePathMessage, "参数错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
-                    return;
+                    return false;
                 }
 
                 if (IsSameOrSubDirectory(outputPathFull, inputPathFull))
                 {
-                    AppendLog("检测到输出目录位于输入目录内，已自动在特征提取阶段排除输出目录，避免旧结果污染聚类。");
+                    AppendLog("检测到输出路径位于输入路径内，已自动在特征提取阶段排除输出路径，避免旧结果污染聚类。");
                 }
 
                 bool useGpu = SelectedComputeDevice.Equals("GPU", StringComparison.OrdinalIgnoreCase);
@@ -671,7 +703,7 @@ namespace CyanTools.ViewModel
                             MessageBox.Show("未成功处理任何图片，请检查图片格式或模型是否正确。", "信息",
                                 MessageBoxButton.OK, MessageBoxImage.Information));
                     }
-                    return;
+                    return false;
                 }
 
                 bool useStyleBrushSpace = SelectedClusteringSpace.Equals(ClusteringSpaceStyleBrushDisplay, StringComparison.Ordinal);
@@ -1034,6 +1066,7 @@ namespace CyanTools.ViewModel
                         ShowClusteringCompletionDialog(outputRoot, distributionImagePath, imageResults.Count, assignments, exportPlan.UncertainIndices.Count);
                     }
                 });
+                return true;
             }
             finally
             {
@@ -1855,7 +1888,7 @@ namespace CyanTools.ViewModel
                             skippedCount++;
                             Application.Current.Dispatcher.Invoke(() =>
                             {
-                                Log += $"警告: 文件 {fileName} 已存在于目标文件夹，已跳过。\n";
+                                Log += $"警告: 文件 {fileName} 已存在于目标路径，已跳过。\n";
                             });
                         }
                         else
@@ -1985,7 +2018,7 @@ namespace CyanTools.ViewModel
         {
             if (Directory.Exists(outputRoot))
             {
-                AppendLog($"检测到已有输出目录，先清理旧结果: {outputRoot}");
+                AppendLog($"检测到已有输出路径，先清理旧结果: {outputRoot}");
 
                 if (!TryDeleteDirectoryWithRetry(outputRoot, maxRetries: 6, delayMilliseconds: 400, out Exception? deleteError))
                 {
@@ -1993,12 +2026,12 @@ namespace CyanTools.ViewModel
                     try
                     {
                         Directory.Move(outputRoot, backupPath);
-                        AppendLog($"旧输出目录被占用，已重命名为: {backupPath}");
+                        AppendLog($"旧输出路径被占用，已重命名为: {backupPath}");
                     }
                     catch (Exception moveEx)
                     {
                         throw new IOException(
-                            $"无法清理旧输出目录: {outputRoot}，请关闭占用该目录的程序后重试。",
+                            $"无法清理旧输出路径: {outputRoot}，请关闭占用该路径的程序后重试。",
                             new AggregateException(deleteError ?? moveEx, moveEx));
                     }
                 }

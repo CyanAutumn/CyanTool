@@ -4,9 +4,13 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CyanTools"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,15 +22,24 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="1" Orientation="Vertical">
-            <TextBlock Text="输入目录："/>
+            <TextBlock Text="输入路径："/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
-                <Button Grid.Column="1" Content="浏览..." Command="{Binding BrowseInputCommand}" Padding="10,5"/>
+                <TextBox Grid.Column="0"
+                         Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="{Binding HasInheritedInputPath}"
+                         Margin="0,0,5,0"
+                         VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="..." Command="{Binding BrowseInputCommand}" Padding="10,5"
+                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
             </Grid>
+            <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                       Foreground="Gray" Margin="0,4,0,0"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,10,0,0">
