@@ -26,8 +26,16 @@
   <ItemGroup>
     <Compile Include="../Utils/SameSourceImageGroupingProcessor.cs" Link="Utils/SameSourceImageGroupingProcessor.cs" />
     <Compile Include="../Utils/InputDirectoryCleanupHelper.cs" Link="Utils/InputDirectoryCleanupHelper.cs" />
+    <Compile Include="../Utils/ImageRenamePipelineProcessor.cs" Link="Utils/ImageRenamePipelineProcessor.cs" />
+    <Compile Include="../Utils/KeepFilesPipelineProcessor.cs" Link="Utils/KeepFilesPipelineProcessor.cs" />
+    <Compile Include="../Utils/KeepFilesRetentionPolicy.cs" Link="Utils/KeepFilesRetentionPolicy.cs" />
+    <Compile Include="../Utils/ResolutionFilterPipelineProcessor.cs" Link="Utils/ResolutionFilterPipelineProcessor.cs" />
     <Compile Include="../Utils/SiblingDirectoryPathBuilder.cs" Link="Utils/SiblingDirectoryPathBuilder.cs" />
+    <Compile Include="../Utils/TagCategoryOptions.cs" Link="Utils/TagCategoryOptions.cs" />
+    <Compile Include="../Utils/TaggingPipelineExecutor.cs" Link="Utils/TaggingPipelineExecutor.cs" />
+    <Compile Include="../Utils/TrainingSetBalancerPipelineProcessor.cs" Link="Utils/TrainingSetBalancerPipelineProcessor.cs" />
     <Compile Include="../Utils/TagTextMergeHelper.cs" Link="Utils/TagTextMergeHelper.cs" />
+    <Compile Include="../Utils/VideoFrameWorkflowPlanner.cs" Link="Utils/VideoFrameWorkflowPlanner.cs" />
     <Compile Include="../Utils/ToolOutputDirectoryDefaults.cs" Link="Utils/ToolOutputDirectoryDefaults.cs" />
     <Compile Include="../Framework/Pipeline/PipelineContext.cs" Link="Framework/Pipeline/PipelineContext.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineSnapshotProvider.cs" Link="Framework/Pipeline/IPipelineSnapshotProvider.cs" />
