@@ -30,6 +30,9 @@
         <DataTemplate DataType="{x:Type viewModel:KeepFilesPipelineNode}">
             <local:KeepFilesView DataContext="{Binding Inner}" />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModel:FolderProcessingPipelineNode}">
+            <local:FolderProcessingView DataContext="{Binding Inner}" />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewModel:ExportVideoFramePipelineNode}">
             <local:ExportVideoFrameView DataContext="{Binding Inner}" />
         </DataTemplate>

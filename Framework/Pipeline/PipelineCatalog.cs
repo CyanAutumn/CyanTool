@@ -44,6 +44,7 @@ namespace CyanTools.Pipeline
             Register(new PipelineNodeDescriptor("图片三分法", typeof(ThreeStagePipelineNode), () => new ThreeStagePipelineNode()));
             Register(new PipelineNodeDescriptor("分辨率筛选", typeof(ResolutionFilterPipelineNode), () => new ResolutionFilterPipelineNode()));
             Register(new PipelineNodeDescriptor("保留指定文件", typeof(KeepFilesPipelineNode), () => new KeepFilesPipelineNode()));
+            Register(new PipelineNodeDescriptor("文件夹处理", typeof(FolderProcessingPipelineNode), () => new FolderProcessingPipelineNode()));
             Register(new PipelineNodeDescriptor("导出视频帧", typeof(ExportVideoFramePipelineNode), () => new ExportVideoFramePipelineNode()));
             Register(new PipelineNodeDescriptor("高斯模糊", typeof(GaussianBlurPipelineNode), () => new GaussianBlurPipelineNode()));
             Register(new PipelineNodeDescriptor("格式转换", typeof(ConvertImageFormatPipelineNode), () => new ConvertImageFormatPipelineNode()));

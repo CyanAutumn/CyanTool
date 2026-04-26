@@ -99,6 +99,11 @@ namespace CyanTools.ViewModel
         }
     }
 
+    public sealed class FolderProcessingPipelineNode : CyanTools.Pipeline.SimplePipelineNode<FolderProcessingViewModel>
+    {
+        public FolderProcessingPipelineNode() : base("文件夹处理") { }
+    }
+
     public sealed class ExportVideoFramePipelineNode : CyanTools.Pipeline.SimplePipelineNode<ExportVideoFrameViewModel>, IPipelineDirectoryNode
     {
         public ExportVideoFramePipelineNode() : base("导出视频帧") { }

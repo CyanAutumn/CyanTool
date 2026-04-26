@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -121,6 +122,91 @@ public sealed class WorkflowNodeExecutionHelperTests : IDisposable
     }
 
     [Fact]
+    public async Task FolderProcessingPipelineProcessor_FlattensNestedFilesAndDeletesEmptyDirectories()
+    {
+        string inputPath = CreateDirectory("folder-processing-flatten");
+        string nestedPath = Directory.CreateDirectory(Path.Combine(inputPath, "group", "leaf")).FullName;
+        await File.WriteAllTextAsync(Path.Combine(nestedPath, "inner.txt"), "content");
+
+        await FolderProcessingPipelineProcessor.ExecuteAsync(
+            inputPath,
+            new FolderProcessingOptions
+            {
+                Operation = FolderProcessingOperation.MoveFilesToTopLevel
+            },
+            _ => { },
+            CancellationToken.None);
+
+        Assert.True(File.Exists(Path.Combine(inputPath, "inner.txt")));
+        Assert.False(Directory.Exists(Path.Combine(inputPath, "group")));
+    }
+
+    [Fact]
+    public async Task FolderProcessingPipelineProcessor_DeletesEmptyDirectoriesRecursively()
+    {
+        string inputPath = CreateDirectory("folder-processing-empty");
+        Directory.CreateDirectory(Path.Combine(inputPath, "empty", "leaf"));
+        string keepPath = Directory.CreateDirectory(Path.Combine(inputPath, "keep", "child")).FullName;
+        await File.WriteAllTextAsync(Path.Combine(keepPath, "file.txt"), "content");
+
+        await FolderProcessingPipelineProcessor.ExecuteAsync(
+            inputPath,
+            new FolderProcessingOptions
+            {
+                Operation = FolderProcessingOperation.DeleteEmptyDirectories
+            },
+            _ => { },
+            CancellationToken.None);
+
+        Assert.False(Directory.Exists(Path.Combine(inputPath, "empty")));
+        Assert.True(Directory.Exists(Path.Combine(inputPath, "keep")));
+    }
+
+    [Fact]
+    public async Task FolderProcessingPipelineProcessor_RetainsKeywordDirectoriesAndAncestors()
+    {
+        string inputPath = CreateDirectory("folder-processing-keyword");
+        Directory.CreateDirectory(Path.Combine(inputPath, "drop-me"));
+        Directory.CreateDirectory(Path.Combine(inputPath, "parent", "keep-cat"));
+        await File.WriteAllTextAsync(Path.Combine(inputPath, "root-note.txt"), "stay");
+
+        await FolderProcessingPipelineProcessor.ExecuteAsync(
+            inputPath,
+            new FolderProcessingOptions
+            {
+                Operation = FolderProcessingOperation.RetainDirectoriesByKeyword,
+                ParameterText = "cat"
+            },
+            _ => { },
+            CancellationToken.None);
+
+        Assert.True(Directory.Exists(Path.Combine(inputPath, "parent")));
+        Assert.True(Directory.Exists(Path.Combine(inputPath, "parent", "keep-cat")));
+        Assert.False(Directory.Exists(Path.Combine(inputPath, "drop-me")));
+        Assert.True(File.Exists(Path.Combine(inputPath, "root-note.txt")));
+    }
+
+    [Fact]
+    public async Task FolderProcessingPipelineProcessor_ExtractsArchivesIntoSameNameFolderAndKeepsArchive()
+    {
+        string inputPath = CreateDirectory("folder-processing-extract");
+        string archivePath = Path.Combine(inputPath, "sample.zip");
+        CreateZipArchive(archivePath, ("nested/file.txt", "hello"));
+
+        await FolderProcessingPipelineProcessor.ExecuteAsync(
+            inputPath,
+            new FolderProcessingOptions
+            {
+                Operation = FolderProcessingOperation.ExtractArchives
+            },
+            _ => { },
+            CancellationToken.None);
+
+        Assert.True(File.Exists(archivePath));
+        Assert.True(File.Exists(Path.Combine(inputPath, "sample", "nested", "file.txt")));
+    }
+
+    [Fact]
     public async Task TaggingPipelineExecutor_UsesProvidedOptionsAndReportsProgress()
     {
         var processor = new FakeTaggingPipelineProcessor();
@@ -215,6 +301,17 @@ public sealed class WorkflowNodeExecutionHelperTests : IDisposable
     {
         using var image = new Image<Rgba32>(width, height);
         image.Save(path);
+    }
+
+    private static void CreateZipArchive(string archivePath, params (string EntryPath, string Content)[] entries)
+    {
+        using ZipArchive archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
+        foreach ((string entryPath, string content) in entries)
+        {
+            ZipArchiveEntry entry = archive.CreateEntry(entryPath);
+            using StreamWriter writer = new StreamWriter(entry.Open());
+            writer.Write(content);
+        }
     }
 
     private sealed class FakeTaggingPipelineProcessor : ITaggingPipelineProcessor

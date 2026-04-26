@@ -20,10 +20,13 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+    <PackageReference Include="SharpCompress" Version="0.36.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Utils/FolderProcessingOperation.cs" Link="Utils/FolderProcessingOperation.cs" />
+    <Compile Include="../Utils/FolderProcessingPipelineProcessor.cs" Link="Utils/FolderProcessingPipelineProcessor.cs" />
     <Compile Include="../Utils/SameSourceImageGroupingProcessor.cs" Link="Utils/SameSourceImageGroupingProcessor.cs" />
     <Compile Include="../Utils/InputDirectoryCleanupHelper.cs" Link="Utils/InputDirectoryCleanupHelper.cs" />
     <Compile Include="../Utils/ImageRenamePipelineProcessor.cs" Link="Utils/ImageRenamePipelineProcessor.cs" />
