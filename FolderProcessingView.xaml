@@ -89,7 +89,7 @@
                 IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}"/>
 
         <TextBox Grid.Row="3"
-                 Text="{Binding LogText}"
+                 Text="{Binding LogText, Mode=OneWay}"
                  IsReadOnly="True"
                  AcceptsReturn="True"
                  TextWrapping="Wrap"

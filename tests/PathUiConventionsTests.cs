@@ -272,6 +272,20 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void FolderProcessingView_LogTextBindingIsOneWay()
+    {
+        string content = ReadRepoFile("FolderProcessingView.xaml");
+
+        Match logTextBox = Regex.Match(
+            content,
+            "<TextBox[^>]*Text=\"\\{Binding LogText[^\\\"]*\\}\"[^>]*/>",
+            RegexOptions.Singleline);
+
+        Assert.True(logTextBox.Success);
+        Assert.Contains("Mode=OneWay", logTextBox.Value);
+    }
+
+    [Fact]
     public void SimplePipelineNode_ForwardsInnerPropertyChangedEvents()
     {
         string content = ReadRepoFile(Path.Combine("Framework", "Pipeline", "SimplePipelineNode.cs"));
