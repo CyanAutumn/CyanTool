@@ -205,8 +205,6 @@ namespace CyanTools.ViewModel
             }
 
             var index = CanvasNodes.IndexOf(canvasNode);
-            canvasNode.PropertyChanged -= OnCanvasNodePropertyChanged;
-            canvasNode.Dispose();
             CanvasNodes.Remove(canvasNode);
 
             SelectedCanvasNode = CanvasNodes.ElementAtOrDefault(Math.Max(index - 1, 0));
@@ -495,7 +493,8 @@ namespace CyanTools.ViewModel
 
         private void CompleteConnection(object parameter)
         {
-            TryCreateConnection(PendingConnection.Source, PendingConnection.Target, logFailures: true);
+            var target = parameter as PipelineCanvasConnectorViewModel ?? PendingConnection.Target;
+            TryCreateConnection(PendingConnection.Source, target, logFailures: true);
             PendingConnection.Source = null;
             PendingConnection.Target = null;
             PendingConnection.IsVisible = false;
@@ -763,11 +762,19 @@ namespace CyanTools.ViewModel
 
         private void ReplacePipelineNodes(IEnumerable<PipelineNodeViewModelBase> nodes)
         {
+            var replacementNodes = nodes.ToList();
+            var previousNodes = PipelineNodes.ToList();
+
             _isRebuildingPipelineNodes = true;
             try
             {
+                foreach (var node in previousNodes)
+                {
+                    DetachNode(node);
+                }
+
                 PipelineNodes.Clear();
-                foreach (var node in nodes)
+                foreach (var node in replacementNodes)
                 {
                     PipelineNodes.Add(node);
                 }
