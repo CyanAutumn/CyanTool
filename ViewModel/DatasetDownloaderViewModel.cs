@@ -58,6 +58,7 @@ namespace CyanTools.ViewModel
         private static readonly string PixivRefreshTokenFilePath = Path.Combine(PixivRefreshTokenDirectory, "pixiv_refresh_token.txt");
         private static readonly TimeSpan DanbooruDownloadDelay = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan KemonoDownloadDelay = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan PixivAccessTokenRefreshLeadTime = TimeSpan.FromMinutes(5);
         private static readonly string[] PixivContentTypes = { "illust", "manga" };
 
         private static readonly JsonSerializerOptions SettingsSerializerOptions = new()
@@ -110,6 +111,7 @@ namespace CyanTools.ViewModel
         private PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot? _activeRunOutputRootSnapshot;
         private Action<string>? _pipelineLogSink;
         private string? _pixivAccessToken;
+        private DateTimeOffset _pixivAccessTokenExpiresAtUtc = DateTimeOffset.MinValue;
         private string _runtimeOutputPath = string.Empty;
         private string _inputText = string.Empty;
         private string _danbooruToken = string.Empty;
@@ -527,6 +529,7 @@ namespace CyanTools.ViewModel
 
                 PixivRefreshToken = tokenResponse.RefreshToken;
                 _pixivAccessToken = tokenResponse.AccessToken;
+                UpdatePixivAccessTokenExpiry(tokenResponse);
                 await SavePixivRefreshTokenAsync();
                 AppendLog("[Pixiv] 刷新令牌已更新。");
             }
@@ -1166,15 +1169,17 @@ namespace CyanTools.ViewModel
             }
 
             _pixivAccessToken = tokenResponse.AccessToken;
+            UpdatePixivAccessTokenExpiry(tokenResponse);
             if (!string.IsNullOrWhiteSpace(tokenResponse.RefreshToken) && tokenResponse.RefreshToken != PixivRefreshToken)
             {
                 PixivRefreshToken = tokenResponse.RefreshToken;
+                await SavePixivRefreshTokenAsync();
             }
         }
 
         private async Task<PixivUserIllustsResponse?> FetchPixivUserIllustsAsync(string artistId, string contentType, string? nextUrl, CancellationToken token)
         {
-            if (string.IsNullOrWhiteSpace(_pixivAccessToken))
+            if (ShouldRefreshPixivAccessTokenBeforeRequest())
             {
                 await RefreshPixivAccessTokenAsync(token);
             }
@@ -1184,7 +1189,7 @@ namespace CyanTools.ViewModel
                 : nextUrl;
 
             var (statusCode, payload) = await SendPixivApiRequestAsync(requestUrl, token);
-            if (statusCode == HttpStatusCode.Unauthorized || statusCode == HttpStatusCode.Forbidden)
+            if (ShouldRefreshPixivAccessToken(statusCode, payload))
             {
                 await RefreshPixivAccessTokenAsync(token);
                 (statusCode, payload) = await SendPixivApiRequestAsync(requestUrl, token);
@@ -1202,6 +1207,36 @@ namespace CyanTools.ViewModel
             }
 
             return JsonConvert.DeserializeObject<PixivUserIllustsResponse>(payload);
+        }
+
+        private bool ShouldRefreshPixivAccessTokenBeforeRequest()
+        {
+            return string.IsNullOrWhiteSpace(_pixivAccessToken)
+                || _pixivAccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow.Add(PixivAccessTokenRefreshLeadTime);
+        }
+
+        private void UpdatePixivAccessTokenExpiry(PixivTokenResponse tokenResponse)
+        {
+            var expiresInSeconds = tokenResponse.ExpiresIn > 0 ? tokenResponse.ExpiresIn : 3600;
+            _pixivAccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds);
+        }
+
+        private static bool ShouldRefreshPixivAccessToken(HttpStatusCode statusCode, string payload)
+        {
+            if (statusCode == HttpStatusCode.Unauthorized || statusCode == HttpStatusCode.Forbidden)
+            {
+                return true;
+            }
+
+            if (statusCode != HttpStatusCode.BadRequest || string.IsNullOrWhiteSpace(payload))
+            {
+                return false;
+            }
+
+            return payload.IndexOf("invalid_grant", StringComparison.OrdinalIgnoreCase) >= 0
+                || payload.IndexOf("invalid access token", StringComparison.OrdinalIgnoreCase) >= 0
+                || (payload.IndexOf("oauth", StringComparison.OrdinalIgnoreCase) >= 0
+                    && payload.IndexOf("access token", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private async Task<(HttpStatusCode StatusCode, string Payload)> SendPixivApiRequestAsync(string requestUrl, CancellationToken token)
