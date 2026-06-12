@@ -1080,7 +1080,9 @@ namespace CyanTools.ViewModel
             await RefreshPixivAccessTokenAsync(token);
 
             var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var existingPixivFiles = LoadExistingPixivImageKeys(outputDirectory);
             int savedCount = 0;
+            int skippedCount = 0;
 
             foreach (var contentType in PixivContentTypes)
             {
@@ -1104,14 +1106,16 @@ namespace CyanTools.ViewModel
                         }
 
                         var targetPath = Path.Combine(outputDirectory, item.FileName);
-                        if (File.Exists(targetPath))
+                        if (File.Exists(targetPath) || existingPixivFiles.Contains(item.FileKey))
                         {
+                            skippedCount++;
                             continue;
                         }
 
                         if (await DownloadPixivImageAsync(item.Url, targetPath, token))
                         {
                             savedCount++;
+                            existingPixivFiles.Add(item.FileKey);
                             AppendLog($"[Pixiv] 已保存 {item.FileName}");
                         }
 
@@ -1126,7 +1130,27 @@ namespace CyanTools.ViewModel
                 }
             }
 
-            AppendLog(savedCount == 0 ? "[Pixiv] 没有可下载图片。" : $"[Pixiv] 共保存 {savedCount} 张图片。");
+            AppendPixivSummary(savedCount, skippedCount);
+        }
+
+        private void AppendPixivSummary(int savedCount, int skippedCount)
+        {
+            if (savedCount == 0 && skippedCount == 0)
+            {
+                AppendLog("[Pixiv] 没有可下载图片。");
+            }
+            else if (savedCount == 0)
+            {
+                AppendLog($"[Pixiv] 没有新图片，跳过 {skippedCount} 张已存在图片。");
+            }
+            else if (skippedCount == 0)
+            {
+                AppendLog($"[Pixiv] 共保存 {savedCount} 张图片。");
+            }
+            else
+            {
+                AppendLog($"[Pixiv] 共保存 {savedCount} 张图片，跳过 {skippedCount} 张已存在图片。");
+            }
         }
 
         private async Task RefreshPixivAccessTokenAsync(CancellationToken token)
@@ -1298,10 +1322,58 @@ namespace CyanTools.ViewModel
                         fileName += ".jpg";
                     }
 
-                    yield return new PixivDownloadItem(url, fileName);
+                    yield return new PixivDownloadItem(url, fileName, BuildPixivFileKey(illust.Id, index));
                     index++;
                 }
             }
+        }
+
+        private static HashSet<string> LoadExistingPixivImageKeys(string outputDirectory)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!Directory.Exists(outputDirectory))
+            {
+                return keys;
+            }
+
+            foreach (var path in Directory.EnumerateFiles(outputDirectory))
+            {
+                var key = TryParsePixivFileKey(Path.GetFileNameWithoutExtension(path));
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    keys.Add(key);
+                }
+            }
+
+            return keys;
+        }
+
+        private static string BuildPixivFileKey(long illustId, int pageIndex)
+        {
+            return $"{illustId}_p{pageIndex}";
+        }
+
+        private static string? TryParsePixivFileKey(string? fileNameWithoutExtension)
+        {
+            if (string.IsNullOrWhiteSpace(fileNameWithoutExtension))
+            {
+                return null;
+            }
+
+            var pageMarkerIndex = fileNameWithoutExtension.LastIndexOf("_p", StringComparison.OrdinalIgnoreCase);
+            if (pageMarkerIndex <= 0 || pageMarkerIndex + 2 >= fileNameWithoutExtension.Length)
+            {
+                return null;
+            }
+
+            var idPart = fileNameWithoutExtension[..pageMarkerIndex];
+            var pagePart = fileNameWithoutExtension[(pageMarkerIndex + 2)..];
+            if (!idPart.All(char.IsDigit) || !pagePart.All(char.IsDigit))
+            {
+                return null;
+            }
+
+            return $"{idPart}_p{pagePart}";
         }
 
         private async Task<bool> DownloadPixivImageAsync(string url, string targetPath, CancellationToken token)
@@ -1320,7 +1392,7 @@ namespace CyanTools.ViewModel
                 }
 
                 await using var input = await response.Content.ReadAsStreamAsync(token);
-                await using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await using var output = new FileStream(targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 await input.CopyToAsync(output, token);
                 return true;
             }
@@ -1939,7 +2011,7 @@ namespace CyanTools.ViewModel
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private sealed record PixivDownloadItem(string Url, string FileName);
+        private sealed record PixivDownloadItem(string Url, string FileName, string FileKey);
         private sealed record KemonoAssetDownload(string Url, string FileName, string? Content, string? PostId);
 
         private sealed class BooruPostInfo
