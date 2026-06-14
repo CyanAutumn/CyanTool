@@ -223,6 +223,11 @@ namespace CyanTools.ViewModel
         }
     }
 
+    public sealed class TrainingOutputOrganizerPipelineNode : CyanTools.Pipeline.SimplePipelineNode<TrainingOutputOrganizerViewModel>
+    {
+        public TrainingOutputOrganizerPipelineNode() : base("训练输出整理") { }
+    }
+
     public sealed class ImageRenamePipelineNode : CyanTools.Pipeline.SimplePipelineNode<ImageRenameViewModel>
     {
         public ImageRenamePipelineNode() : base("图片重命名") { }

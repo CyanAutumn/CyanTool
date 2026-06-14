@@ -55,6 +55,9 @@
         <DataTemplate DataType="{x:Type viewModel:TrainingSetBalancerPipelineNode}">
             <local:TrainingSetBalancerView DataContext="{Binding Inner}" />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModel:TrainingOutputOrganizerPipelineNode}">
+            <local:TrainingOutputOrganizerView DataContext="{Binding Inner}" />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewModel:ImageRenamePipelineNode}">
             <local:ImageRenameView DataContext="{Binding Inner}" />
         </DataTemplate>

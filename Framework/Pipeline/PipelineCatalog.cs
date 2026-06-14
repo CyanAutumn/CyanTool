@@ -52,6 +52,7 @@ namespace CyanTools.Pipeline
             Register(new PipelineNodeDescriptor("同源图片归类", typeof(SameSourceImageGroupingViewModel), () => new SameSourceImageGroupingViewModel()));
             Register(new PipelineNodeDescriptor("图片打标", typeof(TaggingPipelineNode), () => new TaggingPipelineNode()));
             Register(new PipelineNodeDescriptor("训练集配平", typeof(TrainingSetBalancerPipelineNode), () => new TrainingSetBalancerPipelineNode()));
+            Register(new PipelineNodeDescriptor("训练输出整理", typeof(TrainingOutputOrganizerPipelineNode), () => new TrainingOutputOrganizerPipelineNode()));
             Register(new PipelineNodeDescriptor("图片重命名", typeof(ImageRenamePipelineNode), () => new ImageRenamePipelineNode()));
             Register(new PipelineNodeDescriptor("数据集下载器", typeof(DatasetDownloaderPipelineNode), () => new DatasetDownloaderPipelineNode(), requiresUnlock: true));
         }

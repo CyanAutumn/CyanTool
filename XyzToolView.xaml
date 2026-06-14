@@ -1,0 +1,81 @@
+<UserControl x:Class="CyanTools.XyzToolView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="360"
+             d:DesignWidth="760">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Header="XYZ &#x5E8F;&#x53F7;&#x63D0;&#x793A;&#x8BCD;">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="&#x5F00;&#x59CB;"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,8" />
+                <TextBox Grid.Row="0"
+                         Grid.Column="1"
+                         Text="{Binding XyzStartText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,16,8" />
+
+                <TextBlock Grid.Row="0"
+                           Grid.Column="2"
+                           Text="&#x7ED3;&#x675F;"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,8" />
+                <TextBox Grid.Row="0"
+                         Grid.Column="3"
+                         Text="{Binding XyzEndText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,16,8" />
+
+                <TextBlock Grid.Row="0"
+                           Grid.Column="4"
+                           Text="&#x95F4;&#x9694;"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,8" />
+                <TextBox Grid.Row="0"
+                         Grid.Column="5"
+                         Text="{Binding XyzIntervalText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,16,8" />
+
+                <Button Grid.Row="0"
+                        Grid.Column="7"
+                        Content="&#x590D;&#x5236;"
+                        Command="{Binding CopyXyzPromptCommand}"
+                        Padding="16,4"
+                        Margin="0,0,0,8" />
+
+                <TextBox Grid.Row="1"
+                         Grid.Column="0"
+                         Grid.ColumnSpan="8"
+                         Text="{Binding XyzPromptText, Mode=OneWay}"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="180"
+                         VerticalScrollBarVisibility="Auto" />
+            </Grid>
+        </GroupBox>
+    </Grid>
+</UserControl>
