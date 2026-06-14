@@ -19,9 +19,9 @@
             <Border Padding="6,3"
                     Margin="2"
                     CornerRadius="3"
-                    BorderBrush="#FFBFD9FF"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                     BorderThickness="1"
-                    Background="#FFEAF3FF"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}"
                     PreviewMouseLeftButtonDown="TagChip_PreviewMouseLeftButtonDown"
                     PreviewMouseMove="TagChip_PreviewMouseMove"
                     PreviewMouseLeftButtonUp="TagChip_PreviewMouseLeftButtonUp">
@@ -58,8 +58,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel x:Name="TagDisplayPanel" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Text}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TranslationDisplay}" Foreground="Gray" Margin="6,0,0,0"/>
+                        <TextBlock Text="{Binding Text}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        <TextBlock Text="{Binding TranslationDisplay}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="6,0,0,0"/>
                     </StackPanel>
                     <Button x:Name="TagDeleteButton"
                             Grid.Column="2"
@@ -68,7 +72,7 @@
                             Padding="4,0"
                             Background="Transparent"
                             BorderThickness="0"
-                            Foreground="#FF666666"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                             Command="{Binding DataContext.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding}"/>
                     <TextBox x:Name="TagEditBox"
@@ -78,6 +82,8 @@
                              MinWidth="80"
                              AcceptsReturn="True"
                              Background="Transparent"
+                             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                             CaretBrush="{DynamicResource TextFillColorPrimaryBrush}"
                              BorderThickness="0"
                              VerticalContentAlignment="Center"
                              PreviewKeyDown="TagEditBox_PreviewKeyDown"
@@ -102,6 +108,8 @@
                      Text="{Binding DataContext.PendingTagText, RelativeSource={RelativeSource AncestorType=ItemsControl}, UpdateSourceTrigger=PropertyChanged}"
                      AcceptsReturn="True"
                      Background="Transparent"
+                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                     CaretBrush="{DynamicResource TextFillColorPrimaryBrush}"
                      BorderThickness="0"
                      VerticalContentAlignment="Center"
                      PreviewKeyDown="TagInputBox_PreviewKeyDown"
@@ -442,7 +450,11 @@
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </DockPanel>
-                    <Border Grid.Row="1" BorderBrush="#FFCCCCCC" BorderThickness="1" Padding="4" Background="White">
+                    <Border Grid.Row="1"
+                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            Padding="4"
+                            Background="{DynamicResource ControlFillColorDefaultBrush}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="TagItemsControl"
                                           ItemTemplateSelector="{StaticResource TagItemTemplateSelector}"
@@ -469,10 +481,25 @@
                            StaysOpen="False"
                            AllowsTransparency="True"
                            Closed="TagSuggestionPopup_Closed">
-                        <Border Background="White" BorderBrush="#FFCCCCCC" BorderThickness="1" Padding="2" MinWidth="220">
+                        <Border Background="{DynamicResource ApplicationBackgroundBrush}"
+                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                Padding="2"
+                                MinWidth="220">
                             <ListBox x:Name="TagSuggestionList"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                      ItemsSource="{Binding TagSuggestions}"
                                      MouseLeftButtonUp="TagSuggestionList_MouseLeftButtonUp">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="{x:Type ListBoxItem}">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Padding" Value="4,2"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="4,2">
@@ -480,10 +507,11 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Tag}"/>
+                                            <TextBlock Text="{Binding Tag}"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                                             <TextBlock Grid.Column="1"
                                                        Text="{Binding Translation}"
-                                                       Foreground="Gray"
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                        Margin="12,0,0,0"/>
                                         </Grid>
                                     </DataTemplate>
