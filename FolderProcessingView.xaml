@@ -5,94 +5,149 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="500"
+             d:DesignWidth="840">
     <UserControl.Resources>
-        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-        <utils:BooleanToInverseBooleanConverter x:Key="BooleanToInverseBooleanConverter"/>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <utils:BooleanToInverseBooleanConverter x:Key="BooleanToInverseBooleanConverter" />
     </UserControl.Resources>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="路径选择" Grid.Row="0" Margin="0,0,0,10">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+        <GroupBox Header="&#x8DEF;&#x5F84;&#x9009;&#x62E9;"
+                  Grid.Row="0"
+                  Margin="0,0,0,10">
+            <Grid Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5"/>
-                    <TextBox Grid.Column="1"
-                             Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
-                             IsReadOnly="{Binding HasInheritedInputPath}"
-                             Margin="5"/>
-                    <Button Grid.Column="2"
-                            Content="..."
-                            Command="{Binding SelectInputPathCommand}"
-                            Margin="5"
-                            Padding="10,2"
-                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                </Grid>
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="&#x8F93;&#x5165;&#x8DEF;&#x5F84;:"
+                           VerticalAlignment="Center"
+                           Margin="5" />
+                <TextBox Grid.Row="0"
+                         Grid.Column="1"
+                         Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="{Binding HasInheritedInputPath}"
+                         Margin="5" />
+                <Button Grid.Row="0"
+                        Grid.Column="2"
+                        Content="..."
+                        Command="{Binding SelectInputPathCommand}"
+                        Margin="5"
+                        Padding="10,2"
+                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
 
-                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="2"
+                           Text="&#x7BA1;&#x9053;&#x8C03;&#x5EA6;&#x4E2D;&#x6B64;&#x8F93;&#x5165;&#x8DEF;&#x5F84;&#x56FA;&#x5B9A;&#x4E3A;&#x4E0A;&#x4E00;&#x4E2A;&#x8282;&#x70B9;&#x7684;&#x8F93;&#x51FA;&#x8DEF;&#x5F84;&#xFF1B;&#x5982;&#x679C;&#x4E0A;&#x4E00;&#x4E2A;&#x8282;&#x70B9;&#x6CA1;&#x6709;&#x8F93;&#x51FA;&#x8DEF;&#x5F84;&#xFF0C;&#x5219;&#x6CBF;&#x7528;&#x5176;&#x8F93;&#x5165;&#x8DEF;&#x5F84;&#x3002;"
                            Foreground="Gray"
                            Margin="5,0,5,5"
                            TextWrapping="Wrap"
-                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            </StackPanel>
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Text="&#x8F93;&#x51FA;&#x8DEF;&#x5F84;:"
+                           VerticalAlignment="Center"
+                           Margin="5"
+                           Visibility="{Binding IsOutputPathVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBox Grid.Row="2"
+                         Grid.Column="1"
+                         Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="5"
+                         Visibility="{Binding IsOutputPathVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button Grid.Row="2"
+                        Grid.Column="2"
+                        Content="..."
+                        Command="{Binding SelectOutputPathCommand}"
+                        Margin="5"
+                        Padding="10,2"
+                        Visibility="{Binding IsOutputPathVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <TextBlock Grid.Row="3"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="2"
+                           Text="&#x8F93;&#x51FA;&#x8DEF;&#x5F84;&#x7559;&#x7A7A;&#x65F6;&#x9ED8;&#x8BA4;&#x4E3A;&#x8F93;&#x5165;&#x8DEF;&#x5F84;&#x3002;"
+                           Foreground="Gray"
+                           Margin="5,0,5,5"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding IsOutputPathVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </Grid>
         </GroupBox>
 
-        <GroupBox Header="功能设置" Grid.Row="1" Margin="0,0,0,10">
+        <GroupBox Header="&#x529F;&#x80FD;&#x8BBE;&#x7F6E;"
+                  Grid.Row="1"
+                  Margin="0,0,0,10">
             <Grid Margin="5">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="220"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="220"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="260" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="功能:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBlock Grid.Column="0"
+                           Text="&#x529F;&#x80FD;:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,5,0" />
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding AvailableOperations}"
                           SelectedValuePath="Operation"
                           DisplayMemberPath="DisplayName"
                           SelectedValue="{Binding SelectedOperation}"
-                          Margin="0,0,10,0"/>
+                          Margin="0,0,10,0" />
 
                 <TextBlock Grid.Column="2"
                            Text="{Binding ParameterLabel}"
                            VerticalAlignment="Center"
                            Margin="0,0,5,0"
-                           Visibility="{Binding IsParameterVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                           Visibility="{Binding IsParameterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <TextBox Grid.Column="3"
                          Text="{Binding ParameterText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,10,0"
-                         Visibility="{Binding IsParameterVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                         Visibility="{Binding IsParameterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <CheckBox Grid.Column="4"
+                          Content="&#x8986;&#x76D6;&#x5DF2;&#x5B58;&#x5728;&#x6587;&#x4EF6;"
+                          IsChecked="{Binding OverwriteExisting}"
+                          VerticalAlignment="Center"
+                          Visibility="{Binding IsOverwriteOptionVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </GroupBox>
 
         <Button Grid.Row="2"
-                Content="开始处理"
+                Content="&#x5F00;&#x59CB;&#x5904;&#x7406;"
                 Command="{Binding ExecuteCommand}"
                 Padding="12,4"
                 Width="120"
                 HorizontalAlignment="Left"
                 Margin="0,0,0,10"
-                IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}"/>
+                IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}" />
 
         <TextBox Grid.Row="3"
                  Text="{Binding LogText, Mode=OneWay}"
                  IsReadOnly="True"
                  AcceptsReturn="True"
                  TextWrapping="Wrap"
-                 VerticalScrollBarVisibility="Auto"/>
+                 VerticalScrollBarVisibility="Auto" />
     </Grid>
 </UserControl>

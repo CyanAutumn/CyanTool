@@ -15,13 +15,15 @@ namespace CyanTools.ViewModel
 {
     public class FolderProcessingViewModel : INotifyPropertyChanged, IPipelineDirectoryNode, IPipelineRunnableViewModel
     {
-        private const string ToolDisplayName = "文件夹处理";
+        private const string ToolDisplayName = "\u6587\u4EF6\u5939\u5904\u7406";
 
         private readonly StringBuilder _logBuilder = new StringBuilder();
         private string _inputPath = string.Empty;
+        private string _outputPath = string.Empty;
         private FolderProcessingOperation _selectedOperation = FolderProcessingOperation.MoveFilesToTopLevel;
         private string _parameterText = string.Empty;
         private string _logText = string.Empty;
+        private bool _overwriteExisting;
         private bool _isProcessing;
         private bool _isWorkflowMode;
         private bool _hasInheritedInputPath;
@@ -30,13 +32,15 @@ namespace CyanTools.ViewModel
         {
             AvailableOperations = new ObservableCollection<FolderProcessingOperationOption>
             {
-                new FolderProcessingOperationOption(FolderProcessingOperation.MoveFilesToTopLevel, "移动子目录中的文件到顶层"),
-                new FolderProcessingOperationOption(FolderProcessingOperation.DeleteEmptyDirectories, "删除空文件夹"),
-                new FolderProcessingOperationOption(FolderProcessingOperation.RetainDirectoriesByKeyword, "保留含有指定关键字的文件夹"),
-                new FolderProcessingOperationOption(FolderProcessingOperation.ExtractArchives, "解压所有压缩包")
+                new FolderProcessingOperationOption(FolderProcessingOperation.MoveFilesToTopLevel, "\u79FB\u52A8\u5B50\u76EE\u5F55\u4E2D\u7684\u6587\u4EF6\u5230\u9876\u5C42"),
+                new FolderProcessingOperationOption(FolderProcessingOperation.DeleteEmptyDirectories, "\u5220\u9664\u7A7A\u6587\u4EF6\u5939"),
+                new FolderProcessingOperationOption(FolderProcessingOperation.RetainDirectoriesByKeyword, "\u4FDD\u7559\u542B\u6709\u6307\u5B9A\u5173\u952E\u5B57\u7684\u6587\u4EF6\u5939"),
+                new FolderProcessingOperationOption(FolderProcessingOperation.ExtractArchives, "\u89E3\u538B\u6240\u6709\u538B\u7F29\u5305"),
+                new FolderProcessingOperationOption(FolderProcessingOperation.ConvertDiffusionPipeOutputToSdScript, "\u8F6C\u6362diffusion-pipe\u8F93\u51FA\u81F3sd-script")
             };
 
             SelectInputPathCommand = new RelayCommand(SelectInputPath);
+            SelectOutputPathCommand = new RelayCommand(SelectOutputPath);
             ExecuteCommand = new RelayCommand(async () => await ExecuteFromPageAsync(), () => !IsProcessing);
         }
 
@@ -54,8 +58,28 @@ namespace CyanTools.ViewModel
 
                 _inputPath = value ?? string.Empty;
                 OnPropertyChanged(nameof(InputPath));
+                OnPropertyChanged(nameof(EffectiveOutputPath));
             }
         }
+
+        public string OutputPath
+        {
+            get => _outputPath;
+            set
+            {
+                if (_outputPath == value)
+                {
+                    return;
+                }
+
+                _outputPath = value ?? string.Empty;
+                OnPropertyChanged(nameof(OutputPath));
+                OnPropertyChanged(nameof(EffectiveOutputPath));
+            }
+        }
+
+        public string EffectiveOutputPath =>
+            string.IsNullOrWhiteSpace(OutputPath) ? InputPath : OutputPath;
 
         public FolderProcessingOperation SelectedOperation
         {
@@ -71,6 +95,8 @@ namespace CyanTools.ViewModel
                 OnPropertyChanged(nameof(SelectedOperation));
                 OnPropertyChanged(nameof(ParameterLabel));
                 OnPropertyChanged(nameof(IsParameterVisible));
+                OnPropertyChanged(nameof(IsOutputPathVisible));
+                OnPropertyChanged(nameof(IsOverwriteOptionVisible));
             }
         }
 
@@ -89,14 +115,29 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool OverwriteExisting
+        {
+            get => _overwriteExisting;
+            set
+            {
+                if (_overwriteExisting == value)
+                {
+                    return;
+                }
+
+                _overwriteExisting = value;
+                OnPropertyChanged(nameof(OverwriteExisting));
+            }
+        }
+
         public string ParameterLabel
         {
             get
             {
                 return SelectedOperation switch
                 {
-                    FolderProcessingOperation.RetainDirectoriesByKeyword => "关键字:",
-                    FolderProcessingOperation.ExtractArchives => "解压密码:",
+                    FolderProcessingOperation.RetainDirectoriesByKeyword => "\u5173\u952E\u5B57:",
+                    FolderProcessingOperation.ExtractArchives => "\u89E3\u538B\u5BC6\u7801:",
                     _ => string.Empty
                 };
             }
@@ -105,6 +146,12 @@ namespace CyanTools.ViewModel
         public bool IsParameterVisible =>
             SelectedOperation == FolderProcessingOperation.RetainDirectoriesByKeyword ||
             SelectedOperation == FolderProcessingOperation.ExtractArchives;
+
+        public bool IsOutputPathVisible =>
+            SelectedOperation == FolderProcessingOperation.ConvertDiffusionPipeOutputToSdScript;
+
+        public bool IsOverwriteOptionVisible =>
+            SelectedOperation == FolderProcessingOperation.ConvertDiffusionPipeOutputToSdScript;
 
         public string LogText
         {
@@ -183,6 +230,8 @@ namespace CyanTools.ViewModel
 
         public ICommand SelectInputPathCommand { get; }
 
+        public ICommand SelectOutputPathCommand { get; }
+
         public ICommand ExecuteCommand { get; }
 
         public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
@@ -216,12 +265,15 @@ namespace CyanTools.ViewModel
 
             try
             {
+                string outputPath = IsWorkflowMode ? string.Empty : OutputPath;
                 await FolderProcessingPipelineProcessor.ExecuteAsync(
                     InputPath,
                     new FolderProcessingOptions
                     {
                         Operation = SelectedOperation,
-                        ParameterText = ParameterText
+                        ParameterText = ParameterText,
+                        OutputPath = outputPath,
+                        OverwriteExisting = OverwriteExisting
                     },
                     message =>
                     {
@@ -232,14 +284,14 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                string message = $"处理失败: {ex.Message}";
+                string message = $"\u5904\u7406\u5931\u8D25: {ex.Message}";
                 AppendLog(message);
                 pipelineLog?.Invoke(message);
 
                 if (showDialogs)
                 {
                     Application.Current?.Dispatcher?.Invoke(() =>
-                        MessageBox.Show(ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error));
+                        MessageBox.Show(ex.Message, "\u9519\u8BEF", MessageBoxButton.OK, MessageBoxImage.Error));
                 }
 
                 if (rethrowErrors)
@@ -255,15 +307,25 @@ namespace CyanTools.ViewModel
 
         private void SelectInputPath()
         {
+            SelectFolder(path => InputPath = path, "\u9009\u62E9\u8F93\u5165\u6587\u4EF6\u5939");
+        }
+
+        private void SelectOutputPath()
+        {
+            SelectFolder(path => OutputPath = path, "\u9009\u62E9\u8F93\u51FA\u6587\u4EF6\u5939");
+        }
+
+        private static void SelectFolder(Action<string> assignPath, string title)
+        {
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择输入文件夹"
+                Title = title
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                InputPath = dialog.FileName;
+                assignPath(dialog.FileName);
             }
         }
 

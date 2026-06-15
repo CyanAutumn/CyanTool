@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using SharpCompress.Archives;
@@ -11,6 +12,10 @@ namespace CyanTools.Utils
 {
     public static class FolderProcessingPipelineProcessor
     {
+        private const string AdapterFileName = "adapter_model.safetensors";
+        private const int SequenceWidth = 6;
+        private static readonly Regex NumberRegex = new Regex(@"\d+", RegexOptions.Compiled);
+
         private static readonly string[] SupportedArchiveSuffixes =
         {
             ".zip",
@@ -33,7 +38,7 @@ namespace CyanTools.Utils
         {
             if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
             {
-                throw new DirectoryNotFoundException("请先选择有效的输入文件夹。");
+                throw new DirectoryNotFoundException("\u8BF7\u5148\u9009\u62E9\u6709\u6548\u7684\u8F93\u5165\u6587\u4EF6\u5939\u3002");
             }
 
             ArgumentNullException.ThrowIfNull(options);
@@ -48,7 +53,7 @@ namespace CyanTools.Utils
             CancellationToken token)
         {
             string operationName = GetOperationDisplayName(options.Operation);
-            log?.Invoke($"开始处理: {operationName} / {rootPath}");
+            log?.Invoke($"\u5F00\u59CB\u5904\u7406: {operationName} / {rootPath}");
 
             switch (options.Operation)
             {
@@ -64,8 +69,11 @@ namespace CyanTools.Utils
                 case FolderProcessingOperation.ExtractArchives:
                     ExecuteExtractArchives(rootPath, options.ParameterText, log, token);
                     break;
+                case FolderProcessingOperation.ConvertDiffusionPipeOutputToSdScript:
+                    ExecuteConvertDiffusionPipeOutputToSdScript(rootPath, options.OutputPath, options.OverwriteExisting, log, token);
+                    break;
                 default:
-                    throw new InvalidOperationException($"不支持的文件夹处理功能: {options.Operation}");
+                    throw new InvalidOperationException($"\u4E0D\u652F\u6301\u7684\u6587\u4EF6\u5939\u5904\u7406\u529F\u80FD: {options.Operation}");
             }
         }
 
@@ -87,24 +95,24 @@ namespace CyanTools.Utils
                     if (File.Exists(targetPath))
                     {
                         skippedCount++;
-                        log?.Invoke($"跳过同名文件: {filePath}");
+                        log?.Invoke($"\u8DF3\u8FC7\u540C\u540D\u6587\u4EF6: {filePath}");
                         continue;
                     }
 
                     File.Move(filePath, targetPath);
                     movedCount++;
-                    log?.Invoke($"已移动: {filePath} -> {targetPath}");
+                    log?.Invoke($"\u5DF2\u79FB\u52A8: {filePath} -> {targetPath}");
                 }
             }
 
             int deletedEmptyDirectoryCount = DeleteEmptyDirectoriesCore(rootPath, log, token);
-            log?.Invoke($"处理完成。已移动 {movedCount} 个文件，跳过 {skippedCount} 个同名文件，删除 {deletedEmptyDirectoryCount} 个空文件夹。");
+            log?.Invoke($"\u5904\u7406\u5B8C\u6210\u3002\u5DF2\u79FB\u52A8 {movedCount} \u4E2A\u6587\u4EF6\uFF0C\u8DF3\u8FC7 {skippedCount} \u4E2A\u540C\u540D\u6587\u4EF6\uFF0C\u5220\u9664 {deletedEmptyDirectoryCount} \u4E2A\u7A7A\u6587\u4EF6\u5939\u3002");
         }
 
         private static void ExecuteDeleteEmptyDirectories(string rootPath, Action<string>? log, CancellationToken token)
         {
             int deletedCount = DeleteEmptyDirectoriesCore(rootPath, log, token);
-            log?.Invoke($"处理完成。共删除 {deletedCount} 个空文件夹。");
+            log?.Invoke($"\u5904\u7406\u5B8C\u6210\u3002\u5171\u5220\u9664 {deletedCount} \u4E2A\u7A7A\u6587\u4EF6\u5939\u3002");
         }
 
         private static int DeleteEmptyDirectoriesCore(string rootPath, Action<string>? log, CancellationToken token)
@@ -134,7 +142,7 @@ namespace CyanTools.Utils
                     Directory.Delete(directory, recursive: false);
                     deletedAny = true;
                     deletedCount++;
-                    log?.Invoke($"已删除空文件夹: {directory}");
+                    log?.Invoke($"\u5DF2\u5220\u9664\u7A7A\u6587\u4EF6\u5939: {directory}");
                 }
             } while (deletedAny);
 
@@ -150,7 +158,7 @@ namespace CyanTools.Utils
             string normalizedKeyword = keyword?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(normalizedKeyword))
             {
-                throw new InvalidOperationException("关键字不能为空。");
+                throw new InvalidOperationException("\u5173\u952E\u5B57\u4E0D\u80FD\u4E3A\u7A7A\u3002");
             }
 
             HashSet<string> keepDirectories = BuildKeepDirectorySet(rootPath, normalizedKeyword, token);
@@ -174,10 +182,10 @@ namespace CyanTools.Utils
 
                 Directory.Delete(directory, recursive: true);
                 deletedDirectoryCount++;
-                log?.Invoke($"已删除目录: {directory}");
+                log?.Invoke($"\u5DF2\u5220\u9664\u76EE\u5F55: {directory}");
             }
 
-            log?.Invoke($"处理完成。共删除 {deletedDirectoryCount} 个非保留目录。");
+            log?.Invoke($"\u5904\u7406\u5B8C\u6210\u3002\u5171\u5220\u9664 {deletedDirectoryCount} \u4E2A\u975E\u4FDD\u7559\u76EE\u5F55\u3002");
         }
 
         private static HashSet<string> BuildKeepDirectorySet(string rootPath, string keyword, CancellationToken token)
@@ -252,10 +260,69 @@ namespace CyanTools.Utils
                 Directory.CreateDirectory(outputDirectory);
                 ExtractArchive(archivePath, outputDirectory, password, token);
                 extractedArchiveCount++;
-                log?.Invoke($"已解压: {archivePath} -> {outputDirectory}");
+                log?.Invoke($"\u5DF2\u89E3\u538B: {archivePath} -> {outputDirectory}");
             }
 
-            log?.Invoke($"处理完成。共解压 {extractedArchiveCount} 个压缩包。");
+            log?.Invoke($"\u5904\u7406\u5B8C\u6210\u3002\u5171\u89E3\u538B {extractedArchiveCount} \u4E2A\u538B\u7F29\u5305\u3002");
+        }
+
+        private static void ExecuteConvertDiffusionPipeOutputToSdScript(
+            string rootPath,
+            string? outputPath,
+            bool overwriteExisting,
+            Action<string>? log,
+            CancellationToken token)
+        {
+            string outputRoot = string.IsNullOrWhiteSpace(outputPath)
+                ? rootPath
+                : Path.GetFullPath(outputPath.Trim());
+
+            Directory.CreateDirectory(outputRoot);
+
+            var candidates = Directory.EnumerateDirectories(rootPath)
+                .Select(path => new EpochFolder(path, Path.Combine(path, AdapterFileName)))
+                .Where(item => File.Exists(item.SourceFile))
+                .Select(item => TryGetEpochNumber(Path.GetFileName(item.FolderPath), out int epoch)
+                    ? item with { Epoch = epoch }
+                    : item)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                log?.Invoke($"\u672A\u5728\u4E00\u7EA7\u5B50\u6587\u4EF6\u5939\u4E2D\u627E\u5230 {AdapterFileName}\u3002");
+                return;
+            }
+
+            int moved = 0;
+            int skipped = 0;
+
+            foreach (var item in candidates.OrderBy(x => x.Epoch ?? int.MaxValue).ThenBy(x => x.FolderPath, StringComparer.OrdinalIgnoreCase))
+            {
+                token.ThrowIfCancellationRequested();
+
+                if (item.Epoch == null)
+                {
+                    skipped++;
+                    log?.Invoke($"\u8DF3\u8FC7: {Path.GetFileName(item.FolderPath)} \u672A\u8BC6\u522B\u5230 epoch \u5E8F\u53F7\u3002");
+                    continue;
+                }
+
+                string targetFileName = $"adapter_model-{item.Epoch.Value.ToString($"D{SequenceWidth}")}.safetensors";
+                string targetPath = Path.Combine(outputRoot, targetFileName);
+
+                if (File.Exists(targetPath) && !overwriteExisting)
+                {
+                    skipped++;
+                    log?.Invoke($"\u8DF3\u8FC7: {targetFileName} \u5DF2\u5B58\u5728\u3002");
+                    continue;
+                }
+
+                MoveFile(item.SourceFile, targetPath, overwriteExisting);
+                moved++;
+                log?.Invoke($"{Path.GetFileName(item.FolderPath)} -> {targetFileName}");
+            }
+
+            log?.Invoke($"\u5B8C\u6210: \u79FB\u52A8 {moved} \u4E2A\uFF0C\u8DF3\u8FC7 {skipped} \u4E2A\u3002");
         }
 
         private static void ExtractArchive(
@@ -305,7 +372,7 @@ namespace CyanTools.Utils
             if (!string.Equals(destinationPath, normalizedOutputDirectory, StringComparison.OrdinalIgnoreCase) &&
                 !destinationPath.StartsWith(outputPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException($"压缩包包含非法路径: {entryKey}");
+                throw new InvalidDataException($"\u538B\u7F29\u5305\u5305\u542B\u975E\u6CD5\u8DEF\u5F84: {entryKey}");
             }
 
             return destinationPath;
@@ -328,6 +395,38 @@ namespace CyanTools.Utils
             return Path.GetFileNameWithoutExtension(archivePath);
         }
 
+        private static bool TryGetEpochNumber(string folderName, out int epoch)
+        {
+            epoch = 0;
+            MatchCollection matches = NumberRegex.Matches(folderName ?? string.Empty);
+            if (matches.Count == 0)
+            {
+                return false;
+            }
+
+            return int.TryParse(matches[^1].Value, out epoch) && epoch >= 0;
+        }
+
+        private static void MoveFile(string sourcePath, string targetPath, bool overwrite)
+        {
+            if (overwrite && File.Exists(targetPath))
+            {
+                File.Delete(targetPath);
+            }
+
+            string sourceRoot = Path.GetPathRoot(Path.GetFullPath(sourcePath)) ?? string.Empty;
+            string targetRoot = Path.GetPathRoot(Path.GetFullPath(targetPath)) ?? string.Empty;
+
+            if (string.Equals(sourceRoot, targetRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Move(sourcePath, targetPath);
+                return;
+            }
+
+            File.Copy(sourcePath, targetPath);
+            File.Delete(sourcePath);
+        }
+
         private static bool IsSupportedArchivePath(string path)
         {
             return SupportedArchiveSuffixes.Any(suffix => path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
@@ -337,12 +436,18 @@ namespace CyanTools.Utils
         {
             return operation switch
             {
-                FolderProcessingOperation.MoveFilesToTopLevel => "移动子目录中的文件到顶层",
-                FolderProcessingOperation.DeleteEmptyDirectories => "删除空文件夹",
-                FolderProcessingOperation.RetainDirectoriesByKeyword => "保留含有指定关键字的文件夹",
-                FolderProcessingOperation.ExtractArchives => "解压所有压缩包",
+                FolderProcessingOperation.MoveFilesToTopLevel => "\u79FB\u52A8\u5B50\u76EE\u5F55\u4E2D\u7684\u6587\u4EF6\u5230\u9876\u5C42",
+                FolderProcessingOperation.DeleteEmptyDirectories => "\u5220\u9664\u7A7A\u6587\u4EF6\u5939",
+                FolderProcessingOperation.RetainDirectoriesByKeyword => "\u4FDD\u7559\u542B\u6709\u6307\u5B9A\u5173\u952E\u5B57\u7684\u6587\u4EF6\u5939",
+                FolderProcessingOperation.ExtractArchives => "\u89E3\u538B\u6240\u6709\u538B\u7F29\u5305",
+                FolderProcessingOperation.ConvertDiffusionPipeOutputToSdScript => "\u8F6C\u6362diffusion-pipe\u8F93\u51FA\u81F3sd-script",
                 _ => operation.ToString()
             };
+        }
+
+        private sealed record EpochFolder(string FolderPath, string SourceFile)
+        {
+            public int? Epoch { get; init; }
         }
     }
 }

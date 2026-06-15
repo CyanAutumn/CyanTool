@@ -5,7 +5,8 @@ namespace CyanTools.Utils
         MoveFilesToTopLevel,
         DeleteEmptyDirectories,
         RetainDirectoriesByKeyword,
-        ExtractArchives
+        ExtractArchives,
+        ConvertDiffusionPipeOutputToSdScript
     }
 
     public sealed class FolderProcessingOptions
@@ -13,5 +14,9 @@ namespace CyanTools.Utils
         public FolderProcessingOperation Operation { get; init; } = FolderProcessingOperation.MoveFilesToTopLevel;
 
         public string ParameterText { get; init; } = string.Empty;
+
+        public string OutputPath { get; init; } = string.Empty;
+
+        public bool OverwriteExisting { get; init; }
     }
 }
