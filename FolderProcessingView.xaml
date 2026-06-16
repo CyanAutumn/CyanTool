@@ -58,7 +58,7 @@
                            Grid.Column="1"
                            Grid.ColumnSpan="2"
                            Text="&#x7BA1;&#x9053;&#x8C03;&#x5EA6;&#x4E2D;&#x6B64;&#x8F93;&#x5165;&#x8DEF;&#x5F84;&#x56FA;&#x5B9A;&#x4E3A;&#x4E0A;&#x4E00;&#x4E2A;&#x8282;&#x70B9;&#x7684;&#x8F93;&#x51FA;&#x8DEF;&#x5F84;&#xFF1B;&#x5982;&#x679C;&#x4E0A;&#x4E00;&#x4E2A;&#x8282;&#x70B9;&#x6CA1;&#x6709;&#x8F93;&#x51FA;&#x8DEF;&#x5F84;&#xFF0C;&#x5219;&#x6CBF;&#x7528;&#x5176;&#x8F93;&#x5165;&#x8DEF;&#x5F84;&#x3002;"
-                           Foreground="Gray"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Margin="5,0,5,5"
                            TextWrapping="Wrap"
                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -86,7 +86,7 @@
                            Grid.Column="1"
                            Grid.ColumnSpan="2"
                            Text="&#x8F93;&#x51FA;&#x8DEF;&#x5F84;&#x7559;&#x7A7A;&#x65F6;&#x9ED8;&#x8BA4;&#x4E3A;&#x8F93;&#x5165;&#x8DEF;&#x5F84;&#x3002;"
-                           Foreground="Gray"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Margin="5,0,5,5"
                            TextWrapping="Wrap"
                            Visibility="{Binding IsOutputPathVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />

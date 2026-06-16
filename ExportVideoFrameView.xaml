@@ -26,13 +26,13 @@
 
 
         <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="5">
-            <TextBlock Text="输出路径:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+            <TextBlock Text="输出目录:" VerticalAlignment="Center" Margin="0,0,5,0"/>
             <TextBox Width="400" IsReadOnly="True" Text="{Binding OutputFolder}" Margin="0,0,5,0"/>
             <Button Content="选择输出目录" Margin="5,0,0,0" Command="{Binding SelectOutputCommand}"/>
         </StackPanel>
 
 
-        <Border Grid.Row="2" BorderBrush="LightGray" BorderThickness="1" Margin="5">
+        <Border Grid.Row="2" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Margin="5">
             <Image Stretch="Uniform" Source="{Binding CurrentFrame}"/>
         </Border>
 

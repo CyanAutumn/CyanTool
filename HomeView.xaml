@@ -6,187 +6,243 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d"
              d:DesignHeight="640"
-             d:DesignWidth="900"
+             d:DesignWidth="960"
              Background="Transparent">
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
-        <Grid Margin="28,18,28,32">
+    <ScrollViewer Style="{StaticResource CyanPageScrollViewerStyle}">
+        <Grid Style="{StaticResource CyanPageGridStyle}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0"
-                  Margin="0,0,0,18">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <Border Grid.Row="0"
+                    Style="{StaticResource CyanHeroPanelStyle}"
+                    Margin="0,0,0,18">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Cyan Tools"
-                               FontSize="38"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                    <TextBlock Text="本地图片、数据集和训练准备工作台"
-                               FontSize="15"
-                               Margin="2,8,0,0"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Cyan Tools"
+                                   Style="{StaticResource CyanPageTitleStyle}" />
+                        <TextBlock Text="本地图片、数据集和训练准备工作台"
+                                   Style="{StaticResource CyanPageSubtitleStyle}"
+                                   Margin="2,8,0,0" />
 
-                <Border Grid.Column="1"
-                        Width="174"
-                        Height="174"
-                        Margin="28,0,0,0"
-                        Padding="8"
-                        CornerRadius="18"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1">
-                    <Border CornerRadius="14"
-                            ClipToBounds="True"
-                            Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                        <Grid Margin="0,22,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource CyanIconBadgeStyle}"
+                                    Margin="0,0,10,0">
+                                <ui:SymbolIcon Symbol="ImageSparkle24"
+                                               FontSize="20"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                            </Border>
+                            <Border Grid.Column="1"
+                                    Style="{StaticResource CyanIconBadgeStyle}"
+                                    Margin="0,0,10,0">
+                                <ui:SymbolIcon Symbol="DatabaseCheckmark24"
+                                               FontSize="20"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                            </Border>
+                            <Border Grid.Column="2"
+                                    Style="{StaticResource CyanIconBadgeStyle}">
+                                <ui:SymbolIcon Symbol="BranchForkHint24"
+                                               FontSize="20"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Grid.Column="1"
+                            Width="184"
+                            Height="184"
+                            Margin="28,0,0,0"
+                            Style="{StaticResource CyanImageWellStyle}">
                         <Image x:Name="SecretImage"
                                Source="/1.png"
                                Stretch="UniformToFill"
                                Cursor="Hand"
                                MouseDown="SecretImage_MouseDown" />
                     </Border>
-                </Border>
-            </Grid>
+                </Grid>
+            </Border>
 
-            <UniformGrid Grid.Row="1"
-                         Columns="3"
-                         Margin="0,0,0,18">
-                <Border Margin="0,0,10,0"
-                        Padding="18"
-                        CornerRadius="10"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1">
-                    <StackPanel>
+            <Grid Grid.Row="1"
+                  Margin="0,0,0,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource CyanCardStyle}"
+                        Margin="0,0,10,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <ui:SymbolIcon Symbol="ImageMultiple24"
                                        FontSize="28"
                                        Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                        <TextBlock Text="图片处理"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Margin="0,12,0,4" />
-                        <TextBlock Text="缩放、超分、格式转换、筛选与批处理工具集中在左侧导航。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Text="图片处理"
+                                   Style="{StaticResource CyanSectionTitleStyle}"
+                                   Margin="0,14,0,6" />
+                        <TextBlock Grid.Row="2"
+                                   Text="缩放、超分、转换、筛选与批处理"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}" />
+                    </Grid>
                 </Border>
 
-                <Border Margin="10,0"
-                        Padding="18"
-                        CornerRadius="10"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1">
-                    <StackPanel>
+                <Border Grid.Column="1"
+                        Style="{StaticResource CyanCardStyle}"
+                        Margin="10,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <ui:SymbolIcon Symbol="DatabaseSearch24"
                                        FontSize="28"
                                        Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                        <TextBlock Text="数据集工作流"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Margin="0,12,0,4" />
-                        <TextBlock Text="管理图片、标签、Prompt 和下载流程，保持原有工具功能不变。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Text="数据集工作流"
+                                   Style="{StaticResource CyanSectionTitleStyle}"
+                                   Margin="0,14,0,6" />
+                        <TextBlock Grid.Row="2"
+                                   Text="图片、标签、Prompt 与下载流程"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}" />
+                    </Grid>
                 </Border>
 
-                <Border Margin="10,0,0,0"
-                        Padding="18"
-                        CornerRadius="10"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1">
-                    <StackPanel>
+                <Border Grid.Column="2"
+                        Style="{StaticResource CyanCardStyle}"
+                        Margin="10,0,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <ui:SymbolIcon Symbol="BranchFork24"
                                        FontSize="28"
                                        Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                        <TextBlock Text="管道调度"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Margin="0,12,0,4" />
-                        <TextBlock Text="Nodify 节点画布继续承载现有工具控件，适合串联自动化处理。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Text="管道调度"
+                                   Style="{StaticResource CyanSectionTitleStyle}"
+                                   Margin="0,14,0,6" />
+                        <TextBlock Grid.Row="2"
+                                   Text="节点画布与自动化执行编排"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}" />
+                    </Grid>
                 </Border>
-            </UniformGrid>
+            </Grid>
 
             <Border Grid.Row="2"
-                    Padding="22"
-                    CornerRadius="10"
-                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1">
-                <StackPanel>
-                    <TextBlock Text="免责声明：本工具仅供学习与研究使用，使用过程中产生的任何后果均由使用者自行承担，与作者无关。"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               Margin="0,0,0,16" />
+                    Style="{StaticResource CyanCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                    <TextBlock Text="鸣谢"
-                               FontSize="20"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,10" />
+                    <Border Height="4"
+                            CornerRadius="2"
+                            Background="{StaticResource CyanAccentRailBrush}"
+                            Margin="0,0,0,18" />
 
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://space.bilibili.com/14695635"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            今宵
-                        </Hyperlink>
-                        <Run Text=" - 视频教程制作与分辨率归类思路" />
-                    </TextBlock>
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://huggingface.co/SmilingWolf"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            SmilingWolf
-                        </Hyperlink>
-                        <Run Text=" - 打标模型来源" />
-                    </TextBlock>
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://huggingface.co/deepghs"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            DeepGHS
-                        </Hyperlink>
-                        <Run Text=" - 图片三分法与打标模型来源" />
-                    </TextBlock>
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://github.com/lltcggie/waifu2x-caffe"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            lltcggie / waifu2x-caffe
-                        </Hyperlink>
-                        <Run Text=" - 图片放大项目" />
-                    </TextBlock>
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            xinntao / Real-ESRGAN-ncnn-vulkan
-                        </Hyperlink>
-                        <Run Text=" - 图片超分项目" />
-                    </TextBlock>
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://huggingface.co/yuxi-liu-wired/CSD/tree/main/CSD"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            yuxi-liu-wired / CSD
-                        </Hyperlink>
-                        <Run Text=" - 图片聚类模型来源" />
-                    </TextBlock>
-                    <TextBlock Margin="0,5">
-                        <Hyperlink NavigateUri="https://www.pixiv.net/users/84376185"
-                                   RequestNavigate="Hyperlink_RequestNavigate">
-                            Rnglg2
-                        </Hyperlink>
-                        <Run Text=" - 高斯模糊反下毒思路" />
-                    </TextBlock>
-                </StackPanel>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.05*" />
+                            <ColumnDefinition Width="1.4*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Margin="0,0,24,0">
+                            <TextBlock Text="免责声明"
+                                       Style="{StaticResource CyanSectionTitleStyle}"
+                                       Margin="0,0,0,8" />
+                            <TextBlock Text="本工具仅供学习与研究使用，使用过程中产生的任何后果均由使用者自行承担，与作者无关。"
+                                       Style="{StaticResource CyanSecondaryTextBlockStyle}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="鸣谢"
+                                       Style="{StaticResource CyanSectionTitleStyle}"
+                                       Margin="0,0,0,8" />
+
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://space.bilibili.com/14695635"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    今宵
+                                </Hyperlink>
+                                <Run Text=" - 视频教程制作与分辨率归类思路" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://huggingface.co/SmilingWolf"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    SmilingWolf
+                                </Hyperlink>
+                                <Run Text=" - 打标模型来源" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://huggingface.co/deepghs"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    DeepGHS
+                                </Hyperlink>
+                                <Run Text=" - 图片三分法与打标模型来源" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://github.com/lltcggie/waifu2x-caffe"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    lltcggie / waifu2x-caffe
+                                </Hyperlink>
+                                <Run Text=" - 图片放大项目" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    xinntao / Real-ESRGAN-ncnn-vulkan
+                                </Hyperlink>
+                                <Run Text=" - 图片超分项目" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://huggingface.co/yuxi-liu-wired/CSD/tree/main/CSD"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    yuxi-liu-wired / CSD
+                                </Hyperlink>
+                                <Run Text=" - 图片聚类模型来源" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4">
+                                <Hyperlink NavigateUri="https://www.pixiv.net/users/84376185"
+                                           RequestNavigate="Hyperlink_RequestNavigate">
+                                    Rnglg2
+                                </Hyperlink>
+                                <Run Text=" - 高斯模糊反下毒思路" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
             </Border>
         </Grid>
     </ScrollViewer>

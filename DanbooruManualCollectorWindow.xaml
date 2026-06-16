@@ -36,7 +36,7 @@
 
         <TextBlock Grid.Row="1"
                    Text="用法：在列表页中键点击帖子链接打开新标签页，点“提取并下载”会按所有帖子标签页 ID 批量下载。"
-                   Foreground="Gray"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                    Margin="0,0,0,8"/>
 
         <TabControl Grid.Row="2" x:Name="BrowserTabControl" SelectionChanged="OnBrowserTabSelectionChanged"/>

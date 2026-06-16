@@ -3,263 +3,510 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
+             d:DesignHeight="680"
+             d:DesignWidth="1080"
              Background="Transparent">
     <UserControl.Resources>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <utils:BooleanToInverseBooleanConverter x:Key="BooleanToInverseBooleanConverter"/>
     </UserControl.Resources>
+
     <UserControl.DataContext>
         <viewModel:GeminiImageGenerationViewModel />
     </UserControl.DataContext>
-    <Grid Margin="10">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*"/>
-            <ColumnDefinition Width="3*"/>
-        </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="0" Margin="0,0,10,0">
+    <ScrollViewer Style="{StaticResource CyanPageScrollViewerStyle}">
+        <Grid Style="{StaticResource CyanPageGridStyle}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <GroupBox Header="素材图片" Grid.Row="0" Margin="0,0,0,10">
+            <Border Grid.Row="0"
+                    Style="{StaticResource CyanHeroPanelStyle}"
+                    Margin="0,0,0,14">
                 <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Style="{StaticResource CyanIconBadgeStyle}"
+                            Margin="0,0,16,0">
+                        <ui:SymbolIcon Symbol="ImageSplit24"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Gemini 图像生成"
+                                   Style="{StaticResource CyanPageTitleStyle}"
+                                   FontSize="30"/>
+                        <TextBlock Text="素材、提示词、模型参数和生成结果集中在一个更清爽的工作台里。"
+                                   Style="{StaticResource CyanPageSubtitleStyle}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2"
+                                MinWidth="180"
+                                VerticalAlignment="Center"
+                                Margin="18,0,0,0">
+                        <TextBlock Text="状态"
+                                   Style="{StaticResource CyanTinyTextBlockStyle}"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   TextWrapping="Wrap"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   Margin="0,4,0,0"/>
+                        <TextBlock Text="{Binding QueueStatusText}"
+                                   Style="{StaticResource CyanTinyTextBlockStyle}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.08*" MinWidth="410"/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="1.42*" MinWidth="500"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="360"/>
+                        <RowDefinition Height="14"/>
+                        <RowDefinition Height="330"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" BorderBrush="#FFCCCCCC" BorderThickness="1" CornerRadius="4"
-                            AllowDrop="True"
-                            Drop="OnInputImageDrop"
-                            DragEnter="OnInputImageDragEnter"
-                            Background="#FFF9F9F9" Padding="8">
+
+                    <GroupBox Grid.Row="0"
+                              Header="素材图片"
+                              Style="{StaticResource CyanGroupBoxStyle}">
                         <Grid>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <ItemsControl ItemsSource="{Binding InputImages}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border BorderBrush="#FFDDDDDD" BorderThickness="1" CornerRadius="3" Margin="4" Padding="6" Width="150"
-                                                    ToolTip="{Binding Path}">
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="*"/>
-                                                    </Grid.RowDefinitions>
-                                                    <Grid Grid.Row="0">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0"
-                                                                   Text="{Binding FileName}"
-                                                                   TextWrapping="NoWrap"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   VerticalAlignment="Center"
-                                                                   Margin="0,0,4,0"/>
-                                                        <Button Grid.Column="1" Content="×" Width="20" Height="20" Padding="0"
-                                                                Command="{Binding DataContext.RemoveImageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                CommandParameter="{Binding}"
-                                                                HorizontalAlignment="Right" />
-                                                    </Grid>
-                                                    <StackPanel Grid.Row="1">
-                                                        <Border Height="90" Background="#FFF3F3F3" Margin="0,6,0,0">
-                                                            <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
-                                                        </Border>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                                            <TextBlock Text="{Binding DisplayPixels}" Foreground="Gray"/>
-                                                            <TextBlock Text=" | " Foreground="Gray" Margin="4,0"/>
-                                                            <TextBlock Text="{Binding DisplaySize}" Foreground="Gray"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        Visibility="{Binding HasInputImages, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
-                                <TextBlock Text="拖拽图片到这里" FontSize="16" Foreground="Gray" HorizontalAlignment="Center"/>
-                                <TextBlock Text="或点击下方按钮选择" Foreground="Gray" HorizontalAlignment="Center"/>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0"
+                                  Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="{Binding InputImages.Count, StringFormat=已选择 {0} 张}"
+                                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Command="{Binding SelectImageCommand}"
+                                        Style="{StaticResource CyanCommandButtonStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="AddCircle24"
+                                                       Margin="0,0,6,0"/>
+                                        <TextBlock Text="添加图片"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="2"
+                                        Command="{Binding ClearInputCommand}"
+                                        Style="{StaticResource CyanCommandButtonStyle}"
+                                        Margin="0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Broom24"
+                                                       Margin="0,0,6,0"/>
+                                        <TextBlock Text="清空"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <Border Grid.Row="1"
+                                    Style="{StaticResource CyanImageWellStyle}"
+                                    AllowDrop="True"
+                                    Drop="OnInputImageDrop"
+                                    DragEnter="OnInputImageDragEnter"
+                                    Padding="10">
+                                <Grid>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding InputImages}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="158"
+                                                            Height="168"
+                                                            Margin="4"
+                                                            Padding="8"
+                                                            CornerRadius="8"
+                                                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                                            BorderThickness="1"
+                                                            ToolTip="{Binding Path}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="*"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <Grid Grid.Row="0">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="{Binding FileName}"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           VerticalAlignment="Center"
+                                                                           Margin="0,0,6,0"/>
+                                                                <Button Grid.Column="1"
+                                                                        Width="24"
+                                                                        Height="24"
+                                                                        Padding="0"
+                                                                        Command="{Binding DataContext.RemoveImageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        ToolTip="移除">
+                                                                    <ui:SymbolIcon Symbol="Broom24"
+                                                                                   FontSize="13"/>
+                                                                </Button>
+                                                            </Grid>
+                                                            <Border Grid.Row="1"
+                                                                    Style="{StaticResource CyanImageWellStyle}"
+                                                                    Margin="0,8,0,8">
+                                                                <Image Source="{Binding Thumbnail}"
+                                                                       Stretch="Uniform"/>
+                                                            </Border>
+                                                            <TextBlock Grid.Row="2"
+                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                <Run Text="{Binding DisplayPixels}"/>
+                                                                <Run Text="  "/>
+                                                                <Run Text="{Binding DisplaySize}"/>
+                                                            </TextBlock>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Visibility="{Binding HasInputImages, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                                        <ui:SymbolIcon Symbol="ImageSplit24"
+                                                       FontSize="32"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       HorizontalAlignment="Center"/>
+                                        <TextBlock Text="拖入素材或点击添加图片"
+                                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                                   FontSize="15"
+                                                   Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="2"
+                              Header="生成结果"
+                              Style="{StaticResource CyanGroupBoxStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Style="{StaticResource CyanImageWellStyle}"
+                                    Padding="10"
+                                    MouseLeftButtonUp="OnResultImageClick"
+                                    Cursor="Hand">
+                                <Grid>
+                                    <Image Source="{Binding ResultImageSource}"
+                                           Stretch="Uniform"/>
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Visibility="{Binding HasResultImage, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                                        <ui:SymbolIcon Symbol="ImageSplit24"
+                                                       FontSize="34"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       HorizontalAlignment="Center"/>
+                                        <TextBlock Text="还没有生成结果"
+                                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                                   FontSize="15"
+                                                   Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Button Grid.Row="1"
+                                    Command="{Binding ClearResultCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,10,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Broom24"
+                                                   Margin="0,0,6,0"/>
+                                    <TextBlock Text="清空结果"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+
+                <GridSplitter Grid.Column="1"
+                              Style="{StaticResource CyanGridSplitterStyle}"/>
+
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="230"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="260"/>
+                    </Grid.RowDefinitions>
+
+                    <GroupBox Grid.Row="0"
+                              Header="配置与模型"
+                              Style="{StaticResource CyanGroupBoxStyle}"
+                              Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="配置名"
+                                       Style="{StaticResource CyanFormLabelStyle}"/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding AvailableConfigNames}"
+                                      Text="{Binding SelectedConfigName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEditable="True"
+                                      IsTextSearchEnabled="False"
+                                      Margin="0,0,8,0"/>
+                            <Button Grid.Column="2"
+                                    Content="保存"
+                                    Command="{Binding SaveConfigCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"/>
+                            <Button Grid.Column="3"
+                                    Content="删除"
+                                    Command="{Binding DeleteConfigCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0"/>
+
+                            <TextBlock Grid.Row="1"
+                                       Text="API Key"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="0,10,10,0"/>
+                            <PasswordBox Grid.Row="1"
+                                         Grid.Column="1"
+                                         Grid.ColumnSpan="3"
+                                         utils:PasswordBoxHelper.BindPassword="True"
+                                         utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center"
+                                         Margin="0,10,0,0"/>
+
+                            <TextBlock Grid.Row="2"
+                                       Text="模型"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="0,10,10,0"/>
+                            <ComboBox Grid.Row="2"
+                                      Grid.Column="1"
+                                      ItemsSource="{Binding AvailableModels}"
+                                      SelectedItem="{Binding SelectedModel}"
+                                      Margin="0,10,8,0"/>
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="2"
+                                     Grid.ColumnSpan="2"
+                                     Text="{Binding ApiBaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="API 地址"
+                                     VerticalContentAlignment="Center"
+                                     MinWidth="220"
+                                     Margin="0,10,0,0"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="1"
+                              Header="生成设置"
+                              Style="{StaticResource CyanGroupBoxStyle}"
+                              Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="130"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Temperature"
+                                       Style="{StaticResource CyanFormLabelStyle}"/>
+                            <Slider Grid.Column="1"
+                                    Minimum="0"
+                                    Maximum="1"
+                                    Value="{Binding Temperature, Mode=TwoWay}"
+                                    TickFrequency="0.1"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Temperature, StringFormat=F2}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"/>
+
+                            <TextBlock Grid.Row="1"
+                                       Text="尺寸"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="0,10,10,0"/>
+                            <ComboBox Grid.Row="1"
+                                      Grid.Column="1"
+                                      ItemsSource="{Binding ImageSizeOptions}"
+                                      SelectedItem="{Binding SelectedImageSizeOption}"
+                                      DisplayMemberPath="Display"
+                                      Margin="0,10,10,0"/>
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="3"
+                                       Text="宽高比"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="8,10,10,0"/>
+                            <ComboBox Grid.Row="1"
+                                      Grid.Column="4"
+                                      ItemsSource="{Binding AspectRatioOptions}"
+                                      SelectedItem="{Binding SelectedAspectRatioOption}"
+                                      DisplayMemberPath="Display"
+                                      Margin="0,10,0,0"/>
+
+                            <TextBlock Grid.Row="2"
+                                       Text="批量间隔"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="0,10,10,0"/>
+                            <StackPanel Grid.Row="2"
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Margin="0,10,0,0">
+                                <TextBox Width="68"
+                                         Text="{Binding DelayMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center"/>
+                                <TextBlock Text="-"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0"/>
+                                <TextBox Width="68"
+                                         Text="{Binding DelayMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center"/>
+                                <TextBlock Text="秒"
+                                           Style="{StaticResource CyanTinyTextBlockStyle}"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0"/>
                             </StackPanel>
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="3"
+                                       Text="张数"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="8,10,10,0"/>
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="4"
+                                     Text="{Binding BatchCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     VerticalContentAlignment="Center"
+                                     Margin="0,10,0,0"/>
+
+                            <TextBlock Grid.Row="3"
+                                       Grid.Column="1"
+                                       Grid.ColumnSpan="4"
+                                       Text="{Binding ImageSizeValidationError}"
+                                       Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                       Margin="0,8,0,0"
+                                       Visibility="{Binding HasImageSizeValidationError, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
-                    </Border>
+                    </GroupBox>
 
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Bottom">
-                        <Button Content="选择图片..." Command="{Binding SelectImageCommand}" Padding="12,6" />
-                        <Button Content="清空素材" Command="{Binding ClearInputCommand}" Padding="12,6" Margin="10,0,0,0"/>
-                        <TextBlock Text="{Binding InputImages.Count, StringFormat=已选择 {0} 张}" Foreground="Gray" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
-            </GroupBox>
+                    <GroupBox Grid.Row="2"
+                              Header="提示词"
+                              Style="{StaticResource CyanGroupBoxStyle}"
+                              Margin="0,0,0,12">
+                        <TextBox Text="{Binding Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Padding="10"/>
+                    </GroupBox>
 
-            <GroupBox Header="生成结果" Grid.Row="1">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Border Grid.Row="0" BorderBrush="#FFCCCCCC" BorderThickness="1" CornerRadius="4" Background="#FFF9F9F9"
-                            MouseLeftButtonUp="OnResultImageClick" Cursor="Hand">
+                    <GroupBox Grid.Row="3"
+                              Header="执行"
+                              Style="{StaticResource CyanGroupBoxStyle}"
+                              Margin="0,0,0,12">
                         <Grid>
-                            <Image Source="{Binding ResultImageSource}" Stretch="Uniform" Margin="10"/>
-                            <TextBlock Text="还没有生成结果" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Visibility="{Binding HasResultImage, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button Command="{Binding GenerateCommand}"
+                                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="PlayCircle24"
+                                                   Margin="0,0,6,0"/>
+                                    <TextBlock Text="开始生成"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1"
+                                    Command="{Binding BatchGenerateCommand}"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
+                                    Style="{StaticResource CyanCommandButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="AddCircle24"
+                                                   Margin="0,0,6,0"/>
+                                    <TextBlock Text="批量生成"/>
+                                </StackPanel>
+                            </Button>
+                            <ProgressBar Grid.Column="2"
+                                         Height="18"
+                                         Margin="10,0,0,0"
+                                         VerticalAlignment="Center"
+                                         IsIndeterminate="True"
+                                         Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
-                    </Border>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Bottom">
-                        <Button Content="清空结果" Command="{Binding ClearResultCommand}" Padding="12,6"/>
-                    </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="4"
+                              Header="日志"
+                              Style="{StaticResource CyanGroupBoxStyle}">
+                        <ListBox ItemsSource="{Binding LogLines}"
+                                 VirtualizingStackPanel.IsVirtualizing="True"
+                                 VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                 HorizontalContentAlignment="Stretch"
+                                 Style="{StaticResource CyanListBoxSurfaceStyle}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </GroupBox>
                 </Grid>
-            </GroupBox>
-        </Grid>
-
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <GroupBox Header="配置" Grid.Row="0" Margin="0,0,0,10">
-                <Grid Margin="5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="配置名:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableConfigNames}" Text="{Binding SelectedConfigName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              IsEditable="True" Margin="0,0,8,0" Height="28" IsTextSearchEnabled="False"/>
-                    <Button Grid.Column="2" Content="保存" Command="{Binding SaveConfigCommand}" Padding="10,6" Margin="0,0,6,0"/>
-                    <Button Grid.Column="3" Content="删除" Command="{Binding DeleteConfigCommand}" Padding="10,6"/>
-                </Grid>
-            </GroupBox>
-
-            <GroupBox Header="鉴权与模型" Grid.Row="1" Margin="0,0,0,10">
-                <Grid Margin="5">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="API Key:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <PasswordBox Grid.Row="0" Grid.Column="1" Height="28"
-                                 utils:PasswordBoxHelper.BindPassword="True"
-                                 utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 VerticalContentAlignment="Center" />
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="API 地址:" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ApiBaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,6,0,0" Height="28" VerticalContentAlignment="Center"
-                             ToolTip="例如 https://generativelanguage.googleapis.com"/>
-
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="模型:" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding SelectedModel}"
-                              Margin="0,6,0,0" Height="28"/>
-                </Grid>
-            </GroupBox>
-
-            <GroupBox Header="生成设置" Grid.Row="2" Margin="0,0,0,10">
-                <Grid Margin="5">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Temperature:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <Slider Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Temperature, Mode=TwoWay}" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
-                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Temperature, StringFormat=F2}" VerticalAlignment="Center" Foreground="Gray"/>
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="生图尺寸:" VerticalAlignment="Center" Margin="0,8,8,0"/>
-                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ImageSizeOptions}" SelectedItem="{Binding SelectedImageSizeOption}"
-                              DisplayMemberPath="Display" Margin="0,8,0,0" Height="28"/>
-                    <TextBlock Grid.Row="1" Grid.Column="2" Text="固定为 1K / 2K / 4K（大写 K）" VerticalAlignment="Center" Foreground="Gray" Margin="6,8,0,0"/>
-
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="长宽比:" VerticalAlignment="Center" Margin="0,8,8,0"/>
-                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AspectRatioOptions}" SelectedItem="{Binding SelectedAspectRatioOption}"
-                              DisplayMemberPath="Display" Margin="0,8,0,0" Height="28"/>
-                    <TextBlock Grid.Row="2" Grid.Column="2" Text="可选或留空" VerticalAlignment="Center" Foreground="Gray" Margin="6,8,0,0"/>
-
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="批量等待(s):" VerticalAlignment="Center" Margin="0,8,8,0"/>
-                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,8,0,0">
-                        <TextBox Width="60" Text="{Binding DelayMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
-                        <TextBlock Text=" - " VerticalAlignment="Center" Margin="4,0"/>
-                        <TextBox Width="60" Text="{Binding DelayMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
-                    </StackPanel>
-                    <TextBlock Grid.Row="3" Grid.Column="2" Text="最小/最大" VerticalAlignment="Center" Foreground="Gray" Margin="6,8,0,0"/>
-
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="批量张数:" VerticalAlignment="Center" Margin="0,8,8,0"/>
-                    <TextBox Grid.Row="4" Grid.Column="1" Width="80" Text="{Binding BatchCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" Margin="0,8,0,0"/>
-                    <TextBlock Grid.Row="4" Grid.Column="2" Text="1-10" VerticalAlignment="Center" Foreground="Gray" Margin="6,8,0,0"/>
-                </Grid>
-            </GroupBox>
-
-            <GroupBox Header="提示词" Grid.Row="3" Margin="0,0,0,10">
-                <DockPanel>
-                    <TextBox Text="{Binding Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                             MinHeight="120" />
-                </DockPanel>
-            </GroupBox>
-
-            <StackPanel Grid.Row="4" Orientation="Vertical" HorizontalAlignment="Left" Margin="0,0,0,10">
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="开始生成" Command="{Binding GenerateCommand}" Padding="16,8"/>
-                    <Button Content="批量生成(最多10张)" Command="{Binding BatchGenerateCommand}" Padding="16,8" Margin="10,0,0,0"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"/>
-                    <ProgressBar Width="140" Height="18" Margin="10,0,0,0"
-                                 IsIndeterminate="True"
-                                 Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </StackPanel>
-                <TextBlock Text="{Binding QueueStatusText}" Margin="2,6,0,0" Foreground="Gray"/>
-            </StackPanel>
-
-            <Grid Grid.Row="5">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <StackPanel Orientation="Horizontal" Grid.Row="0">
-                    <TextBlock Text="状态:" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding StatusMessage}" Margin="5,0,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
-                <ListBox Grid.Row="1" ItemsSource="{Binding LogLines}" Margin="0,5,0,0"
-                         VirtualizingStackPanel.IsVirtualizing="True"
-                         VirtualizingStackPanel.VirtualizationMode="Recycling">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
             </Grid>
         </Grid>
-    </Grid>
+    </ScrollViewer>
 </UserControl>

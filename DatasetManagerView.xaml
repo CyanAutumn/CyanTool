@@ -122,7 +122,10 @@
                                        TagTemplate="{StaticResource TagTokenTemplate}"
                                        InputTemplate="{StaticResource TagInputTemplate}"/>
     </UserControl.Resources>
-    <Grid x:Name="RootGrid" KeyDown="DatasetManagerView_KeyDown" Focusable="True">
+    <Grid x:Name="RootGrid"
+          KeyDown="DatasetManagerView_KeyDown"
+          Focusable="True"
+          Background="Transparent">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" MinWidth="150"/>
             <ColumnDefinition Width="5"/>
@@ -142,13 +145,15 @@
                 <Button Grid.Column="1" Content="保存所有更改" Command="{Binding SaveAllCommand}" Margin="2,5,0,0" Padding="5"/>
             </Grid>
 
-            <TextBlock DockPanel.Dock="Top" Text="数据列表" FontWeight="Bold" Margin="0,0,0,5"/>
+            <TextBlock DockPanel.Dock="Top"
+                       Text="数据列表"
+                       Style="{StaticResource CyanSectionTitleStyle}"
+                       Margin="0,0,0,8"/>
             <ListBox x:Name="DataItemsList"
                      PreviewMouseLeftButtonDown="DataItemsList_PreviewMouseLeftButtonDown"
                      ItemsSource="{Binding DataItemsWithOperations}"
                      SelectedItem="{Binding SelectedDataItem, Mode=TwoWay}"
-                     BorderThickness="0"
-                     Background="Transparent"
+                     Style="{StaticResource CyanListBoxSurfaceStyle}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      ScrollViewer.CanContentScroll="True"
@@ -193,10 +198,10 @@
                             <Border>
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
-                                        <Setter Property="Background" Value="White"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}"/>
+                                        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
                                         <Setter Property="BorderThickness" Value="1"/>
-                                        <Setter Property="CornerRadius" Value="4"/>
+                                        <Setter Property="CornerRadius" Value="8"/>
                                         <Setter Property="Padding" Value="4"/>
                                         <Style.Triggers>
                                             <DataTrigger Value="True">
@@ -206,8 +211,8 @@
                                                         <Binding Path="DataContext.SelectedDataItem" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
                                                     </MultiBinding>
                                                 </DataTrigger.Binding>
-                                                <Setter Property="BorderBrush" Value="#FF409EFF"/>
-                                                <Setter Property="Background" Value="#FFEAF3FF"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -218,7 +223,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <Grid>
-                                        <Border Background="#FFEFEFEF" CornerRadius="3">
+                                        <Border Background="{DynamicResource ControlFillColorSecondaryBrush}" CornerRadius="6">
                                             <Image Width="80"
                                                    Height="80"
                                                    Stretch="UniformToFill"
@@ -228,7 +233,7 @@
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Top"
                                                 Margin="2"
-                                                Background="#CC333333"
+                                                Background="{StaticResource CyanBadgeBackgroundBrush}"
                                                 CornerRadius="2"
                                                 Padding="2">
                                             <TextBlock Text="{Binding Operation}" Foreground="White" FontSize="10"/>
@@ -254,7 +259,7 @@
         </DockPanel>
 
 
-        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="LightGray"/>
+        <GridSplitter Grid.Column="1" Style="{StaticResource CyanGridSplitterStyle}"/>
 
 
         <Grid Grid.Column="2">
@@ -264,7 +269,10 @@
             </Grid.RowDefinitions>
 
 
-            <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="#FFCCCCCC" Background="#FFF0F0F0">
+            <Border Grid.Row="0"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Orientation="Horizontal" Margin="5">
                     <CheckBox Content="自动下一张" IsChecked="{Binding AutoNext}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     <CheckBox Content="浏览模式" IsChecked="{Binding IsBrowseMode}" VerticalAlignment="Center" Margin="10,0,0,0"/>
@@ -272,7 +280,11 @@
             </Border>
 
 
-            <Border Grid.Row="1" x:Name="ImageContainer" Background="#FFCCCCCC" ClipToBounds="True" SizeChanged="ImageContainer_SizeChanged">
+            <Border Grid.Row="1"
+                    x:Name="ImageContainer"
+                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                    ClipToBounds="True"
+                    SizeChanged="ImageContainer_SizeChanged">
                 <Canvas x:Name="MainCanvas"
                         Background="Transparent"
                         MouseRightButtonDown="MainCanvas_MouseRightButtonDown"
@@ -294,7 +306,7 @@
         </Grid>
 
 
-        <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="LightGray"/>
+        <GridSplitter Grid.Column="3" Style="{StaticResource CyanGridSplitterStyle}"/>
 
 
         <Grid Grid.Column="4" Margin="5">
@@ -305,11 +317,14 @@
             </Grid.RowDefinitions>
 
 
-            <GroupBox Grid.Row="0" Header="分类目录" Margin="0,0,0,5">
+            <GroupBox Grid.Row="0"
+                      Header="分类目录"
+                      Margin="0,0,0,8"
+                      Style="{StaticResource CyanGroupBoxStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="勾选后“保存所有更改”才会处理对应分类"
-                                   Foreground="Gray"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    Margin="0,0,0,5"
                                    TextWrapping="Wrap"/>
 
@@ -402,7 +417,10 @@
             </GroupBox>
 
 
-            <GroupBox Grid.Row="1" Header="内容" Margin="0,0,0,5">
+            <GroupBox Grid.Row="1"
+                      Header="内容"
+                      Margin="0,0,0,8"
+                      Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -411,7 +429,7 @@
                     <DockPanel Grid.Row="0" Margin="0,0,0,6">
                         <StackPanel>
                             <TextBlock Text="{Binding TagTokens.Count, StringFormat=标签数: {0}}"
-                                       Foreground="Gray"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,0,0,4"/>
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -446,7 +464,7 @@
                                     Margin="0,6,0,0"
                                     HorizontalAlignment="Left"/>
                             <TextBlock Text="{Binding TagTranslationCountDisplay}"
-                                       Foreground="Gray"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </DockPanel>
@@ -523,7 +541,10 @@
             </GroupBox>
 
 
-            <GroupBox Grid.Row="2" Header="控制" Margin="0,5,0,0">
+            <GroupBox Grid.Row="2"
+                      Header="控制"
+                      Margin="0,5,0,0"
+                      Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

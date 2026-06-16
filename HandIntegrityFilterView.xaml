@@ -30,7 +30,7 @@
             <CheckBox Content="执行完成后清空输入路径文件夹"
                       IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion}"
                       Margin="0,6,0,0"
-                      ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
+                      ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,10">
@@ -55,12 +55,12 @@
                 <TextBox Grid.Column="0" Text="{Binding GoodOutputDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" VerticalContentAlignment="Center"/>
                 <Button Grid.Column="1" Content="..." Command="{Binding BrowseGoodOutputCommand}" Padding="10,5"/>
             </Grid>
-            <TextBlock Text="留空则不输出好图" Foreground="Gray" Margin="0,5,0,0"/>
+            <TextBlock Text="留空则不输出好图" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,5,0,0"/>
         </StackPanel>
 
         <GroupBox Grid.Row="3" Header="模型设置" Margin="0,0,0,10">
             <StackPanel Margin="10">
-                <TextBlock Text="首次使用会自动下载模型（需联网）" Foreground="Gray" Margin="0,0,0,5"/>
+                <TextBlock Text="首次使用会自动下载模型（需联网）" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,5"/>
                 <TextBlock Text="手部检测模型:"/>
                 <ComboBox ItemsSource="{Binding DetectorModels}"
                           SelectedItem="{Binding SelectedDetectorModel}"

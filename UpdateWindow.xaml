@@ -18,7 +18,7 @@
             <TextBlock x:Name="VersionText" Margin="0,6,0,0" />
         </StackPanel>
 
-        <Border Grid.Row="1" BorderBrush="#DDD" BorderThickness="1" CornerRadius="4">
+        <Border Grid.Row="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4">
             <TextBox x:Name="NotesTextBox"
                      IsReadOnly="True"
                      TextWrapping="Wrap"

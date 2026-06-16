@@ -121,12 +121,12 @@
                       DataType="{x:Type viewModel:PipelineCanvasConnectorViewModel}">
             <TextBlock Text="{Binding Title}"
                        FontSize="12"
-                       Foreground="#444"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        TextTrimming="CharacterEllipsis" />
         </DataTemplate>
 
         <Style x:Key="PipelineButtonStyle" TargetType="Button">
-            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Padding" Value="10,4" />
             <Setter Property="Margin" Value="0,0,6,0" />
         </Style>
     </UserControl.Resources>
@@ -135,19 +135,22 @@
         <viewModel:PipelineSchedulerViewModel />
     </UserControl.DataContext>
 
-    <Grid Margin="5">
+    <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="170" />
+            <RowDefinition Height="180" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="235" />
+            <ColumnDefinition Width="248" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <GroupBox Header="工作流" Grid.ColumnSpan="2" Margin="5">
-            <StackPanel Orientation="Horizontal" Margin="5">
+        <GroupBox Header="工作流"
+                  Grid.ColumnSpan="2"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <StackPanel Orientation="Horizontal">
                 <ComboBox ItemsSource="{Binding Workflows}"
                           Text="{Binding SelectedWorkflowName, UpdateSourceTrigger=PropertyChanged}"
                           IsEditable="True"
@@ -160,18 +163,22 @@
                 <Button Content="取消" Command="{Binding CancelCommand}" Style="{StaticResource PipelineButtonStyle}" />
                 <TextBlock Text="{Binding IsRunning, StringFormat=运行中: {0}}"
                            VerticalAlignment="Center"
-                           Foreground="Gray"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Margin="8,0,0,0" />
             </StackPanel>
         </GroupBox>
 
-        <Grid Grid.Row="1" Grid.Column="0" Margin="5">
+        <Grid Grid.Row="1"
+              Grid.Column="0"
+              Margin="0,0,12,12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="210" />
             </Grid.RowDefinitions>
 
-            <GroupBox Header="可用节点" Margin="0,0,0,5">
+            <GroupBox Header="可用节点"
+                      Margin="0,0,0,10"
+                      Style="{StaticResource CyanGroupBoxStyle}">
                 <DockPanel>
                     <Button Content="添加节点"
                             Command="{Binding AddNodeCommand}"
@@ -182,11 +189,13 @@
                     <ListBox ItemsSource="{Binding AvailableNodes}"
                              SelectedItem="{Binding SelectedAvailableNode}"
                              DisplayMemberPath="DisplayName"
-                             BorderThickness="0" />
+                             Style="{StaticResource CyanListBoxSurfaceStyle}" />
                 </DockPanel>
             </GroupBox>
 
-            <GroupBox Header="执行顺序" Grid.Row="1">
+            <GroupBox Header="执行顺序"
+                      Grid.Row="1"
+                      Style="{StaticResource CyanGroupBoxStyle}">
                 <DockPanel>
                     <StackPanel Orientation="Horizontal"
                                 DockPanel.Dock="Bottom"
@@ -197,7 +206,7 @@
                     </StackPanel>
                     <ListBox ItemsSource="{Binding PipelineNodes}"
                              SelectedItem="{Binding SelectedPipelineNode}"
-                             BorderThickness="0">
+                             Style="{StaticResource CyanListBoxSurfaceStyle}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding DisplayName}" />
@@ -210,10 +219,11 @@
 
         <Border Grid.Row="1"
                 Grid.Column="1"
-                Margin="5"
-                BorderBrush="#DDDDDD"
+                Margin="0,0,0,12"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                Background="#F8F8F8">
+                CornerRadius="8"
+                Background="{DynamicResource ControlFillColorSecondaryBrush}">
             <nodify:NodifyEditor x:Name="PipelineEditor"
                                  ItemsSource="{Binding CanvasNodes}"
                                  Connections="{Binding CanvasConnections}"
@@ -223,7 +233,7 @@
                                  ItemContainerStyle="{StaticResource PipelineItemContainerStyle}"
                                  DisconnectConnectorCommand="{Binding DisconnectConnectorCommand}"
                                  GridCellSize="20"
-                                 Background="#FAFAFA">
+                                 Background="{DynamicResource ControlFillColorSecondaryBrush}">
                 <nodify:NodifyEditor.InputBindings>
                     <KeyBinding Key="Delete" Command="{Binding RemoveNodeCommand}" />
                 </nodify:NodifyEditor.InputBindings>
@@ -251,8 +261,8 @@
                                      MinWidth="440"
                                      MaxWidth="520"
                                      ContentPadding="0"
-                                     HeaderBrush="#2F3A4A"
-                                     ContentBrush="White">
+                                     HeaderBrush="{StaticResource CyanNodeHeaderBrush}"
+                                     ContentBrush="{DynamicResource CardBackgroundFillColorDefaultBrush}">
                             <nodify:Node.HeaderTemplate>
                                 <DataTemplate DataType="{x:Type viewModel:PipelineCanvasNodeViewModel}">
                                     <Grid Margin="2">
@@ -266,7 +276,7 @@
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding DirectoryBehaviorText}"
-                                                       Foreground="#D7DEE8"
+                                                       Foreground="{StaticResource CyanNodeHeaderSecondaryBrush}"
                                                        FontSize="11"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
@@ -288,8 +298,8 @@
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
 
-                                        <Border Background="#F5F7FA"
-                                                BorderBrush="#E4E8EF"
+                                        <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                                                 BorderThickness="0,0,0,1"
                                                 Padding="8">
                                             <Grid>
@@ -303,21 +313,21 @@
                                                 </Grid.ColumnDefinitions>
 
                                                 <TextBlock Text="输入"
-                                                           Foreground="#666"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                            Margin="0,0,8,3" />
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding InputPathPreview}"
-                                                           Foreground="#333"
+                                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                            TextTrimming="CharacterEllipsis"
                                                            Margin="0,0,0,3" />
                                                 <TextBlock Grid.Row="1"
                                                            Text="输出"
-                                                           Foreground="#666"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                            Margin="0,0,8,0" />
                                                 <TextBlock Grid.Row="1"
                                                            Grid.Column="1"
                                                            Text="{Binding OutputPathPreview}"
-                                                           Foreground="#333"
+                                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                            TextTrimming="CharacterEllipsis" />
                                             </Grid>
                                         </Border>
@@ -348,7 +358,10 @@
             </nodify:NodifyEditor>
         </Border>
 
-        <GroupBox Header="日志" Grid.Row="2" Grid.ColumnSpan="2" Margin="5">
+        <GroupBox Header="日志"
+                  Grid.Row="2"
+                  Grid.ColumnSpan="2"
+                  Style="{StaticResource CyanGroupBoxStyle}">
             <DockPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="5,5,5,0">
                     <Button Content="清空日志" Command="{Binding ClearLogCommand}" Style="{StaticResource PipelineButtonStyle}" />
@@ -357,7 +370,9 @@
                     <ItemsControl ItemsSource="{Binding LogLines}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

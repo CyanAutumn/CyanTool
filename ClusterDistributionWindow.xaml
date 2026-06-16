@@ -19,18 +19,18 @@
                        TextWrapping="Wrap" />
             <TextBlock x:Name="ZoomTextBlock"
                        Margin="0,6,0,0"
-                       Foreground="#475467"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                        FontSize="12"
                        TextWrapping="Wrap" />
             <TextBlock x:Name="ImagePathTextBlock"
                        Margin="0,6,0,0"
-                       Foreground="#667085"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        FontSize="12"
                        TextWrapping="Wrap" />
         </StackPanel>
 
         <Border Grid.Row="1"
-                BorderBrush="#D0D8E3"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="6"
                 Background="White">

@@ -24,7 +24,7 @@
                     <Button Content="应用" Command="{Binding ApplyRenamingCommand}" Margin="5"/>
                 </StackPanel>
                 <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                           Foreground="Gray" Margin="5,0,5,5"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="5,0,5,5"
                            TextWrapping="Wrap"
                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </StackPanel>

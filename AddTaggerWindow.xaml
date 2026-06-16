@@ -70,7 +70,7 @@
 
             <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6"
                        Text="{Binding StatusMessage}"
-                       Foreground="#666"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        TextWrapping="Wrap"
                        Margin="0,6,0,0" />
         </Grid>

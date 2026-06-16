@@ -295,6 +295,7 @@ namespace CyanTools
                 WindowBackdropType.None);
 
             ThemeStatusText.Text = useDarkTheme ? "夜间" : "白天";
+            ThemeIcon.Symbol = useDarkTheme ? SymbolRegular.DarkTheme24 : SymbolRegular.WeatherSunny24;
         }
 
         private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

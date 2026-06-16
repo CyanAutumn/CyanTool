@@ -44,13 +44,13 @@
                                     Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         </Grid>
                         <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                                   Foreground="Gray" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"
                                    TextWrapping="Wrap"
                                    Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <CheckBox Content="执行完成后清空输入路径文件夹"
                                   IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion}"
                                   Margin="0,6,0,0"
-                                  ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
+                                  ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。"/>
                     </StackPanel>
                     
                     <StackPanel Margin="0,0,0,10">
@@ -67,7 +67,7 @@
                                     Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                         </Grid>
                         <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
-                                   Foreground="Gray" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"
                                    Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </StackPanel>
                     
@@ -136,7 +136,7 @@
                             <CheckBox Content="保留原始标签" IsChecked="{Binding KeepOriginTags}" Margin="0,5"/>
                             <TextBlock Text="说明：追加tag只会追加所写的视角tag，新出现的图片需要重新打标。"
                                        Margin="0,6,0,0"
-                                       Foreground="Gray"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
                     </GroupBox>

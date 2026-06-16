@@ -26,7 +26,7 @@
                         Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
             </Grid>
             <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                       Foreground="Gray" Margin="0,-6,0,10"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,-6,0,10"
                        TextWrapping="Wrap"
                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 

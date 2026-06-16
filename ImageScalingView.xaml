@@ -3,10 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="520"
+             d:DesignWidth="860">
     <UserControl.Resources>
         <utils:BooleanToInverseBooleanConverter x:Key="BooleanToInverseBooleanConverter"/>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -15,157 +17,228 @@
         <viewModel:ImageScalingViewModel/>
     </UserControl.DataContext>
 
-    <Grid Margin="10">
+    <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <GroupBox Header="路径选择" Grid.Row="0" Margin="0,5">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="输入路径:" VerticalAlignment="Center" Margin="5"/>
-                    <TextBox Grid.Column="1"
-                             Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             IsReadOnly="{Binding HasInheritedInputPath}"
-                             Margin="5"/>
-                    <Button Grid.Column="2"
-                            Content="..."
-                            Command="{Binding SelectInputCommand}"
-                            Margin="5"
-                            Padding="10,2"
-                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                </Grid>
-                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                           Foreground="Gray" Margin="5,2,5,0"
-                           TextWrapping="Wrap"
-                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <CheckBox Content="执行完成后清空输入路径文件夹"
-                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
-                          Margin="5,6,5,0"
-                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
+        <GroupBox Header="路径"
+                  Grid.Row="0"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="输出路径:" VerticalAlignment="Center" Margin="5"
-                                   Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                        <TextBox Grid.Column="1"
-                                 Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 Margin="5"
-                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                        <Button Grid.Column="2"
-                                Content="..."
-                                Command="{Binding SelectOutputCommand}"
-                                Margin="5"
-                                Padding="10,2"
-                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    </Grid>
-                    <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
-                               Foreground="Gray" Margin="5,2,5,5"
-                               Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </StackPanel>
-            </StackPanel>
+                <TextBlock Text="输入路径"
+                           Style="{StaticResource CyanFormLabelStyle}"/>
+                <TextBox Grid.Column="1"
+                         Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="{Binding HasInheritedInputPath}"
+                         Margin="0,0,8,0"/>
+                <Button Grid.Column="2"
+                        Command="{Binding SelectInputCommand}"
+                        Width="40"
+                        ToolTip="选择输入路径"
+                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                    <ui:SymbolIcon Symbol="FolderOpen24"/>
+                </Button>
+
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="2"
+                           Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           Margin="0,6,0,0"
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <CheckBox Grid.Row="2"
+                          Grid.Column="1"
+                          Grid.ColumnSpan="2"
+                          Content="执行完成后清空输入路径文件夹"
+                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
+                          Margin="0,8,0,0"
+                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。"/>
+
+                <TextBlock Grid.Row="3"
+                           Text="输出路径"
+                           Style="{StaticResource CyanFormLabelStyle}"
+                           Margin="0,12,10,0"
+                           Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                <TextBox Grid.Row="3"
+                         Grid.Column="1"
+                         Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,12,8,0"
+                         Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+                <Button Grid.Row="3"
+                        Grid.Column="2"
+                        Command="{Binding SelectOutputCommand}"
+                        Width="40"
+                        Margin="0,12,0,0"
+                        ToolTip="选择输出路径"
+                        Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                    <ui:SymbolIcon Symbol="FolderOpen24"/>
+                </Button>
+
+                <TextBlock Grid.Row="4"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="2"
+                           Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           Margin="0,8,0,0"
+                           Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
         </GroupBox>
 
-        <GroupBox Header="缩放选项" Grid.Row="1" Margin="0,5">
-            <StackPanel Margin="5">
-                <Grid Margin="0,4">
+        <GroupBox Header="缩放选项"
+                  Grid.Row="1"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="240"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="84"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="70"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="84"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                              Content="上采样至目标分辨率(乘积)"
+                    <CheckBox Content="上采样至目标分辨率(乘积)"
                               VerticalAlignment="Center"
                               IsChecked="{Binding IsUpsampleEnabled, Mode=TwoWay}"/>
-                    <TextBlock Grid.Column="1" Text="宽:" VerticalAlignment="Center" Margin="20,0,4,0"/>
+                    <TextBlock Grid.Column="1"
+                               Text="宽"
+                               Style="{StaticResource CyanFormLabelStyle}"
+                               MinWidth="0"
+                               Margin="18,0,8,0"/>
                     <TextBox Grid.Column="2"
                              Text="{Binding UpsampleTargetWidth, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding IsUpsampleEnabled}"
                              VerticalContentAlignment="Center"/>
-                    <TextBlock Grid.Column="3" Text="高:" VerticalAlignment="Center" Margin="10,0,4,0"/>
+                    <TextBlock Grid.Column="3"
+                               Text="高"
+                               Style="{StaticResource CyanFormLabelStyle}"
+                               MinWidth="0"
+                               Margin="14,0,8,0"/>
                     <TextBox Grid.Column="4"
                              Text="{Binding UpsampleTargetHeight, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding IsUpsampleEnabled}"
                              VerticalContentAlignment="Center"/>
                 </Grid>
 
-                <Grid Margin="0,4">
+                <Grid Grid.Row="1"
+                      Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="240"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="84"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="70"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="84"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                              Content="下采样至目标分辨率(乘积)"
+                    <CheckBox Content="下采样至目标分辨率(乘积)"
                               VerticalAlignment="Center"
                               IsChecked="{Binding IsDownsampleEnabled, Mode=TwoWay}"/>
-                    <TextBlock Grid.Column="1" Text="宽:" VerticalAlignment="Center" Margin="20,0,4,0"/>
+                    <TextBlock Grid.Column="1"
+                               Text="宽"
+                               Style="{StaticResource CyanFormLabelStyle}"
+                               MinWidth="0"
+                               Margin="18,0,8,0"/>
                     <TextBox Grid.Column="2"
                              Text="{Binding DownsampleTargetWidth, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding IsDownsampleEnabled}"
                              VerticalContentAlignment="Center"/>
-                    <TextBlock Grid.Column="3" Text="高:" VerticalAlignment="Center" Margin="10,0,4,0"/>
+                    <TextBlock Grid.Column="3"
+                               Text="高"
+                               Style="{StaticResource CyanFormLabelStyle}"
+                               MinWidth="0"
+                               Margin="14,0,8,0"/>
                     <TextBox Grid.Column="4"
                              Text="{Binding DownsampleTargetHeight, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding IsDownsampleEnabled}"
                              VerticalContentAlignment="Center"/>
                 </Grid>
 
-                <TextBlock Text="宽和高会自动修正为最接近的 64 倍数。勾选两个选项时执行顺序: 先上采样，再下采样。命中跳过条件的图片不会输出到目标目录。"
-                           Margin="0,6,0,0"
-                           Foreground="Gray"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
+                <TextBlock Grid.Row="2"
+                           Text="宽和高会自动修正为最接近的 64 倍数。勾选两个选项时执行顺序：先上采样，再下采样。命中跳过条件的图片不会输出到目标目录。"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           Margin="0,12,0,0"/>
+            </Grid>
         </GroupBox>
 
-        <Button Grid.Row="2"
-                Content="开始处理"
-                Command="{Binding StartProcessingCommand}"
-                Margin="0,10,0,5"
-                Padding="10,5"
-                HorizontalAlignment="Center"
-                IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}"/>
-
-        <GroupBox Header="处理进度" Grid.Row="3" Margin="0,5">
-            <ProgressBar Value="{Binding ProgressValue}" Minimum="0" Maximum="100" Height="20" Margin="5"/>
-        </GroupBox>
-
-        <GroupBox Header="处理日志" Grid.Row="4" Margin="0,5">
-            <DockPanel>
-                <Button Content="清空日志"
+        <GroupBox Header="执行"
+                  Grid.Row="2"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        Command="{Binding StartProcessingCommand}"
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}"
+                        IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="PlayCircle24"
+                                       Margin="0,0,6,0"/>
+                        <TextBlock Text="开始处理"/>
+                    </StackPanel>
+                </Button>
+                <ProgressBar Grid.Column="1"
+                             Value="{Binding ProgressValue}"
+                             Minimum="0"
+                             Maximum="100"
+                             Height="18"
+                             VerticalAlignment="Center"
+                             Margin="10,0"/>
+                <Button Grid.Column="2"
                         Command="{Binding ClearLogCommand}"
-                        IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}"
-                        DockPanel.Dock="Top"
-                        HorizontalAlignment="Right"
-                        Margin="0,0,0,5"
-                        Padding="10,2"/>
-                <ListBox ItemsSource="{Binding Logs}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </DockPanel>
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        IsEnabled="{Binding IsProcessing, Converter={StaticResource BooleanToInverseBooleanConverter}}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Broom24"
+                                       Margin="0,0,6,0"/>
+                        <TextBlock Text="清空日志"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="处理日志"
+                  Grid.Row="3"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <ListBox ItemsSource="{Binding Logs}"
+                     Style="{StaticResource CyanListBoxSurfaceStyle}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </GroupBox>
     </Grid>
 </UserControl>

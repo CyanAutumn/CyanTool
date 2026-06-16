@@ -35,7 +35,7 @@
                             Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
                 </Grid>
                 <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                           Foreground="Gray" Margin="5,0,5,5"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="5,0,5,5"
                            TextWrapping="Wrap"
                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
@@ -63,7 +63,7 @@
                 <TextBlock Grid.Column="4" Text="编号位数:" VerticalAlignment="Center" Margin="5" />
                 <TextBox Grid.Column="5" Text="{Binding NumberPadding, UpdateSourceTrigger=PropertyChanged}" Margin="5" />
 
-                <TextBlock Grid.Row="1" Grid.ColumnSpan="6" Text="示例: {Binding SampleFileName}" Margin="5" Foreground="Gray" />
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="6" Text="示例: {Binding SampleFileName}" Margin="5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </GroupBox>
 

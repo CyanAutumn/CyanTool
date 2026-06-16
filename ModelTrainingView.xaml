@@ -65,7 +65,7 @@
                             <ItemsControl ItemsSource="{Binding Parameters}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1" Padding="5">
+                                        <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="5">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="200"/>
@@ -73,7 +73,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Orientation="Vertical">
                                                     <TextBlock Text="{Binding DisplayLabel}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Description}" FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="1" Orientation="Vertical" Margin="10,0,0,0">
                                                     <ContentControl Content="{Binding}">

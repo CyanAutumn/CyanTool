@@ -35,13 +35,13 @@
                             Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                 </Grid>
                 <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                           Foreground="Gray" Margin="0,4,0,0"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"
                            TextWrapping="Wrap"
                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 <CheckBox Content="执行完成后清空输入路径文件夹"
                           IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
                           Margin="0,6,0,0"
-                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出目录。"/>
+                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。"/>
                 <StackPanel Margin="0,5,0,0">
                     <Label Content="输出路径:" Grid.Column="0" VerticalAlignment="Center"
                            Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
@@ -56,16 +56,16 @@
                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
                     </Grid>
                     <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
-                               Foreground="Gray" Margin="0,4,0,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </StackPanel>
                 <TextBlock Text="程序会在输出路径自动生成: 原图 / 缩略图 / 副本 / 被包含 / 差分 / 其他"
                            Margin="0,6,0,0"
-                           Foreground="Gray"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            TextWrapping="Wrap"/>
                 <TextBlock Text="输出路径可留空，默认使用输入路径旁边的“同源”；输出路径必须与输入路径分离，不能放在输入路径里"
                            Margin="0,2,0,0"
-                           Foreground="Gray"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            TextWrapping="Wrap"/>
             </StackPanel>
         </GroupBox>
@@ -84,7 +84,7 @@
                               Margin="5,0"/>
                 </Grid>
                 <TextBlock Text="auto：优先尝试 GPU，失败时回退到 CPU；cuda：必须可用；cpu：强制 CPU。"
-                           Foreground="Gray"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            TextWrapping="Wrap"
                            Margin="0,6,0,0"/>
             </StackPanel>

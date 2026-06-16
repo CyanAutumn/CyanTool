@@ -15,38 +15,59 @@
                  WindowBackdropType="None"
                  Background="{DynamicResource ApplicationBackgroundBrush}"
                  Foreground="{DynamicResource TextFillColorPrimaryBrush}">
-    <Grid>
+    <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Height="56"
-                Background="{DynamicResource ApplicationBackgroundBrush}"
+                Height="64"
+                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1">
             <Grid Margin="18,0">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown">
-                    <ui:SymbolIcon Symbol="Toolbox24"
-                                   FontSize="20"
-                                   Margin="0,0,10,0" />
-                    <TextBlock Text="Cyan Tools"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
+                    <Border Style="{StaticResource CyanIconBadgeStyle}"
+                            Margin="0,0,12,0">
+                        <ui:SymbolIcon Symbol="Toolbox24"
+                                       FontSize="20"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Cyan Tools"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="AI 图像与数据集工作台"
+                                   Style="{StaticResource CyanTinyTextBlockStyle}" />
+                    </StackPanel>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1"
+                <Border Grid.Column="1"
+                        Background="Transparent"
+                        MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown" />
+
+                <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
-                            VerticalAlignment="Center">
+                            VerticalAlignment="Center"
+                            Margin="20,0,12,0">
+                    <ui:SymbolIcon x:Name="ThemeIcon"
+                                   Symbol="WeatherSunny24"
+                                   FontSize="18"
+                                   Margin="0,0,8,0"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                     <TextBlock x:Name="ThemeStatusText"
                                Text="白天"
                                VerticalAlignment="Center"
@@ -56,31 +77,29 @@
                                      ToolTip="切换白天/夜间模式"
                                      Checked="ThemeToggleSwitch_Checked"
                                      Unchecked="ThemeToggleSwitch_Unchecked" />
-                    <Button Content="－"
-                            Width="42"
-                            Height="32"
-                            Margin="12,0,0,0"
-                            Padding="0"
-                            BorderThickness="0"
-                            Background="Transparent"
+                </StackPanel>
+
+                <StackPanel Grid.Column="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Style="{StaticResource CyanTitleBarButtonStyle}"
                             ToolTip="最小化"
-                            Click="AppTitleBar_MinimizeClicked" />
-                    <Button Content="□"
-                            Width="42"
-                            Height="32"
-                            Padding="0"
-                            BorderThickness="0"
-                            Background="Transparent"
+                            Click="AppTitleBar_MinimizeClicked">
+                        <ui:SymbolIcon Symbol="LineHorizontal124"
+                                       FontSize="18" />
+                    </Button>
+                    <Button Style="{StaticResource CyanTitleBarButtonStyle}"
                             ToolTip="最大化/还原"
-                            Click="AppTitleBar_MaximizeClicked" />
-                    <Button Content="×"
-                            Width="42"
-                            Height="32"
-                            Padding="0"
-                            BorderThickness="0"
-                            Background="Transparent"
+                            Click="AppTitleBar_MaximizeClicked">
+                        <ui:SymbolIcon Symbol="FullScreenMaximize24"
+                                       FontSize="16" />
+                    </Button>
+                    <Button Style="{StaticResource CyanTitleBarButtonStyle}"
                             ToolTip="关闭"
-                            Click="AppTitleBar_CloseClicked" />
+                            Click="AppTitleBar_CloseClicked">
+                        <ui:SymbolIcon Symbol="Dismiss24"
+                                       FontSize="18" />
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -92,7 +111,7 @@
                            IsPaneOpen="True"
                            OpenPaneLength="258"
                            CompactPaneLength="56"
-                           FrameMargin="16,8,16,16"
+                           FrameMargin="18,10,18,18"
                            HeaderVisibility="Visible"
                            SelectionChanged="RootNavigationView_SelectionChanged" />
     </Grid>
