@@ -63,7 +63,7 @@
                            Margin="0,6,0,0"
                            Foreground="Gray"
                            TextWrapping="Wrap"/>
-                <TextBlock Text="输出路径必须与输入路径分离，不能放在输入路径里"
+                <TextBlock Text="输出路径可留空，默认使用输入路径旁边的“同源”；输出路径必须与输入路径分离，不能放在输入路径里"
                            Margin="0,2,0,0"
                            Foreground="Gray"
                            TextWrapping="Wrap"/>

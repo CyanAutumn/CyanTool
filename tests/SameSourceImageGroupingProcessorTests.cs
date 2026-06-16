@@ -90,6 +90,9 @@ public sealed class SameSourceImageGroupingProcessorTests : IDisposable
                                          && row["class"]?.ToString() == "contained");
         Assert.Contains(manifest, row => row["src_path"]?.ToString()?.EndsWith("parent_difference.png", StringComparison.OrdinalIgnoreCase) == true
                                          && row["class"]?.ToString() == "difference");
+        Assert.All(manifest, row => Assert.DoesNotContain("\\", row["src_path"]!.ToString()));
+        Assert.Contains(manifest, row => row["class"]?.ToString() == "contained"
+                                         && row["reason"]?.ToString().Contains("mean_diff=", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     [Fact]
@@ -147,6 +150,65 @@ public sealed class SameSourceImageGroupingProcessorTests : IDisposable
         Assert.Equal(96, entry["width"]!.Value<int>());
         Assert.Equal(96, entry["height"]!.Value<int>());
         Assert.Equal(expectedSha, entry["pixel_sha256"]!.Value<string>());
+    }
+
+    [Fact]
+    public void Process_SkipsUnreadableImagesAndContinues()
+    {
+        string inputDir = Path.Combine(_root, "input-broken");
+        string outputDir = Path.Combine(_root, "output-broken");
+        Directory.CreateDirectory(inputDir);
+
+        SaveRgb(Path.Combine(inputDir, "valid.png"), 48, 48, BuildStructuredPixels(48, 48));
+        File.WriteAllText(Path.Combine(inputDir, "broken.png"), "not an image", Encoding.UTF8);
+
+        var log = new StringBuilder();
+
+        SameSourceImageGroupingProcessor.Process(
+            inputDir,
+            outputDir,
+            new SameSourceGroupingOptions { ComputeBackend = "cpu" },
+            progress: null,
+            logAction: message => log.AppendLine(message),
+            CancellationToken.None);
+
+        JArray manifest = JArray.Parse(File.ReadAllText(Path.Combine(outputDir, "manifest.json"), Encoding.UTF8));
+        Assert.Single(manifest);
+        Assert.Contains("跳过无法读取图片: broken.png", log.ToString());
+
+        JObject cache = JObject.Parse(File.ReadAllText(Path.Combine(inputDir, ".image_relation_pipeline_cache", "records.json"), Encoding.UTF8));
+        Assert.NotNull(cache["valid.png"]);
+        Assert.Null(cache["broken.png"]);
+    }
+
+    [Fact]
+    public void Process_UsesVisualDifferenceFallback_ForLargeLowMeanChange()
+    {
+        string inputDir = Path.Combine(_root, "input-visual-diff");
+        string outputDir = Path.Combine(_root, "output-visual-diff");
+        Directory.CreateDirectory(inputDir);
+
+        byte[] parentPixels = BuildStructuredPixels(320, 240, seed: 33);
+        SaveRgb(Path.Combine(inputDir, "parent.png"), 320, 240, parentPixels);
+
+        byte[] childPixels = (byte[])parentPixels.Clone();
+        BrightenPatch(childPixels, 320, 240, left: 0, top: 0, patchWidth: 160, patchHeight: 120, delta: 22);
+        SaveRgb(Path.Combine(inputDir, "visual_difference.png"), 320, 240, childPixels);
+
+        SameSourceImageGroupingProcessor.Process(
+            inputDir,
+            outputDir,
+            new SameSourceGroupingOptions { ComputeBackend = "cpu" },
+            progress: null,
+            logAction: null,
+            CancellationToken.None);
+
+        Assert.True(File.Exists(Path.Combine(outputDir, "差分", "parent_差分1.png")));
+
+        JArray manifest = JArray.Parse(File.ReadAllText(Path.Combine(outputDir, "manifest.json"), Encoding.UTF8));
+        Assert.Contains(manifest, row => row["src_path"]?.ToString()?.EndsWith("visual_difference.png", StringComparison.OrdinalIgnoreCase) == true
+                                         && row["class"]?.ToString() == "difference"
+                                         && row["reason"]?.ToString().Contains("visual_corr=", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     public void Dispose()
@@ -227,6 +289,27 @@ public sealed class SameSourceImageGroupingProcessorTests : IDisposable
                 pixels[index + 2] = (byte)(255 - pixels[index + 2]);
             }
         }
+    }
+
+    private static void BrightenPatch(byte[] pixels, int width, int height, int left, int top, int patchWidth, int patchHeight, int delta)
+    {
+        int right = Math.Min(width, left + patchWidth);
+        int bottom = Math.Min(height, top + patchHeight);
+        for (int y = top; y < bottom; y++)
+        {
+            for (int x = left; x < right; x++)
+            {
+                int index = (y * width + x) * 3;
+                pixels[index] = ClampToByte(pixels[index] + delta);
+                pixels[index + 1] = ClampToByte(pixels[index + 1] + delta);
+                pixels[index + 2] = ClampToByte(pixels[index + 2] + delta);
+            }
+        }
+    }
+
+    private static byte ClampToByte(int value)
+    {
+        return (byte)Math.Max(0, Math.Min(255, value));
     }
 
     private static void SaveRgb(string path, int width, int height, byte[] pixels)

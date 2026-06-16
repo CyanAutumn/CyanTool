@@ -27,11 +27,17 @@ namespace CyanTools.Utils
         private const double ThumbnailPreviewCorrelationThreshold = 0.55;
         private const double ContainmentRecallThreshold = 0.75;
         private const double ContainmentMatchThreshold = 0.87;
+        private const double ContainmentMatchMaxMeanDiff = 0.12;
         private const double ContainmentRecallFallbackScore = 0.70;
         private const double ContainmentRecallFallbackMargin = 0.20;
         private const double ContainmentMatchFallbackScore = 0.70;
         private const double ContainmentMatchFallbackMargin = 0.20;
         private const double DifferenceMaxChangedRatio = 0.10;
+        private const double DifferenceVisualMaxChangedRatio = 0.40;
+        private const double DifferenceVisualMaxMeanDiff = 0.08;
+        private const double DifferenceVisualCorrelationThreshold = 0.73;
+        private const double DifferenceVisualEdgeCorrelationThreshold = 0.73;
+        private const int DifferenceVisualPreviewSize = 128;
 
         private static readonly string[] ContainmentRecallScales = BuildScaleRange(100, 250, 10);
         private static readonly string[] ContainmentMatchScales = BuildScaleRange(100, 250, 5);
@@ -245,21 +251,28 @@ namespace CyanTools.Utils
             {
                 token.ThrowIfCancellationRequested();
 
-                FileInfo info = new(file);
-                string fileName = Path.GetFileName(file);
-                long mtimeNs = info.LastWriteTimeUtc.Ticks * 100;
-                CachedRecord? cached = existingCache.GetValueOrDefault(fileName);
-
-                LoadedImage image = LoadImage(file, cached, info.Length, mtimeNs);
-                records[fileName] = image;
-                updatedCache[fileName] = new CachedRecord
+                try
                 {
-                    FileSize = info.Length,
-                    MtimeNs = mtimeNs,
-                    Width = image.Width,
-                    Height = image.Height,
-                    PixelSha256 = image.PixelSha256
-                };
+                    FileInfo info = new(file);
+                    string fileName = Path.GetFileName(file);
+                    long mtimeNs = ToUnixTimeNanoseconds(info.LastWriteTimeUtc);
+                    CachedRecord? cached = existingCache.GetValueOrDefault(fileName);
+
+                    LoadedImage image = LoadImage(file, cached, info.Length, mtimeNs);
+                    records[fileName] = image;
+                    updatedCache[fileName] = new CachedRecord
+                    {
+                        FileSize = info.Length,
+                        MtimeNs = mtimeNs,
+                        Width = image.Width,
+                        Height = image.Height,
+                        PixelSha256 = image.PixelSha256
+                    };
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logAction?.Invoke($"跳过无法读取图片: {Path.GetFileName(file)} ({ex.Message})");
+                }
             }
 
             Directory.CreateDirectory(cacheDir);
@@ -507,6 +520,7 @@ namespace CyanTools.Utils
                 double bestScore = 0.0;
                 double secondBestScore = 0.0;
                 double bestScale = 1.0;
+                double bestMeanDiff = 1.0;
 
                 foreach (string parentName in candidateParents)
                 {
@@ -516,13 +530,12 @@ namespace CyanTools.Utils
                     }
 
                     LoadedImage parent = images[parentName];
-                    double score = ContainmentBestScore(
+                    (double score, double scale, double meanDiff) = ContainmentMatchMetrics(
                         parent.ContainmentGray!,
                         parent.ContainmentScale,
                         child.ContainmentGray!,
                         child.ContainmentScale,
-                        scaleCandidates,
-                        out double scale);
+                        scaleCandidates);
 
                     if (score > bestScore)
                     {
@@ -530,6 +543,7 @@ namespace CyanTools.Utils
                         bestScore = score;
                         bestParentName = parentName;
                         bestScale = scale;
+                        bestMeanDiff = meanDiff;
                     }
                     else if (score > secondBestScore)
                     {
@@ -537,13 +551,20 @@ namespace CyanTools.Utils
                     }
                 }
 
-                if (bestParentName is not null && (bestScore >= ContainmentMatchThreshold
-                                                   || IsClearBestMatch(bestScore, secondBestScore, ContainmentMatchFallbackScore, ContainmentMatchFallbackMargin)))
+                if (bestParentName is not null
+                    && IsAcceptableContainmentMatch(
+                        bestScore,
+                        secondBestScore,
+                        bestMeanDiff,
+                        ContainmentMatchThreshold,
+                        ContainmentMatchMaxMeanDiff,
+                        ContainmentMatchFallbackScore,
+                        ContainmentMatchFallbackMargin))
                 {
                     parentMap[childName] = bestParentName;
                     classMap[childName] = "contained";
                     scoreMap[childName] = bestScore;
-                    reasonMap[childName] = $"match_template_score={bestScore:F4}, runner_up_score={secondBestScore:F4}, scale={bestScale:F2}";
+                    reasonMap[childName] = $"match_template_score={bestScore:F4}, runner_up_score={secondBestScore:F4}, mean_diff={bestMeanDiff:F4}, scale={bestScale:F2}";
                 }
             }
         }
@@ -579,12 +600,32 @@ namespace CyanTools.Utils
                     }
 
                     (double meanDiff, double changedRatio) = DifferenceMetrics(parent.Rgb, child.Rgb);
-                    if (changedRatio > 0.0 && changedRatio <= DifferenceMaxChangedRatio && meanDiff <= 0.05)
+                    bool isDifference = IsPixelDifferenceMatch(meanDiff, changedRatio);
+                    double? visualCorrelation = null;
+                    double? edgeCorrelation = null;
+
+                    if (!isDifference && CanTryVisualDifference(meanDiff, changedRatio))
+                    {
+                        (double visual, double edge) = VisualDifferenceMetrics(parent.Rgb, child.Rgb);
+                        visualCorrelation = visual;
+                        edgeCorrelation = edge;
+                        isDifference = IsVisualDifferenceMatch(visual, edge);
+                    }
+
+                    if (isDifference)
                     {
                         parentMap[childName] = parentName;
                         classMap[childName] = "difference";
-                        scoreMap[childName] = 1.0 - changedRatio;
-                        reasonMap[childName] = $"mean_diff={meanDiff:F4}, changed_ratio={changedRatio:F4}";
+                        double score = 1.0 - changedRatio;
+                        string reason = $"mean_diff={meanDiff:F4}, changed_ratio={changedRatio:F4}";
+                        if (visualCorrelation.HasValue && edgeCorrelation.HasValue)
+                        {
+                            score = Math.Max(score, Math.Min(visualCorrelation.Value, edgeCorrelation.Value));
+                            reason = $"{reason}, visual_corr={visualCorrelation.Value:F4}, edge_corr={edgeCorrelation.Value:F4}";
+                        }
+
+                        scoreMap[childName] = score;
+                        reasonMap[childName] = reason;
                     }
                 }
             }
@@ -645,10 +686,10 @@ namespace CyanTools.Utils
 
                 manifestRows.Add(new
                 {
-                    src_path = entry.SrcPath,
+                    src_path = ToManifestPath(entry.SrcPath),
                     group_id = entry.GroupId,
                     @class = entry.ClassName,
-                    parent_path = entry.ParentName is null ? null : result.Entries[entry.ParentName].SrcPath,
+                    parent_path = entry.ParentName is null ? null : ToManifestPath(result.Entries[entry.ParentName].SrcPath),
                     score = entry.Score,
                     reason = entry.Reason
                 });
@@ -747,6 +788,35 @@ namespace CyanTools.Utils
             return (meanDiff, changedRatio);
         }
 
+        private static (double VisualCorrelation, double EdgeCorrelation) VisualDifferenceMetrics(Mat leftRgb, Mat rightRgb)
+        {
+            using Mat leftGray = new();
+            using Mat rightGray = new();
+            using Mat leftPreview = new();
+            using Mat rightPreview = new();
+            Cv2.CvtColor(leftRgb, leftGray, ColorConversionCodes.RGB2GRAY);
+            Cv2.CvtColor(rightRgb, rightGray, ColorConversionCodes.RGB2GRAY);
+            Cv2.Resize(leftGray, leftPreview, new OpenCvSharp.Size(DifferenceVisualPreviewSize, DifferenceVisualPreviewSize), 0, 0, InterpolationFlags.Area);
+            Cv2.Resize(rightGray, rightPreview, new OpenCvSharp.Size(DifferenceVisualPreviewSize, DifferenceVisualPreviewSize), 0, 0, InterpolationFlags.Area);
+
+            double visualCorrelation = ComputeCorrelation(ReadMatBytes(leftPreview), ReadMatBytes(rightPreview));
+
+            using Mat leftEdgeX = new();
+            using Mat leftEdgeY = new();
+            using Mat rightEdgeX = new();
+            using Mat rightEdgeY = new();
+            Cv2.Sobel(leftPreview, leftEdgeX, MatType.CV_32F, 1, 0, ksize: 3);
+            Cv2.Sobel(leftPreview, leftEdgeY, MatType.CV_32F, 0, 1, ksize: 3);
+            Cv2.Sobel(rightPreview, rightEdgeX, MatType.CV_32F, 1, 0, ksize: 3);
+            Cv2.Sobel(rightPreview, rightEdgeY, MatType.CV_32F, 0, 1, ksize: 3);
+
+            double edgeCorrelation = (
+                ComputeCorrelation(ReadMatSingles(leftEdgeX), ReadMatSingles(rightEdgeX))
+                + ComputeCorrelation(ReadMatSingles(leftEdgeY), ReadMatSingles(rightEdgeY))) / 2.0;
+
+            return (visualCorrelation, edgeCorrelation);
+        }
+
         private static double ContainmentBestScore(
             Mat parentGray,
             double parentScale,
@@ -795,9 +865,98 @@ namespace CyanTools.Utils
             return bestScore;
         }
 
+        private static (double Score, double Scale, double MeanDiff) ContainmentMatchMetrics(
+            Mat parentGray,
+            double parentScale,
+            Mat childGray,
+            double childScale,
+            IEnumerable<string> scaleCandidates)
+        {
+            double bestScore = 0.0;
+            double bestScale = 1.0;
+            double bestMeanDiff = 1.0;
+            double scaleFactor = parentScale / childScale;
+            double maxOriginalScale = Math.Min(
+                parentGray.Width / (double)childGray.Width,
+                parentGray.Height / (double)childGray.Height) / scaleFactor;
+            maxOriginalScale = Math.Max(1.0, maxOriginalScale);
+
+            foreach (string scaleText in scaleCandidates)
+            {
+                double originalScale = double.Parse(scaleText, System.Globalization.CultureInfo.InvariantCulture);
+                if (originalScale > maxOriginalScale)
+                {
+                    break;
+                }
+
+                double effectiveScale = originalScale * scaleFactor;
+                int scaledWidth = Math.Max(1, (int)Math.Round(childGray.Width * effectiveScale));
+                int scaledHeight = Math.Max(1, (int)Math.Round(childGray.Height * effectiveScale));
+                if (scaledWidth > parentGray.Width || scaledHeight > parentGray.Height)
+                {
+                    continue;
+                }
+
+                using Mat scaledChild = new();
+                Cv2.Resize(childGray, scaledChild, new OpenCvSharp.Size(scaledWidth, scaledHeight), 0, 0, InterpolationFlags.Linear);
+                using Mat result = new();
+                Cv2.MatchTemplate(parentGray, scaledChild, result, TemplateMatchModes.CCoeffNormed);
+                Cv2.MinMaxLoc(result, out _, out double maxScore, out _, out OpenCvSharp.Point maxLocation);
+
+                if (maxScore > bestScore)
+                {
+                    using Mat parentWindow = new(parentGray, new Rect(maxLocation.X, maxLocation.Y, scaledWidth, scaledHeight));
+                    using Mat diff = new();
+                    Cv2.Absdiff(parentWindow, scaledChild, diff);
+                    Scalar diffMean = Cv2.Mean(diff);
+
+                    bestScore = maxScore;
+                    bestScale = originalScale;
+                    bestMeanDiff = diffMean.Val0 / 255.0;
+                }
+            }
+
+            return (bestScore, bestScale, bestMeanDiff);
+        }
+
         private static bool IsClearBestMatch(double bestScore, double secondBestScore, double minimumScore, double minimumMargin)
         {
             return bestScore >= minimumScore && (bestScore - secondBestScore) >= minimumMargin;
+        }
+
+        private static bool IsAcceptableContainmentMatch(
+            double bestScore,
+            double secondBestScore,
+            double meanDiff,
+            double matchThreshold,
+            double maxMeanDiff,
+            double fallbackScore,
+            double fallbackMargin)
+        {
+            if (meanDiff > maxMeanDiff)
+            {
+                return false;
+            }
+
+            return bestScore >= matchThreshold || IsClearBestMatch(bestScore, secondBestScore, fallbackScore, fallbackMargin);
+        }
+
+        private static bool IsPixelDifferenceMatch(double meanDiff, double changedRatio)
+        {
+            return changedRatio > 0.0 && changedRatio <= DifferenceMaxChangedRatio && meanDiff <= 0.05;
+        }
+
+        private static bool CanTryVisualDifference(double meanDiff, double changedRatio)
+        {
+            return changedRatio > 0.0
+                   && changedRatio <= DifferenceVisualMaxChangedRatio
+                   && meanDiff <= DifferenceVisualMaxMeanDiff;
+        }
+
+        private static bool IsVisualDifferenceMatch(double visualCorrelation, double edgeCorrelation)
+        {
+            return visualCorrelation >= DifferenceVisualCorrelationThreshold
+                   && edgeCorrelation >= DifferenceVisualEdgeCorrelationThreshold;
         }
 
         private static bool IsSubPath(string basePath, string candidatePath)
@@ -819,6 +978,19 @@ namespace CyanTools.Utils
             {
                 return false;
             }
+        }
+
+        private static long ToUnixTimeNanoseconds(DateTime utcDateTime)
+        {
+            DateTime normalizedUtc = utcDateTime.Kind == DateTimeKind.Utc
+                ? utcDateTime
+                : utcDateTime.ToUniversalTime();
+            return checked((normalizedUtc - DateTime.UnixEpoch).Ticks * 100L);
+        }
+
+        private static string ToManifestPath(string path)
+        {
+            return path.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
         }
 
         private static string ComputePixelSha256(byte[] pixels)
@@ -887,6 +1059,55 @@ namespace CyanTools.Utils
             return numerator / denominator;
         }
 
+        private static double ComputeCorrelation(IReadOnlyList<float> left, IReadOnlyList<float> right)
+        {
+            if (left.Count == 0 || right.Count == 0 || left.Count != right.Count)
+            {
+                return 0.0;
+            }
+
+            double leftMean = left.Average(value => value);
+            double rightMean = right.Average(value => value);
+            double numerator = 0.0;
+            double leftVariance = 0.0;
+            double rightVariance = 0.0;
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                double leftCentered = left[i] - leftMean;
+                double rightCentered = right[i] - rightMean;
+                numerator += leftCentered * rightCentered;
+                leftVariance += leftCentered * leftCentered;
+                rightVariance += rightCentered * rightCentered;
+            }
+
+            double denominator = Math.Sqrt(leftVariance * rightVariance);
+            if (denominator <= 1e-12)
+            {
+                return AreClose(left, right) ? 1.0 : 0.0;
+            }
+
+            return numerator / denominator;
+        }
+
+        private static bool AreClose(IReadOnlyList<float> left, IReadOnlyList<float> right)
+        {
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (Math.Abs(left[i] - right[i]) > 1e-6f)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static byte[] ReadMatBytes(Mat mat)
         {
             if (mat.Empty())
@@ -903,6 +1124,29 @@ namespace CyanTools.Utils
             byte[] bytes = new byte[byteCount];
             Marshal.Copy(mat.Data, bytes, 0, byteCount);
             return bytes;
+        }
+
+        private static float[] ReadMatSingles(Mat mat)
+        {
+            if (mat.Empty())
+            {
+                return Array.Empty<float>();
+            }
+
+            if (mat.Depth() != MatType.CV_32F)
+            {
+                throw new ArgumentException("Mat must contain 32-bit float values.", nameof(mat));
+            }
+
+            int valueCount = checked((int)(mat.Total() * mat.Channels()));
+            if (valueCount == 0)
+            {
+                return Array.Empty<float>();
+            }
+
+            float[] values = new float[valueCount];
+            Marshal.Copy(mat.Data, values, 0, valueCount);
+            return values;
         }
 
         private static string[] BuildScaleRange(int startPercent, int endPercent, int stepPercent)

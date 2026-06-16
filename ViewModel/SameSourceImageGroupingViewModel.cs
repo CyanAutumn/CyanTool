@@ -14,6 +14,7 @@ namespace CyanTools.ViewModel
     public class SameSourceImageGroupingViewModel : PipelineNodeViewModelBase, IPipelineDirectoryNode
     {
         public override string DisplayName => "同源图片归类";
+        private const string DefaultOutputFolderName = "同源";
 
         private string _inputPath = string.Empty;
         public string InputPath
@@ -24,7 +25,7 @@ namespace CyanTools.ViewModel
                 string previousInput = _inputPath;
                 if (SetField(ref _inputPath, value))
                 {
-                    OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, DisplayName);
+                    OutputPath = ToolOutputDirectoryDefaults.RefreshForInputChange(OutputPath, previousInput, value, DefaultOutputFolderName);
                     RefreshCommandStates();
                 }
             }
@@ -189,7 +190,7 @@ namespace CyanTools.ViewModel
 
         private async Task RunGroupingAsync(bool showDialogs, CancellationToken token)
         {
-            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DisplayName);
+            OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DefaultOutputFolderName);
             if (IsProcessing)
             {
                 return;
