@@ -84,6 +84,22 @@ public sealed class PipelineWorkflowPathPlannerTests
         Assert.True(second.HasInheritedInputPath);
     }
 
+    [Fact]
+    public void ApplyWorkflowPaths_UsesKnownRuntimeOutputPathForNextNodeInput()
+    {
+        var first = new TestRuntimeOutputNode("Pick", Path.Combine("aaa", "bbb"));
+        var second = new TestDirectoryNode("Process", PipelineDirectoryBehavior.GeneratedOutput)
+        {
+            PipelineInputPath = Path.Combine("manual", "input")
+        };
+
+        PipelineWorkflowPathPlanner.ApplyWorkflowPaths(new PipelineNodeViewModelBase[] { first, second });
+
+        Assert.Equal(Path.GetFullPath(Path.Combine("aaa", "bbb")), second.PipelineInputPath);
+        Assert.Equal(Path.GetFullPath(Path.Combine("aaa", "02-Process")), second.PipelineOutputPath);
+        Assert.True(second.HasInheritedInputPath);
+    }
+
     private sealed class TestDirectoryNode : PipelineNodeViewModelBase, IPipelineDirectoryNode
     {
         public TestDirectoryNode(string displayName, PipelineDirectoryBehavior directoryBehavior)
@@ -107,5 +123,32 @@ public sealed class PipelineWorkflowPathPlannerTests
         public override Task RunAsync(PipelineContext context, CancellationToken token) => Task.CompletedTask;
 
         public override PipelineNodeViewModelBase Clone() => throw new NotSupportedException();
+    }
+
+    private sealed class TestRuntimeOutputNode : PipelineNodeViewModelBase, IPipelineRuntimeOutputNode
+    {
+        private readonly string _runtimeOutputPath;
+
+        public TestRuntimeOutputNode(string displayName, string runtimeOutputPath)
+        {
+            DisplayName = displayName;
+            _runtimeOutputPath = runtimeOutputPath;
+        }
+
+        public override string DisplayName { get; }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token) => Task.CompletedTask;
+
+        public override PipelineNodeViewModelBase Clone() => throw new NotSupportedException();
+
+        public void ResetRuntimeOutputPath()
+        {
+        }
+
+        public bool TryGetRuntimeOutputPath(out string path)
+        {
+            path = _runtimeOutputPath;
+            return !string.IsNullOrWhiteSpace(path);
+        }
     }
 }

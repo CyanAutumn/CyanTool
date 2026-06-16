@@ -37,6 +37,7 @@ namespace CyanTools.Pipeline
 
             _initialized = true;
 
+            Register(new PipelineNodeDescriptor("\u9009\u62E9\u6587\u4EF6\u5939", typeof(FolderPickerPipelineNode), () => new FolderPickerPipelineNode()));
             Register(new PipelineNodeDescriptor("\u56FE\u7247\u805A\u7C7B", typeof(ImageClusteringViewModel), () => new ImageClusteringViewModel()));
             Register(new PipelineNodeDescriptor("\u56FE\u7247\u8D85\u5206", typeof(RealEsrganPipelineNode), () => new RealEsrganPipelineNode()));
             Register(new PipelineNodeDescriptor("\u56FE\u7247\u4E0A\u4E0B\u91C7", typeof(ImageScalingPipelineNode), () => new ImageScalingPipelineNode()));

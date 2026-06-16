@@ -54,7 +54,11 @@ namespace CyanTools.Pipeline
             {
                 index++;
                 PipelineWorkflowResolvedPaths resolvedPaths = ApplyNodePaths(node, inheritedInputPath, index);
-                if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveOutputPath))
+                if (TryResolveRuntimeOutputPath(node, out string runtimeOutputPath))
+                {
+                    inheritedInputPath = runtimeOutputPath;
+                }
+                else if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveOutputPath))
                 {
                     inheritedInputPath = resolvedPaths.EffectiveOutputPath;
                 }
@@ -84,6 +88,40 @@ namespace CyanTools.Pipeline
                 PipelineDirectoryBehavior.InPlace => effectiveInputPath,
                 _ => NormalizePath(node.PipelineOutputPath)
             };
+        }
+
+        private static bool TryResolveRuntimeOutputPath(PipelineNodeViewModelBase node, out string path)
+        {
+            path = string.Empty;
+            IPipelineRuntimeOutputNode? runtimeOutputNode = node.GetRuntimeOutputNode();
+            if (runtimeOutputNode == null ||
+                !runtimeOutputNode.TryGetRuntimeOutputPath(out string runtimeOutputPath) ||
+                string.IsNullOrWhiteSpace(runtimeOutputPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                path = NormalizePath(runtimeOutputPath);
+                return !string.IsNullOrWhiteSpace(path);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private static string NormalizePath(string? path)

@@ -10,6 +10,31 @@
              d:DesignHeight="620"
              d:DesignWidth="1100">
     <UserControl.Resources>
+        <DataTemplate DataType="{x:Type viewModel:FolderPickerPipelineNode}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="&#x8DEF;&#x5F84;"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Margin="0,0,8,0" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding FolderPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         MinWidth="260"
+                         VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Content="..."
+                        Command="{Binding SelectFolderCommand}"
+                        Width="34"
+                        Margin="6,0,0,0"
+                        Padding="0,4" />
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type viewModel:ImageClusteringViewModel}">
             <local:ImageClusteringView DataContext="{Binding}" />
         </DataTemplate>

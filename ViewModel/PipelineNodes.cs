@@ -1,11 +1,162 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using CyanTools.Pipeline;
 using CyanTools.Utils;
+using Microsoft.WindowsAPICodePack.Dialogs;
 namespace CyanTools.ViewModel
 {
+    public sealed class FolderPickerPipelineNode : PipelineNodeViewModelBase, IPipelineRuntimeOutputNode, IPipelineSnapshotProvider
+    {
+        private string _folderPath = string.Empty;
+        private string _runtimeOutputPath = string.Empty;
+
+        public FolderPickerPipelineNode()
+        {
+            SelectFolderCommand = new RelayCommand(SelectFolder);
+        }
+
+        public override string DisplayName => "\u9009\u62E9\u6587\u4EF6\u5939";
+
+        public string FolderPath
+        {
+            get => _folderPath;
+            set
+            {
+                if (SetField(ref _folderPath, value ?? string.Empty))
+                {
+                    _runtimeOutputPath = string.Empty;
+                    OnPropertyChanged(nameof(HasFolderPath));
+                }
+            }
+        }
+
+        public bool HasFolderPath => !string.IsNullOrWhiteSpace(FolderPath);
+
+        public ICommand SelectFolderCommand { get; }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+
+            string path = NormalizeExistingFolder(FolderPath);
+            _runtimeOutputPath = path;
+            context.AppendLog($"[{DisplayName}] \u5DF2\u9009\u62E9\u672C\u5730\u6587\u4EF6\u5939: {path}");
+
+            return Task.CompletedTask;
+        }
+
+        public override PipelineNodeViewModelBase Clone()
+        {
+            return new FolderPickerPipelineNode
+            {
+                FolderPath = FolderPath
+            };
+        }
+
+        public void ResetRuntimeOutputPath()
+        {
+            _runtimeOutputPath = string.Empty;
+        }
+
+        public bool TryGetRuntimeOutputPath(out string path)
+        {
+            if (!string.IsNullOrWhiteSpace(_runtimeOutputPath))
+            {
+                path = _runtimeOutputPath;
+                return true;
+            }
+
+            return TryNormalizeExistingFolder(FolderPath, out path);
+        }
+
+        public Dictionary<string, object?> CaptureSnapshot()
+        {
+            return new Dictionary<string, object?>
+            {
+                ["FolderPath"] = FolderPath
+            };
+        }
+
+        public void ApplySnapshot(Dictionary<string, object?> snapshot)
+        {
+            if (snapshot.TryGetValue("FolderPath", out object? value))
+            {
+                FolderPath = value?.ToString() ?? string.Empty;
+            }
+        }
+
+        private void SelectFolder()
+        {
+            using var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "\u9009\u62E9\u7BA1\u9053\u8D77\u59CB\u6587\u4EF6\u5939"
+            };
+
+            if (TryNormalizeExistingFolder(FolderPath, out string initialDirectory))
+            {
+                dialog.InitialDirectory = initialDirectory;
+            }
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                FolderPath = dialog.FileName;
+            }
+        }
+
+        private static string NormalizeExistingFolder(string? folderPath)
+        {
+            if (!TryNormalizeExistingFolder(folderPath, out string path))
+            {
+                throw new InvalidOperationException("\u8BF7\u5148\u9009\u62E9\u6709\u6548\u7684\u672C\u5730\u6587\u4EF6\u5939\u3002");
+            }
+
+            return path;
+        }
+
+        private static bool TryNormalizeExistingFolder(string? folderPath, out string path)
+        {
+            path = string.Empty;
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string normalizedPath = Path.GetFullPath(folderPath.Trim());
+                if (!Directory.Exists(normalizedPath))
+                {
+                    return false;
+                }
+
+                path = normalizedPath;
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+    }
+
     public sealed class RealEsrganPipelineNode : CyanTools.Pipeline.SimplePipelineNode<RealEsrganViewModel>
     {
         public RealEsrganPipelineNode() : base("图片超分") { }

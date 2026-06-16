@@ -100,6 +100,14 @@ namespace CyanTools.ViewModel
                     return directoryNode.PipelineOutputPath;
                 }
 
+                var runtimeOutputNode = PipelineNode.GetRuntimeOutputNode();
+                if (runtimeOutputNode != null &&
+                    runtimeOutputNode.TryGetRuntimeOutputPath(out string runtimeOutputPath) &&
+                    !string.IsNullOrWhiteSpace(runtimeOutputPath))
+                {
+                    return runtimeOutputPath;
+                }
+
                 return PipelineNode.GetRuntimeOutputNode() != null ? "运行后确定" : "无输出";
             }
         }
