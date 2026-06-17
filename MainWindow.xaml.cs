@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using CyanTools.Navigation;
 using CyanTools.Utils;
 using Wpf.Ui.Appearance;
@@ -293,9 +294,76 @@ namespace CyanTools
             ApplicationThemeManager.Apply(
                 useDarkTheme ? ApplicationTheme.Dark : ApplicationTheme.Light,
                 WindowBackdropType.None);
+            ApplyCyanPalette(useDarkTheme);
 
             ThemeStatusText.Text = useDarkTheme ? "夜间" : "白天";
             ThemeIcon.Symbol = useDarkTheme ? SymbolRegular.DarkTheme24 : SymbolRegular.WeatherSunny24;
+        }
+
+        private static void ApplyCyanPalette(bool useDarkTheme)
+        {
+            if (useDarkTheme)
+            {
+                SetSolidBrush("CyanShellBackgroundBrush", Color.FromRgb(9, 14, 24));
+                SetSolidBrush("CyanTopBarBackgroundBrush", Color.FromArgb(232, 15, 23, 42));
+                SetSolidBrush("CyanNavigationShellBrush", Color.FromArgb(216, 12, 19, 33));
+                SetSolidBrush("CyanSurfaceElevatedBrush", Color.FromRgb(18, 28, 46));
+                SetSolidBrush("CyanSurfaceHoverBrush", Color.FromRgb(27, 39, 63));
+                SetSolidBrush("CyanMutedAccentBrush", Color.FromArgb(46, 0, 194, 168));
+                SetSolidBrush("CyanNodeHeaderBrush", Color.FromRgb(20, 184, 166));
+                SetSolidBrush("CyanBadgeBackgroundBrush", Color.FromArgb(212, 15, 23, 42));
+                SetGradientBrush(
+                    "CyanShellGradientBrush",
+                    (Color.FromRgb(9, 14, 24), 0),
+                    (Color.FromRgb(13, 23, 42), 0.55),
+                    (Color.FromRgb(28, 20, 48), 1));
+                SetGradientBrush(
+                    "CyanHeroBackgroundBrush",
+                    (Color.FromArgb(188, 16, 185, 129), 0),
+                    (Color.FromArgb(144, 59, 130, 246), 0.5),
+                    (Color.FromArgb(128, 236, 72, 153), 1));
+                return;
+            }
+
+            SetSolidBrush("CyanShellBackgroundBrush", Color.FromRgb(244, 248, 253));
+            SetSolidBrush("CyanTopBarBackgroundBrush", Color.FromArgb(239, 255, 255, 255));
+            SetSolidBrush("CyanNavigationShellBrush", Color.FromArgb(204, 255, 255, 255));
+            SetSolidBrush("CyanSurfaceElevatedBrush", Color.FromRgb(255, 255, 255));
+            SetSolidBrush("CyanSurfaceHoverBrush", Color.FromRgb(246, 250, 255));
+            SetSolidBrush("CyanMutedAccentBrush", Color.FromArgb(31, 0, 194, 168));
+            SetSolidBrush("CyanNodeHeaderBrush", Color.FromRgb(36, 50, 71));
+            SetSolidBrush("CyanBadgeBackgroundBrush", Color.FromArgb(204, 31, 41, 55));
+            SetGradientBrush(
+                "CyanShellGradientBrush",
+                (Color.FromRgb(248, 251, 255), 0),
+                (Color.FromRgb(240, 248, 255), 0.55),
+                (Color.FromRgb(255, 246, 251), 1));
+            SetGradientBrush(
+                "CyanHeroBackgroundBrush",
+                (Color.FromArgb(51, 0, 194, 168), 0),
+                (Color.FromArgb(36, 90, 167, 255), 0.48),
+                (Color.FromArgb(40, 255, 122, 182), 1));
+        }
+
+        private static void SetSolidBrush(string key, Color color)
+        {
+            Application.Current.Resources[key] = new SolidColorBrush(color);
+        }
+
+        private static void SetGradientBrush(string key, params (Color Color, double Offset)[] stops)
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 1)
+            };
+
+            foreach (var stop in stops)
+            {
+                brush.GradientStops.Add(new GradientStop(stop.Color, stop.Offset));
+            }
+
+            Application.Current.Resources[key] = brush;
         }
 
         private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

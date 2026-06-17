@@ -3,103 +3,151 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
-             d:DesignHeight="500" d:DesignWidth="820">
-        <UserControl.Resources>
-        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+             d:DesignHeight="500"
+             d:DesignWidth="820">
+    <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
-    <Grid>
+
+    <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="路径选择" Grid.Row="0" Margin="5">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Label Content="输入路径:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             IsReadOnly="{Binding HasInheritedInputPath}"
-                             Grid.Column="1" Margin="5,0" VerticalAlignment="Center"/>
-                    <Button Content="..." Command="{Binding SelectInputCommand}" Grid.Column="2" Padding="10,2"
-                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                </Grid>
-                <TextBlock Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"
-                           TextWrapping="Wrap"
-                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <CheckBox Content="执行完成后清空输入路径文件夹"
-                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
-                          Margin="0,6,0,0"
-                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。"/>
-                <StackPanel Margin="0,5,0,0">
-                    <Label Content="输出路径:" Grid.Column="0" VerticalAlignment="Center"
-                           Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="0" Margin="5,0" VerticalAlignment="Center"
-                                 Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                        <Button Content="..." Command="{Binding SelectOutputCommand}" Grid.Column="1" Padding="10,2"
-                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    </Grid>
-                    <TextBlock Text="工作流模式下输出路径自动生成：父级目录/NN-节点名"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"
-                               Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </StackPanel>
-                <TextBlock Text="程序会在输出路径自动生成: 原图 / 缩略图 / 副本 / 被包含 / 差分 / 其他"
+        <GroupBox Header="路径选择"
+                  Grid.Row="0"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="输入路径"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="{Binding HasInheritedInputPath}"
+                         Margin="0,0,8,0" />
+                <Button Grid.Column="2"
+                        Command="{Binding SelectInputCommand}"
+                        Style="{StaticResource CyanSmallIconButtonStyle}"
+                        ToolTip="选择输入路径"
+                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                    <ui:SymbolIcon Symbol="FolderOpen24" />
+                </Button>
+
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="2"
+                           Text="管道调度中此输入路径固定为上一个节点的输出路径；如果上一个节点没有输出路径，则沿用其输入路径。"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
                            Margin="0,6,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           TextWrapping="Wrap"/>
-                <TextBlock Text="输出路径可留空，默认使用输入路径旁边的“同源”；输出路径必须与输入路径分离，不能放在输入路径里"
-                           Margin="0,2,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
+                           Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <CheckBox Grid.Row="2"
+                          Grid.Column="1"
+                          Grid.ColumnSpan="2"
+                          Content="执行完成后清空输入路径文件夹"
+                          IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
+                          Margin="0,8,0,0"
+                          ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。" />
+
+                <TextBlock Grid.Row="3"
+                           Text="输出路径"
+                           Style="{StaticResource CyanFormLabelStyle}"
+                           Margin="0,12,10,0"
+                           Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
+                <TextBox Grid.Row="3"
+                         Grid.Column="1"
+                         Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,12,8,0"
+                         Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
+                <Button Grid.Row="3"
+                        Grid.Column="2"
+                        Command="{Binding SelectOutputCommand}"
+                        Style="{StaticResource CyanSmallIconButtonStyle}"
+                        Margin="0,12,0,0"
+                        ToolTip="选择输出路径"
+                        Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                    <ui:SymbolIcon Symbol="FolderOpen24" />
+                </Button>
+
+                <TextBlock Grid.Row="4"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="2"
+                           Text="程序会在输出路径自动生成：原图 / 缩略图 / 副本 / 被包含 / 差分 / 其他。输出路径可留空，默认使用输入路径旁边的“同源”。"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           Margin="0,8,0,0" />
+            </Grid>
         </GroupBox>
 
-        <GroupBox Header="计算设备" Grid.Row="1" Margin="5">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Label Content="设备:" Grid.Column="0" VerticalAlignment="Center"/>
-                    <ComboBox ItemsSource="{Binding ComputeBackendOptions}"
-                              SelectedItem="{Binding ComputeBackend, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              Grid.Column="1"
-                              Margin="5,0"/>
-                </Grid>
-                <TextBlock Text="auto：优先尝试 GPU，失败时回退到 CPU；cuda：必须可用；cpu：强制 CPU。"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           TextWrapping="Wrap"
-                           Margin="0,6,0,0"/>
-            </StackPanel>
+        <GroupBox Header="计算设备"
+                  Grid.Row="1"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="设备"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding ComputeBackendOptions}"
+                          SelectedItem="{Binding ComputeBackend, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Grid.Column="2"
+                           Text="auto 优先尝试 GPU，失败时回退到 CPU；cuda 必须可用；cpu 强制 CPU。"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           Margin="16,0,0,0"
+                           VerticalAlignment="Center" />
+            </Grid>
         </GroupBox>
 
-        <StackPanel Grid.Row="2" Margin="5">
-            <Button Content="开始归类" Command="{Binding StartCommand}" Padding="5"/>
-        </StackPanel>
-
-        <GroupBox Header="日志和结果" Grid.Row="3" Margin="5">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <TextBox Text="{Binding Log}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="120"/>
-            </ScrollViewer>
+        <GroupBox Header="执行"
+                  Grid.Row="2"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Button Command="{Binding StartCommand}"
+                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Symbol="ImageMultiple24"
+                                   Margin="0,0,6,0" />
+                    <TextBlock Text="开始归类" />
+                </StackPanel>
+            </Button>
         </GroupBox>
 
-        <ProgressBar Value="{Binding Progress}" Maximum="100" Grid.Row="4" Margin="5" Height="20"/>
+        <GroupBox Header="日志和结果"
+                  Grid.Row="3"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <TextBox Text="{Binding Log}"
+                     MinHeight="120"
+                     Style="{StaticResource CyanLogTextBoxStyle}" />
+        </GroupBox>
+
+        <ProgressBar Grid.Row="4"
+                     Value="{Binding Progress}"
+                     Maximum="100"
+                     Height="20" />
     </Grid>
 </UserControl>

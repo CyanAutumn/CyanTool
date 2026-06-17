@@ -11,108 +11,166 @@
                  MinWidth="900"
                  MinHeight="620"
                  WindowStartupLocation="CenterScreen"
-                 ExtendsContentIntoTitleBar="False"
+                 ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="None"
-                 Background="{DynamicResource ApplicationBackgroundBrush}"
+                 Background="{DynamicResource CyanShellBackgroundBrush}"
                  Foreground="{DynamicResource TextFillColorPrimaryBrush}">
-    <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid Background="{DynamicResource CyanShellBackgroundBrush}">
+        <Border Background="{DynamicResource CyanShellGradientBrush}" />
 
-        <Border Grid.Row="0"
-                Height="64"
-                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                BorderThickness="0,0,0,1">
-            <Grid Margin="18,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown">
-                    <Border Style="{StaticResource CyanIconBadgeStyle}"
-                            Margin="0,0,12,0">
-                        <ui:SymbolIcon Symbol="Toolbox24"
-                                       FontSize="20"
-                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Cyan Tools"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Text="AI 图像与数据集工作台"
-                                   Style="{StaticResource CyanTinyTextBlockStyle}" />
-                    </StackPanel>
-                </StackPanel>
+            <Border Grid.Row="0"
+                    Height="70"
+                    Background="{DynamicResource CyanTopBarBackgroundBrush}"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Effect="{StaticResource CyanSoftShadowEffect}">
+                <Grid Margin="18,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="3" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{StaticResource CyanAccentRailBrush}"
+                            CornerRadius="8,8,0,0" />
 
-                <Border Grid.Column="1"
-                        Background="Transparent"
-                        MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown" />
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="20,0,12,0">
-                    <ui:SymbolIcon x:Name="ThemeIcon"
-                                   Symbol="WeatherSunny24"
-                                   FontSize="18"
-                                   Margin="0,0,8,0"
-                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                    <TextBlock x:Name="ThemeStatusText"
-                               Text="白天"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <ui:ToggleSwitch x:Name="ThemeToggleSwitch"
-                                     ToolTip="切换白天/夜间模式"
-                                     Checked="ThemeToggleSwitch_Checked"
-                                     Unchecked="ThemeToggleSwitch_Unchecked" />
-                </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown">
+                            <Border Style="{StaticResource CyanIconBadgeStyle}"
+                                    Margin="0,0,12,0">
+                                <ui:SymbolIcon Symbol="Toolbox24"
+                                               FontSize="21"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Cyan Tools"
+                                           FontSize="19"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="AI 图像与数据集工作台"
+                                           Style="{StaticResource CyanTinyTextBlockStyle}" />
+                            </StackPanel>
+                        </StackPanel>
 
-                <StackPanel Grid.Column="3"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <Button Style="{StaticResource CyanTitleBarButtonStyle}"
-                            ToolTip="最小化"
-                            Click="AppTitleBar_MinimizeClicked">
-                        <ui:SymbolIcon Symbol="LineHorizontal124"
-                                       FontSize="18" />
-                    </Button>
-                    <Button Style="{StaticResource CyanTitleBarButtonStyle}"
-                            ToolTip="最大化/还原"
-                            Click="AppTitleBar_MaximizeClicked">
-                        <ui:SymbolIcon Symbol="FullScreenMaximize24"
-                                       FontSize="16" />
-                    </Button>
-                    <Button Style="{StaticResource CyanTitleBarButtonStyle}"
-                            ToolTip="关闭"
-                            Click="AppTitleBar_CloseClicked">
-                        <ui:SymbolIcon Symbol="Dismiss24"
-                                       FontSize="18" />
-                    </Button>
-                </StackPanel>
-            </Grid>
-        </Border>
+                        <Border Grid.Column="1"
+                                Margin="22,0"
+                                Background="Transparent"
+                                MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <Border Style="{StaticResource CyanPillStyle}"
+                                        Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Sparkle24"
+                                                       FontSize="14"
+                                                       Margin="0,0,6,0"
+                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        <TextBlock Text="WPF UI"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource CyanPillStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="BranchFork24"
+                                                       FontSize="14"
+                                                       Margin="0,0,6,0"
+                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        <TextBlock Text="Pipeline Ready"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
 
-        <ui:NavigationView x:Name="RootNavigationView"
-                           Grid.Row="1"
-                           PaneTitle="Cyan Tools"
-                           PaneDisplayMode="Left"
-                           IsPaneOpen="True"
-                           OpenPaneLength="258"
-                           CompactPaneLength="56"
-                           FrameMargin="18,10,18,18"
-                           HeaderVisibility="Visible"
-                           SelectionChanged="RootNavigationView_SelectionChanged" />
+                        <Border Grid.Column="2"
+                                Style="{StaticResource CyanPillStyle}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,12,0">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <ui:SymbolIcon x:Name="ThemeIcon"
+                                               Symbol="WeatherSunny24"
+                                               FontSize="18"
+                                               Margin="0,0,8,0"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                <TextBlock x:Name="ThemeStatusText"
+                                           Text="白天"
+                                           MinWidth="32"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <ui:ToggleSwitch x:Name="ThemeToggleSwitch"
+                                                 ToolTip="切换白天/夜间模式"
+                                                 Checked="ThemeToggleSwitch_Checked"
+                                                 Unchecked="ThemeToggleSwitch_Unchecked" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Grid.Column="3"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <Button Style="{StaticResource CyanTitleBarButtonStyle}"
+                                    ToolTip="最小化"
+                                    Click="AppTitleBar_MinimizeClicked">
+                                <ui:SymbolIcon Symbol="LineHorizontal124"
+                                               FontSize="18" />
+                            </Button>
+                            <Button Style="{StaticResource CyanTitleBarButtonStyle}"
+                                    ToolTip="最大化/还原"
+                                    Click="AppTitleBar_MaximizeClicked">
+                                <ui:SymbolIcon Symbol="FullScreenMaximize24"
+                                               FontSize="16" />
+                            </Button>
+                            <Button Style="{StaticResource CyanTitleBarButtonStyle}"
+                                    ToolTip="关闭"
+                                    Click="AppTitleBar_CloseClicked">
+                                <ui:SymbolIcon Symbol="Dismiss24"
+                                               FontSize="18" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1"
+                    Margin="0,10,0,0"
+                    Background="{DynamicResource CyanNavigationShellBrush}"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Effect="{StaticResource CyanSoftShadowEffect}">
+                <ui:NavigationView x:Name="RootNavigationView"
+                                   PaneTitle="Cyan Tools"
+                                   PaneDisplayMode="Left"
+                                   IsPaneOpen="True"
+                                   OpenPaneLength="272"
+                                   CompactPaneLength="58"
+                                   FrameMargin="20,14,20,20"
+                                   HeaderVisibility="Visible"
+                                   Background="Transparent"
+                                   SelectionChanged="RootNavigationView_SelectionChanged" />
+            </Border>
+        </Grid>
     </Grid>
 </ui:FluentWindow>

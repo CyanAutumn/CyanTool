@@ -1,11 +1,28 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="CyanShellBackgroundBrush" Color="#FFF4F8FD" />
+    <SolidColorBrush x:Key="CyanTopBarBackgroundBrush" Color="#EFFFFFFF" />
+    <SolidColorBrush x:Key="CyanNavigationShellBrush" Color="#CCFFFFFF" />
+    <SolidColorBrush x:Key="CyanSurfaceElevatedBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="CyanSurfaceHoverBrush" Color="#FFF6FAFF" />
+    <SolidColorBrush x:Key="CyanMutedAccentBrush" Color="#1F00C2A8" />
+    <SolidColorBrush x:Key="CyanStrongTextOnAccentBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="CyanWarningBrush" Color="#FFFFB020" />
+
+    <LinearGradientBrush x:Key="CyanShellGradientBrush"
+                         StartPoint="0,0"
+                         EndPoint="1,1">
+        <GradientStop Color="#FFF8FBFF" Offset="0" />
+        <GradientStop Color="#FFF0F8FF" Offset="0.55" />
+        <GradientStop Color="#FFFFF6FB" Offset="1" />
+    </LinearGradientBrush>
+
     <LinearGradientBrush x:Key="CyanHeroBackgroundBrush"
                          StartPoint="0,0"
                          EndPoint="1,1">
-        <GradientStop Color="#225EEAD4" Offset="0" />
-        <GradientStop Color="#185AA7FF" Offset="0.45" />
-        <GradientStop Color="#18FF7AB6" Offset="1" />
+        <GradientStop Color="#3300C2A8" Offset="0" />
+        <GradientStop Color="#245AA7FF" Offset="0.48" />
+        <GradientStop Color="#28FF7AB6" Offset="1" />
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="CyanAccentRailBrush"
@@ -19,6 +36,19 @@
     <SolidColorBrush x:Key="CyanNodeHeaderBrush" Color="#FF243247" />
     <SolidColorBrush x:Key="CyanNodeHeaderSecondaryBrush" Color="#FFD7DEE8" />
     <SolidColorBrush x:Key="CyanBadgeBackgroundBrush" Color="#CC1F2937" />
+    <SolidColorBrush x:Key="CyanDangerHoverBrush" Color="#FFE5484D" />
+
+    <DropShadowEffect x:Key="CyanSoftShadowEffect"
+                      BlurRadius="24"
+                      ShadowDepth="4"
+                      Opacity="0.12"
+                      Color="#000000" />
+
+    <DropShadowEffect x:Key="CyanGlowShadowEffect"
+                      BlurRadius="26"
+                      ShadowDepth="0"
+                      Opacity="0.22"
+                      Color="#4E8BFF" />
 
     <Style x:Key="CyanPageScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
         <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
@@ -27,38 +57,53 @@
     </Style>
 
     <Style x:Key="CyanPageGridStyle" TargetType="{x:Type Grid}">
-        <Setter Property="Margin" Value="22,18,22,24" />
+        <Setter Property="Margin" Value="24,18,24,24" />
     </Style>
 
     <Style x:Key="CyanCardStyle" TargetType="{x:Type Border}">
         <Setter Property="Padding" Value="18" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CyanSurfaceElevatedBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Effect" Value="{StaticResource CyanSoftShadowEffect}" />
     </Style>
 
     <Style x:Key="CyanHeroPanelStyle"
            TargetType="{x:Type Border}"
            BasedOn="{StaticResource CyanCardStyle}">
-        <Setter Property="Padding" Value="26" />
-        <Setter Property="Background" Value="{StaticResource CyanHeroBackgroundBrush}" />
+        <Setter Property="Padding" Value="28" />
+        <Setter Property="Background" Value="{DynamicResource CyanHeroBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-        <Setter Property="Effect">
-            <Setter.Value>
-                <DropShadowEffect BlurRadius="22"
-                                  ShadowDepth="4"
-                                  Opacity="0.14"
-                                  Color="#000000" />
-            </Setter.Value>
-        </Setter>
+        <Setter Property="Effect" Value="{StaticResource CyanGlowShadowEffect}" />
     </Style>
 
     <Style x:Key="CyanIconBadgeStyle" TargetType="{x:Type Border}">
         <Setter Property="Width" Value="42" />
         <Setter Property="Height" Value="42" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CyanMutedAccentBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style x:Key="CyanFeatureCardStyle"
+           TargetType="{x:Type Border}"
+           BasedOn="{StaticResource CyanCardStyle}">
+        <Setter Property="MinHeight" Value="132" />
+        <Setter Property="Padding" Value="20" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource CyanSurfaceHoverBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="CyanPillStyle" TargetType="{x:Type Border}">
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource CyanMutedAccentBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
@@ -108,9 +153,42 @@
     </Style>
 
     <Style x:Key="CyanGroupBoxStyle" TargetType="{x:Type GroupBox}">
-        <Setter Property="Padding" Value="10" />
+        <Setter Property="Padding" Value="16" />
         <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CyanSurfaceElevatedBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type GroupBox}">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border Margin="0,10,0,0"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Effect="{StaticResource CyanSoftShadowEffect}">
+                            <ContentPresenter Margin="0,10,0,0"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+                        </Border>
+
+                        <Border HorizontalAlignment="Left"
+                                Margin="14,0,0,0"
+                                Padding="10,4"
+                                CornerRadius="8"
+                                Background="{DynamicResource CyanShellBackgroundBrush}"
+                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              TextBlock.FontWeight="SemiBold"
+                                              TextBlock.Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="CyanGridSplitterStyle" TargetType="{x:Type GridSplitter}">
@@ -123,12 +201,23 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="{x:Type ListBoxItem}">
+                    <Setter Property="Padding" Value="8,5" />
+                    <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="CyanCommandButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="Padding" Value="12,6" />
         <Setter Property="Margin" Value="0,0,8,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
     </Style>
 
     <Style x:Key="CyanPrimaryActionButtonStyle"
@@ -136,6 +225,18 @@
            BasedOn="{StaticResource CyanCommandButtonStyle}">
         <Setter Property="MinWidth" Value="132" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource CyanStrongTextOnAccentBrush}" />
+        <Setter Property="Background" Value="{StaticResource CyanAccentRailBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+    </Style>
+
+    <Style x:Key="CyanSmallIconButtonStyle"
+           TargetType="{x:Type Button}"
+           BasedOn="{StaticResource CyanCommandButtonStyle}">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="MinWidth" Value="40" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,0,0" />
     </Style>
 
     <Style x:Key="CyanLogTextBoxStyle" TargetType="{x:Type TextBox}">
@@ -151,6 +252,17 @@
         <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
     </Style>
 
+    <Style x:Key="CyanDataGridStyle" TargetType="{x:Type DataGrid}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
+        <Setter Property="HeadersVisibility" Value="Column" />
+        <Setter Property="RowBackground" Value="Transparent" />
+        <Setter Property="AlternatingRowBackground" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+    </Style>
+
     <Style x:Key="CyanTitleBarButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="Width" Value="40" />
         <Setter Property="Height" Value="34" />
@@ -158,5 +270,11 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource CyanSurfaceHoverBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 </ResourceDictionary>

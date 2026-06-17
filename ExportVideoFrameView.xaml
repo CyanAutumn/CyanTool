@@ -1,63 +1,148 @@
 <UserControl x:Class="CyanTools.ExportVideoFrameView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
-             mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800"
+             mc:Ignorable="d"
+             d:DesignHeight="450"
+             d:DesignWidth="800"
              Unloaded="UserControl_Unloaded">
-    <Grid>
+    <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <GroupBox Header="视频与输出"
+                  Grid.Row="0"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="5">
-            <TextBlock Text="视频路径:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox Width="400" IsReadOnly="True" Text="{Binding VideoPath}" Margin="0,0,5,0"/>
-            <Button Content="选择视频" Margin="5,0,0,0" Command="{Binding SelectVideoCommand}"/>
-        </StackPanel>
+                <TextBlock Text="视频路径"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Column="1"
+                         IsReadOnly="True"
+                         Text="{Binding VideoPath}"
+                         Margin="0,0,8,0" />
+                <Button Grid.Column="2"
+                        Command="{Binding SelectVideoCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ImageMultiple24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="选择视频" />
+                    </StackPanel>
+                </Button>
 
+                <TextBlock Grid.Row="1"
+                           Text="输出目录"
+                           Style="{StaticResource CyanFormLabelStyle}"
+                           Margin="0,12,10,0" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         IsReadOnly="True"
+                         Text="{Binding OutputFolder}"
+                         Margin="0,12,8,0" />
+                <Button Grid.Row="1"
+                        Grid.Column="2"
+                        Command="{Binding SelectOutputCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="FolderOpen24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="选择目录" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </GroupBox>
 
-        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="5">
-            <TextBlock Text="输出目录:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox Width="400" IsReadOnly="True" Text="{Binding OutputFolder}" Margin="0,0,5,0"/>
-            <Button Content="选择输出目录" Margin="5,0,0,0" Command="{Binding SelectOutputCommand}"/>
-        </StackPanel>
+        <GroupBox Header="帧预览"
+                  Grid.Row="1"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Border Style="{StaticResource CyanImageWellStyle}">
+                <Image Stretch="Uniform"
+                       Source="{Binding CurrentFrame}" />
+            </Border>
+        </GroupBox>
 
+        <GroupBox Header="时间轴"
+                  Grid.Row="2"
+                  Margin="0,0,0,12"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="2" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Margin="5">
-            <Image Stretch="Uniform" Source="{Binding CurrentFrame}"/>
-        </Border>
+                <TextBlock Text="帧间隔"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Column="1"
+                         TextAlignment="Center"
+                         Text="{Binding FrameIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         PreviewTextInput="FrameIntervalTextBox_PreviewTextInput" />
+                <Button Grid.Column="2"
+                        Content="上一帧"
+                        Command="{Binding PreviousFrameCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Margin="14,0,8,0" />
+                <Button Grid.Column="3"
+                        Content="下一帧"
+                        Command="{Binding NextFrameCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}" />
 
+                <Slider Grid.Row="1"
+                        Grid.ColumnSpan="5"
+                        Margin="0,14,0,0"
+                        Minimum="0"
+                        Maximum="{Binding MaxFrameIndex}"
+                        Value="{Binding CurrentFrameIndex, Mode=TwoWay}"
+                        IsEnabled="{Binding IsVideoLoaded}" />
+            </Grid>
+        </GroupBox>
 
-        <Slider Grid.Row="3" Margin="5"
-                Minimum="0"
-                Maximum="{Binding MaxFrameIndex}"
-                Value="{Binding CurrentFrameIndex, Mode=TwoWay}"
-                IsEnabled="{Binding IsVideoLoaded}"/>
-
-
-        <StackPanel Orientation="Horizontal" Grid.Row="4" Margin="5">
-            <TextBlock Text="帧间隔 (毫秒):" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBox Width="70" TextAlignment="Center"
-                     Text="{Binding FrameIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     PreviewTextInput="FrameIntervalTextBox_PreviewTextInput"/>
-            <Button Content="上一帧" Margin="10,0,0,0" Command="{Binding PreviousFrameCommand}"/>
-            <Button Content="下一帧" Margin="5,0,0,0" Command="{Binding NextFrameCommand}"/>
-        </StackPanel>
-
-
-        <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="5">
-            <Button Content="输出当前帧" Command="{Binding ExportCurrentFrameCommand}"/>
-            <Button Content="输出所有帧" Margin="10,0,0,0" Command="{Binding ExportAllFramesCommand}"/>
-            <Button Content="导出为GIF" Margin="10,0,0,0" Command="{Binding ExportGifCommand}"/>
-        </StackPanel>
+        <GroupBox Header="导出"
+                  Grid.Row="3"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <StackPanel Orientation="Horizontal">
+                <Button Command="{Binding ExportCurrentFrameCommand}"
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ImageArrowForward24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="输出当前帧" />
+                    </StackPanel>
+                </Button>
+                <Button Content="输出所有帧"
+                        Command="{Binding ExportAllFramesCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}" />
+                <Button Content="导出为 GIF"
+                        Command="{Binding ExportGifCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}" />
+            </StackPanel>
+        </GroupBox>
     </Grid>
 </UserControl>
