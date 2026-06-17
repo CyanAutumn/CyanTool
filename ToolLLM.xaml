@@ -179,11 +179,12 @@
                                          VerticalContentAlignment="Center"
                                          Margin="0,0,8,0"/>
                                 <Button Grid.Column="2"
-                                        Content="..."
-                                        Width="40"
                                         Command="{Binding SelectFolderCommand}"
                                         CommandParameter="WorkingDirectory"
-                                        ToolTip="选择工作目录"/>
+                                        Style="{StaticResource CyanSmallIconButtonStyle}"
+                                        ToolTip="选择工作目录">
+                                    <ui:SymbolIcon Symbol="FolderOpen24"/>
+                                </Button>
                             </Grid>
                         </Grid>
                     </GroupBox>
@@ -214,10 +215,12 @@
                                      VerticalContentAlignment="Center"
                                      Margin="0,0,8,0"/>
                             <Button Grid.Column="2"
-                                    Content="..."
-                                    Width="40"
                                     Command="{Binding SelectFolderCommand}"
-                                    CommandParameter="Path1"/>
+                                    CommandParameter="Path1"
+                                    Style="{StaticResource CyanSmallIconButtonStyle}"
+                                    ToolTip="选择路径 1">
+                                <ui:SymbolIcon Symbol="FolderOpen24"/>
+                            </Button>
 
                             <TextBlock Grid.Row="1"
                                        Text="路径 2"
@@ -230,11 +233,13 @@
                                      Margin="0,8,8,0"/>
                             <Button Grid.Row="1"
                                     Grid.Column="2"
-                                    Content="..."
-                                    Width="40"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
-                                    CommandParameter="Path2"/>
+                                    CommandParameter="Path2"
+                                    Style="{StaticResource CyanSmallIconButtonStyle}"
+                                    ToolTip="选择路径 2">
+                                <ui:SymbolIcon Symbol="FolderOpen24"/>
+                            </Button>
 
                             <TextBlock Grid.Row="2"
                                        Text="路径 3"
@@ -247,11 +252,13 @@
                                      Margin="0,8,8,0"/>
                             <Button Grid.Row="2"
                                     Grid.Column="2"
-                                    Content="..."
-                                    Width="40"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
-                                    CommandParameter="Path3"/>
+                                    CommandParameter="Path3"
+                                    Style="{StaticResource CyanSmallIconButtonStyle}"
+                                    ToolTip="选择路径 3">
+                                <ui:SymbolIcon Symbol="FolderOpen24"/>
+                            </Button>
 
                             <TextBlock Grid.Row="3"
                                        Text="路径 4"
@@ -264,11 +271,13 @@
                                      Margin="0,8,8,0"/>
                             <Button Grid.Row="3"
                                     Grid.Column="2"
-                                    Content="..."
-                                    Width="40"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
-                                    CommandParameter="Path4"/>
+                                    CommandParameter="Path4"
+                                    Style="{StaticResource CyanSmallIconButtonStyle}"
+                                    ToolTip="选择路径 4">
+                                <ui:SymbolIcon Symbol="FolderOpen24"/>
+                            </Button>
 
                             <TextBlock Grid.Row="4"
                                        Text="路径 5"
@@ -281,11 +290,13 @@
                                      Margin="0,8,8,0"/>
                             <Button Grid.Row="4"
                                     Grid.Column="2"
-                                    Content="..."
-                                    Width="40"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
-                                    CommandParameter="Path5"/>
+                                    CommandParameter="Path5"
+                                    Style="{StaticResource CyanSmallIconButtonStyle}"
+                                    ToolTip="选择路径 5">
+                                <ui:SymbolIcon Symbol="FolderOpen24"/>
+                            </Button>
                         </Grid>
                     </GroupBox>
 

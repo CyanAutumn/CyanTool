@@ -3,20 +3,49 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d"
              d:DesignHeight="360"
-             d:DesignWidth="760">
-    <Grid Margin="16">
+             d:DesignWidth="760"
+             Background="Transparent">
+    <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="XYZ &#x5E8F;&#x53F7;&#x63D0;&#x793A;&#x8BCD;">
-            <Grid Margin="8">
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="NumberSymbol24"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="XYZ 序号提示词"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="按开始、结束和间隔生成可复制的序号提示词。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="生成设置"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -29,52 +58,42 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Grid.Column="0"
-                           Text="&#x5F00;&#x59CB;"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,8" />
-                <TextBox Grid.Row="0"
-                         Grid.Column="1"
+                <TextBlock Text="开始"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Column="1"
                          Text="{Binding XyzStartText, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,16,8" />
+                         Margin="0,0,16,0" />
 
-                <TextBlock Grid.Row="0"
-                           Grid.Column="2"
-                           Text="&#x7ED3;&#x675F;"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,8" />
-                <TextBox Grid.Row="0"
-                         Grid.Column="3"
+                <TextBlock Grid.Column="2"
+                           Text="结束"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Column="3"
                          Text="{Binding XyzEndText, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,16,8" />
+                         Margin="0,0,16,0" />
 
-                <TextBlock Grid.Row="0"
-                           Grid.Column="4"
-                           Text="&#x95F4;&#x9694;"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,8" />
-                <TextBox Grid.Row="0"
-                         Grid.Column="5"
-                         Text="{Binding XyzIntervalText, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,16,8" />
+                <TextBlock Grid.Column="4"
+                           Text="间隔"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Column="5"
+                         Text="{Binding XyzIntervalText, UpdateSourceTrigger=PropertyChanged}" />
 
-                <Button Grid.Row="0"
-                        Grid.Column="7"
-                        Content="&#x590D;&#x5236;"
+                <Button Grid.Column="7"
                         Command="{Binding CopyXyzPromptCommand}"
-                        Padding="16,4"
-                        Margin="0,0,0,8" />
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Copy24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="复制" />
+                    </StackPanel>
+                </Button>
 
                 <TextBox Grid.Row="1"
                          Grid.Column="0"
                          Grid.ColumnSpan="8"
                          Text="{Binding XyzPromptText, Mode=OneWay}"
-                         IsReadOnly="True"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         MinHeight="180"
-                         VerticalScrollBarVisibility="Auto" />
+                         Style="{StaticResource CyanLogTextBoxStyle}"
+                         Margin="0,14,0,0"
+                         MinHeight="180" />
             </Grid>
         </GroupBox>
     </Grid>

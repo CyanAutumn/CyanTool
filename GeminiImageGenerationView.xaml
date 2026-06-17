@@ -146,11 +146,7 @@
                                                     <Border Width="158"
                                                             Height="168"
                                                             Margin="4"
-                                                            Padding="8"
-                                                            CornerRadius="8"
-                                                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                                            BorderThickness="1"
+                                                            Style="{StaticResource CyanThumbnailCardStyle}"
                                                             ToolTip="{Binding Path}">
                                                         <Grid>
                                                             <Grid.RowDefinitions>
@@ -347,6 +343,7 @@
                               Margin="0,0,0,12">
                         <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
