@@ -112,7 +112,7 @@ namespace CyanTools
             _homeView.ShowUnlockedImage();
             RefreshMenuItems();
             System.Windows.MessageBox.Show(
-                "隐藏下载器已解锁。",
+                "再敲咬你啊",
                 "提示",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
