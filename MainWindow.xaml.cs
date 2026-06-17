@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using CyanTools.Localization;
 using CyanTools.Navigation;
 using CyanTools.Utils;
 using Wpf.Ui.Appearance;
@@ -19,6 +20,8 @@ namespace CyanTools
         private bool _downloadersUnlocked;
         private int _secretImageClickCount;
         private NavigationMenuEntry? _currentEntry;
+        private bool _isUpdatingLanguageSelection;
+        private bool _useDarkTheme;
 
         public MainWindow()
         {
@@ -27,10 +30,17 @@ namespace CyanTools
 
             _homeView.SecretImageClicked += HomeView_SecretImageClicked;
 
+            InitializeLanguageSelector();
             ApplyTheme(useDarkTheme: false);
             RefreshMenuItems();
 
             Loaded += (_, _) => ShowHome();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            LocalizationManager.LanguageChanged -= LocalizationManager_LanguageChanged;
+            base.OnClosed(e);
         }
 
         private void RootNavigationView_SelectionChanged(NavigationView sender, RoutedEventArgs args)
@@ -78,8 +88,12 @@ namespace CyanTools
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show(
-                    $"页面加载失败: {page.DisplayName}\n{page.ControlType.FullName}\n\n{ex}",
-                    "错误",
+                    LocalizationManager.Format(
+                        "页面加载失败: {0}\n{1}\n\n{2}",
+                        LocalizationManager.Translate(page.DisplayName),
+                        page.ControlType.FullName ?? string.Empty,
+                        ex),
+                    LocalizationManager.Translate("错误"),
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
             }
@@ -90,8 +104,9 @@ namespace CyanTools
             }
 
             _currentEntry = entry;
-            RootNavigationView.Header = page.DisplayName;
+            RootNavigationView.Header = LocalizationManager.Translate(page.DisplayName);
             RootNavigationView.ReplaceContent(control);
+            LocalizationManager.ApplyTo(control);
             MarkActiveItem(activeItem);
         }
 
@@ -114,7 +129,7 @@ namespace CyanTools
             RefreshMenuItems();
             System.Windows.MessageBox.Show(
                 "再敲咬你啊",
-                "提示",
+                LocalizationManager.Translate("提示"),
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
         }
@@ -142,7 +157,7 @@ namespace CyanTools
         {
             var item = new NavigationViewItem
             {
-                Content = entry.IsHome ? "主页" : entry.DisplayName,
+                Content = LocalizationManager.Translate(entry.IsHome ? "主页" : entry.DisplayName),
                 Icon = new SymbolIcon(GetIconForEntry(entry)),
                 Tag = entry
             };
@@ -194,8 +209,9 @@ namespace CyanTools
         private void ShowHome(NavigationViewItem? activeItem = null)
         {
             _currentEntry = NavigationMenuEntry.Home;
-            RootNavigationView.Header = "主页";
+            RootNavigationView.Header = LocalizationManager.Translate("主页");
             RootNavigationView.ReplaceContent(_homeView);
+            LocalizationManager.ApplyTo(_homeView);
             MarkActiveItem(activeItem ?? FindItemForEntry(NavigationMenuEntry.Home));
         }
 
@@ -214,7 +230,8 @@ namespace CyanTools
 
         private void MarkActiveItem(NavigationViewItem? activeItem)
         {
-            foreach (var item in _navigationItems.Keys)
+            var items = new List<NavigationViewItem>(_navigationItems.Keys);
+            foreach (var item in items)
             {
                 item.IsActive = ReferenceEquals(item, activeItem);
             }
@@ -238,6 +255,25 @@ namespace CyanTools
         private void ThemeToggleSwitch_Unchecked(object sender, RoutedEventArgs e)
         {
             ApplyTheme(useDarkTheme: false);
+        }
+
+        private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingLanguageSelection)
+            {
+                return;
+            }
+
+            if (LanguageComboBox.SelectedValue is AppLanguage selectedLanguage)
+            {
+                LocalizationManager.SetLanguage(selectedLanguage);
+                return;
+            }
+
+            if (LanguageComboBox.SelectedItem is LanguageOption option)
+            {
+                LocalizationManager.SetLanguage(option.Language);
+            }
         }
 
         private void AppTitleBar_MinimizeClicked(object sender, RoutedEventArgs e)
@@ -291,13 +327,50 @@ namespace CyanTools
 
         private void ApplyTheme(bool useDarkTheme)
         {
+            _useDarkTheme = useDarkTheme;
             ApplicationThemeManager.Apply(
                 useDarkTheme ? ApplicationTheme.Dark : ApplicationTheme.Light,
                 WindowBackdropType.None);
             ApplyCyanPalette(useDarkTheme);
 
-            ThemeStatusText.Text = useDarkTheme ? "夜间" : "白天";
+            ThemeStatusText.Text = LocalizationManager.Translate(useDarkTheme ? "夜间" : "白天");
             ThemeIcon.Symbol = useDarkTheme ? SymbolRegular.DarkTheme24 : SymbolRegular.WeatherSunny24;
+        }
+
+        private void InitializeLanguageSelector()
+        {
+            _isUpdatingLanguageSelection = true;
+            LanguageComboBox.ItemsSource = LocalizationManager.LanguageOptions;
+            LanguageComboBox.DisplayMemberPath = nameof(LanguageOption.DisplayName);
+            LanguageComboBox.SelectedValuePath = nameof(LanguageOption.Language);
+            LanguageComboBox.SelectedValue = LocalizationManager.CurrentLanguage;
+            _isUpdatingLanguageSelection = false;
+
+            LocalizationManager.LanguageChanged += LocalizationManager_LanguageChanged;
+        }
+
+        private void LocalizationManager_LanguageChanged(object? sender, EventArgs e)
+        {
+            RefreshLocalizedText();
+        }
+
+        private void RefreshLocalizedText()
+        {
+            _isUpdatingLanguageSelection = true;
+            LanguageComboBox.SelectedValue = LocalizationManager.CurrentLanguage;
+            _isUpdatingLanguageSelection = false;
+
+            ApplyTheme(_useDarkTheme);
+            RefreshMenuItems();
+            UpdateNavigationHeader();
+            LocalizationManager.ApplyTo(this);
+        }
+
+        private void UpdateNavigationHeader()
+        {
+            RootNavigationView.Header = _currentEntry == null || _currentEntry.IsHome
+                ? LocalizationManager.Translate("主页")
+                : LocalizationManager.Translate(_currentEntry.DisplayName);
         }
 
         private static void ApplyCyanPalette(bool useDarkTheme)

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Threading.Tasks;
 using AutoUpdaterDotNET;
+using CyanTools.Localization;
 
 namespace CyanTools
 {
@@ -21,6 +22,7 @@ namespace CyanTools
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            LocalizationManager.InitializeApplication();
             base.OnStartup(e);
             AutoUpdater.CheckForUpdateEvent += AutoUpdaterOnCheckForUpdateEvent;
             AutoUpdater.Start("https://raw.githubusercontent.com/CyanAutumn/CyanToolsUpdate/main/version.xml");
