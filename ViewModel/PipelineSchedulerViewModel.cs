@@ -49,8 +49,8 @@ namespace CyanTools.ViewModel
             CanvasNodes.CollectionChanged += OnCanvasNodesCollectionChanged;
             CanvasConnections.CollectionChanged += OnCanvasConnectionsCollectionChanged;
 
-            AddNodeCommand = new RelayCommand(AddNode, () => SelectedAvailableNode != null && !IsRunning);
-            RemoveNodeCommand = new RelayCommand(RemoveSelectedNode, () => SelectedCanvasNode != null && !IsRunning);
+            AddNodeCommand = new RelayCommand(AddNode, CanAddNode);
+            RemoveNodeCommand = new RelayCommand(RemoveNode, CanRemoveNode);
             MoveUpCommand = new RelayCommand(MoveUp, () => CanMove(-1));
             MoveDownCommand = new RelayCommand(MoveDown, () => CanMove(1));
             StartCommand = new RelayCommand(async () => await RunAsync(), () => CanvasNodes.Any() && !IsRunning);
@@ -151,15 +151,22 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void AddNode()
+        private bool CanAddNode(object parameter)
         {
-            if (SelectedAvailableNode == null)
+            return !IsRunning && (parameter is PipelineNodeDescriptor || SelectedAvailableNode != null);
+        }
+
+        private void AddNode(object parameter)
+        {
+            var descriptor = parameter as PipelineNodeDescriptor ?? SelectedAvailableNode;
+            if (descriptor == null)
             {
                 return;
             }
 
+            SelectedAvailableNode = descriptor;
             var previousTail = GetCanvasNodesInExecutionOrder().LastOrDefault(n => n.HasOutput);
-            var instance = SelectedAvailableNode.Factory();
+            var instance = descriptor.Factory();
             var canvasNode = CreateCanvasNode(instance, CanvasNodes.Count);
 
             CanvasNodes.Add(canvasNode);
@@ -181,15 +188,21 @@ namespace CyanTools.ViewModel
             return new PipelineCanvasNodeViewModel(pipelineNode, location);
         }
 
-        private void RemoveSelectedNode()
+        private bool CanRemoveNode(object parameter)
         {
-            if (SelectedCanvasNode == null)
+            return !IsRunning && (parameter is PipelineCanvasNodeViewModel || SelectedCanvasNode != null);
+        }
+
+        private void RemoveNode(object parameter)
+        {
+            var node = parameter as PipelineCanvasNodeViewModel ?? SelectedCanvasNode;
+            if (node == null)
             {
                 return;
             }
 
-            var removedName = SelectedCanvasNode.DisplayName;
-            RemoveCanvasNode(SelectedCanvasNode);
+            var removedName = node.DisplayName;
+            RemoveCanvasNode(node);
             AppendLog($"已移除节点: {removedName}");
         }
 

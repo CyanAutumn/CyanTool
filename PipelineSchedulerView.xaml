@@ -143,6 +143,7 @@
     <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="180" />
         </Grid.RowDefinitions>
@@ -151,7 +152,35 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <Border Grid.Row="0"
+                Grid.ColumnSpan="2"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="BranchFork24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="管线调度"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="在节点画布中编排处理流程，保存工作流并查看执行日志。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <GroupBox Header="工作流"
+                  Grid.Row="1"
                   Grid.ColumnSpan="2"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
@@ -217,81 +246,9 @@
             </Grid>
         </GroupBox>
 
-        <Grid Grid.Row="1"
-              Grid.Column="0"
-              Margin="0,0,12,12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
-                <RowDefinition Height="210" />
-            </Grid.RowDefinitions>
-
-            <GroupBox Header="可用节点"
-                      Margin="0,0,0,10"
-                      Style="{StaticResource CyanGroupBoxStyle}">
-                <DockPanel>
-                    <Button Content="添加节点"
-                            Command="{Binding AddNodeCommand}"
-                            Style="{StaticResource PipelineButtonStyle}"
-                            Margin="0,10,0,0"
-                            Padding="8,4"
-                            DockPanel.Dock="Bottom">
-                        <Button.ContentTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="AddCircle24" Margin="0,0,6,0" />
-                                    <TextBlock Text="{Binding}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </Button.ContentTemplate>
-                    </Button>
-                    <ListBox ItemsSource="{Binding AvailableNodes}"
-                             SelectedItem="{Binding SelectedAvailableNode}"
-                             DisplayMemberPath="DisplayName"
-                             Style="{StaticResource CyanListBoxSurfaceStyle}" />
-                </DockPanel>
-            </GroupBox>
-
-            <GroupBox Header="执行顺序"
-                      Grid.Row="1"
-                      Style="{StaticResource CyanGroupBoxStyle}">
-                <DockPanel>
-                    <StackPanel Orientation="Horizontal"
-                                DockPanel.Dock="Bottom"
-                                Margin="0,10,0,0">
-                        <Button Command="{Binding MoveUpCommand}" Style="{StaticResource PipelineButtonStyle}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="ArrowUp24" Margin="0,0,6,0" />
-                                <TextBlock Text="前移" />
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding MoveDownCommand}" Style="{StaticResource PipelineButtonStyle}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="ArrowDown24" Margin="0,0,6,0" />
-                                <TextBlock Text="后移" />
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding RemoveNodeCommand}" Style="{StaticResource PipelineButtonStyle}" Margin="0">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Dismiss24" Margin="0,0,6,0" />
-                                <TextBlock Text="移除" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                    <ListBox ItemsSource="{Binding PipelineNodes}"
-                             SelectedItem="{Binding SelectedPipelineNode}"
-                             Style="{StaticResource CyanListBoxSurfaceStyle}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DisplayName}" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </DockPanel>
-            </GroupBox>
-        </Grid>
-
-        <Border Grid.Row="1"
-                Grid.Column="1"
+        <Border Grid.Row="2"
+                Grid.Column="0"
+                Grid.ColumnSpan="2"
                 Margin="0,0,0,12"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="1"
@@ -308,6 +265,22 @@
                                  DisconnectConnectorCommand="{Binding DisconnectConnectorCommand}"
                                  GridCellSize="20"
                                  Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                <nodify:NodifyEditor.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="添加节点"
+                                  ItemsSource="{Binding AvailableNodes}"
+                                  Tag="{Binding}">
+                            <MenuItem.ItemContainerStyle>
+                                <Style TargetType="{x:Type MenuItem}">
+                                    <Setter Property="Header" Value="{Binding DisplayName}" />
+                                    <Setter Property="Command" Value="{Binding Tag.AddNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type MenuItem}}}" />
+                                    <Setter Property="CommandParameter" Value="{Binding}" />
+                                </Style>
+                            </MenuItem.ItemContainerStyle>
+                        </MenuItem>
+                    </ContextMenu>
+                </nodify:NodifyEditor.ContextMenu>
+
                 <nodify:NodifyEditor.InputBindings>
                     <KeyBinding Key="Delete" Command="{Binding RemoveNodeCommand}" />
                 </nodify:NodifyEditor.InputBindings>
@@ -336,7 +309,36 @@
                                      MaxWidth="520"
                                      ContentPadding="0"
                                      HeaderBrush="{StaticResource CyanNodeHeaderBrush}"
-                                     ContentBrush="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                                     ContentBrush="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                     Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType={x:Type nodify:NodifyEditor}}}">
+                            <nodify:Node.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                             Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="删除节点"
+                                              Command="{Binding Tag.RemoveNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="Delete24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Header="添加节点"
+                                              ItemsSource="{Binding Tag.AvailableNodes, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                              Tag="{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="AddCircle24" />
+                                        </MenuItem.Icon>
+                                        <MenuItem.ItemContainerStyle>
+                                            <Style TargetType="{x:Type MenuItem}">
+                                                <Setter Property="Header" Value="{Binding DisplayName}" />
+                                                <Setter Property="Command" Value="{Binding Tag.AddNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type MenuItem}}}" />
+                                                <Setter Property="CommandParameter" Value="{Binding}" />
+                                            </Style>
+                                        </MenuItem.ItemContainerStyle>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </nodify:Node.ContextMenu>
+
                             <nodify:Node.HeaderTemplate>
                                 <DataTemplate DataType="{x:Type viewModel:PipelineCanvasNodeViewModel}">
                                     <Grid Margin="2">
@@ -439,7 +441,7 @@
         </Border>
 
         <GroupBox Header="日志"
-                  Grid.Row="2"
+                  Grid.Row="3"
                   Grid.ColumnSpan="2"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <DockPanel>
