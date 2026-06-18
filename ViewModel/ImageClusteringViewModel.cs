@@ -21,6 +21,7 @@ namespace CyanTools.ViewModel
         private const string FeatureTypeHybridDisplay = "Style+Content（偏画风+偏内容）";
         private const string FeatureTypeStyleDisplay = "Style（偏画风）";
         private const string FeatureTypeGrayStyleDisplay = "Style（灰度去色，更偏笔触）";
+        private const string FeatureTypeHeadLineStyleDisplay = "Style（头部线条/笔触，训练推荐）";
         private const string FeatureTypeStyleColorDownweightDisplay = "Style（颜色降权，保留少量色彩）";
         private const string FeatureTypeContentDisplay = "Content（偏内容）";
         private const string ClusteringSpaceRawDisplay = "高维向量（推荐）";
@@ -40,6 +41,7 @@ namespace CyanTools.ViewModel
         private const string DefaultSelectedAlgorithm = "KMeans";
         private const string DefaultSelectedComputeDevice = "GPU";
         private const string CsdModelRelativePath = "Models/csd/csd_clip_model.onnx";
+        private const string HeadDetectionModelRelativePath = "Models/anime_head_detection/head_detect_v0_s.onnx";
         private const string CsdModelDownloadUrl = "https://huggingface.co/yuxi-liu-wired/CSD/resolve/main/csd_clip_model.onnx";
         private const string CsdModelPageUrl = "https://huggingface.co/yuxi-liu-wired/CSD";
         private const string ClusterDistributionFileName = "cluster_distribution.png";
@@ -190,6 +192,7 @@ namespace CyanTools.ViewModel
             FeatureTypeHybridDisplay,
             FeatureTypeStyleDisplay,
             FeatureTypeGrayStyleDisplay,
+            FeatureTypeHeadLineStyleDisplay,
             FeatureTypeStyleColorDownweightDisplay,
             FeatureTypeContentDisplay
         };
@@ -664,11 +667,16 @@ namespace CyanTools.ViewModel
                 bool useGpu = SelectedComputeDevice.Equals("GPU", StringComparison.OrdinalIgnoreCase);
                 AppendLog($"选择计算设备: {SelectedComputeDevice}");
                 bool useKMeansFamily = SelectedAlgorithm == "KMeans" || SelectedAlgorithm == "SphericalKMeans";
+                bool useHeadLineStyleFeature = UsesHeadLineStyleVectors(SelectedFeatureType);
                 bool requestedTwoStageStyleClustering = EnableTwoStageStyleClustering;
-                bool useTwoStageStyleClustering = requestedTwoStageStyleClustering && useKMeansFamily;
+                bool useTwoStageStyleClustering = requestedTwoStageStyleClustering && useKMeansFamily && !useHeadLineStyleFeature;
                 if (requestedTwoStageStyleClustering && !useKMeansFamily)
                 {
                     AppendLog("二阶段风格聚类当前仅支持 KMeans / SphericalKMeans，已忽略该选项。");
+                }
+                else if (requestedTwoStageStyleClustering && useHeadLineStyleFeature)
+                {
+                    AppendLog("头部线条/笔触模式已内置头部灰度 Style + 线条纹理组合，已忽略二阶段聚类选项。");
                 }
 
                 bool includeGrayStyle = UsesGrayStyleVectors(SelectedFeatureType, useTwoStageStyleClustering);
@@ -676,9 +684,17 @@ namespace CyanTools.ViewModel
                 {
                     AppendLog("已启用灰度 Style 分支：特征提取将额外进行一次灰度图推理，速度会变慢。");
                 }
+                if (useHeadLineStyleFeature)
+                {
+                    AppendLog("已启用训练推荐的头部线条/笔触模式：先裁剪头部区域，再组合头部灰度 Style 与线条纹理特征。");
+                    if (SelectedAlgorithm != "SphericalKMeans" || !SelectedClusteringSpace.Equals(ClusteringSpaceStyleBrushDisplay, StringComparison.Ordinal) || !UseBestKBySilhouette)
+                    {
+                        AppendLog("复现实验推荐设置：算法=SphericalKMeans，聚类空间=高维 Style（更偏笔触），勾选“最优”。");
+                    }
+                }
 
                 var processor = new Utils.ImageClusteringProcessor(modelPath, useGpu, AppendLog);
-                var imageResults = processor.ProcessFolder(InputPath,
+                var processResult = processor.ProcessFolderWithSummary(InputPath,
                     p => Application.Current.Dispatcher.Invoke(() => Progress = p * 50),
                     error =>
                     {
@@ -689,8 +705,21 @@ namespace CyanTools.ViewModel
                                 MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning));
                         }
                     },
-                    includeGrayStyle,
+                    new ImageClusteringExtractionOptions
+                    {
+                        IncludeBaseEmbeddings = !useHeadLineStyleFeature,
+                        IncludeGrayStyle = includeGrayStyle,
+                        IncludeHeadLineStyle = useHeadLineStyleFeature,
+                        HeadDetectionModelPath = Path.GetFullPath(HeadDetectionModelRelativePath)
+                    },
                     new[] { outputPathFull });
+                var imageResults = processResult.Results;
+                if (useHeadLineStyleFeature)
+                {
+                    var summary = processResult.Summary;
+                    AppendLog(
+                        $"头部线条/笔触统计：成功处理 {summary.ProcessedImages}/{summary.TotalImages} 张；头部检测 {summary.HeadDetectedCrops} 张，中心裁剪兜底 {summary.HeadFallbackCrops} 张，失败 {summary.FailedImages} 张。");
+                }
 
                 token.ThrowIfCancellationRequested();
 
@@ -1206,6 +1235,9 @@ namespace CyanTools.ViewModel
             {
                 "Style" => NormalizeVectorCopy(result.StyleVector),
                 "GrayStyle" => NormalizeVectorCopy(result.GrayStyleVector),
+                "HeadLineStyle" => ConcatWeightedNormalizedVectors(
+                    (result.HeadGrayStyleVector, 0.55f),
+                    (result.HeadLineStyleVector, 1.00f)),
                 "StyleColorDownweight" => BlendNormalizedVectors(result.StyleVector, result.GrayStyleVector, colorRetention),
                 "Content" => NormalizeVectorCopy(result.ContentVector),
                 "Style+Content" => ConcatNormalizedVectors(result.StyleVector, result.ContentVector),
@@ -1221,6 +1253,30 @@ namespace CyanTools.ViewModel
             var merged = new float[a.Length + b.Length];
             Array.Copy(a, 0, merged, 0, a.Length);
             Array.Copy(b, 0, merged, a.Length, b.Length);
+            return NormalizeVectorCopy(merged);
+        }
+
+        private static float[] ConcatWeightedNormalizedVectors(params (float[] Vector, float Weight)[] parts)
+        {
+            int length = parts.Sum(part => part.Vector?.Length ?? 0);
+            if (length == 0)
+            {
+                throw new InvalidOperationException("用于拼接的特征为空。");
+            }
+
+            var merged = new float[length];
+            int offset = 0;
+            foreach (var (vector, weight) in parts)
+            {
+                var normalized = NormalizeVectorCopy(vector);
+                for (int i = 0; i < normalized.Length; i++)
+                {
+                    merged[offset + i] = normalized[i] * weight;
+                }
+
+                offset += normalized.Length;
+            }
+
             return NormalizeVectorCopy(merged);
         }
 
@@ -1287,6 +1343,7 @@ namespace CyanTools.ViewModel
             {
                 "Style" => "style",
                 "GrayStyle" => "graystyle",
+                "HeadLineStyle" => "headlinestyle",
                 "StyleColorDownweight" => "stylelite",
                 "Content" => "content",
                 "Style+Content" => "hybrid",
@@ -1315,6 +1372,12 @@ namespace CyanTools.ViewModel
                 featureType.StartsWith("Style（灰度", StringComparison.OrdinalIgnoreCase))
             {
                 return "GrayStyle";
+            }
+
+            if (featureType.StartsWith("HeadLineStyle", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（头部线条", StringComparison.OrdinalIgnoreCase))
+            {
+                return "HeadLineStyle";
             }
 
             if (featureType.StartsWith("StyleColorDownweight", StringComparison.OrdinalIgnoreCase) ||
@@ -1347,6 +1410,7 @@ namespace CyanTools.ViewModel
             {
                 "Style" => FeatureTypeStyleDisplay,
                 "GrayStyle" => FeatureTypeGrayStyleDisplay,
+                "HeadLineStyle" => FeatureTypeHeadLineStyleDisplay,
                 "StyleColorDownweight" => FeatureTypeStyleColorDownweightDisplay,
                 "Content" => FeatureTypeContentDisplay,
                 _ => FeatureTypeHybridDisplay
@@ -1368,12 +1432,18 @@ namespace CyanTools.ViewModel
             };
         }
 
+        private static bool UsesHeadLineStyleVectors(string featureType)
+        {
+            return GetFeatureTypeKey(featureType) == "HeadLineStyle";
+        }
+
         private static bool IsStyleLikeFeatureType(string featureType)
         {
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => true,
                 "GrayStyle" => true,
+                "HeadLineStyle" => true,
                 "StyleColorDownweight" => true,
                 _ => false
             };
@@ -1384,6 +1454,7 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "StyleColorDownweight" => FeatureTypeStyleColorDownweightDisplay,
+                "HeadLineStyle" => FeatureTypeHeadLineStyleDisplay,
                 "GrayStyle" => FeatureTypeStyleDisplay,
                 "Style" => FeatureTypeStyleDisplay,
                 _ => FeatureTypeStyleDisplay
