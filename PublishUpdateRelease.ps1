@@ -15,6 +15,11 @@
 
 
 
+
+
+
+
+
 [CmdletBinding()]
 param(
     [string]$Repo = "CyanAutumn/CyanToolsUpdate",
@@ -29,6 +34,12 @@ param(
     [string]$SevenZipPath = "",
     [string]$VersionXmlPath = "version.xml",
     [string]$VersionXmlBranch = "main",
+    [switch]$PublishGitUpdateRepo,
+    [string]$GitUpdateRepoWorkingDirectory = "",
+    [string]$GitUpdateBranch = "main",
+    [string]$GitUpdatePayloadPath = "files",
+    [string]$GitUpdateManifestPath = "version.json",
+    [switch]$SkipReleaseAssetUpload,
     [switch]$SkipVersionXmlUpdate,
     [switch]$SkipProjectVersionUpdate,
     [switch]$SkipBuild
@@ -334,6 +345,212 @@ function Update-VersionXml {
     Put-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch -Message "Update version.xml to $Version" -Content $newContent -Sha $sha
 }
 
+function Get-LatestGitUpdateManifestVersion {
+    param(
+        [string]$Repo,
+        [string]$Path,
+        [string]$Branch
+    )
+
+    $existing = Get-RepoFileContent -Repo $Repo -Path $Path -Branch $Branch
+    if ($null -eq $existing -or [string]::IsNullOrWhiteSpace($existing.Content)) {
+        return $null
+    }
+
+    try {
+        $manifest = $existing.Content | ConvertFrom-Json
+        if ($manifest -and -not [string]::IsNullOrWhiteSpace($manifest.version)) {
+            return [string]$manifest.version
+        }
+    }
+    catch {
+        return $null
+    }
+
+    return $null
+}
+
+function Invoke-GitChecked {
+    param(
+        [string]$WorkingDirectory,
+        [string[]]$Arguments
+    )
+
+    & git -C $WorkingDirectory @Arguments | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "git 命令失败（exit code: $LASTEXITCODE）：git -C `"$WorkingDirectory`" $($Arguments -join ' ')"
+    }
+}
+
+function Ensure-GitUpdateRepository {
+    param(
+        [string]$Repo,
+        [string]$WorkingDirectory,
+        [string]$Branch
+    )
+
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $git) {
+        throw "未检测到 git。请先安装 Git，或不要使用 -PublishGitUpdateRepo。"
+    }
+
+    $repoUrl = "https://github.com/$Repo.git"
+    if (-not (Test-Path -LiteralPath $WorkingDirectory -PathType Container)) {
+        $parent = Split-Path -Parent $WorkingDirectory
+        if (-not [string]::IsNullOrWhiteSpace($parent)) {
+            New-Item -ItemType Directory -Force -Path $parent | Out-Null
+        }
+
+        Write-Host "克隆更新仓库: $repoUrl -> $WorkingDirectory"
+        & git clone --branch $Branch $repoUrl $WorkingDirectory | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "克隆更新仓库失败（git exit code: $LASTEXITCODE）"
+        }
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $WorkingDirectory ".git") -PathType Container)) {
+        throw "GitUpdateRepoWorkingDirectory 不是 git 仓库：$WorkingDirectory"
+    }
+
+    Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("fetch", "origin", $Branch)
+    Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("checkout", $Branch)
+    Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("pull", "--ff-only", "origin", $Branch)
+}
+
+function Get-PublishBuildItems {
+    param([string]$BuildDir)
+
+    $items = @()
+    $items += @(Get-ChildItem -LiteralPath $BuildDir -Force -File)
+    $runtimesPath = Join-Path $BuildDir "runtimes"
+    if (Test-Path -LiteralPath $runtimesPath -PathType Container) {
+        $items += Get-Item -LiteralPath $runtimesPath
+    }
+
+    return @($items)
+}
+
+function Copy-PublishItemsToPayload {
+    param(
+        [string]$BuildDir,
+        [string]$PayloadDirectory
+    )
+
+    if (Test-Path -LiteralPath $PayloadDirectory) {
+        Remove-Item -LiteralPath $PayloadDirectory -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $PayloadDirectory | Out-Null
+
+    $items = Get-PublishBuildItems -BuildDir $BuildDir
+    if ($items.Count -eq 0) {
+        throw "目标目录下没有可发布内容（顶层文件或 runtimes 目录）：$BuildDir"
+    }
+
+    foreach ($item in $items) {
+        Copy-Item -LiteralPath $item.FullName -Destination $PayloadDirectory -Recurse -Force
+    }
+}
+
+function Get-FileSha256 {
+    param([string]$Path)
+
+    $hash = Get-FileHash -LiteralPath $Path -Algorithm SHA256
+    return $hash.Hash.ToLowerInvariant()
+}
+
+function ConvertTo-ManifestRelativePath {
+    param(
+        [string]$Root,
+        [string]$Path
+    )
+
+    $relative = [System.IO.Path]::GetRelativePath($Root, $Path)
+    return ($relative -replace "\\", "/")
+}
+
+function Build-GitUpdateManifest {
+    param(
+        [string]$Repo,
+        [string]$Branch,
+        [string]$PayloadPath,
+        [string]$PayloadDirectory,
+        [string]$Version,
+        [string]$ReleaseNotes
+    )
+
+    $files = @()
+    foreach ($file in Get-ChildItem -LiteralPath $PayloadDirectory -Recurse -File | Sort-Object FullName) {
+        $files += [pscustomobject]@{
+            path = ConvertTo-ManifestRelativePath -Root $PayloadDirectory -Path $file.FullName
+            size = $file.Length
+            sha256 = Get-FileSha256 -Path $file.FullName
+        }
+    }
+
+    $normalizedPayloadPath = ($PayloadPath -replace "\\", "/").Trim("/")
+    return [pscustomobject]@{
+        version = $Version
+        mandatory = $false
+        releaseNotes = $ReleaseNotes
+        repo = $Repo
+        branch = $Branch
+        payloadPath = $normalizedPayloadPath
+        rawBaseUrl = "https://raw.githubusercontent.com/$Repo/$Branch/$normalizedPayloadPath"
+        files = $files
+    } | ConvertTo-Json -Depth 8
+}
+
+function Publish-GitUpdateRepository {
+    param(
+        [string]$Repo,
+        [string]$WorkingDirectory,
+        [string]$Branch,
+        [string]$PayloadPath,
+        [string]$ManifestPath,
+        [string]$BuildDir,
+        [string]$Version,
+        [string]$ReleaseNotes
+    )
+
+    Ensure-GitUpdateRepository -Repo $Repo -WorkingDirectory $WorkingDirectory -Branch $Branch
+
+    $normalizedPayloadPath = ($PayloadPath -replace "\\", [System.IO.Path]::DirectorySeparatorChar).Trim([System.IO.Path]::DirectorySeparatorChar)
+    $payloadDirectory = Join-Path $WorkingDirectory $normalizedPayloadPath
+    Copy-PublishItemsToPayload -BuildDir $BuildDir -PayloadDirectory $payloadDirectory
+
+    $manifestFile = Join-Path $WorkingDirectory $ManifestPath
+    $manifestDirectory = Split-Path -Parent $manifestFile
+    if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
+        New-Item -ItemType Directory -Force -Path $manifestDirectory | Out-Null
+    }
+
+    $manifestJson = Build-GitUpdateManifest `
+        -Repo $Repo `
+        -Branch $Branch `
+        -PayloadPath $PayloadPath `
+        -PayloadDirectory $payloadDirectory `
+        -Version $Version `
+        -ReleaseNotes $ReleaseNotes
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($manifestFile, $manifestJson + "`n", $utf8NoBom)
+
+    $payloadPathForGit = ($PayloadPath -replace "\\", "/").Trim("/")
+    $manifestPathForGit = ($ManifestPath -replace "\\", "/")
+    Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("add", "--all", "--", $payloadPathForGit, $manifestPathForGit)
+
+    $status = & git -C $WorkingDirectory status --porcelain -- $payloadPathForGit $manifestPathForGit
+    if ([string]::IsNullOrWhiteSpace(($status -join "`n"))) {
+        Write-Host "Git 更新仓库没有文件变化，跳过 commit/push。"
+        return
+    }
+
+    Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("commit", "-m", "Update CyanTools to $Version")
+    Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("push", "origin", $Branch)
+    Write-Host "已推送 Git 增量更新：$Repo $Branch/$ManifestPath"
+}
+
 function Read-ReleaseNotes {
     param(
         [string]$ReleaseNotes,
@@ -395,6 +612,12 @@ if (-not [System.IO.Path]::IsPathRooted($BuildDir)) {
 if (-not [System.IO.Path]::IsPathRooted($OutDir)) {
     $OutDir = Join-Path $baseDir $OutDir
 }
+if ([string]::IsNullOrWhiteSpace($GitUpdateRepoWorkingDirectory)) {
+    $GitUpdateRepoWorkingDirectory = Join-Path $OutDir "CyanToolsUpdateRepo"
+}
+if (-not [System.IO.Path]::IsPathRooted($GitUpdateRepoWorkingDirectory)) {
+    $GitUpdateRepoWorkingDirectory = Join-Path $baseDir $GitUpdateRepoWorkingDirectory
+}
 
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $gh) {
@@ -417,12 +640,21 @@ if (-not $PSBoundParameters.ContainsKey("TagPrefix")) {
 }
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $auto = Derive-NextVersionFromLatestRelease -Repo $Repo -TagPrefix $TagPrefix
-    if ($null -eq $auto) {
-        throw "无法自动推断下一个版本号（可能是仓库无 releases 或未登录 gh）。请用 -Version 指定，例如：-Version 1.0.0.4"
+    if ($PublishGitUpdateRepo -and $SkipReleaseAssetUpload) {
+        $latestManifestVersion = Get-LatestGitUpdateManifestVersion -Repo $Repo -Path $GitUpdateManifestPath -Branch $GitUpdateBranch
+        if (-not [string]::IsNullOrWhiteSpace($latestManifestVersion)) {
+            $Version = Increment-Version -VersionString $latestManifestVersion
+        }
     }
 
-    $Version = $auto.Version
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        $auto = Derive-NextVersionFromLatestRelease -Repo $Repo -TagPrefix $TagPrefix
+        if ($null -eq $auto) {
+            throw "无法自动推断下一个版本号（可能是仓库无 releases/version.json 或未登录 gh）。请用 -Version 指定，例如：-Version 1.0.0.4"
+        }
+
+        $Version = $auto.Version
+    }
 }
 
 $tag = "$TagPrefix$Version"
@@ -449,92 +681,105 @@ if (-not (Test-Path -LiteralPath $BuildDir -PathType Container)) {
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-if (Test-Path -LiteralPath $zipArchivePath) {
-    Remove-Item -LiteralPath $zipArchivePath -Force
-}
-
-Write-Host "打包目录: $BuildDir"
-Write-Host "输出文件: $zipArchivePath"
-
-Push-Location $BuildDir
-try {
-    $items = @()
-    $items += @(Get-ChildItem -Force -File | Select-Object -ExpandProperty Name)
-    if (Test-Path -LiteralPath "runtimes" -PathType Container) {
-        $items += "runtimes"
-    }
-    $items = @($items | Select-Object -Unique)
-
-    if ($items.Count -eq 0) {
-        throw "目标目录下没有可打包内容（顶层文件或 runtimes 目录）：$BuildDir"
-    }
-
-    if ($null -ne $sevenZip) {
-        & $sevenZip a -tzip -mx=9 $zipArchivePath @items | Out-Host
-        if ($LASTEXITCODE -ne 0) {
-            throw "打包 zip 失败（7z exit code: $LASTEXITCODE）"
-        }
-    }
-    else {
-        $compress = Get-Command Compress-Archive -ErrorAction SilentlyContinue
-        if (-not $compress) {
-            throw "未检测到 7z.exe 且当前 PowerShell 不支持 Compress-Archive。请安装 7-Zip，或升级 PowerShell。"
-        }
-        Compress-Archive -Path $items -DestinationPath $zipArchivePath -Force
-    }
-}
-finally {
-    Pop-Location
-}
 
 $releaseNotes = Read-ReleaseNotes -ReleaseNotes $ReleaseNotes -ReleaseNotesFile $ReleaseNotesFile -SkipPrompt:$SkipReleaseNotesPrompt
 $hasReleaseNotes = -not [string]::IsNullOrWhiteSpace($releaseNotes)
 
-$releaseExists = $false
-$prevErrorActionPreference = $ErrorActionPreference
-try {
-    $ErrorActionPreference = "Continue"
-    & gh release view $tag --repo $Repo --json tagName 1>$null 2>$null
-    $releaseExists = ($LASTEXITCODE -eq 0)
-}
-finally {
-    $ErrorActionPreference = $prevErrorActionPreference
+if ($PublishGitUpdateRepo) {
+    Publish-GitUpdateRepository `
+        -Repo $Repo `
+        -WorkingDirectory $GitUpdateRepoWorkingDirectory `
+        -Branch $GitUpdateBranch `
+        -PayloadPath $GitUpdatePayloadPath `
+        -ManifestPath $GitUpdateManifestPath `
+        -BuildDir $BuildDir `
+        -Version $Version `
+        -ReleaseNotes $releaseNotes
 }
 
-if (-not $releaseExists) {
-    Write-Host "创建 Release: $Repo $tag"
-    $notesToUse = if ($hasReleaseNotes) { $releaseNotes } else { "Auto upload $tag" }
-    & gh release create $tag $zipArchivePath --repo $Repo --title $tag --notes $notesToUse | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        throw "创建 Release 失败（gh exit code: $LASTEXITCODE）"
+if (-not $SkipReleaseAssetUpload) {
+    if (Test-Path -LiteralPath $zipArchivePath) {
+        Remove-Item -LiteralPath $zipArchivePath -Force
     }
-}
-else {
-    if ($hasReleaseNotes) {
-        Write-Host "更新 Release 说明: $Repo $tag"
-        & gh release edit $tag --repo $Repo --notes $releaseNotes | Out-Host
+
+    Write-Host "打包目录: $BuildDir"
+    Write-Host "输出文件: $zipArchivePath"
+
+    Push-Location $BuildDir
+    try {
+        $items = @((Get-PublishBuildItems -BuildDir $BuildDir) | ForEach-Object { $_.Name } | Select-Object -Unique)
+
+        if ($items.Count -eq 0) {
+            throw "目标目录下没有可打包内容（顶层文件或 runtimes 目录）：$BuildDir"
+        }
+
+        if ($null -ne $sevenZip) {
+            & $sevenZip a -tzip -mx=9 $zipArchivePath @items | Out-Host
+            if ($LASTEXITCODE -ne 0) {
+                throw "打包 zip 失败（7z exit code: $LASTEXITCODE）"
+            }
+        }
+        else {
+            $compress = Get-Command Compress-Archive -ErrorAction SilentlyContinue
+            if (-not $compress) {
+                throw "未检测到 7z.exe 且当前 PowerShell 不支持 Compress-Archive。请安装 7-Zip，或升级 PowerShell。"
+            }
+            Compress-Archive -Path $items -DestinationPath $zipArchivePath -Force
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $releaseExists = $false
+    $prevErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        & gh release view $tag --repo $Repo --json tagName 1>$null 2>$null
+        $releaseExists = ($LASTEXITCODE -eq 0)
+    }
+    finally {
+        $ErrorActionPreference = $prevErrorActionPreference
+    }
+
+    if (-not $releaseExists) {
+        Write-Host "创建 Release: $Repo $tag"
+        $notesToUse = if ($hasReleaseNotes) { $releaseNotes } else { "Auto upload $tag" }
+        & gh release create $tag $zipArchivePath --repo $Repo --title $tag --notes $notesToUse | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            throw "更新 Release 说明失败（gh exit code: $LASTEXITCODE）"
+            throw "创建 Release 失败（gh exit code: $LASTEXITCODE）"
+        }
+    }
+    else {
+        if ($hasReleaseNotes) {
+            Write-Host "更新 Release 说明: $Repo $tag"
+            & gh release edit $tag --repo $Repo --notes $releaseNotes | Out-Host
+            if ($LASTEXITCODE -ne 0) {
+                throw "更新 Release 说明失败（gh exit code: $LASTEXITCODE）"
+            }
+        }
+
+        Write-Host "更新 Release 资产: $Repo $tag"
+        & gh release upload $tag $zipArchivePath --repo $Repo --clobber | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "上传 Release 资产失败（gh exit code: $LASTEXITCODE）"
         }
     }
 
-    Write-Host "更新 Release 资产: $Repo $tag"
-    & gh release upload $tag $zipArchivePath --repo $Repo --clobber | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        throw "上传 Release 资产失败（gh exit code: $LASTEXITCODE）"
+    if (-not $SkipVersionXmlUpdate) {
+        $downloadUrl = "https://github.com/$Repo/releases/download/$tag/$zipAssetName"
+        Write-Host "更新 version.xml: $Repo $VersionXmlBranch/$VersionXmlPath"
+        Update-VersionXml -Repo $Repo -Path $VersionXmlPath -Branch $VersionXmlBranch -Version $Version -DownloadUrl $downloadUrl
+    }
+
+    $viewJson = & gh release view $tag --repo $Repo --json url 2>$null
+    if (-not [string]::IsNullOrWhiteSpace($viewJson)) {
+        $url = ($viewJson | ConvertFrom-Json).url
+        Write-Host "Release URL: $url"
     }
 }
-
-if (-not $SkipVersionXmlUpdate) {
-    $downloadUrl = "https://github.com/$Repo/releases/download/$tag/$zipAssetName"
-    Write-Host "更新 version.xml: $Repo $VersionXmlBranch/$VersionXmlPath"
-    Update-VersionXml -Repo $Repo -Path $VersionXmlPath -Branch $VersionXmlBranch -Version $Version -DownloadUrl $downloadUrl
-}
-
-$viewJson = & gh release view $tag --repo $Repo --json url 2>$null
-if (-not [string]::IsNullOrWhiteSpace($viewJson)) {
-    $url = ($viewJson | ConvertFrom-Json).url
-    Write-Host "Release URL: $url"
+else {
+    Write-Host "已跳过 Release zip 上传；旧版 AutoUpdater 的 version.xml 未更新。"
 }
 
 Write-Host "完成。"

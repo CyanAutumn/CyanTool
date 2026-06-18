@@ -19,11 +19,38 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="ImageSparkle24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Real-ESRGAN / waifu2x"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="统一管理超分工具、模型参数、输出选项和运行日志。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <GroupBox Header="路径"
-                  Grid.Row="0"
+                  Grid.Row="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -103,7 +130,7 @@
         </GroupBox>
 
         <GroupBox Header="引擎"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -125,7 +152,7 @@
             </Grid>
         </GroupBox>
 
-        <Grid Grid.Row="2"
+        <Grid Grid.Row="3"
               Margin="0,0,0,12">
             <GroupBox Header="Real-ESRGAN 参数"
                       Style="{StaticResource CyanGroupBoxStyle}"
@@ -241,7 +268,7 @@
         </Grid>
 
         <GroupBox Header="执行"
-                  Grid.Row="3"
+                  Grid.Row="4"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -293,7 +320,7 @@
         </GroupBox>
 
         <GroupBox Header="日志"
-                  Grid.Row="4"
+                  Grid.Row="5"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <ListBox ItemsSource="{Binding LogLines}"
                      VirtualizingStackPanel.IsVirtualizing="True"

@@ -19,11 +19,38 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="300"/>
             </Grid.RowDefinitions>
 
+            <Border Grid.Row="0"
+                    Style="{StaticResource CyanCardStyle}"
+                    Margin="0,0,0,14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CyanIconBadgeStyle}"
+                            Margin="0,0,14,0">
+                        <ui:SymbolIcon Symbol="DataScatter24"
+                                       FontSize="22"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="图像聚类"
+                                   Style="{StaticResource CyanSectionTitleStyle}" />
+                        <TextBlock Text="按特征空间、聚类算法和 UMAP 参数整理图片分组。"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <GroupBox Header="路径"
-                      Grid.Row="0"
+                      Grid.Row="1"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
@@ -99,7 +126,7 @@
             </GroupBox>
 
             <GroupBox Header="聚类参数"
-                      Grid.Row="1"
+                      Grid.Row="2"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
@@ -329,7 +356,7 @@
             </GroupBox>
 
             <GroupBox Header="UMAP 参数"
-                      Grid.Row="2"
+                      Grid.Row="3"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
@@ -372,7 +399,7 @@
                 </Grid>
             </GroupBox>
 
-            <Grid Grid.Row="3">
+            <Grid Grid.Row="4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>

@@ -51,6 +51,7 @@ namespace CyanTools.ViewModel
         private const string PixivAppOsVersion = "14.6";
         private const string DefaultOutputDirectory = "./output_{time}_{id}_{name}";
         private const int DefaultPixivIntervalSeconds = 20;
+        private const int ImageDownloadRetryCount = 3;
         private static readonly string SettingsDirectory = Path.Combine(AppContext.BaseDirectory, "Config");
         private static readonly string SettingsFilePath = Path.Combine(SettingsDirectory, "dataset_downloader.json");
         private static readonly string DanbooruTokenFilePath = Path.Combine(AppContext.BaseDirectory, "cookies.txt");
@@ -884,7 +885,7 @@ namespace CyanTools.ViewModel
             var imagePath = Path.Combine(outputDirectory, fileName);
             var txtPath = Path.Combine(outputDirectory, Path.ChangeExtension(fileName, ".txt"));
 
-            if (File.Exists(imagePath))
+            if (File.Exists(imagePath) && ShouldSkipExistingDownloadedFile(imagePath, "Danbooru", fileName))
             {
                 AppendLog($"[Danbooru] 已存在，跳过 {fileName}");
                 if (!File.Exists(txtPath))
@@ -902,16 +903,35 @@ namespace CyanTools.ViewModel
 
             try
             {
-                var response = await _danbooruClient.ExecuteAsync(request, token);
-                if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
+                for (int attempt = 1; attempt <= ImageDownloadRetryCount; attempt++)
                 {
-                    AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
+                    var response = await _danbooruClient.ExecuteAsync(request, token);
+                    if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
+                    {
+                        if (attempt < ImageDownloadRetryCount)
+                        {
+                            continue;
+                        }
+
+                        AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
+                        return;
+                    }
+
+                    await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
+                    if (!ValidateDownloadedFileOrDelete(imagePath, "Danbooru", fileName, attempt, ImageDownloadRetryCount))
+                    {
+                        if (attempt >= ImageDownloadRetryCount)
+                        {
+                            return;
+                        }
+
+                        continue;
+                    }
+
+                    await SaveDanbooruTagsTxtAsync(post, txtPath, token);
+                    AppendLog($"[Danbooru] 已保存 {fileName}");
                     return;
                 }
-
-                await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
-                await SaveDanbooruTagsTxtAsync(post, txtPath, token);
-                AppendLog($"[Danbooru] 已保存 {fileName}");
             }
             finally
             {
@@ -1106,7 +1126,18 @@ namespace CyanTools.ViewModel
                         }
 
                         var targetPath = Path.Combine(outputDirectory, item.FileName);
-                        if (File.Exists(targetPath) || existingPixivFiles.Contains(item.FileKey))
+                        if (File.Exists(targetPath))
+                        {
+                            if (ShouldSkipExistingDownloadedFile(targetPath, "Pixiv", item.FileName))
+                            {
+                                skippedCount++;
+                                existingPixivFiles.Add(item.FileKey);
+                                continue;
+                            }
+
+                            existingPixivFiles.Remove(item.FileKey);
+                        }
+                        else if (existingPixivFiles.Contains(item.FileKey))
                         {
                             skippedCount++;
                             continue;
@@ -1380,21 +1411,43 @@ namespace CyanTools.ViewModel
         {
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Referrer = new Uri("https://app-api.pixiv.net/");
-                request.Headers.TryAddWithoutValidation("User-Agent", PixivUserAgent);
-
-                using var response = await PixivImageClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-                if (!response.IsSuccessStatusCode)
+                for (int attempt = 1; attempt <= ImageDownloadRetryCount; attempt++)
                 {
-                    AppendLog($"[Pixiv] 下载失败: {response.StatusCode}");
-                    return false;
-                }
+                    using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Referrer = new Uri("https://app-api.pixiv.net/");
+                    request.Headers.TryAddWithoutValidation("User-Agent", PixivUserAgent);
 
-                await using var input = await response.Content.ReadAsStreamAsync(token);
-                await using var output = new FileStream(targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                await input.CopyToAsync(output, token);
-                return true;
+                    using var response = await PixivImageClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        if (attempt < ImageDownloadRetryCount)
+                        {
+                            continue;
+                        }
+
+                        AppendLog($"[Pixiv] 下载失败: {response.StatusCode}");
+                        return false;
+                    }
+
+                    await using var input = await response.Content.ReadAsStreamAsync(token);
+                    await using (var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await input.CopyToAsync(output, token);
+                    }
+
+                    if (!ValidateDownloadedFileOrDelete(targetPath, "Pixiv", Path.GetFileName(targetPath), attempt, ImageDownloadRetryCount))
+                    {
+                        if (attempt >= ImageDownloadRetryCount)
+                        {
+                            return false;
+                        }
+
+                        continue;
+                    }
+
+                    return true;
+                }
+                return false;
             }
             catch (OperationCanceledException)
             {
@@ -1402,6 +1455,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
+                TryDeleteFile(targetPath);
                 AppendLog($"[Pixiv] 下载失败: {ex.Message}");
                 return false;
             }
@@ -1438,8 +1492,11 @@ namespace CyanTools.ViewModel
                     var targetPath = Path.Combine(outputDirectory, asset.FileName);
                     if (File.Exists(targetPath))
                     {
-                        skippedCount++;
-                        continue;
+                        if (ShouldSkipExistingDownloadedFile(targetPath, "Kemono", asset.FileName))
+                        {
+                            skippedCount++;
+                            continue;
+                        }
                     }
 
                     if (await DownloadKemonoAssetAsync(asset, outputDirectory, token))
@@ -1662,9 +1719,15 @@ namespace CyanTools.ViewModel
                     using var response = await KemonoHttpClient.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead, token);
                     response.EnsureSuccessStatusCode();
                     await using var input = await response.Content.ReadAsStreamAsync(token);
-                    await using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                    await input.CopyToAsync(output, token);
-                    return true;
+                    await using (var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await input.CopyToAsync(output, token);
+                    }
+
+                    if (ValidateDownloadedFileOrDelete(targetPath, "Kemono", asset.FileName, attempt + 1, KemonoRetryCount + 1))
+                    {
+                        return true;
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -1672,6 +1735,7 @@ namespace CyanTools.ViewModel
                 }
                 catch
                 {
+                    TryDeleteFile(targetPath);
                     if (attempt >= KemonoRetryCount)
                     {
                         return false;
@@ -1680,6 +1744,46 @@ namespace CyanTools.ViewModel
             }
 
             return false;
+        }
+
+        private bool ShouldSkipExistingDownloadedFile(string filePath, string source, string displayName)
+        {
+            if (!DownloadedImageValidator.HasSupportedImageExtension(filePath)
+                || DownloadedImageValidator.CanDecodeImage(filePath))
+            {
+                return true;
+            }
+
+            TryDeleteFile(filePath);
+            AppendLog($"[{source}] Existing image failed validation and was deleted: {displayName}");
+            return false;
+        }
+
+        private bool ValidateDownloadedFileOrDelete(string filePath, string source, string displayName, int attempt, int maxAttempts)
+        {
+            if (!DownloadedImageValidator.HasSupportedImageExtension(filePath)
+                || DownloadedImageValidator.CanDecodeImage(filePath))
+            {
+                return true;
+            }
+
+            TryDeleteFile(filePath);
+            AppendLog($"[{source}] Image validation failed, deleted bad file ({attempt}/{maxAttempts}): {displayName}");
+            return false;
+        }
+
+        private static void TryDeleteFile(string filePath)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private static async Task SaveKemonoContentAsync(string? content, string fileName, string outputDirectory, CancellationToken token)

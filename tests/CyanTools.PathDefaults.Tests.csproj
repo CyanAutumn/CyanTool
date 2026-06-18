@@ -30,6 +30,7 @@
     <Compile Include="../Utils/FolderProcessingPipelineProcessor.cs" Link="Utils/FolderProcessingPipelineProcessor.cs" />
     <Compile Include="../Utils/SameSourceImageGroupingProcessor.cs" Link="Utils/SameSourceImageGroupingProcessor.cs" />
     <Compile Include="../Utils/InputDirectoryCleanupHelper.cs" Link="Utils/InputDirectoryCleanupHelper.cs" />
+    <Compile Include="../Utils/DownloadedImageValidator.cs" Link="Utils/DownloadedImageValidator.cs" />
     <Compile Include="../Utils/ImageRenamePipelineProcessor.cs" Link="Utils/ImageRenamePipelineProcessor.cs" />
     <Compile Include="../Utils/KeepFilesPipelineProcessor.cs" Link="Utils/KeepFilesPipelineProcessor.cs" />
     <Compile Include="../Utils/KeepFilesRetentionPolicy.cs" Link="Utils/KeepFilesRetentionPolicy.cs" />

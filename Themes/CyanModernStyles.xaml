@@ -204,6 +204,7 @@
                         </Border>
 
                         <Border HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
                                 Margin="14,0,0,0"
                                 Padding="10,4"
                                 CornerRadius="8"
@@ -219,6 +220,29 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type GroupBox}" BasedOn="{StaticResource CyanGroupBoxStyle}" />
+
+    <Style x:Key="CyanDialogRootGridStyle" TargetType="{x:Type Grid}">
+        <Setter Property="Margin" Value="18" />
+        <Setter Property="Background" Value="{DynamicResource CyanShellBackgroundBrush}" />
+    </Style>
+
+    <Style x:Key="CyanParameterRowStyle" TargetType="{x:Type Border}">
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style x:Key="CyanExpanderStyle" TargetType="{x:Type Expander}">
+        <Setter Property="Margin" Value="0,0,0,10" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CyanSurfaceElevatedBrush}" />
     </Style>
 
     <Style x:Key="CyanGridSplitterStyle" TargetType="{x:Type GridSplitter}">

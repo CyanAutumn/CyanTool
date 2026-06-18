@@ -29,6 +29,7 @@ namespace CyanTools.ViewModel
         private bool _downloadersUnlocked;
         private bool _isLoadingWorkflow;
         private string? _selectedWorkflowName;
+        private string? _loadedWorkflowName;
         private bool _isRefreshingWorkflowPaths;
         private bool _isRebuildingPipelineNodes;
         private bool _isUpdatingSelection;
@@ -57,6 +58,7 @@ namespace CyanTools.ViewModel
             CancelCommand = new RelayCommand(CancelRun, () => IsRunning);
             ClearLogCommand = new RelayCommand(() => LogLines.Clear(), () => !IsRunning);
             SaveWorkflowCommand = new RelayCommand(SaveWorkflow, () => !IsRunning && !string.IsNullOrWhiteSpace(SelectedWorkflowName));
+            RenameWorkflowCommand = new RelayCommand(RenameWorkflow, CanRenameWorkflow);
             DeleteWorkflowCommand = new RelayCommand(DeleteWorkflow, () => !IsRunning && !string.IsNullOrWhiteSpace(SelectedWorkflowName));
             StartConnectionCommand = new RelayCommand(StartConnection, CanStartConnection);
             CreateConnectionCommand = new RelayCommand(CompleteConnection, _ => !IsRunning);
@@ -133,6 +135,7 @@ namespace CyanTools.ViewModel
         public ICommand CancelCommand { get; }
         public ICommand ClearLogCommand { get; }
         public ICommand SaveWorkflowCommand { get; }
+        public ICommand RenameWorkflowCommand { get; }
         public ICommand DeleteWorkflowCommand { get; }
         public ICommand StartConnectionCommand { get; }
         public ICommand CreateConnectionCommand { get; }
@@ -370,8 +373,86 @@ namespace CyanTools.ViewModel
 
             ReplacePipelineNodes(order.Select(n => n.PipelineNode));
             WorkflowStorage.Save(SelectedWorkflowName.Trim(), PipelineNodes);
+            _loadedWorkflowName = SelectedWorkflowName.Trim();
             RefreshWorkflowList();
             AppendLog($"已保存工作流: {SelectedWorkflowName.Trim()}");
+            RaiseCommandStates();
+        }
+
+        private bool CanRenameWorkflow()
+        {
+            var oldName = _loadedWorkflowName?.Trim();
+            var newName = SelectedWorkflowName?.Trim();
+            return !IsRunning &&
+                   !string.IsNullOrWhiteSpace(oldName) &&
+                   !string.IsNullOrWhiteSpace(newName) &&
+                   !string.Equals(oldName, newName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void RenameWorkflow()
+        {
+            var oldName = _loadedWorkflowName?.Trim();
+            var newName = SelectedWorkflowName?.Trim();
+            if (string.IsNullOrWhiteSpace(oldName))
+            {
+                AppendLog("\u8bf7\u5148\u9009\u62e9\u8981\u91cd\u547d\u540d\u7684\u5de5\u4f5c\u6d41\u3002");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                AppendLog("\u8bf7\u8f93\u5165\u65b0\u7684\u5de5\u4f5c\u6d41\u540d\u79f0\u3002");
+                return;
+            }
+
+            if (string.Equals(oldName, newName, StringComparison.OrdinalIgnoreCase))
+            {
+                AppendLog("\u65b0\u540d\u79f0\u4e0e\u5f53\u524d\u5de5\u4f5c\u6d41\u76f8\u540c\u3002");
+                return;
+            }
+
+            if (!IsValidWorkflowFileName(oldName) || !IsValidWorkflowFileName(newName))
+            {
+                AppendLog("\u5de5\u4f5c\u6d41\u540d\u79f0\u4e0d\u80fd\u5305\u542b\u6587\u4ef6\u8def\u5f84\u975e\u6cd5\u5b57\u7b26\u3002");
+                return;
+            }
+
+            try
+            {
+                var folder = WorkflowStorage.EnsureFolder();
+                var oldPath = Path.Combine(folder, $"{oldName}.json");
+                var newPath = Path.Combine(folder, $"{newName}.json");
+
+                if (!File.Exists(oldPath))
+                {
+                    AppendLog("\u627e\u4e0d\u5230\u539f\u5de5\u4f5c\u6d41\u6587\u4ef6\uff0c\u5df2\u5237\u65b0\u5217\u8868\u3002");
+                    RefreshWorkflowList();
+                    return;
+                }
+
+                if (File.Exists(newPath))
+                {
+                    AppendLog("\u76ee\u6807\u540d\u79f0\u5df2\u5b58\u5728\uff0c\u8bf7\u6362\u4e00\u4e2a\u540d\u79f0\u3002");
+                    return;
+                }
+
+                File.Move(oldPath, newPath);
+                _loadedWorkflowName = newName;
+                RefreshWorkflowList();
+                SelectedWorkflowName = newName;
+                AppendLog($"\u5df2\u91cd\u547d\u540d\u5de5\u4f5c\u6d41: {oldName} -> {newName}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"\u65e0\u6cd5\u91cd\u547d\u540d\u5de5\u4f5c\u6d41: {ex.Message}");
+            }
+
+            RaiseCommandStates();
+        }
+
+        private static bool IsValidWorkflowFileName(string name)
+        {
+            return name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
         }
 
         private void DeleteWorkflow()
@@ -390,8 +471,14 @@ namespace CyanTools.ViewModel
                 AppendLog($"已删除工作流: {name}");
             }
 
+            if (string.Equals(_loadedWorkflowName, name, StringComparison.OrdinalIgnoreCase))
+            {
+                _loadedWorkflowName = null;
+            }
+
             RefreshWorkflowList();
             SelectedWorkflowName = Workflows.FirstOrDefault();
+            RaiseCommandStates();
         }
 
         private void RefreshWorkflowList()
@@ -427,6 +514,7 @@ namespace CyanTools.ViewModel
             {
                 var nodes = WorkflowStorage.Load(name, _downloadersUnlocked);
                 LoadCanvasFromPipelineNodes(nodes);
+                _loadedWorkflowName = name;
             }
             finally
             {
@@ -436,6 +524,7 @@ namespace CyanTools.ViewModel
             RefreshWorkflowPaths();
             SelectedCanvasNode = CanvasNodes.FirstOrDefault();
             AppendLog($"已载入工作流: {name}");
+            RaiseCommandStates();
         }
 
         private void LoadCanvasFromPipelineNodes(IReadOnlyList<PipelineNodeViewModelBase> nodes)
@@ -868,6 +957,7 @@ namespace CyanTools.ViewModel
             (CancelCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (SaveWorkflowCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (RenameWorkflowCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (DeleteWorkflowCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (StartConnectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (CreateConnectionCommand as RelayCommand)?.RaiseCanExecuteChanged();

@@ -1,37 +1,82 @@
 <Window x:Class="CyanTools.UpdateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="Update Available"
-        Width="560"
-        Height="420"
+        Width="600"
+        Height="440"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanResizeWithGrip">
-    <Grid Margin="16">
+        ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource CyanShellBackgroundBrush}"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    <Grid Style="{StaticResource CyanDialogRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock x:Name="TitleText" FontSize="16" FontWeight="Bold" />
-            <TextBlock x:Name="VersionText" Margin="0,6,0,0" />
-        </StackPanel>
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4">
-            <TextBox x:Name="NotesTextBox"
-                     IsReadOnly="True"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto"
-                     HorizontalScrollBarVisibility="Disabled"
-                     Padding="8"
-                     BorderThickness="0"
-                     Background="White" />
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="ArrowSync24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock x:Name="TitleText"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock x:Name="VersionText"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="LaterButton" Content="Later" Width="90" Margin="0,0,8,0" Click="LaterButton_Click" />
-            <Button x:Name="UpdateButton" Content="Update Now" Width="100" IsDefault="True" Click="UpdateButton_Click" />
-        </StackPanel>
+        <Border Grid.Row="1"
+                Style="{StaticResource CyanCardStyle}">
+            <TextBox x:Name="NotesTextBox"
+                     Style="{StaticResource CyanLogTextBoxStyle}"
+                     BorderThickness="0"
+                     HorizontalScrollBarVisibility="Disabled" />
+        </Border>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource CyanToolbarSurfaceStyle}"
+                Margin="0,14,0,0">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button x:Name="LaterButton"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Click="LaterButton_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Dismiss24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="Later" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="UpdateButton"
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}"
+                        IsDefault="True"
+                        Click="UpdateButton_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ArrowSync24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="Update Now" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

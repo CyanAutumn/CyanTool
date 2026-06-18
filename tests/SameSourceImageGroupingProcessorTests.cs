@@ -324,3 +324,53 @@ public sealed class SameSourceImageGroupingProcessorTests : IDisposable
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
+
+public sealed class DownloadedImageValidatorTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "CyanTools_DownloadedImageValidatorTests", Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public void CanDecodeImage_ReturnsTrue_ForCompletePng()
+    {
+        string imagePath = Path.Combine(_root, "complete.png");
+        Directory.CreateDirectory(_root);
+
+        using (var image = new Image<Rgb24>(1, 1))
+        {
+            image.SaveAsPng(imagePath);
+        }
+
+        Assert.True(DownloadedImageValidator.CanDecodeImage(imagePath));
+    }
+
+    [Fact]
+    public void CanDecodeImage_ReturnsFalse_ForTruncatedPng()
+    {
+        string imagePath = Path.Combine(_root, "truncated.png");
+        Directory.CreateDirectory(_root);
+
+        using (var image = new Image<Rgb24>(2, 2))
+        {
+            image.SaveAsPng(imagePath);
+        }
+
+        byte[] bytes = File.ReadAllBytes(imagePath);
+        File.WriteAllBytes(imagePath, bytes.Take(bytes.Length / 2).ToArray());
+
+        Assert.False(DownloadedImageValidator.CanDecodeImage(imagePath));
+    }
+
+    [Fact]
+    public void HasSupportedImageExtension_ReturnsFalse_ForTextFile()
+    {
+        Assert.False(DownloadedImageValidator.HasSupportedImageExtension("caption.txt"));
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+    }
+}

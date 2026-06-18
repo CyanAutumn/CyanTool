@@ -6,21 +6,47 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d"
-             d:DesignHeight="450"
-             d:DesignWidth="800"
+             d:DesignHeight="620"
+             d:DesignWidth="960"
              Unloaded="UserControl_Unloaded">
     <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="视频与输出"
-                  Grid.Row="0"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="ImageArrowForward24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="视频抽帧"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="预览视频帧并导出当前帧、全部帧或 GIF。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="视频与输出"
+                  Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -32,7 +58,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="视频路径"
+                <TextBlock Text="视频路径:"
                            Style="{StaticResource CyanFormLabelStyle}" />
                 <TextBox Grid.Column="1"
                          IsReadOnly="True"
@@ -49,7 +75,7 @@
                 </Button>
 
                 <TextBlock Grid.Row="1"
-                           Text="输出目录"
+                           Text="输出路径"
                            Style="{StaticResource CyanFormLabelStyle}"
                            Margin="0,12,10,0" />
                 <TextBox Grid.Row="1"
@@ -71,20 +97,18 @@
             </Grid>
         </GroupBox>
 
-        <GroupBox Header="帧预览"
-                  Grid.Row="1"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <GroupBox Grid.Row="2"
+                  Header="帧预览"
+                  Margin="0,0,0,14">
             <Border Style="{StaticResource CyanImageWellStyle}">
                 <Image Stretch="Uniform"
                        Source="{Binding CurrentFrame}" />
             </Border>
         </GroupBox>
 
-        <GroupBox Header="时间轴"
-                  Grid.Row="2"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <GroupBox Grid.Row="3"
+                  Header="时间轴"
+                  Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -124,9 +148,8 @@
             </Grid>
         </GroupBox>
 
-        <GroupBox Header="导出"
-                  Grid.Row="3"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <Border Grid.Row="4"
+                Style="{StaticResource CyanToolbarSurfaceStyle}">
             <StackPanel Orientation="Horizontal">
                 <Button Command="{Binding ExportCurrentFrameCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
@@ -136,13 +159,23 @@
                         <TextBlock Text="输出当前帧" />
                     </StackPanel>
                 </Button>
-                <Button Content="输出所有帧"
-                        Command="{Binding ExportAllFramesCommand}"
-                        Style="{StaticResource CyanCommandButtonStyle}" />
-                <Button Content="导出为 GIF"
-                        Command="{Binding ExportGifCommand}"
-                        Style="{StaticResource CyanCommandButtonStyle}" />
+                <Button Command="{Binding ExportAllFramesCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ImageMultiple24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="输出所有帧" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding ExportGifCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Save24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="导出为 GIF" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
-        </GroupBox>
+        </Border>
     </Grid>
 </UserControl>

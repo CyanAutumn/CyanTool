@@ -12,19 +12,52 @@
         <viewModel:ImageProcessingViewModel />
     </UserControl.DataContext>
 
-    <Grid Style="{StaticResource CyanPageGridStyle}">
+    <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0"
+                Grid.ColumnSpan="2"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="ImageEdit24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="图片处理"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="对目标路径中的图片执行镜像等轻量批处理操作。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
 
         <GroupBox Header="路径"
-                  Grid.Row="0"
+                  Grid.Row="1"
+                  Grid.Column="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
-            <Grid>
+            <Grid Grid.Row="0" Grid.Column="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -46,7 +79,8 @@
         </GroupBox>
 
         <GroupBox Header="处理选项"
-                  Grid.Row="1"
+                  Grid.Row="2"
+                  Grid.Column="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <CheckBox Content="镜像图片（左右翻转）"
@@ -54,7 +88,8 @@
         </GroupBox>
 
         <GroupBox Header="执行"
-                  Grid.Row="2"
+                  Grid.Row="3"
+                  Grid.Column="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Button Command="{Binding StartProcessingCommand}"
@@ -69,7 +104,8 @@
         </GroupBox>
 
         <GroupBox Header="日志"
-                  Grid.Row="3"
+                  Grid.Row="4"
+                  Grid.Column="1"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <DockPanel>
                 <Button Content="清空日志"

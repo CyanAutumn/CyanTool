@@ -8,8 +8,8 @@
              xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d"
-             d:DesignHeight="450"
-             d:DesignWidth="800">
+             d:DesignHeight="560"
+             d:DesignWidth="900">
     <UserControl.Resources>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
@@ -22,10 +22,35 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="路径"
-                  Grid.Row="0"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="Filter24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="分辨率筛选"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="按高度、宽度或分辨率阈值筛掉不符合要求的图片。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="路径"
+                  Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -44,12 +69,11 @@
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
                 <Button Grid.Column="2"
+                        Content="..."
                         Command="{Binding BrowseInputCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         ToolTip="选择输入路径"
-                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
-                    <ui:SymbolIcon Symbol="FolderOpen24" />
-                </Button>
+                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
 
                 <TextBlock Grid.Row="1"
                            Grid.Column="1"
@@ -61,10 +85,9 @@
             </Grid>
         </GroupBox>
 
-        <GroupBox Header="筛选条件"
-                  Grid.Row="1"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <GroupBox Grid.Row="2"
+                  Header="筛选条件"
+                  Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -72,102 +95,114 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
+                <Border Style="{StaticResource CyanParameterRowStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="100" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Content="删除指定高度以下的图片"
+                                  IsChecked="{Binding IsHeightFilterEnabled}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="最小高度"
+                                   Style="{StaticResource CyanFormLabelStyle}"
+                                   IsEnabled="{Binding IsHeightFilterEnabled}" />
+                        <TextBox Grid.Column="2"
+                                 Text="{Binding MinHeight}"
+                                 IsEnabled="{Binding IsHeightFilterEnabled}" />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Style="{StaticResource CyanParameterRowStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="100" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Content="删除指定宽度以下的图片"
+                                  IsChecked="{Binding IsWidthFilterEnabled}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="最小宽度"
+                                   Style="{StaticResource CyanFormLabelStyle}"
+                                   IsEnabled="{Binding IsWidthFilterEnabled}" />
+                        <TextBox Grid.Column="2"
+                                 Text="{Binding MinWidth}"
+                                 IsEnabled="{Binding IsWidthFilterEnabled}" />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="2"
+                        Style="{StaticResource CyanParameterRowStyle}"
+                        Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="80" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Content="删除指定分辨率以下的图片"
+                                  IsChecked="{Binding IsResolutionFilterEnabled}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="最小分辨率"
+                                   Style="{StaticResource CyanFormLabelStyle}"
+                                   IsEnabled="{Binding IsResolutionFilterEnabled}" />
+                        <TextBox Grid.Column="2"
+                                 Text="{Binding MinResolutionWidth}"
+                                 IsEnabled="{Binding IsResolutionFilterEnabled}" />
+                        <TextBlock Grid.Column="3"
+                                   Text="x"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBox Grid.Column="4"
+                                 Text="{Binding MinResolutionHeight}"
+                                 IsEnabled="{Binding IsResolutionFilterEnabled}" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </GroupBox>
+
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Style="{StaticResource CyanToolbarSurfaceStyle}"
+                    Margin="0,0,0,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="240" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <CheckBox Content="删除指定高度以下的图片"
-                              IsChecked="{Binding IsHeightFilterEnabled}" />
-                    <TextBlock Grid.Column="1"
-                               Text="最小高度"
-                               Style="{StaticResource CyanFormLabelStyle}"
-                               IsEnabled="{Binding IsHeightFilterEnabled}" />
-                    <TextBox Grid.Column="2"
-                             Text="{Binding MinHeight}"
-                             IsEnabled="{Binding IsHeightFilterEnabled}" />
+                    <Button Command="{Binding StartCommand}"
+                            IsEnabled="{Binding IsStartButtonEnabled}"
+                            Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Filter24"
+                                           Margin="0,0,6,0" />
+                            <TextBlock Text="开始筛选" />
+                        </StackPanel>
+                    </Button>
+                    <ProgressBar Grid.Column="1"
+                                 Value="{Binding ProgressValue}"
+                                 Height="8"
+                                 VerticalAlignment="Center"
+                                 Margin="12,0,0,0" />
                 </Grid>
+            </Border>
 
-                <Grid Grid.Row="1"
-                      Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="240" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="100" />
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Content="删除指定宽度以下的图片"
-                              IsChecked="{Binding IsWidthFilterEnabled}" />
-                    <TextBlock Grid.Column="1"
-                               Text="最小宽度"
-                               Style="{StaticResource CyanFormLabelStyle}"
-                               IsEnabled="{Binding IsWidthFilterEnabled}" />
-                    <TextBox Grid.Column="2"
-                             Text="{Binding MinWidth}"
-                             IsEnabled="{Binding IsWidthFilterEnabled}" />
-                </Grid>
-
-                <Grid Grid.Row="2"
-                      Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="240" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="80" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="80" />
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Content="删除指定分辨率以下的图片"
-                              IsChecked="{Binding IsResolutionFilterEnabled}" />
-                    <TextBlock Grid.Column="1"
-                               Text="最小分辨率"
-                               Style="{StaticResource CyanFormLabelStyle}"
-                               IsEnabled="{Binding IsResolutionFilterEnabled}" />
-                    <TextBox Grid.Column="2"
-                             Text="{Binding MinResolutionWidth}"
-                             IsEnabled="{Binding IsResolutionFilterEnabled}" />
-                    <TextBlock Grid.Column="3"
-                               Text="x"
-                               VerticalAlignment="Center"
-                               Margin="8,0"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <TextBox Grid.Column="4"
-                             Text="{Binding MinResolutionHeight}"
-                             IsEnabled="{Binding IsResolutionFilterEnabled}" />
-                </Grid>
-            </Grid>
-        </GroupBox>
-
-        <GroupBox Header="执行"
-                  Grid.Row="2"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Button Command="{Binding StartCommand}"
-                        IsEnabled="{Binding IsStartButtonEnabled}"
-                        Style="{StaticResource CyanPrimaryActionButtonStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Filter24"
-                                       Margin="0,0,6,0" />
-                        <TextBlock Text="开始筛选" />
-                    </StackPanel>
-                </Button>
-                <ProgressBar Grid.Column="1"
-                             Value="{Binding ProgressValue}"
-                             Height="18"
-                             VerticalAlignment="Center"
-                             Margin="12,0,0,0" />
-            </Grid>
-        </GroupBox>
-
-        <GroupBox Header="日志"
-                  Grid.Row="3"
-                  Style="{StaticResource CyanGroupBoxStyle}">
-            <ListView ItemsSource="{Binding Logs}"
-                      Style="{StaticResource CyanListBoxSurfaceStyle}" />
-        </GroupBox>
+            <GroupBox Grid.Row="1"
+                      Header="日志">
+                <ListView ItemsSource="{Binding Logs}"
+                          Style="{StaticResource CyanListBoxSurfaceStyle}" />
+            </GroupBox>
+        </Grid>
     </Grid>
 </UserControl>

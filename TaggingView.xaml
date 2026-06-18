@@ -19,12 +19,39 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="TagMultiple24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="批量打标"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="选择输入路径、打标模型和阈值后批量生成标签文件。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <GroupBox Header="输入"
-                  Grid.Row="0"
+                  Grid.Row="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -63,7 +90,7 @@
         </GroupBox>
 
         <GroupBox Header="模型"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -94,7 +121,7 @@
         </GroupBox>
 
         <GroupBox Header="标签与阈值"
-                  Grid.Row="2"
+                  Grid.Row="3"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -181,7 +208,7 @@
         </GroupBox>
 
         <GroupBox Header="日志"
-                  Grid.Row="3"
+                  Grid.Row="4"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <ListBox ItemsSource="{Binding LogLines}"
@@ -200,7 +227,7 @@
         </GroupBox>
 
         <GroupBox Header="执行"
-                  Grid.Row="4"
+                  Grid.Row="5"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>

@@ -7,8 +7,8 @@
              xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d"
-             d:DesignHeight="450"
-             d:DesignWidth="800">
+             d:DesignHeight="520"
+             d:DesignWidth="860">
     <UserControl.Resources>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
@@ -21,10 +21,35 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="路径"
-                  Grid.Row="0"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="Delete24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="保留指定文件"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="按扩展名保留需要的文件类型，其余文件会被清理。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="路径"
+                  Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -60,39 +85,45 @@
             </Grid>
         </GroupBox>
 
-        <GroupBox Header="保留的文件类型"
-                  Grid.Row="1"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
-            <WrapPanel>
-                <CheckBox Content="jpg" Margin="0,0,14,8" IsChecked="{Binding KeepJpg}" />
-                <CheckBox Content="png" Margin="0,0,14,8" IsChecked="{Binding KeepPng}" />
-                <CheckBox Content="webp" Margin="0,0,14,8" IsChecked="{Binding KeepWebp}" />
-                <CheckBox Content="bmp" Margin="0,0,14,8" IsChecked="{Binding KeepBmp}" />
-                <CheckBox Content="jpeg" Margin="0,0,14,8" IsChecked="{Binding KeepJpeg}" />
-                <CheckBox Content="npz" Margin="0,0,14,8" IsChecked="{Binding KeepNpz}" />
-                <CheckBox Content="txt" Margin="0,0,14,8" IsChecked="{Binding KeepTxt}" />
-                <CheckBox Content=".txt(中文内容)" Margin="0,0,14,8" IsChecked="{Binding KeepChineseTxt}" />
-            </WrapPanel>
-        </GroupBox>
+        <Grid Grid.Row="2"
+              Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-        <GroupBox Header="执行"
-                  Grid.Row="2"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
-            <Button Command="{Binding DeleteFilesCommand}"
-                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Delete24"
-                                   Margin="0,0,6,0" />
-                    <TextBlock Text="删除其他文件" />
-                </StackPanel>
-            </Button>
-        </GroupBox>
+            <GroupBox Grid.Column="0"
+                      Header="保留的文件类型">
+                <WrapPanel>
+                    <CheckBox Content="jpg" Margin="0,0,14,8" IsChecked="{Binding KeepJpg}" />
+                    <CheckBox Content="png" Margin="0,0,14,8" IsChecked="{Binding KeepPng}" />
+                    <CheckBox Content="webp" Margin="0,0,14,8" IsChecked="{Binding KeepWebp}" />
+                    <CheckBox Content="bmp" Margin="0,0,14,8" IsChecked="{Binding KeepBmp}" />
+                    <CheckBox Content="jpeg" Margin="0,0,14,8" IsChecked="{Binding KeepJpeg}" />
+                    <CheckBox Content="npz" Margin="0,0,14,8" IsChecked="{Binding KeepNpz}" />
+                    <CheckBox Content="txt" Margin="0,0,14,8" IsChecked="{Binding KeepTxt}" />
+                    <CheckBox Content=".txt(中文内容)" Margin="0,0,14,8" IsChecked="{Binding KeepChineseTxt}" />
+                </WrapPanel>
+            </GroupBox>
 
-        <GroupBox Header="日志"
-                  Grid.Row="3"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+            <Border Grid.Column="2"
+                    Style="{StaticResource CyanToolbarSurfaceStyle}"
+                    VerticalAlignment="Stretch">
+                <Button Command="{Binding DeleteFilesCommand}"
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Delete24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="删除其他文件" />
+                    </StackPanel>
+                </Button>
+            </Border>
+        </Grid>
+
+        <GroupBox Grid.Row="3"
+                  Header="日志">
             <TextBox Text="{Binding LogText, Mode=OneWay}"
                      Style="{StaticResource CyanLogTextBoxStyle}" />
         </GroupBox>

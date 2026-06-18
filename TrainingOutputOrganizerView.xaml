@@ -6,8 +6,8 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:utils="clr-namespace:CyanTools.Utils"
              mc:Ignorable="d"
-             d:DesignHeight="420"
-             d:DesignWidth="760"
+             d:DesignHeight="520"
+             d:DesignWidth="860"
              Background="Transparent">
     <UserControl.Resources>
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -16,13 +16,39 @@
     <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <GroupBox Header="LoRA epoch 文件整理"
-                  Grid.Row="0"
-                  Margin="0,0,0,12"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="Archive24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="LoRA epoch 文件整理"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="将 diffusion-pipe epoch 输出整理为 sd-script 可识别的 adapter_model 序列。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="路径与选项"
+                  Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -36,7 +62,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="输入文件夹"
+                <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
                 <TextBox Grid.Column="1"
                          Text="{Binding InputFolder, UpdateSourceTrigger=PropertyChanged}"
@@ -45,7 +71,7 @@
                 <Button Grid.Column="2"
                         Command="{Binding BrowseInputFolderCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
-                        ToolTip="选择输入文件夹"
+                        ToolTip="选择输入路径"
                         Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                     <ui:SymbolIcon Symbol="FolderOpen24" />
                 </Button>
@@ -59,7 +85,7 @@
                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
                 <TextBlock Grid.Row="2"
-                           Text="输出文件夹"
+                           Text="输出路径"
                            Style="{StaticResource CyanFormLabelStyle}"
                            Margin="0,12,10,0"
                            Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
@@ -73,7 +99,7 @@
                         Command="{Binding BrowseOutputFolderCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         Margin="0,12,0,0"
-                        ToolTip="选择输出文件夹"
+                        ToolTip="选择输出路径"
                         Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                     <ui:SymbolIcon Symbol="FolderOpen24" />
                 </Button>
@@ -86,36 +112,38 @@
                            Margin="0,12,0,0"
                            Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                <Grid Grid.Row="3"
-                      Grid.Column="1"
-                      Grid.ColumnSpan="2"
-                      Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Content="覆盖已存在文件"
-                              IsChecked="{Binding OverwriteExisting}"
-                              VerticalAlignment="Center" />
-                    <Button Grid.Column="1"
-                            Command="{Binding ConvertModelsCommand}"
-                            Style="{StaticResource CyanPrimaryActionButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="Archive24"
-                                           Margin="0,0,6,0" />
-                            <TextBlock Text="开始整理" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
+                <Border Grid.Row="3"
+                        Grid.Column="1"
+                        Grid.ColumnSpan="2"
+                        Style="{StaticResource CyanToolbarSurfaceStyle}"
+                        Margin="0,14,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Content="覆盖已存在文件"
+                                  IsChecked="{Binding OverwriteExisting}"
+                                  VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Command="{Binding ConvertModelsCommand}"
+                                Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Archive24"
+                                               Margin="0,0,6,0" />
+                                <TextBlock Text="开始整理" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
             </Grid>
         </GroupBox>
 
-        <GroupBox Grid.Row="1"
-                  Header="处理日志"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <GroupBox Grid.Row="2"
+                  Header="处理日志">
             <TextBox Text="{Binding LogText, Mode=OneWay}"
                      Style="{StaticResource CyanLogTextBoxStyle}"
-                     MinHeight="150" />
+                     MinHeight="180" />
         </GroupBox>
     </Grid>
 </UserControl>

@@ -16,11 +16,38 @@
     <Grid Style="{StaticResource CyanPageGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="ArrowSync24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="训练集配平"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="按子文件夹图片数量计算重复次数，让训练步数占比更均衡。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <GroupBox Header="训练集路径与操作"
-                  Grid.Row="0"
+                  Grid.Row="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -43,12 +70,11 @@
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
                 <Button Grid.Column="2"
+                        Content="..."
                         Command="{Binding BrowseFolderCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         ToolTip="选择输入路径"
-                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
-                    <ui:SymbolIcon Symbol="FolderOpen24" />
-                </Button>
+                        Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
                 <Button Grid.Column="3"
                         Command="{Binding BalanceCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}"
@@ -75,7 +101,7 @@
         </GroupBox>
 
         <GroupBox Header="子文件夹配平"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <DataGrid ItemsSource="{Binding FolderItems}"
                       AutoGenerateColumns="False"

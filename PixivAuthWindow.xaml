@@ -3,12 +3,47 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         Title="Pixiv Login"
         Height="720"
-        Width="1024">
-    <Grid>
-        <wv2:WebView2 x:Name="WebView" />
+        Width="1024"
+        Background="{DynamicResource CyanShellBackgroundBrush}"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanToolbarSurfaceStyle}"
+                Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal">
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Width="34"
+                        Height="34"
+                        Margin="0,0,10,0">
+                    <ui:SymbolIcon Symbol="Key24"
+                                   FontSize="18"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Pixiv Login"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="登录完成后窗口会自动返回授权码。"
+                               Style="{StaticResource CyanTinyTextBlockStyle}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Style="{StaticResource CyanImageWellStyle}"
+                Padding="0">
+            <wv2:WebView2 x:Name="WebView" />
+        </Border>
     </Grid>
 </Window>

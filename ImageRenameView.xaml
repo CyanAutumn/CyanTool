@@ -18,11 +18,38 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="Edit24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="图片重命名"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="按前缀、起始编号和位数批量预览并重命名图片。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <GroupBox Header="路径选择"
-                  Grid.Row="0"
+                  Grid.Row="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -61,7 +88,7 @@
         </GroupBox>
 
         <GroupBox Header="命名规则"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -107,7 +134,7 @@
         </GroupBox>
 
         <GroupBox Header="执行"
-                  Grid.Row="2"
+                  Grid.Row="3"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -161,7 +188,7 @@
         </GroupBox>
 
         <GroupBox Header="重命名预览"
-                  Grid.Row="3"
+                  Grid.Row="4"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -170,7 +197,7 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="存在命名冲突，请调整规则后重试。"
-                           Foreground="Red"
+                           Foreground="{StaticResource CyanDangerHoverBrush}"
                            Margin="0,0,0,10"
                            FontWeight="SemiBold">
                     <TextBlock.Style>
@@ -204,7 +231,7 @@
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HasConflict}" Value="True">
-                                    <Setter Property="Foreground" Value="Red" />
+                                    <Setter Property="Foreground" Value="{StaticResource CyanDangerHoverBrush}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

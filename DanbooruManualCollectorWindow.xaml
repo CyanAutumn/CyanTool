@@ -3,51 +3,159 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="Danbooru 正则手动获取"
         Height="760"
         Width="1240"
         MinHeight="620"
-        MinWidth="940">
-    <Grid Margin="10">
+        MinWidth="940"
+        Background="{DynamicResource CyanShellBackgroundBrush}"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    <Grid Style="{StaticResource CyanDialogRootGridStyle}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="URL:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <TextBox Grid.Column="1" x:Name="UrlTextBox" Margin="0,0,8,0"/>
-            <Button Grid.Column="2" x:Name="OpenButton" Content="当前页打开" Width="96" Margin="0,0,8,0" Click="OnOpenClicked"/>
-            <Button Grid.Column="3" x:Name="OpenListButton" Content="打开列表页" Width="96" Margin="0,0,8,0" Click="OnOpenListClicked"/>
-            <Button Grid.Column="4" x:Name="CloseTabButton" Content="关闭当前标签页" Width="112" Margin="0,0,8,0" Click="OnCloseCurrentTabClicked"/>
-            <Button Grid.Column="5" x:Name="ExtractAndDownloadButton" Content="提取并下载" Width="100" Click="OnExtractAndDownloadClicked"/>
-        </Grid>
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="1"
-                   Text="用法：在列表页中键点击帖子链接打开新标签页，点“提取并下载”会按所有帖子标签页 ID 批量下载。"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                   Margin="0,0,0,8"/>
+                <Border Grid.Row="0"
+                        Grid.Column="0"
+                        Style="{StaticResource CyanIconBadgeStyle}"
+                        Width="38"
+                        Height="38"
+                        Margin="0,0,12,12">
+                    <ui:SymbolIcon Symbol="DatabaseSearch24"
+                                   FontSize="20"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
 
-        <TabControl Grid.Row="2" x:Name="BrowserTabControl" SelectionChanged="OnBrowserTabSelectionChanged"/>
+                <StackPanel Grid.Row="0"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="5"
+                            Margin="0,0,0,12">
+                    <TextBlock Text="Danbooru 正则手动获取"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="在列表页中键打开帖子标签页，再提取所有帖子 ID 批量下载。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
 
-        <DockPanel Grid.Row="3" Margin="0,8,0,0">
-            <Button Content="关闭窗口" Width="96" DockPanel.Dock="Right" Click="OnCancelClicked"/>
-            <TextBlock x:Name="StatusTextBlock"
-                       Text="准备就绪"
-                       VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis"
-                       Margin="0,0,8,0"/>
-        </DockPanel>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           Text="URL"
+                           Style="{StaticResource CyanFormLabelStyle}" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         x:Name="UrlTextBox"
+                         Margin="0,0,8,0" />
+                <Button Grid.Row="1"
+                        Grid.Column="2"
+                        x:Name="OpenButton"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Click="OnOpenClicked">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="PlayCircle24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="当前页打开" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Row="1"
+                        Grid.Column="3"
+                        x:Name="OpenListButton"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Click="OnOpenListClicked">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="DocumentSearch24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="打开列表页" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Row="1"
+                        Grid.Column="4"
+                        x:Name="CloseTabButton"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Click="OnCloseCurrentTabClicked">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Dismiss24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="关闭当前标签页" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Row="1"
+                        Grid.Column="5"
+                        x:Name="ExtractAndDownloadButton"
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}"
+                        Click="OnExtractAndDownloadClicked">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="CloudArrowDown24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="提取并下载" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Style="{StaticResource CyanStatusStripStyle}"
+                Margin="0,0,0,12">
+            <TextBlock Text="用法：在列表页中键点击帖子链接打开新标签页，点“提取并下载”会按所有帖子标签页 ID 批量下载。"
+                       Style="{StaticResource CyanTinyTextBlockStyle}" />
+        </Border>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource CyanImageWellStyle}"
+                Padding="0">
+            <TabControl x:Name="BrowserTabControl"
+                        SelectionChanged="OnBrowserTabSelectionChanged"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}" />
+        </Border>
+
+        <Border Grid.Row="3"
+                Style="{StaticResource CyanToolbarSurfaceStyle}"
+                Margin="0,12,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           x:Name="StatusTextBlock"
+                           Text="准备就绪"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,12,0" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        Click="OnCancelClicked">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Dismiss24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="关闭窗口" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

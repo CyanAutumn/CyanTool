@@ -6,63 +6,102 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d"
-             d:DesignHeight="450"
-             d:DesignWidth="800">
+             d:DesignHeight="560"
+             d:DesignWidth="920">
     <UserControl.DataContext>
         <viewModel:ImageMetadataViewModel />
     </UserControl.DataContext>
 
     <Grid Style="{StaticResource CyanPageGridStyle}">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.05*" />
-            <ColumnDefinition Width="1.45*" />
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <GroupBox Header="图片预览"
-                  Margin="0,0,12,0"
-                  Style="{StaticResource CyanGroupBoxStyle}">
-            <Border Style="{StaticResource CyanImageWellStyle}"
-                    AllowDrop="True"
-                    Drop="UserControl_Drop"
-                    DragEnter="UserControl_DragEnter">
-                <Image Stretch="Uniform"
-                       Source="{Binding DisplayedImage}" />
-            </Border>
-        </GroupBox>
-
-        <GroupBox Header="元数据"
-                  Grid.Column="1"
-                  Style="{StaticResource CyanGroupBoxStyle}">
+        <Border Grid.Row="0"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBox Grid.Row="0"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         AcceptsReturn="True"
-                         FontFamily="Consolas"
-                         FontSize="12"
-                         Padding="10"
-                         BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                         Background="{DynamicResource ControlFillColorDefaultBrush}"
-                         Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                         Text="{Binding MetadataJson, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                <Button Grid.Row="1"
-                        Command="{Binding UpdateMetadataCommand}"
-                        HorizontalAlignment="Right"
-                        Margin="0,12,0,0"
-                        Style="{StaticResource CyanPrimaryActionButtonStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Save24"
-                                       Margin="0,0,6,0" />
-                        <TextBlock Text="更新元数据" />
-                    </StackPanel>
-                </Button>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="DocumentSearch24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="图片元数据"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="拖入图片后查看并编辑元数据 JSON。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
             </Grid>
-        </GroupBox>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.05*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="1.45*" />
+            </Grid.ColumnDefinitions>
+
+            <GroupBox Grid.Column="0"
+                      Header="图片预览">
+                <Border Style="{StaticResource CyanImageWellStyle}"
+                        AllowDrop="True"
+                        Drop="UserControl_Drop"
+                        DragEnter="UserControl_DragEnter">
+                    <Grid>
+                        <Image Stretch="Uniform"
+                               Source="{Binding DisplayedImage}" />
+                    </Grid>
+                </Border>
+            </GroupBox>
+
+            <GridSplitter Grid.Column="1"
+                          Style="{StaticResource CyanGridSplitterStyle}" />
+
+            <GroupBox Grid.Column="2"
+                      Header="元数据">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBox Grid.Row="0"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             AcceptsReturn="True"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             Padding="12"
+                             BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                             Background="{DynamicResource ControlFillColorDefaultBrush}"
+                             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                             Text="{Binding MetadataJson, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <Border Grid.Row="1"
+                            Style="{StaticResource CyanToolbarSurfaceStyle}"
+                            Margin="0,12,0,0">
+                        <Button Command="{Binding UpdateMetadataCommand}"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Save24"
+                                               Margin="0,0,6,0" />
+                                <TextBlock Text="更新元数据" />
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                </Grid>
+            </GroupBox>
+        </Grid>
     </Grid>
 </UserControl>
