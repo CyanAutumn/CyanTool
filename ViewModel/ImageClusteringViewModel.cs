@@ -834,6 +834,7 @@ namespace CyanTools.ViewModel
                 }
 
                 int resolvedKMeansK = NumClusters;
+                bool mergeKMeansClustersAfterClustering = false;
                 if (useKMeansFamily)
                 {
                     if (UseBestKBySilhouette)
@@ -841,58 +842,14 @@ namespace CyanTools.ViewModel
                         if (clusteringSpace.Count < 3)
                         {
                             resolvedKMeansK = Math.Clamp(clusteringSpace.Count, 1, 2);
-                            AppendLog($"样本数量过少（{clusteringSpace.Count}），无法稳定评估轮廓系数，自动使用 K={resolvedKMeansK}。");
+                            AppendLog($"样本数量过少（{clusteringSpace.Count}），自动使用 K={resolvedKMeansK}。");
                         }
                         else
                         {
-                            int minK = 2;
-                            int maxK = Math.Min(ResolveAutoKUpperBound(clusteringSpace.Count), clusteringSpace.Count - 1);
-                            int bestK;
-                            double bestScore;
-                            int autoMinK;
-                            int autoMaxK;
-                            int evaluationCount;
-                            bool usedSample;
-
-                            if (SelectedAlgorithm == "SphericalKMeans")
-                            {
-                                var autoResult = Utils.SphericalKMeansClusterer.FindBestKBySilhouette(
-                                    clusteringSpace,
-                                    minK,
-                                    maxK,
-                                    randomState: 42,
-                                    evaluationSampleSize: 600,
-                                    log: AppendLog);
-                                bestK = autoResult.BestK;
-                                bestScore = autoResult.BestScore;
-                                autoMinK = autoResult.MinK;
-                                autoMaxK = autoResult.MaxK;
-                                evaluationCount = autoResult.EvaluationCount;
-                                usedSample = autoResult.UsedSample;
-                            }
-                            else
-                            {
-                                var autoResult = Utils.SklearnKMeansClusterer.FindBestKBySilhouette(
-                                    clusteringSpace,
-                                    minK,
-                                    maxK,
-                                    randomState: 42,
-                                    evaluationSampleSize: 600,
-                                    log: AppendLog);
-                                bestK = autoResult.BestK;
-                                bestScore = autoResult.BestScore;
-                                autoMinK = autoResult.MinK;
-                                autoMaxK = autoResult.MaxK;
-                                evaluationCount = autoResult.EvaluationCount;
-                                usedSample = autoResult.UsedSample;
-                            }
-
-                            resolvedKMeansK = bestK;
-                            string sampleHint = usedSample
-                                ? $"，评估样本 {evaluationCount}/{clusteringSpace.Count}"
-                                : string.Empty;
+                            resolvedKMeansK = ResolveAutoMergeInitialClusterCount(clusteringSpace.Count);
+                            mergeKMeansClustersAfterClustering = true;
                             AppendLog(
-                                $"轮廓系数最优结果：K={resolvedKMeansK}，score={bestScore:F4}，范围 {autoMinK}-{autoMaxK}{sampleHint}");
+                                $"最优模式：先自动过分割为 K={resolvedKMeansK}，随后根据簇中心邻近距离断点合并，最终文件夹数量由数据决定。");
                         }
                     }
                     else
@@ -924,6 +881,30 @@ namespace CyanTools.ViewModel
                         "HDBSCAN" => Utils.HdbscanClusterer.Cluster(clusteringSpace, MinClusterSize),
                         _ => new int[clusteringSourcePoints.Count]
                     };
+                }
+
+                if (mergeKMeansClustersAfterClustering)
+                {
+                    bool mergeInCosineSpace = useTwoStageStyleClustering ||
+                        !useUmapSpace ||
+                        SelectedAlgorithm == "SphericalKMeans";
+                    var mergeReferenceSpace = useUmapSpace && !useTwoStageStyleClustering
+                        ? clusteringSpace
+                        : clusteringSourcePoints;
+                    var mergeResult = Utils.AdaptiveClusterMerger.MergeNearbyClusters(
+                        mergeReferenceSpace,
+                        assignments,
+                        useCosineDistance: mergeInCosineSpace);
+                    assignments = mergeResult.Labels;
+                    if (mergeResult.Changed)
+                    {
+                        AppendLog(
+                            $"最优模式合并完成：初始 {mergeResult.OriginalClusterCount} 簇 -> 最终 {mergeResult.FinalClusterCount} 个文件夹，断点距离 {mergeResult.CutDistance:F4}。");
+                    }
+                    else
+                    {
+                        AppendLog($"最优模式未发现稳定的簇间距离断点，保留 {mergeResult.FinalClusterCount} 个文件夹。");
+                    }
                 }
 
                 Application.Current.Dispatcher.Invoke(() => Progress = 75);
@@ -1164,6 +1145,20 @@ namespace CyanTools.ViewModel
         {
             int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount));
             return Math.Clamp(bySqrt, 3, 20);
+        }
+
+        private static int ResolveAutoMergeInitialClusterCount(int sampleCount)
+        {
+            if (sampleCount <= 1)
+            {
+                return Math.Max(sampleCount, 1);
+            }
+
+            int sqrtScaled = (int)Math.Round(Math.Sqrt(sampleCount) * 2.0d);
+            int byDatasetSize = sampleCount < 120
+                ? Math.Max(4, sampleCount / 8)
+                : sqrtScaled;
+            return Math.Clamp(Math.Max(4, byDatasetSize), 2, Math.Min(80, sampleCount - 1));
         }
 
         private static bool IsValidTwoDimensionalSpace(IReadOnlyList<float[]> points)

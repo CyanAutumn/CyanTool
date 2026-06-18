@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <Compile Include="../Utils/FolderProcessingOperation.cs" Link="Utils/FolderProcessingOperation.cs" />
+    <Compile Include="../Utils/AdaptiveClusterMerger.cs" Link="Utils/AdaptiveClusterMerger.cs" />
     <Compile Include="../Utils/FolderProcessingPipelineProcessor.cs" Link="Utils/FolderProcessingPipelineProcessor.cs" />
     <Compile Include="../Utils/SameSourceImageGroupingProcessor.cs" Link="Utils/SameSourceImageGroupingProcessor.cs" />
     <Compile Include="../Utils/InputDirectoryCleanupHelper.cs" Link="Utils/InputDirectoryCleanupHelper.cs" />
