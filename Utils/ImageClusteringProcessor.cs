@@ -121,15 +121,23 @@ namespace CyanTools.Utils
                 bool useHeadDetector = options.IncludeHeadLineStyle &&
                     !string.IsNullOrWhiteSpace(options.HeadDetectionModelPath) &&
                     File.Exists(options.HeadDetectionModelPath);
+                bool useEyeValidation = useHeadDetector &&
+                    options.RequireEyeForReliableHeadCrop &&
+                    !string.IsNullOrWhiteSpace(options.HeadValidationEyeModelPath) &&
+                    File.Exists(options.HeadValidationEyeModelPath);
                 if (options.IncludeHeadLineStyle)
                 {
                     if (useHeadDetector)
                     {
-                        _log($"已启用头部线条 Style 分支：使用头部检测模型 {options.HeadDetectionModelPath}");
+                        _log($"已启用头部渲染/线条 Style 分支：使用头部检测模型 {options.HeadDetectionModelPath}");
+                        if (useEyeValidation)
+                        {
+                            _log($"已启用头部可靠性校验：使用眼部检测模型 {options.HeadValidationEyeModelPath}");
+                        }
                     }
                     else
                     {
-                        _log("已启用头部线条 Style 分支，但未找到头部检测模型，将全部使用中心裁剪兜底。");
+                        _log("已启用头部渲染/线条 Style 分支，但未找到头部检测模型，将全部使用中心裁剪兜底。");
                     }
                 }
 
@@ -176,9 +184,17 @@ namespace CyanTools.Utils
                             ContentVector = contentVec
                         };
 
+                        if (options.IncludeGrayStructureStyle)
+                        {
+                            result.GrayRenderStyleVector = ExtractRenderStyleDescriptor(original);
+                            result.GrayLineStyleVector = ExtractLineTextureDescriptor(original, StyleDescriptorCropMode.Center);
+                            result.GrayToneEdgeStyleVector = ExtractToneEdgeDescriptor(original);
+                            result.GraySketchStyleVector = ExtractSketchStyleDescriptor(original);
+                        }
+
                         if (options.IncludeHeadLineStyle)
                         {
-                            using var headCrop = CreateStyleHeadCrop(original, options, useHeadDetector, out bool usedFallback);
+                            using var headCrop = CreateStyleHeadCrop(original, options, useHeadDetector, useEyeValidation, out bool usedFallback);
                             var headGrayTensor = PreprocessImage(headCrop, grayscale: true);
                             (result.HeadGrayStyleVector, _) = ExtractEmbeddings(headGrayTensor);
                             if (result.HeadGrayStyleVector.Length == 0)
@@ -186,8 +202,16 @@ namespace CyanTools.Utils
                                 throw new InvalidOperationException("头部灰度 Style 分支输出为空，请检查模型输出或预处理流程。");
                             }
 
-                            result.HeadLineStyleVector = ExtractLineTextureDescriptor(headCrop);
+                            result.HeadRenderStyleVector = ExtractRenderStyleDescriptor(headCrop);
+                            result.HeadLineStyleVector = ExtractLineTextureDescriptor(headCrop, StyleDescriptorCropMode.Full);
+                            result.HeadUpperLineStyleVector = ExtractLineTextureDescriptor(headCrop, StyleDescriptorCropMode.Upper);
+                            result.HeadCenterLineStyleVector = ExtractLineTextureDescriptor(headCrop, StyleDescriptorCropMode.Center);
+                            result.HeadFaceLineStyleVector = ExtractLineTextureDescriptor(headCrop, StyleDescriptorCropMode.FaceCore);
+                            result.HeadEyeLineStyleVector = ExtractLineTextureDescriptor(headCrop, StyleDescriptorCropMode.EyeBand);
+                            result.HeadToneEdgeStyleVector = ExtractToneEdgeDescriptor(headCrop);
+                            result.HeadFaceToneEdgeStyleVector = ExtractToneEdgeDescriptor(headCrop, StyleDescriptorCropMode.FaceCore);
                             result.UsedHeadFallbackCrop = usedFallback;
+                            result.HeadCropReliabilityVector = new[] { usedFallback ? 0f : 1f };
                             if (usedFallback)
                             {
                                 summary.HeadFallbackCrops++;
@@ -384,6 +408,7 @@ namespace CyanTools.Utils
             Image<Rgb24> original,
             ImageClusteringExtractionOptions options,
             bool useHeadDetector,
+            bool useEyeValidation,
             out bool usedFallback)
         {
             using var oriented = original.Clone(ctx => ctx.AutoOrient());
@@ -400,12 +425,25 @@ namespace CyanTools.Utils
 
                 if (detections.Count > 0)
                 {
-                    var best = detections
+                    var ordered = detections
                         .OrderByDescending(d => d.Score)
                         .ThenByDescending(d => d.BoundingBox.Width * d.BoundingBox.Height)
-                        .First();
+                        .ToArray();
+
+                    foreach (var detection in ordered.Take(5))
+                    {
+                        cropRect = ExpandSquare(detection.BoundingBox, oriented.Width, oriented.Height, options.HeadCropScale);
+                        using var candidate = oriented.Clone(ctx => ctx.Crop(cropRect));
+                        if (!useEyeValidation || HasReliableEyeCue(candidate, options))
+                        {
+                            usedFallback = false;
+                            return oriented.Clone(ctx => ctx.Crop(cropRect));
+                        }
+                    }
+
+                    var best = ordered[0];
                     cropRect = ExpandSquare(best.BoundingBox, oriented.Width, oriented.Height, options.HeadCropScale);
-                    usedFallback = false;
+                    usedFallback = true;
                     return oriented.Clone(ctx => ctx.Crop(cropRect));
                 }
             }
@@ -413,6 +451,23 @@ namespace CyanTools.Utils
             cropRect = CenterSquare(oriented.Width, oriented.Height, options.HeadFallbackCenterScale);
             usedFallback = true;
             return oriented.Clone(ctx => ctx.Crop(cropRect));
+        }
+
+        private static bool HasReliableEyeCue(Image<Rgb24> headCrop, ImageClusteringExtractionOptions options)
+        {
+            if (string.IsNullOrWhiteSpace(options.HeadValidationEyeModelPath) ||
+                !File.Exists(options.HeadValidationEyeModelPath))
+            {
+                return true;
+            }
+
+            var eyes = YoloDetection.Predict(
+                headCrop,
+                options.HeadValidationEyeModelPath,
+                options.HeadValidationEyeConfidence,
+                options.HeadValidationEyeIou,
+                options.HeadValidationEyeMaxInferSize);
+            return eyes.Count > 0;
         }
 
         private static Rectangle ExpandSquare(Rectangle rect, int imageWidth, int imageHeight, float scale)
@@ -448,25 +503,203 @@ namespace CyanTools.Utils
             return new Rectangle(x0, y0, x1 - x0, y1 - y0);
         }
 
-        private static float[] ExtractLineTextureDescriptor(Image<Rgb24> original)
+        private enum StyleDescriptorCropMode
         {
-            const int size = 128;
+            Full,
+            Upper,
+            Center,
+            FaceCore,
+            EyeBand
+        }
 
-            int canvasSize = Math.Max(original.Width, original.Height);
-            using var canvas = new Image<Rgb24>(canvasSize, canvasSize, new Rgb24(255, 255, 255));
-            canvas.Mutate(ctx =>
+        private static float[] ExtractLineTextureDescriptor(Image<Rgb24> original, StyleDescriptorCropMode mode)
+        {
+            const int size = 112;
+
+            var gray = SquareResizeGray(original, mode, size);
+            var blur = GaussianBlur(gray, 2.0f);
+            var detail = new float[size, size];
+            for (int y = 0; y < size; y++)
             {
-                ctx.DrawImage(original, new Point((canvasSize - original.Width) / 2, (canvasSize - original.Height) / 2), 1f);
-                ctx.Grayscale();
-                ctx.Resize(new ResizeOptions
+                for (int x = 0; x < size; x++)
                 {
-                    Size = new SixLabors.ImageSharp.Size(size, size),
-                    Sampler = KnownResamplers.Lanczos3
-                });
-            });
+                    detail[y, x] = Math.Clamp((gray[y, x] - blur[y, x]) * 2.5f + 0.5f, 0f, 1f);
+                }
+            }
 
+            var features = new List<float>(430);
+            bool preserveLayout = mode == StyleDescriptorCropMode.FaceCore || mode == StyleDescriptorCropMode.EyeBand;
+            AddGradientStats(features, detail, cells: 1, sortedCells: false);
+            AddGradientStats(features, detail, cells: 3, sortedCells: !preserveLayout);
+            if (preserveLayout)
+            {
+                AddGradientStats(features, detail, cells: 4, sortedCells: false);
+                AddSpatialEdgeProfile(features, detail, bands: 8);
+            }
+
+            AddLbpHistogram(features, detail);
+            AddEdgeDensityProfile(features, detail);
+            return L2Normalize(features.ToArray());
+        }
+
+        private static float[] ExtractToneEdgeDescriptor(Image<Rgb24> original, StyleDescriptorCropMode mode = StyleDescriptorCropMode.Full)
+        {
+            const int size = 112;
+
+            var gray = SquareResizeGray(original, mode, size);
+            var low = GaussianBlur(gray, 4.0f);
+            var high = new float[size, size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    high[y, x] = Math.Clamp(gray[y, x] - low[y, x] + 0.5f, 0f, 1f);
+                }
+            }
+
+            var features = new List<float>(100);
+            AddValueHistogramL2(features, Flatten(high), bins: 32);
+            AddGradientQuantiles(features, gray);
+            AddGradientStats(features, gray, cells: 2, sortedCells: true);
+            return L2Normalize(features.ToArray());
+        }
+
+        private static float[] ExtractRenderStyleDescriptor(Image<Rgb24> original)
+        {
+            const int size = 112;
+
+            var rgb = SquareResizeRgb(original, StyleDescriptorCropMode.Full, size);
+            var lum = new float[size, size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float r = rgb[y, x, 0];
+                    float g = rgb[y, x, 1];
+                    float b = rgb[y, x, 2];
+                    lum[y, x] = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+                }
+            }
+
+            var (mag, _) = ComputeGradients(lum);
+            var broad = GaussianBlur(lum, 5.0f);
+            var blur = GaussianBlur(lum, 2.5f);
+            var flat = GaussianBlur(lum, 1.0f);
+            var detailValues = new List<float>(size * size);
+            var blockToneValues = new List<float>(size * size);
+            var softEdgeValues = new List<float>(size * size);
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    detailValues.Add(MathF.Abs(lum[y, x] - blur[y, x]));
+                    blockToneValues.Add(Math.Clamp(lum[y, x] - broad[y, x] + 0.5f, 0f, 1f));
+                    softEdgeValues.Add(MathF.Abs(lum[y, x] - flat[y, x]));
+                }
+            }
+
+            var lumValues = Flatten(lum);
+            var magValues = Flatten(mag);
+            var features = new List<float>(130);
+            AddValueHistogramL2(features, lumValues, bins: 24);
+            AddValueHistogramL2(features, blockToneValues, bins: 24);
+            AddValueHistogramL2(features, detailValues, bins: 18);
+            AddValueHistogramL2(features, softEdgeValues, bins: 18);
+            AddQuantilesL2(features, lumValues, new[] { 0.05f, 0.15f, 0.35f, 0.50f, 0.65f, 0.85f, 0.95f });
+            AddQuantilesL2(features, magValues, new[] { 0.50f, 0.70f, 0.85f, 0.93f, 0.98f });
+            AddQuantilesL2(features, detailValues, new[] { 0.50f, 0.70f, 0.85f, 0.93f, 0.98f });
+            AddGradientStats(features, lum, cells: 2, sortedCells: true);
+            var summary = new[]
+            {
+                ValueMean(lumValues),
+                ValueStdDev(lumValues),
+                ValueMean(detailValues),
+                ValueStdDev(detailValues),
+                ValueMean(softEdgeValues),
+                ValueStdDev(softEdgeValues)
+            };
+            features.AddRange(L2Normalize(summary));
+            return L2Normalize(features.ToArray());
+        }
+
+        private static float[] ExtractSketchStyleDescriptor(Image<Rgb24> original)
+        {
+            const int size = 112;
+
+            var gray = SquareResizeGray(original, StyleDescriptorCropMode.Full, size, autoContrast: false);
+            var blur = GaussianBlur(gray, 2.0f);
+            var (mag, _) = ComputeGradients(gray);
+            var lumValues = Flatten(gray);
+            var magValues = Flatten(mag);
+            var detailValues = new List<float>(size * size);
+            int nearWhitePixels = 0;
+            int paleQuietPixels = 0;
+            int darkInkPixels = 0;
+            int thinLinePixels = 0;
+            int strongEdgePixels = 0;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float lum = gray[y, x];
+                    float edge = mag[y, x];
+                    float detail = MathF.Abs(lum - blur[y, x]);
+                    detailValues.Add(detail);
+                    if (lum > 0.92f)
+                    {
+                        nearWhitePixels++;
+                        if (edge < 0.025f)
+                        {
+                            paleQuietPixels++;
+                        }
+                    }
+
+                    if (lum < 0.58f)
+                    {
+                        darkInkPixels++;
+                    }
+
+                    if (edge > 0.035f && detail < 0.11f)
+                    {
+                        thinLinePixels++;
+                    }
+
+                    if (edge > 0.12f)
+                    {
+                        strongEdgePixels++;
+                    }
+                }
+            }
+
+            float total = size * size;
+            var features = new List<float>(120);
+            AddValueHistogramL2(features, lumValues, bins: 24);
+            AddValueHistogramL2(features, detailValues, bins: 18);
+            AddQuantilesL2(features, lumValues, new[] { 0.05f, 0.20f, 0.50f, 0.80f, 0.92f, 0.98f });
+            AddQuantilesL2(features, magValues, new[] { 0.50f, 0.75f, 0.88f, 0.95f, 0.985f });
+            var summary = new[]
+            {
+                nearWhitePixels / total,
+                paleQuietPixels / total,
+                darkInkPixels / total,
+                thinLinePixels / total,
+                strongEdgePixels / total,
+                ValueMean(lumValues),
+                ValueStdDev(lumValues),
+                ValueMean(detailValues),
+                ValueStdDev(detailValues)
+            };
+            features.AddRange(L2Normalize(summary));
+            return L2Normalize(features.ToArray());
+        }
+
+        private static float[,] SquareResizeGray(Image<Rgb24> original, StyleDescriptorCropMode mode, int size, bool autoContrast = true)
+        {
+            using var resized = CreateSquareCanvas(original, mode, size);
+            resized.Mutate(ctx => ctx.Grayscale());
             var gray = new float[size, size];
-            canvas.ProcessPixelRows(accessor =>
+            resized.ProcessPixelRows(accessor =>
             {
                 for (int y = 0; y < size; y++)
                 {
@@ -478,70 +711,465 @@ namespace CyanTools.Utils
                 }
             });
 
-            var magnitudes = new List<float>((size - 2) * (size - 2));
-            var gradients = new (float Mag, float Angle)[size, size];
-            var laplacians = new List<float>((size - 2) * (size - 2));
-
-            for (int y = 1; y < size - 1; y++)
+            if (autoContrast)
             {
-                for (int x = 1; x < size - 1; x++)
+                AutoContrast(gray, cutoff: 0.01f);
+            }
+
+            return gray;
+        }
+
+        private static float[,,] SquareResizeRgb(Image<Rgb24> original, StyleDescriptorCropMode mode, int size)
+        {
+            using var resized = CreateSquareCanvas(original, mode, size);
+            var rgb = new float[size, size, 3];
+            resized.ProcessPixelRows(accessor =>
+            {
+                for (int y = 0; y < size; y++)
                 {
-                    float gx =
-                        -gray[y - 1, x - 1] + gray[y - 1, x + 1]
-                        - 2f * gray[y, x - 1] + 2f * gray[y, x + 1]
-                        - gray[y + 1, x - 1] + gray[y + 1, x + 1];
-                    float gy =
-                        -gray[y - 1, x - 1] - 2f * gray[y - 1, x] - gray[y - 1, x + 1]
-                        + gray[y + 1, x - 1] + 2f * gray[y + 1, x] + gray[y + 1, x + 1];
-                    float mag = MathF.Sqrt(gx * gx + gy * gy);
-                    float angle = MathF.Atan2(gy, gx);
-                    while (angle < 0f)
+                    Span<Rgb24> row = accessor.GetRowSpan(y);
+                    for (int x = 0; x < size; x++)
                     {
-                        angle += MathF.PI;
+                        rgb[y, x, 0] = row[x].R / 255f;
+                        rgb[y, x, 1] = row[x].G / 255f;
+                        rgb[y, x, 2] = row[x].B / 255f;
                     }
-                    while (angle >= MathF.PI)
+                }
+            });
+            return rgb;
+        }
+
+        private static Image<Rgb24> CreateSquareCanvas(Image<Rgb24> original, StyleDescriptorCropMode mode, int size)
+        {
+            using var crop = CreateDescriptorCrop(original, mode);
+            int resizedWidth;
+            int resizedHeight;
+            if (crop.Width >= crop.Height)
+            {
+                resizedWidth = size;
+                resizedHeight = Math.Max(1, (int)MathF.Round(crop.Height * (size / (float)crop.Width)));
+            }
+            else
+            {
+                resizedHeight = size;
+                resizedWidth = Math.Max(1, (int)MathF.Round(crop.Width * (size / (float)crop.Height)));
+            }
+
+            using var resized = crop.Clone(ctx => ctx.Resize(new ResizeOptions
+            {
+                Size = new SixLabors.ImageSharp.Size(resizedWidth, resizedHeight),
+                Sampler = KnownResamplers.Lanczos3
+            }));
+
+            var canvas = new Image<Rgb24>(size, size, new Rgb24(255, 255, 255));
+            canvas.Mutate(ctx => ctx.DrawImage(
+                resized,
+                new Point((size - resized.Width) / 2, (size - resized.Height) / 2),
+                1f));
+            return canvas;
+        }
+
+        private static Image<Rgb24> CreateDescriptorCrop(Image<Rgb24> original, StyleDescriptorCropMode mode)
+        {
+            if (mode == StyleDescriptorCropMode.Upper)
+            {
+                int height = Math.Max(1, (int)MathF.Round(original.Height * 0.62f));
+                return original.Clone(ctx => ctx.Crop(new Rectangle(0, 0, original.Width, height)));
+            }
+
+            if (mode == StyleDescriptorCropMode.Center)
+            {
+                int size = Math.Max(1, (int)MathF.Round(Math.Min(original.Width, original.Height) * 0.76f));
+                int x = Math.Max(0, (original.Width - size) / 2);
+                int y = Math.Max(0, (original.Height - size) / 2);
+                return original.Clone(ctx => ctx.Crop(new Rectangle(x, y, Math.Min(size, original.Width - x), Math.Min(size, original.Height - y))));
+            }
+
+            if (mode == StyleDescriptorCropMode.FaceCore)
+            {
+                int width = Math.Max(1, (int)MathF.Round(original.Width * 0.58f));
+                int height = Math.Max(1, (int)MathF.Round(original.Height * 0.60f));
+                int x = Math.Max(0, (original.Width - width) / 2);
+                int centerY = (int)MathF.Round(original.Height * 0.52f);
+                int y = Math.Clamp(centerY - height / 2, 0, Math.Max(0, original.Height - height));
+                return original.Clone(ctx => ctx.Crop(new Rectangle(x, y, Math.Min(width, original.Width - x), Math.Min(height, original.Height - y))));
+            }
+
+            if (mode == StyleDescriptorCropMode.EyeBand)
+            {
+                int width = Math.Max(1, (int)MathF.Round(original.Width * 0.72f));
+                int height = Math.Max(1, (int)MathF.Round(original.Height * 0.34f));
+                int x = Math.Max(0, (original.Width - width) / 2);
+                int centerY = (int)MathF.Round(original.Height * 0.40f);
+                int y = Math.Clamp(centerY - height / 2, 0, Math.Max(0, original.Height - height));
+                return original.Clone(ctx => ctx.Crop(new Rectangle(x, y, Math.Min(width, original.Width - x), Math.Min(height, original.Height - y))));
+            }
+
+            return original.Clone();
+        }
+
+        private static void AutoContrast(float[,] values, float cutoff)
+        {
+            var flat = Flatten(values);
+            flat.Sort();
+            float low = Quantile(flat, cutoff);
+            float high = Quantile(flat, 1f - cutoff);
+            float range = high - low;
+            if (range <= 1e-6f)
+            {
+                return;
+            }
+
+            int height = values.GetLength(0);
+            int width = values.GetLength(1);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    values[y, x] = Math.Clamp((values[y, x] - low) / range, 0f, 1f);
+                }
+            }
+        }
+
+        private static void AddGradientStats(List<float> features, float[,] gray, int cells, bool sortedCells)
+        {
+            var (mag, angle) = ComputeGradients(gray);
+            var magValues = Flatten(mag);
+            magValues.Sort();
+            float threshold = Quantile(magValues, 0.70f);
+            float clip = Quantile(magValues, 0.985f) + 1e-6f;
+            int height = gray.GetLength(0);
+            int width = gray.GetLength(1);
+            var parts = new List<float[]>(cells * cells);
+
+            for (int cy = 0; cy < cells; cy++)
+            {
+                for (int cx = 0; cx < cells; cx++)
+                {
+                    int y0 = cy * height / cells;
+                    int y1 = (cy + 1) * height / cells;
+                    int x0 = cx * width / cells;
+                    int x1 = (cx + 1) * width / cells;
+                    var hist = new float[12];
+                    var cellMagnitudes = new List<float>((y1 - y0) * (x1 - x0));
+                    int edgeCount = 0;
+
+                    for (int y = y0; y < y1; y++)
                     {
-                        angle -= MathF.PI;
+                        for (int x = x0; x < x1; x++)
+                        {
+                            float clippedMag = Math.Min(mag[y, x], clip);
+                            cellMagnitudes.Add(clippedMag);
+                            if (clippedMag > threshold)
+                            {
+                                edgeCount++;
+                            }
+
+                            int bin = Math.Min(hist.Length - 1, (int)(angle[y, x] / MathF.PI * hist.Length));
+                            hist[bin] += MathF.Sqrt(clippedMag + 1e-8f);
+                        }
                     }
 
-                    gradients[y, x] = (mag, angle);
-                    magnitudes.Add(mag);
-
-                    float lap = Math.Abs(
-                        -4f * gray[y, x]
-                        + gray[y - 1, x]
-                        + gray[y + 1, x]
-                        + gray[y, x - 1]
-                        + gray[y, x + 1]);
-                    laplacians.Add(lap);
+                    float total = Math.Max(1, cellMagnitudes.Count);
+                    var part = new float[hist.Length + 3];
+                    Array.Copy(hist, part, hist.Length);
+                    part[^3] = edgeCount / total;
+                    part[^2] = ValueMean(cellMagnitudes);
+                    part[^1] = ValueStdDev(cellMagnitudes);
+                    parts.Add(L2Normalize(part));
                 }
             }
 
-            magnitudes.Sort();
-            laplacians.Sort();
-            float maxMag = Math.Max(1e-6f, magnitudes[^1]);
-            float maxLap = Math.Max(1e-6f, laplacians[^1]);
-            float q50 = Quantile(magnitudes, 0.50f);
-            float q75 = Quantile(magnitudes, 0.75f);
-            float q90 = Quantile(magnitudes, 0.90f);
-            float q95 = Quantile(magnitudes, 0.95f);
+            if (sortedCells && parts.Count > 1)
+            {
+                parts = parts.OrderByDescending(part => part[^3]).ToList();
+            }
 
-            var features = new List<float>(360);
-            AddGradientOrientationHistogram(features, gradients, size, bins: 16);
-            AddValueHistogram(features, magnitudes, maxMag, bins: 16);
-            AddValueHistogram(features, laplacians, maxLap, bins: 16);
-            features.Add(q50 / maxMag);
-            features.Add(q75 / maxMag);
-            features.Add(q90 / maxMag);
-            features.Add(q95 / maxMag);
-            features.Add(ValueMean(magnitudes) / maxMag);
-            features.Add(ValueStdDev(magnitudes) / maxMag);
-            features.Add(ValueMean(laplacians) / maxLap);
-            features.Add(ValueStdDev(laplacians) / maxLap);
-            AddSortedLocalEdgeDensities(features, gradients, size, threshold: q75);
-            AddMaskedLbpHistogram(features, gray, gradients, size, threshold: q75);
+            features.AddRange(L2Normalize(parts.SelectMany(part => part).ToArray()));
+        }
 
-            return L2Normalize(features.ToArray());
+        private static void AddGradientQuantiles(List<float> features, float[,] gray)
+        {
+            var (mag, _) = ComputeGradients(gray);
+            AddQuantilesL2(features, Flatten(mag), new[] { 0.25f, 0.50f, 0.70f, 0.85f, 0.93f, 0.98f });
+        }
+
+        private static void AddLbpHistogram(List<float> features, float[,] gray)
+        {
+            int height = gray.GetLength(0);
+            int width = gray.GetLength(1);
+            var hist = new float[256];
+            int samples = 0;
+            for (int y = 1; y < height - 1; y++)
+            {
+                for (int x = 1; x < width - 1; x++)
+                {
+                    float center = gray[y, x];
+                    int code = 0;
+                    code |= gray[y - 1, x - 1] >= center ? 1 : 0;
+                    code |= gray[y - 1, x] >= center ? 2 : 0;
+                    code |= gray[y - 1, x + 1] >= center ? 4 : 0;
+                    code |= gray[y, x + 1] >= center ? 8 : 0;
+                    code |= gray[y + 1, x + 1] >= center ? 16 : 0;
+                    code |= gray[y + 1, x] >= center ? 32 : 0;
+                    code |= gray[y + 1, x - 1] >= center ? 64 : 0;
+                    code |= gray[y, x - 1] >= center ? 128 : 0;
+                    hist[code] += 1f;
+                    samples++;
+                }
+            }
+
+            if (samples > 0)
+            {
+                for (int i = 0; i < hist.Length; i++)
+                {
+                    hist[i] /= samples;
+                }
+            }
+
+            features.AddRange(L2Normalize(hist));
+        }
+
+        private static void AddEdgeDensityProfile(List<float> features, float[,] gray)
+        {
+            var (mag, _) = ComputeGradients(gray);
+            var values = Flatten(mag);
+            values.Sort();
+            var thresholds = new[] { 0.60f, 0.75f, 0.88f, 0.95f }.Select(q => Quantile(values, q)).ToArray();
+            var result = new List<float>(thresholds.Length * 2);
+            foreach (float threshold in thresholds)
+            {
+                int count = 0;
+                double sum = 0d;
+                foreach (float value in values)
+                {
+                    if (value > threshold)
+                    {
+                        count++;
+                        sum += value;
+                    }
+                }
+
+                result.Add(count / (float)Math.Max(1, values.Count));
+                result.Add(count == 0 ? 0f : (float)(sum / count));
+            }
+
+            features.AddRange(L2Normalize(result.ToArray()));
+        }
+
+        private static void AddSpatialEdgeProfile(List<float> features, float[,] gray, int bands)
+        {
+            var (mag, _) = ComputeGradients(gray);
+            var values = Flatten(mag);
+            values.Sort();
+            float threshold = Quantile(values, 0.78f);
+            int height = gray.GetLength(0);
+            int width = gray.GetLength(1);
+            var result = new List<float>(bands * 4);
+
+            for (int band = 0; band < bands; band++)
+            {
+                int x0 = band * width / bands;
+                int x1 = (band + 1) * width / bands;
+                AddBandEdgeStats(result, mag, threshold, x0, x1, 0, height);
+            }
+
+            for (int band = 0; band < bands; band++)
+            {
+                int y0 = band * height / bands;
+                int y1 = (band + 1) * height / bands;
+                AddBandEdgeStats(result, mag, threshold, 0, width, y0, y1);
+            }
+
+            features.AddRange(L2Normalize(result.ToArray()));
+        }
+
+        private static void AddBandEdgeStats(
+            List<float> result,
+            float[,] mag,
+            float threshold,
+            int x0,
+            int x1,
+            int y0,
+            int y1)
+        {
+            int count = 0;
+            double sum = 0d;
+            int total = Math.Max(1, (x1 - x0) * (y1 - y0));
+            for (int y = y0; y < y1; y++)
+            {
+                for (int x = x0; x < x1; x++)
+                {
+                    float value = mag[y, x];
+                    if (value > threshold)
+                    {
+                        count++;
+                        sum += value;
+                    }
+                }
+            }
+
+            result.Add(count / (float)total);
+            result.Add(count == 0 ? 0f : (float)(sum / count));
+        }
+
+        private static void AddValueHistogramL2(List<float> features, IReadOnlyList<float> values, int bins)
+        {
+            var hist = new float[bins];
+            foreach (float value in values)
+            {
+                int bin = Math.Min(bins - 1, (int)(Math.Clamp(value, 0f, 0.999999f) * bins));
+                hist[bin] += 1f;
+            }
+
+            float sum = hist.Sum();
+            if (sum > 1e-6f)
+            {
+                for (int i = 0; i < hist.Length; i++)
+                {
+                    hist[i] /= sum;
+                }
+            }
+
+            features.AddRange(L2Normalize(hist));
+        }
+
+        private static void AddWeightedValueHistogramL2(List<float> features, float[,] values, float[,] weights, int bins)
+        {
+            var hist = new float[bins];
+            int height = values.GetLength(0);
+            int width = values.GetLength(1);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int bin = Math.Min(bins - 1, (int)(Math.Clamp(values[y, x], 0f, 0.999999f) * bins));
+                    hist[bin] += weights[y, x];
+                }
+            }
+
+            features.AddRange(L2Normalize(hist));
+        }
+
+        private static void AddQuantilesL2(List<float> features, IReadOnlyList<float> values, IReadOnlyList<float> quantiles)
+        {
+            var sorted = values.ToList();
+            sorted.Sort();
+            var result = new float[quantiles.Count];
+            for (int i = 0; i < quantiles.Count; i++)
+            {
+                result[i] = Quantile(sorted, quantiles[i]);
+            }
+
+            features.AddRange(L2Normalize(result));
+        }
+
+        private static (float[,] Mag, float[,] Angle) ComputeGradients(float[,] gray)
+        {
+            int height = gray.GetLength(0);
+            int width = gray.GetLength(1);
+            var mag = new float[height, width];
+            var angle = new float[height, width];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float gx = x == 0
+                        ? gray[y, Math.Min(width - 1, x + 1)] - gray[y, x]
+                        : x == width - 1
+                            ? gray[y, x] - gray[y, x - 1]
+                            : (gray[y, x + 1] - gray[y, x - 1]) * 0.5f;
+                    float gy = y == 0
+                        ? gray[Math.Min(height - 1, y + 1), x] - gray[y, x]
+                        : y == height - 1
+                            ? gray[y, x] - gray[y - 1, x]
+                            : (gray[y + 1, x] - gray[y - 1, x]) * 0.5f;
+                    mag[y, x] = MathF.Sqrt(gx * gx + gy * gy);
+                    float a = MathF.Atan2(gy, gx);
+                    while (a < 0f)
+                    {
+                        a += MathF.PI;
+                    }
+                    while (a >= MathF.PI)
+                    {
+                        a -= MathF.PI;
+                    }
+
+                    angle[y, x] = a;
+                }
+            }
+
+            return (mag, angle);
+        }
+
+        private static float[,] GaussianBlur(float[,] source, float sigma)
+        {
+            int height = source.GetLength(0);
+            int width = source.GetLength(1);
+            int radius = Math.Max(1, (int)MathF.Ceiling(sigma * 3f));
+            var kernel = new float[radius * 2 + 1];
+            float kernelSum = 0f;
+            for (int i = -radius; i <= radius; i++)
+            {
+                float value = MathF.Exp(-(i * i) / (2f * sigma * sigma));
+                kernel[i + radius] = value;
+                kernelSum += value;
+            }
+
+            for (int i = 0; i < kernel.Length; i++)
+            {
+                kernel[i] /= kernelSum;
+            }
+
+            var temp = new float[height, width];
+            var result = new float[height, width];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float sum = 0f;
+                    for (int k = -radius; k <= radius; k++)
+                    {
+                        int xx = Math.Clamp(x + k, 0, width - 1);
+                        sum += source[y, xx] * kernel[k + radius];
+                    }
+
+                    temp[y, x] = sum;
+                }
+            }
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float sum = 0f;
+                    for (int k = -radius; k <= radius; k++)
+                    {
+                        int yy = Math.Clamp(y + k, 0, height - 1);
+                        sum += temp[yy, x] * kernel[k + radius];
+                    }
+
+                    result[y, x] = sum;
+                }
+            }
+
+            return result;
+        }
+
+        private static List<float> Flatten(float[,] values)
+        {
+            int height = values.GetLength(0);
+            int width = values.GetLength(1);
+            var result = new List<float>(height * width);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    result.Add(values[y, x]);
+                }
+            }
+
+            return result;
         }
 
         private static void AddGradientOrientationHistogram(List<float> features, (float Mag, float Angle)[,] gradients, int size, int bins)
@@ -753,8 +1381,20 @@ namespace CyanTools.Utils
         public string FilePath { get; set; } = string.Empty;
         public float[] StyleVector { get; set; } = Array.Empty<float>();
         public float[] GrayStyleVector { get; set; } = Array.Empty<float>();
+        public float[] GrayRenderStyleVector { get; set; } = Array.Empty<float>();
+        public float[] GrayLineStyleVector { get; set; } = Array.Empty<float>();
+        public float[] GrayToneEdgeStyleVector { get; set; } = Array.Empty<float>();
+        public float[] GraySketchStyleVector { get; set; } = Array.Empty<float>();
         public float[] HeadGrayStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadRenderStyleVector { get; set; } = Array.Empty<float>();
         public float[] HeadLineStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadUpperLineStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadCenterLineStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadFaceLineStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadEyeLineStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadToneEdgeStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadFaceToneEdgeStyleVector { get; set; } = Array.Empty<float>();
+        public float[] HeadCropReliabilityVector { get; set; } = Array.Empty<float>();
         public bool UsedHeadFallbackCrop { get; set; }
         public float[] ContentVector { get; set; } = Array.Empty<float>();
     }
@@ -763,13 +1403,19 @@ namespace CyanTools.Utils
     {
         public bool IncludeBaseEmbeddings { get; init; } = true;
         public bool IncludeGrayStyle { get; init; }
+        public bool IncludeGrayStructureStyle { get; init; }
         public bool IncludeHeadLineStyle { get; init; }
         public string? HeadDetectionModelPath { get; init; }
+        public string? HeadValidationEyeModelPath { get; init; }
+        public bool RequireEyeForReliableHeadCrop { get; init; } = true;
         public float HeadDetectionConfidence { get; init; } = 0.35f;
         public float HeadDetectionIou { get; init; } = 0.70f;
         public int HeadDetectionMaxInferSize { get; init; } = 640;
-        public float HeadCropScale { get; init; } = 1.8f;
-        public float HeadFallbackCenterScale { get; init; } = 0.62f;
+        public float HeadValidationEyeConfidence { get; init; } = 0.28f;
+        public float HeadValidationEyeIou { get; init; } = 0.60f;
+        public int HeadValidationEyeMaxInferSize { get; init; } = 384;
+        public float HeadCropScale { get; init; } = 1.15f;
+        public float HeadFallbackCenterScale { get; init; } = 0.42f;
     }
 
     public sealed class ImageClusteringExtractionSummary

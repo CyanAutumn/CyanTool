@@ -137,6 +137,105 @@ namespace CyanTools.Utils
             };
         }
 
+        public static Result MergeToPreferredClusterCount(
+            IReadOnlyList<float[]> points,
+            IReadOnlyList<int> labels,
+            int preferredMaxClusters,
+            bool useCosineDistance = false,
+            double maxCompleteLinkDistance = double.PositiveInfinity)
+        {
+            if (points == null)
+            {
+                throw new ArgumentNullException(nameof(points));
+            }
+
+            if (labels == null)
+            {
+                throw new ArgumentNullException(nameof(labels));
+            }
+
+            if (points.Count != labels.Count)
+            {
+                throw new ArgumentException("Point and label counts must match.", nameof(labels));
+            }
+
+            var clusterIds = labels
+                .Where(label => label >= 0)
+                .Distinct()
+                .OrderBy(label => label)
+                .ToArray();
+
+            if (clusterIds.Length == 0)
+            {
+                return new Result
+                {
+                    Labels = labels.ToArray(),
+                    OriginalClusterCount = 0,
+                    FinalClusterCount = 0,
+                    CutDistance = double.PositiveInfinity
+                };
+            }
+
+            int targetCount = Math.Clamp(preferredMaxClusters, 1, clusterIds.Length);
+            if (clusterIds.Length <= targetCount)
+            {
+                return new Result
+                {
+                    Labels = RelabelSequentially(labels),
+                    OriginalClusterCount = clusterIds.Length,
+                    FinalClusterCount = clusterIds.Length,
+                    CutDistance = double.PositiveInfinity
+                };
+            }
+
+            var idToIndex = clusterIds
+                .Select((id, index) => new { id, index })
+                .ToDictionary(item => item.id, item => item.index);
+
+            var groupedIndices = clusterIds
+                .Select(id => Enumerable.Range(0, labels.Count).Where(index => labels[index] == id).ToArray())
+                .ToArray();
+
+            var centroids = groupedIndices.Select(indices => ComputeCentroid(points, indices, useCosineDistance)).ToArray();
+            var distanceMatrix = BuildDistanceMatrix(centroids, useCosineDistance);
+            var mergedGroups = MergeByCompleteLinkToCount(
+                    distanceMatrix,
+                    targetCount,
+                    maxCompleteLinkDistance,
+                    out double lastMergeDistance)
+                .OrderBy(group => group.Min())
+                .ToArray();
+            var clusterIndexToMergedLabel = new Dictionary<int, int>();
+            for (int groupIndex = 0; groupIndex < mergedGroups.Length; groupIndex++)
+            {
+                foreach (int clusterIndex in mergedGroups[groupIndex])
+                {
+                    clusterIndexToMergedLabel[clusterIndex] = groupIndex;
+                }
+            }
+
+            var mergedLabels = new int[labels.Count];
+            for (int i = 0; i < labels.Count; i++)
+            {
+                int label = labels[i];
+                if (label < 0)
+                {
+                    mergedLabels[i] = label;
+                    continue;
+                }
+
+                mergedLabels[i] = clusterIndexToMergedLabel[idToIndex[label]];
+            }
+
+            return new Result
+            {
+                Labels = mergedLabels,
+                OriginalClusterCount = clusterIds.Length,
+                FinalClusterCount = mergedGroups.Length,
+                CutDistance = lastMergeDistance
+            };
+        }
+
         private static int FindCutStart(IReadOnlyList<double> sortedDistances, double minJumpRatio)
         {
             if (sortedDistances.Count < 3)
@@ -247,6 +346,57 @@ namespace CyanTools.Utils
                     break;
                 }
 
+                groups[bestA].AddRange(groups[bestB]);
+                groups[bestA].Sort();
+                groups.RemoveAt(bestB);
+            }
+
+            return groups.ToArray();
+        }
+
+        private static List<int>[] MergeByCompleteLinkToCount(
+            double[,] distances,
+            int targetCount,
+            double maxMergeDistance,
+            out double lastMergeDistance)
+        {
+            int count = distances.GetLength(0);
+            var groups = Enumerable.Range(0, count)
+                .Select(index => new List<int> { index })
+                .ToList();
+            lastMergeDistance = double.PositiveInfinity;
+
+            while (groups.Count > Math.Max(1, targetCount))
+            {
+                int bestA = -1;
+                int bestB = -1;
+                double bestDistance = double.PositiveInfinity;
+
+                for (int a = 0; a < groups.Count; a++)
+                {
+                    for (int b = a + 1; b < groups.Count; b++)
+                    {
+                        double distance = CompleteLinkDistance(groups[a], groups[b], distances);
+                        if (distance < bestDistance)
+                        {
+                            bestDistance = distance;
+                            bestA = a;
+                            bestB = b;
+                        }
+                    }
+                }
+
+                if (bestA < 0 || bestB < 0)
+                {
+                    break;
+                }
+
+                if (bestDistance > maxMergeDistance)
+                {
+                    break;
+                }
+
+                lastMergeDistance = bestDistance;
                 groups[bestA].AddRange(groups[bestB]);
                 groups[bestA].Sort();
                 groups.RemoveAt(bestB);

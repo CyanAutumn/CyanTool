@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -87,7 +86,6 @@ namespace CyanTools.ViewModel
         public ICommand BrowseInputCommand { get; }
         public ICommand StartTaggingCommand { get; }
         public ICommand ClearLogCommand { get; }
-        public ICommand CheckCudaCommand { get; }
         public ICommand AddTaggerCommand { get; }
 
         public TaggingViewModel()
@@ -123,7 +121,6 @@ namespace CyanTools.ViewModel
             BrowseInputCommand = new RelayCommand(_ => BrowseForFolder(path => InputDirectory = path));
             StartTaggingCommand = new RelayCommand(async _ => await StartProcessing(), _ => IsIdle && !string.IsNullOrWhiteSpace(InputDirectory));
             ClearLogCommand = new RelayCommand(_ => LogLines.Clear(), _ => IsIdle);
-            CheckCudaCommand = new RelayCommand(async _ => await CheckOrInstallCudaAsync(), _ => IsIdle);
             AddTaggerCommand = new RelayCommand(_ => AddTagger(), _ => IsIdle);
         }
 
@@ -266,99 +263,6 @@ namespace CyanTools.ViewModel
             var normalized = tag.Replace('_', ' ').Trim().ToLowerInvariant();
             normalized = string.Concat(normalized.Where(c => !char.IsWhiteSpace(c)));
             return normalized;
-        }
-
-        private async Task CheckOrInstallCudaAsync()
-        {
-            await Task.Run(() =>
-            {
-                var check = TaggingProcessor.CheckCudaEnvironment();
-                AddLog($"CUDA 检查结果: {check.Details}");
-
-                if (check.NvidiaDriverDetected && check.CudaExecutionProviderAvailable)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show("CUDA 环境可用，已可以优先使用 GPU(CUDA) 打标。", "CUDA 检查", MessageBoxButton.OK, MessageBoxImage.Information);
-                    });
-                    return;
-                }
-
-                if (!check.CudaAppendApiSupported)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show(
-                            $"{check.Details}\n\n检测到当前程序的 onnxruntime.dll 不支持 CUDA 执行提供器。\n这不是安装 CUDA Toolkit 能解决的问题，请更新/重新发布带 `Microsoft.ML.OnnxRuntime.Gpu` 的版本。",
-                            "CUDA 检查",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    });
-                    return;
-                }
-
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    var result = MessageBox.Show(
-                        $"{check.Details}\n\n是否尝试使用 winget 安装 CUDA Toolkit 12.x（推荐 12.4）？\n（需要联网，可能需要管理员权限；安装完成后请重启软件。注意：cuDNN 需要另外安装。）",
-                        "CUDA 检查/安装",
-                        MessageBoxButton.YesNoCancel,
-                        MessageBoxImage.Warning);
-
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        TryLaunchWingetCudaInstall();
-                    }
-                    else if (result == MessageBoxResult.No)
-                    {
-                        OpenCudaInstallPages(check.NvidiaDriverDetected);
-                    }
-                });
-            });
-        }
-
-        private static void TryLaunchWingetCudaInstall()
-        {
-            const string wingetArgs =
-                "/k winget install -e --id Nvidia.CUDA -s winget --version 12.4 --accept-source-agreements --accept-package-agreements || winget show --id Nvidia.CUDA -s winget --versions || winget search cuda -s winget";
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = wingetArgs,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"启动 winget 失败：{ex.Message}\n\n将为你打开 CUDA 下载页面，请手动安装。",
-                    "CUDA 安装",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-
-                OpenCudaInstallPages(nvidiaDriverDetected: true);
-            }
-        }
-
-        private static void OpenCudaInstallPages(bool nvidiaDriverDetected)
-        {
-            try
-            {
-                if (!nvidiaDriverDetected)
-                {
-                    Process.Start(new ProcessStartInfo("https://www.nvidia.com/Download/index.aspx") { UseShellExecute = true });
-                }
-
-                Process.Start(new ProcessStartInfo("https://developer.nvidia.com/cuda-downloads") { UseShellExecute = true });
-                Process.Start(new ProcessStartInfo("https://developer.nvidia.com/cudnn") { UseShellExecute = true });
-            }
-            catch
-            {
-
-            }
         }
 
         private async Task StartProcessing()

@@ -256,16 +256,6 @@
                         <TextBlock Text="清空日志"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="2"
-                        Command="{Binding CheckCudaCommand}"
-                        IsEnabled="{Binding IsIdle}"
-                        Style="{StaticResource CyanCommandButtonStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="CheckmarkCircle24"
-                                       Margin="0,0,6,0"/>
-                        <TextBlock Text="检查/安装 CUDA"/>
-                    </StackPanel>
-                </Button>
                 <ProgressBar Grid.Column="3"
                              Value="{Binding ProgressValue}"
                              Minimum="0"

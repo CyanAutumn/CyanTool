@@ -44,7 +44,15 @@ namespace CyanTools.Utils
             "cublas64_12.dll",
             "cublasLt64_12.dll",
             "cufft64_11.dll",
-            "cudnn64_8.dll"
+            "cudnn64_9.dll",
+            "cudnn_adv64_9.dll",
+            "cudnn_cnn64_9.dll",
+            "cudnn_engines_precompiled64_9.dll",
+            "cudnn_engines_runtime_compiled64_9.dll",
+            "cudnn_engines_tensor_ir64_9.dll",
+            "cudnn_graph64_9.dll",
+            "cudnn_heuristic64_9.dll",
+            "cudnn_ops64_9.dll"
         };
 
         public TaggingProcessor()
@@ -100,7 +108,7 @@ namespace CyanTools.Utils
                 cudaAppendApiSupported = false;
                 cudaEpDetails =
                     $"无法加载 CUDA 相关 DLL（或其依赖）。{ex.Message}\n" +
-                    "通常需要安装 CUDA 12.x 运行库（cudart64_12.dll / cublas64_12.dll / cublasLt64_12.dll / cufft64_11.dll）以及 cuDNN 8（cudnn64_8.dll）。\n" +
+                    "通常需要安装 CUDA 12.x 运行库（cudart64_12.dll / cublas64_12.dll / cublasLt64_12.dll / cufft64_11.dll）以及 cuDNN 9（cudnn64_9.dll）。\n" +
                     "如果你安装的是 CUDA 13.x，也需要额外安装 CUDA 12.x（因为 DLL 名称是 cudart64_12.dll，而不是 cudart64_13.dll）。";
             }
             catch (OnnxRuntimeException ex)
@@ -111,7 +119,7 @@ namespace CyanTools.Utils
                 {
                     cudaEpDetails =
                         $"CUDA 执行提供器不可用。{ex.Message}\n" +
-                        "通常是缺少 CUDA 12.x / cuDNN 8 的运行库 DLL，请先安装对应版本并确保它们在 PATH 中（或放到程序同目录）。";
+                        "通常是缺少 CUDA 12.x / cuDNN 9 的运行库 DLL，请先安装对应版本并确保它们在 PATH 中（或放到程序同目录）。";
                 }
                 else
                 {
@@ -133,12 +141,14 @@ namespace CyanTools.Utils
                       ? "已找到 CUDA 12.x/cuDNN 依赖 DLL。"
                       : $"未在该目录找到以下 DLL：{string.Join(", ", missingCuda12Dlls)}");
 
+            var installedCudnnSummary = BuildInstalledCudnnSummary(missingCuda12Dlls);
             var details = string.Join("\n", new[]
             {
                 driverDetected
                     ? "已检测到 NVIDIA 驱动 (nvcuda.dll)。"
                     : "未检测到 NVIDIA 驱动 (nvcuda.dll)，请先安装/更新显卡驱动。",
                 cuda12Summary,
+                installedCudnnSummary,
                 cudaEpDetails
             }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
@@ -165,7 +175,8 @@ namespace CyanTools.Utils
 
             cudaBinDirectory = bin;
             cudaVersion = version;
-            var missing = GetMissingDlls(bin, Cuda12RequiredDlls);
+            var dependencyDirectories = GetCudaDependencySearchDirectories(bin);
+            var missing = GetMissingDlls(dependencyDirectories, Cuda12RequiredDlls);
             missingRequiredDlls = missing;
 
             if (TryPrependToProcessPath(bin, out var reason))
@@ -177,12 +188,183 @@ namespace CyanTools.Utils
                 log?.Invoke(reason);
             }
 
+            foreach (var dependencyDirectory in dependencyDirectories.Where(directory =>
+                         !string.Equals(directory, bin, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (TryPrependToProcessPath(dependencyDirectory, out var dependencyReason))
+                {
+                    log?.Invoke($"已将 CUDA/cuDNN 依赖目录加入当前进程 PATH：{dependencyDirectory}");
+                }
+                else if (!string.IsNullOrWhiteSpace(dependencyReason))
+                {
+                    log?.Invoke(dependencyReason);
+                }
+            }
+
             if (missing.Count > 0)
             {
-                log?.Invoke($"CUDA 依赖可能不完整，未在 {bin} 找到：{string.Join(", ", missing)}");
+                log?.Invoke($"CUDA/cuDNN 依赖可能不完整，未在当前依赖目录找到：{string.Join(", ", missing)}");
             }
 
             return true;
+        }
+
+        private static string? BuildInstalledCudnnSummary(IReadOnlyList<string> missingRequiredDlls)
+        {
+            if (!missingRequiredDlls.Any(name =>
+                    name.StartsWith("cudnn", StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
+            }
+
+            var nvidiaCudnnRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "NVIDIA",
+                "CUDNN");
+            if (!Directory.Exists(nvidiaCudnnRoot))
+            {
+                return null;
+            }
+
+            var cudnnDlls = EnumerateFilesSafely(nvidiaCudnnRoot, "cudnn64_*.dll")
+                .Select(path => Path.GetFileName(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (cudnnDlls.Count == 0)
+            {
+                return null;
+            }
+
+            if (cudnnDlls.Any(name => string.Equals(name, "cudnn64_9.dll", StringComparison.OrdinalIgnoreCase)))
+            {
+                return $"检测到 NVIDIA CUDNN 目录，但 cuDNN 9 DLL 未在当前进程依赖路径中：{nvidiaCudnnRoot}";
+            }
+
+            return $"检测到 NVIDIA CUDNN 目录：{nvidiaCudnnRoot}，但当前安装的是 {string.Join(", ", cudnnDlls)}。当前 ONNX Runtime GPU 版本需要 cuDNN 9（cudnn64_9.dll）。";
+        }
+
+        private static IReadOnlyList<string> GetCudaDependencySearchDirectories(string cudaBinDirectory)
+        {
+            var directories = new List<string>
+            {
+                cudaBinDirectory,
+                AppContext.BaseDirectory,
+                Path.Combine(AppContext.BaseDirectory, "runtimes", "win-x64", "native"),
+                Path.Combine(AppContext.BaseDirectory, "waifu2x-caffe")
+            };
+            directories.AddRange(GetNvidiaCudnn9Directories());
+
+            return directories
+                .Where(directory => !string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static IEnumerable<string> GetNvidiaCudnn9Directories()
+        {
+            var nvidiaCudnnRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "NVIDIA",
+                "CUDNN");
+            if (!Directory.Exists(nvidiaCudnnRoot))
+            {
+                yield break;
+            }
+
+            var directories = EnumerateFilesSafely(nvidiaCudnnRoot, "cudnn64_9.dll")
+                .Select(Path.GetDirectoryName)
+                .Where(directory => !string.IsNullOrWhiteSpace(directory))
+                .Cast<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var cuda12Directories = directories
+                .Select(directory => new
+                {
+                    Directory = directory,
+                    HasVersion = TryGetCudaCompatibilityVersion(directory, out var version),
+                    Version = version
+                })
+                .Where(item => item.HasVersion && item.Version.Major == 12)
+                .GroupBy(item => item.Version)
+                .OrderByDescending(group => group.Key)
+                .FirstOrDefault();
+
+            if (cuda12Directories != null)
+            {
+                foreach (var item in cuda12Directories)
+                {
+                    yield return item.Directory;
+                }
+
+                yield break;
+            }
+
+            if (!directories.Any(directory => TryGetCudaCompatibilityVersion(directory, out _)))
+            {
+                foreach (var directory in directories)
+                {
+                    yield return directory;
+                }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateFilesSafely(string root, string searchPattern)
+        {
+            try
+            {
+                return Directory
+                    .EnumerateFiles(root, searchPattern, SearchOption.AllDirectories)
+                    .ToList();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Array.Empty<string>();
+            }
+            catch (IOException)
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private static bool TryGetCudaCompatibilityVersion(string path, out Version version)
+        {
+            version = new Version();
+            var segments = path.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries);
+            foreach (var segment in segments)
+            {
+                if (Version.TryParse(segment, out var parsed) &&
+                    (parsed.Major == 12 || parsed.Major == 13))
+                {
+                    version = parsed;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IReadOnlyList<string> GetMissingDlls(IEnumerable<string> directories, IEnumerable<string> dllNames)
+        {
+            var searchDirectories = directories
+                .Where(directory => !string.IsNullOrWhiteSpace(directory))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var missing = new List<string>();
+
+            foreach (var dllName in dllNames)
+            {
+                bool found = searchDirectories.Any(directory => File.Exists(Path.Combine(directory, dllName)));
+                if (!found)
+                {
+                    missing.Add(dllName);
+                }
+            }
+
+            return missing;
         }
 
         private static IReadOnlyList<string> GetMissingDlls(string directory, IEnumerable<string> dllNames)

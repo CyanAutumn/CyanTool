@@ -50,7 +50,7 @@
     <PackageReference Include="SharpCompress" Version="0.36.0" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
     <PackageReference Include="Microsoft.WindowsAPICodePack-Shell" Version="1.1.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.18.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.22.0" />
     <PackageReference Include="UMAP" Version="1.0.62830" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="System.Numerics.Tensors" Version="9.0.9" />

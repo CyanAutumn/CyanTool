@@ -153,16 +153,6 @@
                               ItemsSource="{Binding ComputeDevices}"
                               SelectedItem="{Binding SelectedComputeDevice}"
                               Margin="0,0,12,0"/>
-                    <Button Grid.Column="2"
-                            Command="{Binding CheckCudaCommand}"
-                            Style="{StaticResource CyanCommandButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="CheckmarkCircle24"
-                                           Margin="0,0,6,0"/>
-                            <TextBlock Text="检查/安装 CUDA"/>
-                        </StackPanel>
-                    </Button>
-
                     <TextBlock Grid.Row="1"
                                Text="特征类型"
                                Style="{StaticResource CyanFormLabelStyle}"
@@ -360,13 +350,14 @@
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="160"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
@@ -376,22 +367,27 @@
                     <TextBox Grid.Column="1"
                              Text="{Binding UmapNNeighbors, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Column="2"
+                    <TextBlock Grid.Row="1"
                                Text="min_dist"
                                Style="{StaticResource CyanFormLabelStyle}"
-                               Margin="18,0,10,0"
+                               Margin="0,12,10,0"
                                ToolTip="小=更抱团，大=更松散"/>
-                    <TextBox Grid.Column="3"
+                    <TextBox Grid.Row="1"
+                             Grid.Column="1"
+                             Margin="0,12,0,0"
                              Text="{Binding UmapMinDist, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
 
-                    <TextBlock Grid.Column="4"
+                    <TextBlock Grid.Row="2"
                                Text="spread"
                                Style="{StaticResource CyanFormLabelStyle}"
-                               Margin="18,0,10,0"
+                               Margin="0,12,10,0"
                                ToolTip="大=组间更开，小=组间更近"/>
-                    <TextBox Grid.Column="5"
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Margin="0,12,0,0"
                              Text="{Binding UmapSpread, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
-                    <TextBlock Grid.Column="6"
+                    <TextBlock Grid.Column="2"
+                               Grid.RowSpan="3"
                                Text="仅在 UMAP 空间下生效。"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                VerticalAlignment="Center"

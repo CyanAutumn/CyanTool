@@ -195,6 +195,11 @@ namespace CyanTools
                 return SymbolRegular.Bot24;
             }
 
+            if (controlType == typeof(OptionsView))
+            {
+                return SymbolRegular.Settings24;
+            }
+
             if (controlType == typeof(RealEsrganView) ||
                 controlType == typeof(ImageScalingView) ||
                 controlType == typeof(ImageProcessingView) ||

@@ -1,0 +1,194 @@
+<UserControl x:Class="CyanTools.OptionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             mc:Ignorable="d"
+             d:DesignHeight="680"
+             d:DesignWidth="920">
+    <ScrollViewer Style="{StaticResource CyanPageScrollViewerStyle}">
+        <Grid Style="{StaticResource CyanPageGridStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="320"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Style="{StaticResource CyanCardStyle}"
+                    Margin="0,0,0,14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CyanIconBadgeStyle}"
+                            Margin="0,0,14,0">
+                        <ui:SymbolIcon Symbol="Settings24"
+                                       FontSize="22"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="选项"
+                                   Style="{StaticResource CyanSectionTitleStyle}" />
+                        <TextBlock Text="管理本机运行环境与共享工具设置。"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <GroupBox Grid.Row="1"
+                      Header="CUDA / cuDNN"
+                      Margin="0,0,0,12"
+                      Style="{StaticResource CyanGroupBoxStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Command="{Binding CheckCudaCommand}"
+                            Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="CheckmarkCircle24"
+                                           Margin="0,0,6,0"/>
+                            <TextBlock Text="检查/安装 CUDA"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1"
+                            Command="{Binding InstallCudaToolkitCommand}"
+                            Style="{StaticResource CyanCommandButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowDownload24"
+                                           Margin="0,0,6,0"/>
+                            <TextBlock Text="安装 CUDA Toolkit"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2"
+                            Command="{Binding OpenCudaCudnnPagesCommand}"
+                            Style="{StaticResource CyanCommandButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Open24"
+                                           Margin="0,0,6,0"/>
+                            <TextBlock Text="CUDA/cuDNN 页面"/>
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Grid.Row="1"
+                               Grid.ColumnSpan="4"
+                               Text="GPU 推理依赖 NVIDIA 驱动、CUDA 12.x、cuDNN 9，以及带 CUDA Provider 的 ONNX Runtime。cuDNN 可拖入 zip 自动复制到程序目录或 CUDA 12 bin。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,12,0,0"/>
+
+                    <Border Grid.Row="2"
+                            Grid.ColumnSpan="4"
+                            Margin="0,14,0,0"
+                            Padding="16"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                            Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                            AllowDrop="True"
+                            DragEnter="CudnnPackage_DragEnter"
+                            DragOver="CudnnPackage_DragEnter"
+                            Drop="CudnnPackage_Drop">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Symbol="ArrowDownload24"
+                                           FontSize="24"
+                                           Margin="0,0,12,0"
+                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                           VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="拖入 cuDNN zip 安装包"
+                                           Style="{StaticResource CyanSectionTitleStyle}"
+                                           FontSize="15"/>
+                                <TextBlock Text="{Binding CudnnPackageStatus}"
+                                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <Button Grid.Column="2"
+                                    Command="{Binding SelectCudnnPackageCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="12,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Open24"
+                                                   Margin="0,0,6,0"/>
+                                    <TextBlock Text="选择 zip"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Row="2"
+                      Header="NVIDIA 驱动应用"
+                      Margin="0,0,0,12"
+                      Style="{StaticResource CyanGroupBoxStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding NvidiaAppStatus}"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Command="{Binding RefreshNvidiaAppStatusCommand}"
+                            Style="{StaticResource CyanCommandButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="CheckmarkCircle24"
+                                           Margin="0,0,6,0"/>
+                            <TextBlock Text="重新检测"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2"
+                            Command="{Binding OpenNvidiaAppPageCommand}"
+                            Style="{StaticResource CyanCommandButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Open24"
+                                           Margin="0,0,6,0"/>
+                            <TextBlock Text="NVIDIA App"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Row="3"
+                      Header="日志"
+                      Style="{StaticResource CyanGroupBoxStyle}">
+                <ListBox ItemsSource="{Binding LogLines}"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         HorizontalContentAlignment="Stretch"
+                         Style="{StaticResource CyanListBoxSurfaceStyle}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </GroupBox>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

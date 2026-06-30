@@ -20,8 +20,10 @@ namespace CyanTools.ViewModel
         public override string DisplayName => "图片聚类";
         private const string FeatureTypeHybridDisplay = "Style+Content（偏画风+偏内容）";
         private const string FeatureTypeStyleDisplay = "Style（偏画风）";
+        private const string FeatureTypeOriginalCsdStyleDisplay = "Style（原版 CSD）";
         private const string FeatureTypeGrayStyleDisplay = "Style（灰度去色，更偏笔触）";
-        private const string FeatureTypeHeadLineStyleDisplay = "Style（头部线条/笔触，训练推荐）";
+        private const string FeatureTypeStrictGrayStyleDisplay = "Style（灰度去色，严格画风）";
+        private const string FeatureTypeHeadLineStyleDisplay = "Style（头部画法/线条，训练推荐）";
         private const string FeatureTypeStyleColorDownweightDisplay = "Style（颜色降权，保留少量色彩）";
         private const string FeatureTypeContentDisplay = "Content（偏内容）";
         private const string ClusteringSpaceRawDisplay = "高维向量（推荐）";
@@ -42,6 +44,7 @@ namespace CyanTools.ViewModel
         private const string DefaultSelectedComputeDevice = "GPU";
         private const string CsdModelRelativePath = "Models/csd/csd_clip_model.onnx";
         private const string HeadDetectionModelRelativePath = "Models/anime_head_detection/head_detect_v0_s.onnx";
+        private const string EyeDetectionModelRelativePath = "Models/anime_eye_detection/eye_detect_v1.0_s.onnx";
         private const string CsdModelDownloadUrl = "https://huggingface.co/yuxi-liu-wired/CSD/resolve/main/csd_clip_model.onnx";
         private const string CsdModelPageUrl = "https://huggingface.co/yuxi-liu-wired/CSD";
         private const string ClusterDistributionFileName = "cluster_distribution.png";
@@ -191,7 +194,9 @@ namespace CyanTools.ViewModel
         {
             FeatureTypeHybridDisplay,
             FeatureTypeStyleDisplay,
+            FeatureTypeOriginalCsdStyleDisplay,
             FeatureTypeGrayStyleDisplay,
+            FeatureTypeStrictGrayStyleDisplay,
             FeatureTypeHeadLineStyleDisplay,
             FeatureTypeStyleColorDownweightDisplay,
             FeatureTypeContentDisplay
@@ -304,7 +309,6 @@ namespace CyanTools.ViewModel
         public ICommand SelectOutputCommand { get; }
         public ICommand StartCommand { get; }
         public ICommand MoveFilesToTopLevelCommand { get; }
-        public ICommand CheckCudaCommand { get; }
         public ICommand ResetParametersCommand { get; }
 
         public ImageClusteringViewModel()
@@ -314,7 +318,6 @@ namespace CyanTools.ViewModel
             StartCommand = new RelayCommand(async () => await RunClusteringAsync(showDialogs: true, CancellationToken.None),
                 () => !string.IsNullOrEmpty(InputPath) && !IsClustering);
             MoveFilesToTopLevelCommand = new RelayCommand(async () => await MoveFilesToTopLevelAsync(), () => !string.IsNullOrEmpty(InputPath) && !IsClustering);
-            CheckCudaCommand = new RelayCommand(async () => await CheckOrInstallCudaAsync(), () => !IsClustering);
             ResetParametersCommand = new RelayCommand(_ => ResetParametersToDefaults(), _ => !IsClustering);
 
             LoadSettings();
@@ -356,7 +359,6 @@ namespace CyanTools.ViewModel
         {
             (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (MoveFilesToTopLevelCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            (CheckCudaCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (ResetParametersCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
@@ -511,87 +513,6 @@ namespace CyanTools.ViewModel
             LogToPipeline($"[图片聚类] {message}");
         }
 
-        private async Task CheckOrInstallCudaAsync()
-        {
-            var check = await Task.Run(TaggingProcessor.CheckCudaEnvironment);
-            AppendLog($"CUDA 检查结果: {check.Details}");
-
-            if (check.NvidiaDriverDetected && check.CudaExecutionProviderAvailable)
-            {
-                MessageBox.Show("CUDA 环境可用，已可以使用 GPU(CUDA) 进行图片聚类。", "CUDA 检查", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (!check.CudaAppendApiSupported)
-            {
-                MessageBox.Show(
-                    $"{check.Details}\n\n检测到当前程序的 onnxruntime.dll 不支持 CUDA 执行提供器。\n这不是安装 CUDA Toolkit 能解决的问题，请更新/重新发布带 `Microsoft.ML.OnnxRuntime.Gpu` 的版本。",
-                    "CUDA 检查",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            var result = MessageBox.Show(
-                $"{check.Details}\n\n是否尝试使用 winget 安装 CUDA Toolkit 12.x（推荐 12.4）？\n（需要联网，可能需要管理员权限；安装完成后请重启软件。注意：cuDNN 需要另外安装。）",
-                "CUDA 检查/安装",
-                MessageBoxButton.YesNoCancel,
-                MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                TryLaunchWingetCudaInstall();
-            }
-            else if (result == MessageBoxResult.No)
-            {
-                OpenCudaInstallPages(check.NvidiaDriverDetected);
-            }
-        }
-
-        private static void TryLaunchWingetCudaInstall()
-        {
-            const string wingetArgs =
-                "/k winget install -e --id Nvidia.CUDA -s winget --version 12.4 --accept-source-agreements --accept-package-agreements || winget show --id Nvidia.CUDA -s winget --versions || winget search cuda -s winget";
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = wingetArgs,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"启动 winget 失败：{ex.Message}\n\n将为你打开 CUDA 下载页面，请手动安装。",
-                    "CUDA 安装",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-
-                OpenCudaInstallPages(nvidiaDriverDetected: true);
-            }
-        }
-
-        private static void OpenCudaInstallPages(bool nvidiaDriverDetected)
-        {
-            try
-            {
-                if (!nvidiaDriverDetected)
-                {
-                    Process.Start(new ProcessStartInfo("https://www.nvidia.com/Download/index.aspx") { UseShellExecute = true });
-                }
-
-                Process.Start(new ProcessStartInfo("https://developer.nvidia.com/cuda-downloads") { UseShellExecute = true });
-                Process.Start(new ProcessStartInfo("https://developer.nvidia.com/cudnn") { UseShellExecute = true });
-            }
-            catch
-            {
-
-            }
-        }
-
         private async Task RunClusteringAsync(bool showDialogs, CancellationToken token)
         {
             OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DisplayName);
@@ -667,7 +588,9 @@ namespace CyanTools.ViewModel
                 bool useGpu = SelectedComputeDevice.Equals("GPU", StringComparison.OrdinalIgnoreCase);
                 AppendLog($"选择计算设备: {SelectedComputeDevice}");
                 bool useKMeansFamily = SelectedAlgorithm == "KMeans" || SelectedAlgorithm == "SphericalKMeans";
+                string selectedFeatureTypeKey = GetFeatureTypeKey(SelectedFeatureType);
                 bool useHeadLineStyleFeature = UsesHeadLineStyleVectors(SelectedFeatureType);
+                bool useStrictGrayStyleFeature = selectedFeatureTypeKey == "StrictGrayStyle";
                 bool requestedTwoStageStyleClustering = EnableTwoStageStyleClustering;
                 bool useTwoStageStyleClustering = requestedTwoStageStyleClustering && useKMeansFamily && !useHeadLineStyleFeature;
                 if (requestedTwoStageStyleClustering && !useKMeansFamily)
@@ -676,7 +599,7 @@ namespace CyanTools.ViewModel
                 }
                 else if (requestedTwoStageStyleClustering && useHeadLineStyleFeature)
                 {
-                    AppendLog("头部线条/笔触模式已内置头部灰度 Style + 线条纹理组合，已忽略二阶段聚类选项。");
+                    AppendLog("头部渲染/线条模式已内置局部风格描述子组合，已忽略二阶段聚类选项。");
                 }
 
                 bool includeGrayStyle = UsesGrayStyleVectors(SelectedFeatureType, useTwoStageStyleClustering);
@@ -686,7 +609,7 @@ namespace CyanTools.ViewModel
                 }
                 if (useHeadLineStyleFeature)
                 {
-                    AppendLog("已启用训练推荐的头部线条/笔触模式：先裁剪头部区域，再组合头部灰度 Style 与线条纹理特征。");
+                    AppendLog("已启用头部渲染/线条实验模式：先裁剪头部区域，仅用裁剪结果判断画风，再复制裁剪前原图到最终文件夹。");
                     if (SelectedAlgorithm != "SphericalKMeans" || !SelectedClusteringSpace.Equals(ClusteringSpaceStyleBrushDisplay, StringComparison.Ordinal) || !UseBestKBySilhouette)
                     {
                         AppendLog("复现实验推荐设置：算法=SphericalKMeans，聚类空间=高维 Style（更偏笔触），勾选“最优”。");
@@ -709,8 +632,10 @@ namespace CyanTools.ViewModel
                     {
                         IncludeBaseEmbeddings = !useHeadLineStyleFeature,
                         IncludeGrayStyle = includeGrayStyle,
+                        IncludeGrayStructureStyle = UsesGrayStructureStyleVectors(SelectedFeatureType),
                         IncludeHeadLineStyle = useHeadLineStyleFeature,
-                        HeadDetectionModelPath = Path.GetFullPath(HeadDetectionModelRelativePath)
+                        HeadDetectionModelPath = Path.GetFullPath(HeadDetectionModelRelativePath),
+                        HeadValidationEyeModelPath = Path.GetFullPath(EyeDetectionModelRelativePath)
                     },
                     new[] { outputPathFull });
                 var imageResults = processResult.Results;
@@ -718,7 +643,7 @@ namespace CyanTools.ViewModel
                 {
                     var summary = processResult.Summary;
                     AppendLog(
-                        $"头部线条/笔触统计：成功处理 {summary.ProcessedImages}/{summary.TotalImages} 张；头部检测 {summary.HeadDetectedCrops} 张，中心裁剪兜底 {summary.HeadFallbackCrops} 张，失败 {summary.FailedImages} 张。");
+                        $"头部渲染/线条统计：成功处理 {summary.ProcessedImages}/{summary.TotalImages} 张；可靠头部 {summary.HeadDetectedCrops} 张，低可信/兜底 {summary.HeadFallbackCrops} 张，失败 {summary.FailedImages} 张。");
                 }
 
                 token.ThrowIfCancellationRequested();
@@ -741,6 +666,7 @@ namespace CyanTools.ViewModel
                 List<float[]> dataPoints = BuildFeatureVectors(imageResults, SelectedFeatureType, colorRetention);
                 string effectiveFeatureType;
                 List<float[]> clusteringSourcePoints;
+                List<float[]>? headStyleMergePoints = null;
                 List<float[]>? coarseStagePoints = null;
 
                 if (useTwoStageStyleClustering)
@@ -753,7 +679,7 @@ namespace CyanTools.ViewModel
                     {
                         AppendLog("二阶段风格聚类仅支持 Style 类特征，已忽略当前非 Style 特征选择，改用灰度 Style -> 彩色 Style。");
                     }
-                    else if (GetFeatureTypeKey(SelectedFeatureType) == "GrayStyle")
+                    else if (UsesGrayStructureStyleVectors(SelectedFeatureType))
                     {
                         AppendLog("当前使用二阶段风格聚类：先按灰度 Style 粗分，再用彩色 Style 细分，避免颜色完全丢失。");
                     }
@@ -785,10 +711,19 @@ namespace CyanTools.ViewModel
                     {
                         AppendLog("当前使用灰度 Style 分支聚类：颜色信息会被尽量压掉。");
                     }
+                    else if (effectiveFeatureType.Equals(FeatureTypeOriginalCsdStyleDisplay, StringComparison.Ordinal))
+                    {
+                        AppendLog("当前使用原版 CSD Style：仅使用模型 style_output，不叠加灰度、线条或同源分页增强。");
+                    }
                     else if (effectiveFeatureType.Equals(FeatureTypeStyleColorDownweightDisplay, StringComparison.Ordinal))
                     {
                         AppendLog($"当前使用颜色降权 Style：原彩色 Style 保留系数 {ColorDownweightStyleRetention:F2}。");
                     }
+                }
+
+                if (useHeadLineStyleFeature)
+                {
+                    headStyleMergePoints = BuildHeadStyleMergeVectors(imageResults);
                 }
 
                 if (SelectedAlgorithm == "SphericalKMeans")
@@ -864,6 +799,8 @@ namespace CyanTools.ViewModel
 
                 int resolvedKMeansK = NumClusters;
                 bool mergeKMeansClustersAfterClustering = false;
+                int preferredHeadStyleAutoClusterCount = 0;
+                int preferredStrictGrayStyleAutoClusterCount = 0;
                 if (useKMeansFamily)
                 {
                     if (UseBestKBySilhouette)
@@ -877,8 +814,23 @@ namespace CyanTools.ViewModel
                         {
                             resolvedKMeansK = ResolveAutoMergeInitialClusterCount(clusteringSpace.Count);
                             mergeKMeansClustersAfterClustering = true;
-                            AppendLog(
-                                $"最优模式：先自动过分割为 K={resolvedKMeansK}，随后根据簇中心邻近距离断点合并，最终文件夹数量由数据决定。");
+                            if (useHeadLineStyleFeature)
+                            {
+                                preferredHeadStyleAutoClusterCount = ResolvePreferredHeadStyleAutoClusterCount(clusteringSpace.Count);
+                                AppendLog(
+                                    $"最优模式：头部画法/线条特征先过分割为 K={resolvedKMeansK}，再尝试合并到约 {preferredHeadStyleAutoClusterCount} 个以内；若簇间画风距离过大则提前停止。");
+                            }
+                            else if (useStrictGrayStyleFeature)
+                            {
+                                preferredStrictGrayStyleAutoClusterCount = ResolvePreferredStrictGrayStyleAutoClusterCount(clusteringSpace.Count);
+                                AppendLog(
+                                    $"最优模式：严格灰度画风先过分割为 K={resolvedKMeansK}，再合并到约 {preferredStrictGrayStyleAutoClusterCount} 个以内，避免自动细分生成数百个文件夹。");
+                            }
+                            else
+                            {
+                                AppendLog(
+                                    $"最优模式：先自动过分割为 K={resolvedKMeansK}，随后根据簇中心邻近距离断点合并，最终文件夹数量由数据决定。");
+                            }
                         }
                     }
                     else
@@ -920,10 +872,23 @@ namespace CyanTools.ViewModel
                     var mergeReferenceSpace = useUmapSpace && !useTwoStageStyleClustering
                         ? clusteringSpace
                         : clusteringSourcePoints;
-                    var mergeResult = Utils.AdaptiveClusterMerger.MergeNearbyClusters(
-                        mergeReferenceSpace,
-                        assignments,
-                        useCosineDistance: mergeInCosineSpace);
+                    var mergeResult = useHeadLineStyleFeature && UseBestKBySilhouette
+                        ? Utils.AdaptiveClusterMerger.MergeToPreferredClusterCount(
+                            headStyleMergePoints ?? mergeReferenceSpace,
+                            assignments,
+                            preferredHeadStyleAutoClusterCount,
+                            useCosineDistance: mergeInCosineSpace,
+                            maxCompleteLinkDistance: ResolveHeadStyleMergeMaxCompleteLinkDistance())
+                        : useStrictGrayStyleFeature && UseBestKBySilhouette
+                            ? Utils.AdaptiveClusterMerger.MergeToPreferredClusterCount(
+                                mergeReferenceSpace,
+                                assignments,
+                                preferredStrictGrayStyleAutoClusterCount,
+                                useCosineDistance: mergeInCosineSpace)
+                            : Utils.AdaptiveClusterMerger.MergeNearbyClusters(
+                                mergeReferenceSpace,
+                                assignments,
+                                useCosineDistance: mergeInCosineSpace);
                     assignments = mergeResult.Labels;
                     if (mergeResult.Changed)
                     {
@@ -935,6 +900,81 @@ namespace CyanTools.ViewModel
                         AppendLog($"最优模式未发现稳定的簇间距离断点，保留 {mergeResult.FinalClusterCount} 个文件夹。");
                     }
                 }
+
+                if (useKMeansFamily &&
+                    UseBestKBySilhouette &&
+                    !useUmapSpace &&
+                    IsStyleLikeFeatureType(effectiveFeatureType) &&
+                    !(useHeadLineStyleFeature && UseBestKBySilhouette) &&
+                    !(useStrictGrayStyleFeature && UseBestKBySilhouette))
+                {
+                    var purityResult = useHeadLineStyleFeature
+                        ? Utils.StyleClusterPurityRefiner.SplitLooseClusters(
+                            clusteringSourcePoints,
+                            assignments,
+                            useCosineDistance: true,
+                            minClusterSizeToSplit: 4,
+                            minJumpRatio: 1.22d,
+                            minJumpDistance: 0.003d)
+                        : Utils.StyleClusterPurityRefiner.SplitLooseClusters(
+                            clusteringSourcePoints,
+                            assignments,
+                            useCosineDistance: SelectedAlgorithm == "SphericalKMeans" || useStyleBrushSpace || useTwoStageStyleClustering);
+                    assignments = purityResult.Labels;
+                    if (purityResult.Changed)
+                    {
+                        AppendLog(
+                            $"风格可靠性细分完成：拆分 {purityResult.SplitClusterCount} 个松散簇，文件夹数 {purityResult.OriginalClusterCount} -> {purityResult.FinalClusterCount}，完全链接阈值 {purityResult.CompleteLinkThreshold:F4}。");
+                    }
+                }
+                else if (useHeadLineStyleFeature && UseBestKBySilhouette)
+                {
+                    AppendLog("头部画法/线条最优模式已跳过全局松散簇细分，避免把训练文件夹重新拆成数百个小簇。");
+                }
+                else if (useStrictGrayStyleFeature && UseBestKBySilhouette)
+                {
+                    AppendLog("严格灰度画风最优模式已跳过全局松散簇细分，避免把结果重新拆成数百个文件夹。");
+                }
+                else if (useKMeansFamily && !UseBestKBySilhouette)
+                {
+                    AppendLog("手动 K 模式已跳过自动风格细分，导出文件夹数将尽量尊重手动 K 值。");
+                }
+
+                if (useHeadLineStyleFeature && UseBestKBySilhouette)
+                {
+                    var sizeSplitResult = SplitOversizedHeadStyleClusters(
+                        clusteringSourcePoints,
+                        assignments,
+                        ResolveHeadStyleOversizedClusterMaxSize());
+                    assignments = sizeSplitResult.Labels;
+                    if (sizeSplitResult.SplitClusterCount > 0)
+                    {
+                        AppendLog(
+                            $"头部画法/线条最优模式已对 {sizeSplitResult.SplitClusterCount} 个过大簇做有限再聚类，当前文件夹数 {sizeSplitResult.FinalClusterCount}，最大目标簇大小约 {ResolveHeadStyleOversizedClusterMaxSize()} 张。");
+                    }
+                }
+
+                if (useHeadLineStyleFeature && UseBestKBySilhouette)
+                {
+                    AppendLog("头部画法/线条最优模式已保留低可信/兜底头部与可靠头部的合并结果，避免同画风因正脸/侧脸/背面构图被拆开。");
+                }
+
+                bool shouldApplySameSourcePageCohesion =
+                    useKMeansFamily &&
+                    IsStyleLikeFeatureType(effectiveFeatureType) &&
+                    GetFeatureTypeKey(effectiveFeatureType) != "OriginalCsdStyle";
+                if (shouldApplySameSourcePageCohesion)
+                {
+                    var cohesionResult = ApplySameSourcePageCohesion(assignments, imageResults);
+                    assignments = cohesionResult.Labels;
+                    if (cohesionResult.ChangedImageCount > 0)
+                    {
+                        AppendLog(
+                            $"同源分页一致性合并完成：修正 {cohesionResult.ChangedImageCount} 张跨文件夹分页图，涉及 {cohesionResult.ChangedGroupCount} 个源图组；当前文件夹数 {cohesionResult.FinalClusterCount}。");
+                    }
+                }
+
+                assignments = RelabelAssignmentsSequentially(assignments);
 
                 Application.Current.Dispatcher.Invoke(() => Progress = 75);
 
@@ -1190,6 +1230,40 @@ namespace CyanTools.ViewModel
             return Math.Clamp(Math.Max(4, byDatasetSize), 2, Math.Min(80, sampleCount - 1));
         }
 
+        private static int ResolvePreferredHeadStyleAutoClusterCount(int sampleCount)
+        {
+            if (sampleCount <= 1)
+            {
+                return Math.Max(sampleCount, 1);
+            }
+
+            int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount) * 1.05d);
+            int lowerBound = sampleCount < 240 ? 6 : 12;
+            return Math.Clamp(bySqrt, lowerBound, Math.Min(48, sampleCount));
+        }
+
+        private static int ResolvePreferredStrictGrayStyleAutoClusterCount(int sampleCount)
+        {
+            if (sampleCount <= 1)
+            {
+                return Math.Max(sampleCount, 1);
+            }
+
+            int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount) * 0.75d);
+            int lowerBound = sampleCount < 240 ? 6 : 12;
+            return Math.Clamp(bySqrt, lowerBound, Math.Min(36, sampleCount));
+        }
+
+        private static double ResolveHeadStyleMergeMaxCompleteLinkDistance()
+        {
+            return 0.045d;
+        }
+
+        private static int ResolveHeadStyleOversizedClusterMaxSize()
+        {
+            return 40;
+        }
+
         private static bool IsValidTwoDimensionalSpace(IReadOnlyList<float[]> points)
         {
             return points.Count > 0 && points.All(v => v != null && v.Length == 2);
@@ -1234,15 +1308,98 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => NormalizeVectorCopy(result.StyleVector),
-                "GrayStyle" => NormalizeVectorCopy(result.GrayStyleVector),
+                "OriginalCsdStyle" => NormalizeVectorCopy(result.StyleVector),
+                "GrayStyle" => BuildGrayStructureStyleVector(result),
+                "StrictGrayStyle" => BuildStrictGrayStructureStyleVector(result),
                 "HeadLineStyle" => ConcatWeightedNormalizedVectors(
-                    (result.HeadGrayStyleVector, 0.55f),
-                    (result.HeadLineStyleVector, 1.00f)),
+                    (result.HeadGrayStyleVector, 0.72f),
+                    (result.HeadRenderStyleVector, 0.55f),
+                    (result.HeadLineStyleVector, 0.48f),
+                    (result.HeadUpperLineStyleVector, 0.34f),
+                    (result.HeadCenterLineStyleVector, 0.46f),
+                    (result.HeadFaceLineStyleVector, 0.58f),
+                    (result.HeadEyeLineStyleVector, 0.52f),
+                    (result.HeadToneEdgeStyleVector, 0.50f),
+                    (result.HeadFaceToneEdgeStyleVector, 0.42f)),
                 "StyleColorDownweight" => BlendNormalizedVectors(result.StyleVector, result.GrayStyleVector, colorRetention),
                 "Content" => NormalizeVectorCopy(result.ContentVector),
                 "Style+Content" => ConcatNormalizedVectors(result.StyleVector, result.ContentVector),
                 _ => throw new InvalidOperationException($"未知特征类型: {featureType}")
             };
+        }
+
+        private static float[] BuildHeadStyleMergeVector(ImageStyleResult result)
+        {
+            return ConcatWeightedNormalizedVectors(
+                (result.HeadGrayStyleVector, 0.82f),
+                (result.HeadRenderStyleVector, 0.58f),
+                (result.HeadLineStyleVector, 0.42f),
+                (result.HeadUpperLineStyleVector, 0.26f),
+                (result.HeadCenterLineStyleVector, 0.34f),
+                (result.HeadFaceLineStyleVector, 0.28f),
+                (result.HeadEyeLineStyleVector, 0.24f),
+                (result.HeadToneEdgeStyleVector, 0.52f),
+                (result.HeadFaceToneEdgeStyleVector, 0.32f));
+        }
+
+        private static float[] BuildGrayStructureStyleVector(ImageStyleResult result)
+        {
+            var parts = new List<(float[] Vector, float Weight)>
+            {
+                (result.GrayStyleVector, 0.70f)
+            };
+
+            if (HasVector(result.GrayRenderStyleVector))
+            {
+                parts.Add((result.GrayRenderStyleVector, 0.45f));
+            }
+
+            if (HasVector(result.GrayLineStyleVector))
+            {
+                parts.Add((result.GrayLineStyleVector, 0.55f));
+            }
+
+            if (HasVector(result.GrayToneEdgeStyleVector))
+            {
+                parts.Add((result.GrayToneEdgeStyleVector, 0.40f));
+            }
+
+            return ConcatWeightedNormalizedVectors(parts.ToArray());
+        }
+
+        private static float[] BuildStrictGrayStructureStyleVector(ImageStyleResult result)
+        {
+            var parts = new List<(float[] Vector, float Weight)>
+            {
+                (result.GrayStyleVector, 0.55f)
+            };
+
+            if (HasVector(result.GrayRenderStyleVector))
+            {
+                parts.Add((result.GrayRenderStyleVector, 0.75f));
+            }
+
+            if (HasVector(result.GrayLineStyleVector))
+            {
+                parts.Add((result.GrayLineStyleVector, 0.95f));
+            }
+
+            if (HasVector(result.GrayToneEdgeStyleVector))
+            {
+                parts.Add((result.GrayToneEdgeStyleVector, 0.80f));
+            }
+
+            if (HasVector(result.GraySketchStyleVector))
+            {
+                parts.Add((result.GraySketchStyleVector, 1.10f));
+            }
+
+            return ConcatWeightedNormalizedVectors(parts.ToArray());
+        }
+
+        private static bool HasVector(float[]? vector)
+        {
+            return vector != null && vector.Length > 0;
         }
 
         private static float[] ConcatNormalizedVectors(float[] first, float[] second)
@@ -1342,7 +1499,9 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => "style",
+                "OriginalCsdStyle" => "csdstyle",
                 "GrayStyle" => "graystyle",
+                "StrictGrayStyle" => "graystrictstyle",
                 "HeadLineStyle" => "headlinestyle",
                 "StyleColorDownweight" => "stylelite",
                 "Content" => "content",
@@ -1368,6 +1527,19 @@ namespace CyanTools.ViewModel
                 return "Style+Content";
             }
 
+            if (featureType.StartsWith("OriginalCsdStyle", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（原版 CSD", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（原版CSD", StringComparison.OrdinalIgnoreCase))
+            {
+                return "OriginalCsdStyle";
+            }
+
+            if (featureType.StartsWith("StrictGrayStyle", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（灰度去色，严格", StringComparison.OrdinalIgnoreCase))
+            {
+                return "StrictGrayStyle";
+            }
+
             if (featureType.StartsWith("GrayStyle", StringComparison.OrdinalIgnoreCase) ||
                 featureType.StartsWith("Style（灰度", StringComparison.OrdinalIgnoreCase))
             {
@@ -1375,7 +1547,9 @@ namespace CyanTools.ViewModel
             }
 
             if (featureType.StartsWith("HeadLineStyle", StringComparison.OrdinalIgnoreCase) ||
-                featureType.StartsWith("Style（头部线条", StringComparison.OrdinalIgnoreCase))
+                featureType.StartsWith("Style（头部线条", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（头部渲染", StringComparison.OrdinalIgnoreCase) ||
+                featureType.StartsWith("Style（头部画法", StringComparison.OrdinalIgnoreCase))
             {
                 return "HeadLineStyle";
             }
@@ -1409,7 +1583,9 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => FeatureTypeStyleDisplay,
+                "OriginalCsdStyle" => FeatureTypeOriginalCsdStyleDisplay,
                 "GrayStyle" => FeatureTypeGrayStyleDisplay,
+                "StrictGrayStyle" => FeatureTypeStrictGrayStyleDisplay,
                 "HeadLineStyle" => FeatureTypeHeadLineStyleDisplay,
                 "StyleColorDownweight" => FeatureTypeStyleColorDownweightDisplay,
                 "Content" => FeatureTypeContentDisplay,
@@ -1427,7 +1603,18 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "GrayStyle" => true,
+                "StrictGrayStyle" => true,
                 "StyleColorDownweight" => true,
+                _ => false
+            };
+        }
+
+        private static bool UsesGrayStructureStyleVectors(string featureType)
+        {
+            return GetFeatureTypeKey(featureType) switch
+            {
+                "GrayStyle" => true,
+                "StrictGrayStyle" => true,
                 _ => false
             };
         }
@@ -1442,7 +1629,9 @@ namespace CyanTools.ViewModel
             return GetFeatureTypeKey(featureType) switch
             {
                 "Style" => true,
+                "OriginalCsdStyle" => true,
                 "GrayStyle" => true,
+                "StrictGrayStyle" => true,
                 "HeadLineStyle" => true,
                 "StyleColorDownweight" => true,
                 _ => false
@@ -1456,6 +1645,8 @@ namespace CyanTools.ViewModel
                 "StyleColorDownweight" => FeatureTypeStyleColorDownweightDisplay,
                 "HeadLineStyle" => FeatureTypeHeadLineStyleDisplay,
                 "GrayStyle" => FeatureTypeStyleDisplay,
+                "StrictGrayStyle" => FeatureTypeStyleDisplay,
+                "OriginalCsdStyle" => FeatureTypeOriginalCsdStyleDisplay,
                 "Style" => FeatureTypeStyleDisplay,
                 _ => FeatureTypeStyleDisplay
             };
@@ -1511,6 +1702,17 @@ namespace CyanTools.ViewModel
             return vectors;
         }
 
+        private static List<float[]> BuildHeadStyleMergeVectors(IReadOnlyList<ImageStyleResult> results)
+        {
+            var vectors = new List<float[]>(results.Count);
+            for (int i = 0; i < results.Count; i++)
+            {
+                vectors.Add(BuildHeadStyleMergeVector(results[i]));
+            }
+
+            return vectors;
+        }
+
         private static List<float[]> ProjectToTwoDimensions(IReadOnlyList<float[]> dataPoints)
         {
             var projected = new List<float[]>(dataPoints.Count);
@@ -1524,6 +1726,235 @@ namespace CyanTools.ViewModel
 
             return projected;
         }
+
+        private static int[] RelabelAssignmentsSequentially(IReadOnlyList<int> assignments)
+        {
+            var labelMap = new Dictionary<int, int>();
+            int nextLabel = 0;
+            var relabeled = new int[assignments.Count];
+            for (int i = 0; i < assignments.Count; i++)
+            {
+                int label = assignments[i];
+                if (label < 0)
+                {
+                    relabeled[i] = label;
+                    continue;
+                }
+
+                if (!labelMap.TryGetValue(label, out int mappedLabel))
+                {
+                    mappedLabel = nextLabel++;
+                    labelMap[label] = mappedLabel;
+                }
+
+                relabeled[i] = mappedLabel;
+            }
+
+            return relabeled;
+        }
+
+        private static HeadReliabilitySplitResult SplitMixedHeadReliabilityClusters(
+            IReadOnlyList<int> assignments,
+            IReadOnlyList<ImageStyleResult> results)
+        {
+            if (assignments.Count != results.Count)
+            {
+                throw new InvalidOperationException("聚类标签数量与图片数量不一致。");
+            }
+
+            var labels = assignments.ToArray();
+            int nextLabel = labels.Where(label => label >= 0).DefaultIfEmpty(-1).Max() + 1;
+            int splitCount = 0;
+            var groups = Enumerable.Range(0, labels.Length)
+                .Where(i => labels[i] >= 0)
+                .GroupBy(i => labels[i])
+                .ToArray();
+
+            foreach (var group in groups)
+            {
+                var indices = group.ToList();
+                bool hasReliable = indices.Any(i => !results[i].UsedHeadFallbackCrop);
+                bool hasFallback = indices.Any(i => results[i].UsedHeadFallbackCrop);
+                if (hasReliable && hasFallback)
+                {
+                    int fallbackLabel = nextLabel++;
+                    foreach (int index in indices.Where(i => results[i].UsedHeadFallbackCrop))
+                    {
+                        labels[index] = fallbackLabel;
+                    }
+
+                    splitCount++;
+                }
+            }
+
+            int finalCount = labels.Where(label => label >= 0).Distinct().Count();
+            return new HeadReliabilitySplitResult(labels, splitCount, finalCount);
+        }
+
+        private static HeadReliabilitySplitResult SplitOversizedHeadStyleClusters(
+            IReadOnlyList<float[]> vectors,
+            IReadOnlyList<int> assignments,
+            int maxClusterSize)
+        {
+            if (vectors.Count != assignments.Count)
+            {
+                throw new InvalidOperationException("特征数量与聚类标签数量不一致。");
+            }
+
+            int targetMaxSize = Math.Max(2, maxClusterSize);
+            var labels = assignments.ToArray();
+            int nextLabel = labels.Where(label => label >= 0).DefaultIfEmpty(-1).Max() + 1;
+            int splitCount = 0;
+            var groups = Enumerable.Range(0, labels.Length)
+                .Where(i => labels[i] >= 0)
+                .GroupBy(i => labels[i])
+                .Select(group => group.ToArray())
+                .Where(indices => indices.Length > targetMaxSize)
+                .ToArray();
+
+            foreach (var indices in groups)
+            {
+                int localK = Math.Clamp(
+                    (int)Math.Ceiling(indices.Length / (double)targetMaxSize),
+                    2,
+                    indices.Length);
+                var localVectors = indices.Select(index => vectors[index]).ToList();
+                int[] localLabels = Utils.SphericalKMeansClusterer.Cluster(
+                    localVectors,
+                    localK,
+                    randomState: 420 + splitCount);
+
+                foreach (var localGroup in Enumerable.Range(0, localLabels.Length)
+                    .GroupBy(i => localLabels[i])
+                    .OrderBy(group => indices[group.Min()]))
+                {
+                    int label = nextLabel++;
+                    foreach (int localIndex in localGroup)
+                    {
+                        labels[indices[localIndex]] = label;
+                    }
+                }
+
+                splitCount++;
+            }
+
+            int finalCount = labels.Where(label => label >= 0).Distinct().Count();
+            return new HeadReliabilitySplitResult(labels, splitCount, finalCount);
+        }
+
+        private sealed record HeadReliabilitySplitResult(
+            int[] Labels,
+            int SplitClusterCount,
+            int FinalClusterCount);
+
+        private static SameSourceCohesionResult ApplySameSourcePageCohesion(
+            IReadOnlyList<int> assignments,
+            IReadOnlyList<ImageStyleResult> results)
+        {
+            if (assignments.Count != results.Count)
+            {
+                throw new InvalidOperationException("聚类标签数量与图片数量不一致。");
+            }
+
+            var labels = assignments.ToArray();
+            int changedImages = 0;
+            int changedGroups = 0;
+            var groups = Enumerable.Range(0, results.Count)
+                .Select(index => new
+                {
+                    Index = index,
+                    Key = TryGetSameSourcePageKey(results[index].FilePath)
+                })
+                .Where(item => !string.IsNullOrWhiteSpace(item.Key) && labels[item.Index] >= 0)
+                .GroupBy(item => item.Key!)
+                .Where(group => group.Count() >= 2);
+
+            foreach (var group in groups)
+            {
+                var indices = group.Select(item => item.Index).ToArray();
+                var labelCounts = indices
+                    .GroupBy(index => labels[index])
+                    .Select(labelGroup => new
+                    {
+                        Label = labelGroup.Key,
+                        Count = labelGroup.Count()
+                    })
+                    .OrderByDescending(item => item.Count)
+                    .ThenBy(item => item.Label)
+                    .ToArray();
+                if (labelCounts.Length <= 1 || labelCounts[0].Count < 2)
+                {
+                    continue;
+                }
+
+                int targetLabel = labelCounts[0].Label;
+                bool changedThisGroup = false;
+                foreach (int index in indices)
+                {
+                    if (labels[index] == targetLabel)
+                    {
+                        continue;
+                    }
+
+                    labels[index] = targetLabel;
+                    changedImages++;
+                    changedThisGroup = true;
+                }
+
+                if (changedThisGroup)
+                {
+                    changedGroups++;
+                }
+            }
+
+            int finalClusterCount = labels.Where(label => label >= 0).Distinct().Count();
+            return new SameSourceCohesionResult(labels, changedImages, changedGroups, finalClusterCount);
+        }
+
+        private static string? TryGetSameSourcePageKey(string filePath)
+        {
+            string name = Path.GetFileNameWithoutExtension(filePath);
+            int pageMarker = name.LastIndexOf("_p", StringComparison.OrdinalIgnoreCase);
+            if (pageMarker <= 0 || pageMarker + 2 >= name.Length)
+            {
+                return null;
+            }
+
+            bool hasPageNumber = true;
+            for (int i = pageMarker + 2; i < name.Length; i++)
+            {
+                if (!char.IsDigit(name[i]))
+                {
+                    hasPageNumber = false;
+                    break;
+                }
+            }
+
+            if (!hasPageNumber)
+            {
+                return null;
+            }
+
+            int idStart = pageMarker - 1;
+            while (idStart >= 0 && char.IsDigit(name[idStart]))
+            {
+                idStart--;
+            }
+
+            int idLength = pageMarker - idStart - 1;
+            if (idLength < 6)
+            {
+                return null;
+            }
+
+            return name.Substring(idStart + 1, idLength);
+        }
+
+        private sealed record SameSourceCohesionResult(
+            int[] Labels,
+            int ChangedImageCount,
+            int ChangedGroupCount,
+            int FinalClusterCount);
 
         private sealed class ClusterExportPlan
         {
