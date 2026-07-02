@@ -120,7 +120,7 @@
                                 <TextBlock Text="拖入 cuDNN zip 安装包"
                                            Style="{StaticResource CyanSectionTitleStyle}"
                                            FontSize="15"/>
-                                <TextBlock Text="{Binding CudnnPackageStatus}"
+                                <TextBlock Text="{Binding CudnnPackageStatus, Converter={StaticResource LocalizedTextConverter}}"
                                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                            Margin="0,4,0,0"/>
                             </StackPanel>
@@ -149,7 +149,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding NvidiaAppStatus}"
+                    <TextBlock Text="{Binding NvidiaAppStatus, Converter={StaticResource LocalizedTextConverter}}"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                VerticalAlignment="Center"/>
                     <Button Grid.Column="1"
@@ -203,9 +203,14 @@
                         <ComboBox Grid.Column="1"
                                   ItemsSource="{Binding DiffusionPipeMirrorOptions}"
                                   SelectedItem="{Binding SelectedDiffusionPipeMirror}"
-                                  DisplayMemberPath="Label"
                                   MinHeight="32"
-                                  Margin="0,0,14,0"/>
+                                  Margin="0,0,14,0">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
 
                         <TextBlock Grid.Column="2"
                                    Text="WSL 本地代理端口"
@@ -216,7 +221,7 @@
                                  Margin="0,0,14,0"/>
 
                         <TextBlock Grid.Column="4"
-                                   Text="{Binding DiffusionPipeStatus}"
+                                   Text="{Binding DiffusionPipeStatus, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                    VerticalAlignment="Center"
                                    TextWrapping="Wrap"/>

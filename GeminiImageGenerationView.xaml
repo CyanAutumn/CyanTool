@@ -59,12 +59,12 @@
                                 Margin="18,0,0,0">
                         <TextBlock Text="状态"
                                    Style="{StaticResource CyanTinyTextBlockStyle}"/>
-                        <TextBlock Text="{Binding StatusMessage}"
+                        <TextBlock Text="{Binding StatusMessage, Converter={StaticResource LocalizedTextConverter}}"
                                    TextWrapping="Wrap"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                    Margin="0,4,0,0"/>
-                        <TextBlock Text="{Binding QueueStatusText}"
+                        <TextBlock Text="{Binding QueueStatusText, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanTinyTextBlockStyle}"
                                    Margin="0,4,0,0"/>
                     </StackPanel>
@@ -379,8 +379,13 @@
                                       Grid.Column="1"
                                       ItemsSource="{Binding ImageSizeOptions}"
                                       SelectedItem="{Binding SelectedImageSizeOption}"
-                                      DisplayMemberPath="Display"
-                                      Margin="0,10,10,0"/>
+                                      Margin="0,10,10,0">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Display, Converter={StaticResource LocalizedTextConverter}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <TextBlock Grid.Row="1"
                                        Grid.Column="3"
                                        Text="宽高比"
@@ -390,8 +395,13 @@
                                       Grid.Column="4"
                                       ItemsSource="{Binding AspectRatioOptions}"
                                       SelectedItem="{Binding SelectedAspectRatioOption}"
-                                      DisplayMemberPath="Display"
-                                      Margin="0,10,0,0"/>
+                                      Margin="0,10,0,0">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Display, Converter={StaticResource LocalizedTextConverter}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
 
                             <TextBlock Grid.Row="2"
                                        Text="批量间隔"

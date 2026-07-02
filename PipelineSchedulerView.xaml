@@ -122,7 +122,7 @@
 
         <DataTemplate x:Key="ConnectorHeaderTemplate"
                       DataType="{x:Type viewModel:PipelineCanvasConnectorViewModel}">
-            <TextBlock Text="{Binding Title}"
+            <TextBlock Text="{Binding Title, Converter={StaticResource LocalizedTextConverter}}"
                        FontSize="12"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        TextTrimming="CharacterEllipsis" />
@@ -281,7 +281,7 @@
                                   Tag="{Binding}">
                             <MenuItem.ItemContainerStyle>
                                 <Style TargetType="{x:Type MenuItem}">
-                                    <Setter Property="Header" Value="{Binding DisplayName}" />
+                                    <Setter Property="Header" Value="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
                                     <Setter Property="Command" Value="{Binding Tag.AddNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type MenuItem}}}" />
                                     <Setter Property="CommandParameter" Value="{Binding}" />
                                 </Style>
@@ -339,7 +339,7 @@
                                         </MenuItem.Icon>
                                         <MenuItem.ItemContainerStyle>
                                             <Style TargetType="{x:Type MenuItem}">
-                                                <Setter Property="Header" Value="{Binding DisplayName}" />
+                                                <Setter Property="Header" Value="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
                                                 <Setter Property="Command" Value="{Binding Tag.AddNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type MenuItem}}}" />
                                                 <Setter Property="CommandParameter" Value="{Binding}" />
                                             </Style>
@@ -362,11 +362,11 @@
                                                        VerticalAlignment="Center"
                                                        Margin="0,0,8,0" />
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="{Binding DisplayName}"
+                                            <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}"
                                                        Foreground="White"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding DirectoryBehaviorText}"
+                                            <TextBlock Text="{Binding DirectoryBehaviorText, Converter={StaticResource LocalizedTextConverter}}"
                                                        Foreground="{StaticResource CyanNodeHeaderSecondaryBrush}"
                                                        FontSize="11"
                                                        TextTrimming="CharacterEllipsis" />

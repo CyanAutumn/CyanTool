@@ -41,7 +41,13 @@
                         <Setter.Value>
                             <DataTemplate>
                                 <ComboBox ItemsSource="{Binding Options}"
-                                          SelectedItem="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                          SelectedItem="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource LocalizedTextConverter}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </DataTemplate>
                         </Setter.Value>
                     </Setter>
@@ -219,7 +225,7 @@
                           Margin="0,0,0,4">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Expander Header="{Binding DisplayName}"
+                        <Expander Header="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}"
                                   IsExpanded="True"
                                   Style="{StaticResource CyanExpanderStyle}">
                             <Border Style="{StaticResource CyanCardStyle}"
@@ -237,11 +243,11 @@
 
                                                     <StackPanel Grid.Column="0"
                                                                 Margin="0,0,18,0">
-                                                        <TextBlock Text="{Binding DisplayLabel}"
+                                                        <TextBlock Text="{Binding DisplayLabel, Converter={StaticResource LocalizedTextConverter}}"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                    TextWrapping="Wrap" />
-                                                        <TextBlock Text="{Binding Description}"
+                                                        <TextBlock Text="{Binding Description, Converter={StaticResource LocalizedTextConverter}}"
                                                                    Style="{StaticResource CyanTinyTextBlockStyle}"
                                                                    Margin="0,4,0,0" />
                                                     </StackPanel>

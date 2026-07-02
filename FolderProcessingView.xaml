@@ -139,12 +139,17 @@
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailableOperations}"
                               SelectedValuePath="Operation"
-                              DisplayMemberPath="DisplayName"
                               SelectedValue="{Binding SelectedOperation}"
-                              Margin="0,0,14,0" />
+                              Margin="0,0,14,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
                     <TextBlock Grid.Column="2"
-                               Text="{Binding ParameterLabel}"
+                               Text="{Binding ParameterLabel, Converter={StaticResource LocalizedTextConverter}}"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Visibility="{Binding IsParameterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <TextBox Grid.Column="3"

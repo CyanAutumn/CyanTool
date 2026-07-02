@@ -161,7 +161,13 @@
                               Grid.Column="1"
                               ItemsSource="{Binding FeatureTypes}"
                               SelectedItem="{Binding SelectedFeatureType}"
-                              Margin="0,12,12,0"/>
+                              Margin="0,12,12,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource LocalizedTextConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <TextBlock Grid.Row="1"
                                Grid.Column="2"
                                Text="聚类算法"
@@ -181,7 +187,13 @@
                               Grid.Column="1"
                               ItemsSource="{Binding ClusteringSpaces}"
                               SelectedItem="{Binding SelectedClusteringSpace}"
-                              Margin="0,12,12,0"/>
+                              Margin="0,12,12,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource LocalizedTextConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <CheckBox Grid.Row="2"
                               Grid.Column="2"
                               Grid.ColumnSpan="2"

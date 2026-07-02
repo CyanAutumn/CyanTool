@@ -147,7 +147,7 @@
                 <TextBlock Grid.Row="0"
                            Grid.Column="0"
                            Grid.ColumnSpan="4"
-                           Text="{Binding StatusMessage}"
+                           Text="{Binding StatusMessage, Converter={StaticResource LocalizedTextConverter}}"
                            Style="{StaticResource CyanTinyTextBlockStyle}"
                            Margin="0,0,0,10" />
 

@@ -173,7 +173,13 @@
                               IsEnabled="{Binding IsIdle}"
                               ItemsSource="{Binding ExistingTxtConflictOptions}"
                               SelectedItem="{Binding SelectedExistingTxtConflictOption}"
-                              DisplayMemberPath="DisplayName"/>
+                              MinHeight="32">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <TextBlock Grid.Column="2"
                                Text="通用阈值"
                                Style="{StaticResource CyanFormLabelStyle}"

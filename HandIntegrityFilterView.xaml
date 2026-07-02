@@ -176,8 +176,13 @@
                                       Grid.ColumnSpan="3"
                                       ItemsSource="{Binding DetectorModels}"
                                       SelectedItem="{Binding SelectedDetectorModel}"
-                                      DisplayMemberPath="DisplayName"
-                                      Margin="0,0,0,8" />
+                                      Margin="0,0,0,8">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
@@ -188,8 +193,13 @@
                                       Grid.ColumnSpan="3"
                                       ItemsSource="{Binding LandmarkModels}"
                                       SelectedItem="{Binding SelectedLandmarkModel}"
-                                      DisplayMemberPath="DisplayName"
-                                      Margin="0,0,0,12" />
+                                      Margin="0,0,0,12">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
 
                             <TextBlock Grid.Row="3"
                                        Grid.Column="0"
@@ -291,7 +301,13 @@
                                       Grid.Column="1"
                                       ItemsSource="{Binding OutputModes}"
                                       SelectedItem="{Binding SelectedOutputMode}"
-                                      Margin="0,0,12,8" />
+                                      Margin="0,0,12,8">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource LocalizedTextConverter}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <TextBlock Grid.Row="1"
                                        Grid.Column="2"
                                        Text="裁剪缩放"

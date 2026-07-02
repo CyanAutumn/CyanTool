@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -48,6 +49,12 @@ namespace CyanTools.Localization
 
         private static bool _classHandlerRegistered;
         private static AppLanguage _currentLanguage = AppLanguage.Chinese;
+        private static List<DynamicTranslationPattern>? _dynamicTranslationPatterns;
+
+        static LocalizationManager()
+        {
+            LocalizationSupplement.AddTo(Translations);
+        }
 
         public static event EventHandler? LanguageChanged;
 
@@ -105,7 +112,7 @@ namespace CyanTools.Localization
 
             if (!Translations.TryGetValue(source, out var text))
             {
-                return source;
+                return TranslateDynamic(source);
             }
 
             return _currentLanguage switch
@@ -119,6 +126,92 @@ namespace CyanTools.Localization
         public static string Format(string source, params object[] args)
         {
             return string.Format(CultureInfo.CurrentCulture, Translate(source), args);
+        }
+
+        private static string TranslateDynamic(string source)
+        {
+            foreach (var pattern in GetDynamicTranslationPatterns())
+            {
+                var match = pattern.Regex.Match(source);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var args = new object[match.Groups.Count - 1];
+                for (var i = 1; i < match.Groups.Count; i++)
+                {
+                    args[i - 1] = match.Groups[i].Value;
+                }
+
+                var template = _currentLanguage switch
+                {
+                    AppLanguage.English => pattern.Text.English,
+                    AppLanguage.Japanese => pattern.Text.Japanese,
+                    _ => pattern.Source
+                };
+
+                return string.Format(CultureInfo.CurrentCulture, template, args);
+            }
+
+            return source;
+        }
+
+        private static IReadOnlyList<DynamicTranslationPattern> GetDynamicTranslationPatterns()
+        {
+            if (_dynamicTranslationPatterns != null)
+            {
+                return _dynamicTranslationPatterns;
+            }
+
+            var patterns = new List<DynamicTranslationPattern>();
+            foreach (var (source, text) in Translations)
+            {
+                if (!source.Contains('{') || !source.Contains('}'))
+                {
+                    continue;
+                }
+
+                var regexPattern = BuildDynamicRegexPattern(source);
+                if (regexPattern != null)
+                {
+                    patterns.Add(new DynamicTranslationPattern(
+                        source,
+                        text,
+                        new Regex(regexPattern, RegexOptions.CultureInvariant)));
+                }
+            }
+
+            _dynamicTranslationPatterns = patterns;
+            return patterns;
+        }
+
+        private static string? BuildDynamicRegexPattern(string source)
+        {
+            var matches = Regex.Matches(source, @"\{[^{}]+\}");
+            if (matches.Count == 0)
+            {
+                return null;
+            }
+
+            var pattern = "^";
+            var position = 0;
+            foreach (Match match in matches)
+            {
+                var placeholder = match.Value[1..^1].Split(':')[0];
+                if (!int.TryParse(placeholder, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                {
+                    return null;
+                }
+
+                pattern += Regex.Escape(source[position..match.Index]);
+                pattern += "(.*?)";
+                position = match.Index + match.Length;
+            }
+
+            pattern += Regex.Escape(source[position..]);
+            pattern += "$";
+            return pattern;
         }
 
         public static void ApplyTo(DependencyObject? root)
@@ -185,6 +278,7 @@ namespace CyanTools.Localization
         {
             if (BindingOperations.IsDataBound(textBlock, TextBlock.TextProperty))
             {
+                textBlock.GetBindingExpression(TextBlock.TextProperty)?.UpdateTarget();
                 return;
             }
 
@@ -218,6 +312,7 @@ namespace CyanTools.Localization
         {
             if (BindingOperations.IsDataBound(contentControl, ContentControl.ContentProperty))
             {
+                contentControl.GetBindingExpression(ContentControl.ContentProperty)?.UpdateTarget();
                 return;
             }
 
@@ -237,6 +332,7 @@ namespace CyanTools.Localization
         {
             if (BindingOperations.IsDataBound(control, HeaderedContentControl.HeaderProperty))
             {
+                control.GetBindingExpression(HeaderedContentControl.HeaderProperty)?.UpdateTarget();
                 return;
             }
 
@@ -256,6 +352,7 @@ namespace CyanTools.Localization
         {
             if (BindingOperations.IsDataBound(control, HeaderedItemsControl.HeaderProperty))
             {
+                control.GetBindingExpression(HeaderedItemsControl.HeaderProperty)?.UpdateTarget();
                 return;
             }
 
@@ -275,6 +372,7 @@ namespace CyanTools.Localization
         {
             if (BindingOperations.IsDataBound(element, FrameworkElement.ToolTipProperty))
             {
+                element.GetBindingExpression(FrameworkElement.ToolTipProperty)?.UpdateTarget();
                 return;
             }
 
@@ -398,7 +496,9 @@ namespace CyanTools.Localization
             };
         }
 
-        private readonly record struct LocalizedText(string English, string Japanese);
+        internal readonly record struct LocalizedText(string English, string Japanese);
+
+        private sealed record DynamicTranslationPattern(string Source, LocalizedText Text, Regex Regex);
 
         private static readonly Dictionary<string, LocalizedText> Translations = new(StringComparer.Ordinal)
         {

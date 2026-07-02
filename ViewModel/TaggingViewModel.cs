@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Localization;
 using CyanTools.Pipeline;
 using CyanTools.Utils;
 using CyanTools;
@@ -179,8 +180,8 @@ namespace CyanTools.ViewModel
                 if (existing != null)
                 {
                     var result = MessageBox.Show(
-                        $"已存在同名打标器：{existing.DisplayName}，是否覆盖？",
-                        "添加打标器",
+                        LocalizationManager.Format("已存在同名打标器：{0}，是否覆盖？", existing.DisplayName),
+                        LocalizationManager.Translate("添加打标器"),
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
 

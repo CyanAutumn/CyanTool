@@ -186,7 +186,7 @@
                                    Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
                 </Border>
                 <TextBlock Grid.Column="1"
-                           Text="{Binding StatusText}"
+                           Text="{Binding StatusText, Converter={StaticResource LocalizedTextConverter}}"
                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                            VerticalAlignment="Center"/>
             </Grid>
