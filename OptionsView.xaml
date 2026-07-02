@@ -13,6 +13,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="320"/>
             </Grid.RowDefinitions>
 
@@ -173,6 +174,125 @@
             </GroupBox>
 
             <GroupBox Grid.Row="3"
+                      Header="diffusion-pipe / WSL2"
+                      Margin="0,0,0,12"
+                      Style="{StaticResource CyanGroupBoxStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="在 Ubuntu WSL2 中部署 tdrussell/diffusion-pipe：安装 WSL/Ubuntu、准备基础依赖、克隆仓库、创建 cu128 conda 环境、安装 torch/flash-attn、应用 Anima 补丁并执行 1 step smoke 训练。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               TextWrapping="Wrap"/>
+
+                    <Grid Grid.Row="1"
+                          Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="镜像源"
+                                   Style="{StaticResource CyanFormLabelStyle}"/>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding DiffusionPipeMirrorOptions}"
+                                  SelectedItem="{Binding SelectedDiffusionPipeMirror}"
+                                  DisplayMemberPath="Label"
+                                  MinHeight="32"
+                                  Margin="0,0,14,0"/>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="WSL 本地代理端口"
+                                   Style="{StaticResource CyanFormLabelStyle}"/>
+                        <TextBox Grid.Column="3"
+                                 Text="{Binding DiffusionPipeProxyPort, UpdateSourceTrigger=PropertyChanged}"
+                                 MinHeight="32"
+                                 Margin="0,0,14,0"/>
+
+                        <TextBlock Grid.Column="4"
+                                   Text="{Binding DiffusionPipeStatus}"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap"/>
+                    </Grid>
+
+                    <WrapPanel Grid.Row="2"
+                               Margin="0,12,0,0">
+                        <Button Command="{Binding CheckDiffusionPipeCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="CheckmarkCircle24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="检测 WSL 环境"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding InstallWslCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowDownload24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="安装 WSL"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding InstallUbuntuCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowDownload24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="安装 Ubuntu 子系统"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding InstallDiffusionPipeCommand}"
+                                Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowDownload24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="安装 diffusion-pipe"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ValidateDiffusionPipeCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="CheckmarkCircle24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="校验"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding UpdateDiffusionPipeCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowSync24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="更新"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ReinstallDiffusionPipeCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowSync24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="重装"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DeleteUbuntuCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Delete24"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="删除 Ubuntu"/>
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Row="4"
                       Header="日志"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <ListBox ItemsSource="{Binding LogLines}"

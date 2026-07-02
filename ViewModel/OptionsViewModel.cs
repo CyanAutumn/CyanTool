@@ -17,24 +17,45 @@ namespace CyanTools.ViewModel
     public sealed class OptionsViewModel : INotifyPropertyChanged
     {
         private const int MaxLogLines = 300;
+        private readonly DiffusionPipeWslDeployer _diffusionPipeDeployer = new();
         private bool _isBusy;
         private string _cudnnPackageStatus = "拖入 NVIDIA cuDNN 9 的 Windows zip 安装包，或点击选择文件。";
         private string _nvidiaAppStatus = "尚未检测。";
+        private string _diffusionPipeStatus = "尚未检测 diffusion-pipe / WSL2 环境。";
+        private string _diffusionPipeProxyPort = "7890";
+        private DiffusionPipeMirrorOption _selectedDiffusionPipeMirror = null!;
 
         public OptionsViewModel()
         {
             LogLines = new ObservableCollection<string>();
+            DiffusionPipeMirrorOptions = new ObservableCollection<DiffusionPipeMirrorOption>
+            {
+                new("default", "官方源"),
+                new("tsinghua", "清华 TUNA"),
+                new("aliyun", "阿里云")
+            };
+            _selectedDiffusionPipeMirror = DiffusionPipeMirrorOptions[0];
+
             CheckCudaCommand = new RelayCommand(async _ => await CheckOrInstallCudaAsync(), _ => !IsBusy);
             InstallCudaToolkitCommand = new RelayCommand(_ => TryLaunchWingetCudaInstall(), _ => !IsBusy);
             OpenCudaCudnnPagesCommand = new RelayCommand(_ => OpenCudaInstallPages(), _ => !IsBusy);
             SelectCudnnPackageCommand = new RelayCommand(async _ => await SelectAndInstallCudnnPackageAsync(), _ => !IsBusy);
             RefreshNvidiaAppStatusCommand = new RelayCommand(_ => RefreshNvidiaAppStatus(), _ => !IsBusy);
             OpenNvidiaAppPageCommand = new RelayCommand(_ => OpenNvidiaAppPage(), _ => !IsBusy);
+            CheckDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Check), _ => !IsBusy);
+            InstallWslCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.InstallWsl), _ => !IsBusy);
+            InstallUbuntuCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.InstallUbuntu), _ => !IsBusy);
+            InstallDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Install), _ => !IsBusy);
+            ValidateDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Validate), _ => !IsBusy);
+            UpdateDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Update), _ => !IsBusy);
+            ReinstallDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Reinstall), _ => !IsBusy);
+            DeleteUbuntuCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.DeleteUbuntu), _ => !IsBusy);
 
             RefreshNvidiaAppStatus();
         }
 
         public ObservableCollection<string> LogLines { get; }
+        public ObservableCollection<DiffusionPipeMirrorOption> DiffusionPipeMirrorOptions { get; }
 
         public bool IsBusy
         {
@@ -60,12 +81,38 @@ namespace CyanTools.ViewModel
             set => SetField(ref _nvidiaAppStatus, value);
         }
 
+        public string DiffusionPipeStatus
+        {
+            get => _diffusionPipeStatus;
+            set => SetField(ref _diffusionPipeStatus, value);
+        }
+
+        public string DiffusionPipeProxyPort
+        {
+            get => _diffusionPipeProxyPort;
+            set => SetField(ref _diffusionPipeProxyPort, value);
+        }
+
+        public DiffusionPipeMirrorOption SelectedDiffusionPipeMirror
+        {
+            get => _selectedDiffusionPipeMirror;
+            set => SetField(ref _selectedDiffusionPipeMirror, value);
+        }
+
         public ICommand CheckCudaCommand { get; }
         public ICommand InstallCudaToolkitCommand { get; }
         public ICommand OpenCudaCudnnPagesCommand { get; }
         public ICommand SelectCudnnPackageCommand { get; }
         public ICommand RefreshNvidiaAppStatusCommand { get; }
         public ICommand OpenNvidiaAppPageCommand { get; }
+        public ICommand CheckDiffusionPipeCommand { get; }
+        public ICommand InstallWslCommand { get; }
+        public ICommand InstallUbuntuCommand { get; }
+        public ICommand InstallDiffusionPipeCommand { get; }
+        public ICommand ValidateDiffusionPipeCommand { get; }
+        public ICommand UpdateDiffusionPipeCommand { get; }
+        public ICommand ReinstallDiffusionPipeCommand { get; }
+        public ICommand DeleteUbuntuCommand { get; }
 
         public async Task InstallCudnnPackageAsync(string packagePath)
         {
@@ -504,6 +551,135 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private async Task RunDiffusionPipeActionAsync(DiffusionPipeWslAction action)
+        {
+            if (!ConfirmDiffusionPipeAction(action))
+            {
+                return;
+            }
+
+            int? proxyPort = ParseDiffusionPipeProxyPort();
+            if (proxyPort == -1)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                DiffusionPipeStatus = GetDiffusionPipeRunningStatus(action);
+                AddLog(DiffusionPipeStatus);
+
+                var options = new DiffusionPipeWslOptions(
+                    SelectedDiffusionPipeMirror?.Id ?? "default",
+                    proxyPort);
+
+                await _diffusionPipeDeployer.RunAsync(
+                    action,
+                    options,
+                    new Progress<string>(AddLog));
+
+                DiffusionPipeStatus = GetDiffusionPipeCompletedStatus(action);
+                AddLog(DiffusionPipeStatus);
+            }
+            catch (OperationCanceledException)
+            {
+                DiffusionPipeStatus = "diffusion-pipe 操作已取消。";
+                AddLog(DiffusionPipeStatus);
+            }
+            catch (Exception ex)
+            {
+                DiffusionPipeStatus = $"diffusion-pipe 操作失败: {ex.Message}";
+                AddLog(DiffusionPipeStatus);
+                MessageBox.Show(
+                    $"{ex.Message}\n\n请查看选项页日志。WSL/Ubuntu 安装步骤可能需要管理员权限或重启 Windows。",
+                    "diffusion-pipe / WSL2",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private bool ConfirmDiffusionPipeAction(DiffusionPipeWslAction action)
+        {
+            if (action == DiffusionPipeWslAction.DeleteUbuntu)
+            {
+                return MessageBox.Show(
+                    "确认删除 Ubuntu 子系统？\n\n注意：这会删除 Ubuntu 子系统内的全部数据。",
+                    "删除 Ubuntu 子系统",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) == MessageBoxResult.Yes;
+            }
+
+            if (action == DiffusionPipeWslAction.Reinstall)
+            {
+                return MessageBox.Show(
+                    "确认重装 diffusion-pipe？\n\n这会删除旧的 ~/diffusion-pipe 仓库和 diffusion-pipe-cu128 conda 环境，但不会删除 Ubuntu 子系统。",
+                    "重装 diffusion-pipe",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) == MessageBoxResult.Yes;
+            }
+
+            return true;
+        }
+
+        private int? ParseDiffusionPipeProxyPort()
+        {
+            if (string.IsNullOrWhiteSpace(DiffusionPipeProxyPort))
+            {
+                return null;
+            }
+
+            if (!int.TryParse(DiffusionPipeProxyPort.Trim(), out int port) ||
+                port < 0 ||
+                port > 65535)
+            {
+                MessageBox.Show(
+                    "WSL 本地代理端口必须是 0-65535 的整数；填 0 或留空表示不使用代理。",
+                    "diffusion-pipe / WSL2",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return -1;
+            }
+
+            return port == 0 ? null : port;
+        }
+
+        private static string GetDiffusionPipeRunningStatus(DiffusionPipeWslAction action)
+        {
+            return action switch
+            {
+                DiffusionPipeWslAction.Check => "正在检测 diffusion-pipe / WSL2 环境...",
+                DiffusionPipeWslAction.InstallWsl => "正在安装或启用 Windows WSL 功能...",
+                DiffusionPipeWslAction.InstallUbuntu => "正在安装或初始化 Ubuntu 子系统...",
+                DiffusionPipeWslAction.Install => "正在部署 diffusion-pipe / WSL2 环境...",
+                DiffusionPipeWslAction.Validate => "正在校验 diffusion-pipe / WSL2 环境...",
+                DiffusionPipeWslAction.Update => "正在更新 diffusion-pipe / WSL2 环境...",
+                DiffusionPipeWslAction.Reinstall => "正在重装 diffusion-pipe / WSL2 环境...",
+                DiffusionPipeWslAction.DeleteUbuntu => "正在删除 Ubuntu 子系统...",
+                _ => "正在执行 diffusion-pipe 操作..."
+            };
+        }
+
+        private static string GetDiffusionPipeCompletedStatus(DiffusionPipeWslAction action)
+        {
+            return action switch
+            {
+                DiffusionPipeWslAction.Check => "diffusion-pipe / WSL2 环境检测完成。",
+                DiffusionPipeWslAction.InstallWsl => "WSL 功能安装命令已完成；如系统提示，请重启 Windows。",
+                DiffusionPipeWslAction.InstallUbuntu => "Ubuntu 子系统已就绪。",
+                DiffusionPipeWslAction.Install => "diffusion-pipe / WSL2 部署完成。",
+                DiffusionPipeWslAction.Validate => "diffusion-pipe / WSL2 校验完成。",
+                DiffusionPipeWslAction.Update => "diffusion-pipe / WSL2 更新完成。",
+                DiffusionPipeWslAction.Reinstall => "diffusion-pipe / WSL2 重装完成。",
+                DiffusionPipeWslAction.DeleteUbuntu => "Ubuntu 子系统删除流程完成。",
+                _ => "diffusion-pipe 操作完成。"
+            };
+        }
+
         private void RaiseCommandStates()
         {
             (CheckCudaCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -512,6 +688,14 @@ namespace CyanTools.ViewModel
             (SelectCudnnPackageCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (RefreshNvidiaAppStatusCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (OpenNvidiaAppPageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (CheckDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (InstallWslCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (InstallUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (InstallDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (ValidateDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (UpdateDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (ReinstallDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeleteUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
         private void AddLog(string message)
@@ -547,5 +731,17 @@ namespace CyanTools.ViewModel
         }
 
         private sealed record CudnnInstallResult(string StatusMessage, string LogMessage);
+
+        public sealed class DiffusionPipeMirrorOption
+        {
+            public DiffusionPipeMirrorOption(string id, string label)
+            {
+                Id = id;
+                Label = label;
+            }
+
+            public string Id { get; }
+            public string Label { get; }
+        }
     }
 }
