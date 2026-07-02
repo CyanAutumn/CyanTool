@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <Compile Remove="Utils\TaggingProcessor-DESKTOP-AIAI78G.cs" />
+    <Compile Remove="Utils\ImageClusteringProcessor-DESKTOP-16EQG8U.cs" />
     <Compile Remove="ViewModel\TaggingViewModel-DESKTOP-AIAI78G.cs" />
     <None Remove="TaggingView-DESKTOP-AIAI78G.xaml" />
     <Page Remove="TaggingView-DESKTOP-AIAI78G.xaml" />

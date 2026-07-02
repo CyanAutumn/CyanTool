@@ -72,36 +72,7 @@
                         <Border Grid.Column="1"
                                 Margin="22,0"
                                 Background="Transparent"
-                                MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown">
-                            <StackPanel Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <Border Style="{StaticResource CyanPillStyle}"
-                                        Margin="0,0,8,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Sparkle24"
-                                                       FontSize="14"
-                                                       Margin="0,0,6,0"
-                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                        <TextBlock Text="WPF UI"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                    </StackPanel>
-                                </Border>
-                                <Border Style="{StaticResource CyanPillStyle}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="BranchFork24"
-                                                       FontSize="14"
-                                                       Margin="0,0,6,0"
-                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                        <TextBlock Text="管道就绪"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Border>
+                                MouseLeftButtonDown="TitleDragArea_MouseLeftButtonDown" />
 
                         <Border Grid.Column="2"
                                 Style="{StaticResource CyanPillStyle}"
@@ -188,7 +159,7 @@
                                    OpenPaneLength="272"
                                    CompactPaneLength="58"
                                    FrameMargin="20,14,20,20"
-                                   HeaderVisibility="Visible"
+                                   HeaderVisibility="Collapsed"
                                    Background="Transparent"
                                    SelectionChanged="RootNavigationView_SelectionChanged" />
             </Border>
