@@ -90,37 +90,6 @@
                             <TextBlock Margin="0,4">
                                 <Hyperlink NavigateUri="https://space.bilibili.com/14695635"
                                            RequestNavigate="Hyperlink_RequestNavigate">今宵</Hyperlink>
-                                <Run Text=" - 视频教程制作与分辨率归类思路" />
-                            </TextBlock>
-                            <TextBlock Margin="0,4">
-                                <Hyperlink NavigateUri="https://huggingface.co/SmilingWolf"
-                                           RequestNavigate="Hyperlink_RequestNavigate">SmilingWolf</Hyperlink>
-                                <Run Text=" - 打标模型来源" />
-                            </TextBlock>
-                            <TextBlock Margin="0,4">
-                                <Hyperlink NavigateUri="https://huggingface.co/deepghs"
-                                           RequestNavigate="Hyperlink_RequestNavigate">DeepGHS</Hyperlink>
-                                <Run Text=" - 图片三分法与打标模型来源" />
-                            </TextBlock>
-                            <TextBlock Margin="0,4">
-                                <Hyperlink NavigateUri="https://github.com/lltcggie/waifu2x-caffe"
-                                           RequestNavigate="Hyperlink_RequestNavigate">lltcggie / waifu2x-caffe</Hyperlink>
-                                <Run Text=" - 图片放大项目" />
-                            </TextBlock>
-                            <TextBlock Margin="0,4">
-                                <Hyperlink NavigateUri="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan"
-                                           RequestNavigate="Hyperlink_RequestNavigate">xinntao / Real-ESRGAN-ncnn-vulkan</Hyperlink>
-                                <Run Text=" - 图片超分项目" />
-                            </TextBlock>
-                            <TextBlock Margin="0,4">
-                                <Hyperlink NavigateUri="https://huggingface.co/yuxi-liu-wired/CSD/tree/main/CSD"
-                                           RequestNavigate="Hyperlink_RequestNavigate">yuxi-liu-wired / CSD</Hyperlink>
-                                <Run Text=" - 图片聚类模型来源" />
-                            </TextBlock>
-                            <TextBlock Margin="0,4">
-                                <Hyperlink NavigateUri="https://www.pixiv.net/users/84376185"
-                                           RequestNavigate="Hyperlink_RequestNavigate">Rnglg2</Hyperlink>
-                                <Run Text=" - 高斯模糊反下毒思路" />
                             </TextBlock>
                         </StackPanel>
                     </Grid>
