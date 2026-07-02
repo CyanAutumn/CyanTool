@@ -164,9 +164,28 @@ namespace CyanTools
             }
 
             var pageEntries = entries.Where(entry => !entry.IsHome && entry.Metadata != null).ToList();
+            var standaloneEntries = pageEntries
+                .Where(IsStandaloneTopLevelEntry)
+                .OrderBy(entry => entry.Metadata?.Order ?? 0)
+                .ToList();
+            foreach (var entry in standaloneEntries)
+            {
+                var item = CreateNavigationItem(entry);
+                RootNavigationView.MenuItems.Add(item);
+                _navigationItems[item] = entry;
+
+                if (previousEntry != null && IsSameEntry(previousEntry, entry))
+                {
+                    activeItem = item;
+                }
+            }
+
+            var groupedPageEntries = pageEntries
+                .Where(entry => !IsStandaloneTopLevelEntry(entry))
+                .ToList();
             foreach (var category in NavigationCategories)
             {
-                var categoryEntries = pageEntries
+                var categoryEntries = groupedPageEntries
                     .Where(entry => entry.Metadata?.Category == category.Category)
                     .OrderBy(entry => entry.Metadata?.Order ?? 0)
                     .ToList();
@@ -193,6 +212,11 @@ namespace CyanTools
             }
 
             MarkActiveItem(activeItem);
+        }
+
+        private static bool IsStandaloneTopLevelEntry(NavigationMenuEntry entry)
+        {
+            return entry.Metadata?.ControlType == typeof(PipelineSchedulerView);
         }
 
         private static NavigationViewItem CreateCategoryItem(NavigationCategoryDefinition category)
@@ -525,24 +549,24 @@ namespace CyanTools
         {
             if (useDarkTheme)
             {
-                SetSolidBrush("CyanShellBackgroundBrush", Color.FromRgb(9, 14, 24));
-                SetSolidBrush("CyanTopBarBackgroundBrush", Color.FromArgb(232, 15, 23, 42));
-                SetSolidBrush("CyanNavigationShellBrush", Color.FromArgb(216, 12, 19, 33));
-                SetSolidBrush("CyanSurfaceElevatedBrush", Color.FromRgb(18, 28, 46));
-                SetSolidBrush("CyanSurfaceHoverBrush", Color.FromRgb(27, 39, 63));
-                SetSolidBrush("CyanMutedAccentBrush", Color.FromArgb(46, 0, 194, 168));
-                SetSolidBrush("CyanNodeHeaderBrush", Color.FromRgb(20, 184, 166));
-                SetSolidBrush("CyanBadgeBackgroundBrush", Color.FromArgb(212, 15, 23, 42));
+                SetSolidBrush("CyanShellBackgroundBrush", Color.FromRgb(9, 9, 11));
+                SetSolidBrush("CyanTopBarBackgroundBrush", Color.FromArgb(238, 15, 15, 17));
+                SetSolidBrush("CyanNavigationShellBrush", Color.FromArgb(224, 12, 12, 14));
+                SetSolidBrush("CyanSurfaceElevatedBrush", Color.FromRgb(22, 22, 24));
+                SetSolidBrush("CyanSurfaceHoverBrush", Color.FromRgb(32, 32, 35));
+                SetSolidBrush("CyanMutedAccentBrush", Color.FromArgb(44, 0, 194, 168));
+                SetSolidBrush("CyanNodeHeaderBrush", Color.FromRgb(26, 27, 30));
+                SetSolidBrush("CyanBadgeBackgroundBrush", Color.FromArgb(222, 28, 28, 31));
                 SetGradientBrush(
                     "CyanShellGradientBrush",
-                    (Color.FromRgb(9, 14, 24), 0),
-                    (Color.FromRgb(13, 23, 42), 0.55),
-                    (Color.FromRgb(28, 20, 48), 1));
+                    (Color.FromRgb(9, 9, 11), 0),
+                    (Color.FromRgb(12, 12, 14), 0.55),
+                    (Color.FromRgb(18, 18, 20), 1));
                 SetGradientBrush(
                     "CyanHeroBackgroundBrush",
-                    (Color.FromArgb(188, 16, 185, 129), 0),
-                    (Color.FromArgb(144, 59, 130, 246), 0.5),
-                    (Color.FromArgb(128, 236, 72, 153), 1));
+                    (Color.FromArgb(220, 30, 30, 32), 0),
+                    (Color.FromArgb(194, 18, 18, 20), 0.58),
+                    (Color.FromArgb(76, 0, 194, 168), 1));
                 return;
             }
 
