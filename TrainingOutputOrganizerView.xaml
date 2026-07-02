@@ -79,7 +79,7 @@
                 <TextBlock Grid.Row="1"
                            Grid.Column="1"
                            Grid.ColumnSpan="2"
-                           Text="管道调度中此输入路径固定为上一个节点的输出路径。"
+                           Text="工作流中此输入路径固定为上一个节点的输出路径。"
                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                            Margin="0,6,0,0"
                            Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}}" />

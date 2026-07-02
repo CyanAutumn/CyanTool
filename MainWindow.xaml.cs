@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,6 +18,14 @@ namespace CyanTools
         private readonly ToolNavigationService _navigationService = new();
         private readonly Dictionary<NavigationViewItem, NavigationMenuEntry> _navigationItems = new();
         private readonly HomeView _homeView = new();
+        private static readonly IReadOnlyList<NavigationCategoryDefinition> NavigationCategories =
+        [
+            new NavigationCategoryDefinition(ToolPageCategory.Training, "训练", SymbolRegular.HatGraduation24),
+            new NavigationCategoryDefinition(ToolPageCategory.DatasetAcquisition, "数据集获取", SymbolRegular.CloudArrowDown24),
+            new NavigationCategoryDefinition(ToolPageCategory.DatasetClassification, "数据集归类", SymbolRegular.Collections24),
+            new NavigationCategoryDefinition(ToolPageCategory.DatasetProcessing, "数据集处理", SymbolRegular.ImageMultiple24),
+            new NavigationCategoryDefinition(ToolPageCategory.EnvironmentSettings, "环境设置", SymbolRegular.Settings24)
+        ];
         private bool _downloadersUnlocked;
         private int _secretImageClickCount;
         private NavigationMenuEntry? _currentEntry;
@@ -137,20 +146,63 @@ namespace CyanTools
         private void RefreshMenuItems()
         {
             var previousEntry = _currentEntry;
+            NavigationViewItem? activeItem = null;
             RootNavigationView.MenuItems.Clear();
             _navigationItems.Clear();
 
-            foreach (var entry in _navigationService.GetMenuEntries(_downloadersUnlocked))
+            var entries = _navigationService.GetMenuEntries(_downloadersUnlocked);
+            var homeEntry = entries.FirstOrDefault(entry => entry.IsHome);
+            if (homeEntry != null)
             {
-                var item = CreateNavigationItem(entry);
-                RootNavigationView.MenuItems.Add(item);
-                _navigationItems[item] = entry;
-
-                if (previousEntry != null && IsSameEntry(previousEntry, entry))
+                var homeItem = CreateNavigationItem(homeEntry);
+                RootNavigationView.MenuItems.Add(homeItem);
+                _navigationItems[homeItem] = homeEntry;
+                if (previousEntry != null && IsSameEntry(previousEntry, homeEntry))
                 {
-                    MarkActiveItem(item);
+                    activeItem = homeItem;
                 }
             }
+
+            var pageEntries = entries.Where(entry => !entry.IsHome && entry.Metadata != null).ToList();
+            foreach (var category in NavigationCategories)
+            {
+                var categoryEntries = pageEntries
+                    .Where(entry => entry.Metadata?.Category == category.Category)
+                    .OrderBy(entry => entry.Metadata?.Order ?? 0)
+                    .ToList();
+                if (categoryEntries.Count == 0)
+                {
+                    continue;
+                }
+
+                var categoryItem = CreateCategoryItem(category);
+                foreach (var entry in categoryEntries)
+                {
+                    var item = CreateNavigationItem(entry);
+                    categoryItem.MenuItems.Add(item);
+                    _navigationItems[item] = entry;
+
+                    if (previousEntry != null && IsSameEntry(previousEntry, entry))
+                    {
+                        activeItem = item;
+                        categoryItem.IsExpanded = true;
+                    }
+                }
+
+                RootNavigationView.MenuItems.Add(categoryItem);
+            }
+
+            MarkActiveItem(activeItem);
+        }
+
+        private static NavigationViewItem CreateCategoryItem(NavigationCategoryDefinition category)
+        {
+            return new NavigationViewItem
+            {
+                Content = LocalizationManager.Translate(category.DisplayName),
+                Icon = new SymbolIcon(category.Icon),
+                IsExpanded = false
+            };
         }
 
         private NavigationViewItem CreateNavigationItem(NavigationMenuEntry entry)
@@ -176,13 +228,27 @@ namespace CyanTools
             var controlType = entry.Metadata?.ControlType;
             if (controlType == typeof(PipelineSchedulerView))
             {
-                return SymbolRegular.BranchFork24;
+                return SymbolRegular.Flowchart24;
             }
 
-            if (controlType == typeof(DatasetManagerView) ||
-                controlType == typeof(DanbooruCrawlerView))
+            if (controlType == typeof(ToolLLM))
             {
-                return SymbolRegular.DatabaseSearch24;
+                return SymbolRegular.BotSparkle24;
+            }
+
+            if (controlType == typeof(TrainingSetBalancerView))
+            {
+                return SymbolRegular.Scales24;
+            }
+
+            if (controlType == typeof(XyzToolView))
+            {
+                return SymbolRegular.NumberSymbolSquare24;
+            }
+
+            if (controlType == typeof(DanbooruCrawlerView))
+            {
+                return SymbolRegular.ArrowDownload24;
             }
 
             if (controlType == typeof(GeminiImageGenerationView))
@@ -190,22 +256,99 @@ namespace CyanTools
                 return SymbolRegular.Sparkle24;
             }
 
-            if (controlType == typeof(ToolLLM))
+            if (controlType == typeof(ImageBucketingView))
             {
-                return SymbolRegular.Bot24;
+                return SymbolRegular.Table24;
+            }
+
+            if (controlType == typeof(ThreeStageView))
+            {
+                return SymbolRegular.SplitHorizontal24;
+            }
+
+            if (controlType == typeof(ResolutionFilterView))
+            {
+                return SymbolRegular.Filter24;
+            }
+
+            if (controlType == typeof(ImageClusteringView))
+            {
+                return SymbolRegular.ImageSearch24;
+            }
+
+            if (controlType == typeof(SameSourceImageGroupingView))
+            {
+                return SymbolRegular.FolderPeople24;
+            }
+
+            if (controlType == typeof(KeepFilesView))
+            {
+                return SymbolRegular.Folder24;
+            }
+
+            if (controlType == typeof(DatasetManagerView))
+            {
+                return SymbolRegular.DatabaseSearch24;
+            }
+
+            if (controlType == typeof(RealEsrganView))
+            {
+                return SymbolRegular.ImageSparkle24;
+            }
+
+            if (controlType == typeof(ImageScalingView))
+            {
+                return SymbolRegular.ResizeImage24;
+            }
+
+            if (controlType == typeof(ImageProcessingView))
+            {
+                return SymbolRegular.DrawImage24;
+            }
+
+            if (controlType == typeof(ExportVideoFrameView))
+            {
+                return SymbolRegular.VideoClipMultiple24;
+            }
+
+            if (controlType == typeof(ImageMetadataView))
+            {
+                return SymbolRegular.DocumentText24;
+            }
+
+            if (controlType == typeof(GaussianBlurView))
+            {
+                return SymbolRegular.Blur24;
+            }
+
+            if (controlType == typeof(ConvertImageFormatView))
+            {
+                return SymbolRegular.ImageArrowForward24;
+            }
+
+            if (controlType == typeof(ConvertTransparentChannelView))
+            {
+                return SymbolRegular.Layer24;
+            }
+
+            if (controlType == typeof(TaggingView))
+            {
+                return SymbolRegular.Tag24;
+            }
+
+            if (controlType == typeof(ImageRenameView))
+            {
+                return SymbolRegular.Rename24;
+            }
+
+            if (controlType == typeof(FolderProcessingView))
+            {
+                return SymbolRegular.AppFolder24;
             }
 
             if (controlType == typeof(OptionsView))
             {
-                return SymbolRegular.Settings24;
-            }
-
-            if (controlType == typeof(RealEsrganView) ||
-                controlType == typeof(ImageScalingView) ||
-                controlType == typeof(ImageProcessingView) ||
-                controlType == typeof(ImageClusteringView))
-            {
-                return SymbolRegular.ImageMultiple24;
+                return SymbolRegular.WrenchSettings24;
             }
 
             return SymbolRegular.Toolbox24;
@@ -457,6 +600,20 @@ namespace CyanTools
             {
                 await imageClusteringViewModel.SaveStateOnCloseAsync();
             }
+        }
+
+        private sealed class NavigationCategoryDefinition
+        {
+            public NavigationCategoryDefinition(ToolPageCategory category, string displayName, SymbolRegular icon)
+            {
+                Category = category;
+                DisplayName = displayName;
+                Icon = icon;
+            }
+
+            public ToolPageCategory Category { get; }
+            public string DisplayName { get; }
+            public SymbolRegular Icon { get; }
         }
     }
 }

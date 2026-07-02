@@ -5,17 +5,19 @@ namespace CyanTools.Navigation
 {
     public sealed class ToolPageMetadata
     {
-        public ToolPageMetadata(string displayName, Type controlType, int order, bool requiresUnlock)
+        public ToolPageMetadata(string displayName, Type controlType, int order, bool requiresUnlock, ToolPageCategory category)
         {
             DisplayName = displayName;
             ControlType = controlType;
             Order = order;
             RequiresUnlock = requiresUnlock;
+            Category = category;
         }
 
         public string DisplayName { get; }
         public Type ControlType { get; }
         public int Order { get; }
         public bool RequiresUnlock { get; }
+        public ToolPageCategory Category { get; }
     }
 }

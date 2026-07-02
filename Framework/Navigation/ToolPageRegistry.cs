@@ -29,7 +29,12 @@ namespace CyanTools.Navigation
                 .Where(t => typeof(UserControl).IsAssignableFrom(t) && !t.IsAbstract)
                 .Select(t => new { Type = t, Attribute = t.GetCustomAttribute<ToolPageAttribute>() })
                 .Where(x => x.Attribute != null && !HiddenControls.Contains(x.Type))
-                .Select(x => new ToolPageMetadata(x.Attribute!.DisplayName, x.Type, x.Attribute.Order, x.Attribute.RequiresUnlock))
+                .Select(x => new ToolPageMetadata(
+                    x.Attribute!.DisplayName,
+                    x.Type,
+                    x.Attribute.Order,
+                    x.Attribute.RequiresUnlock,
+                    GetCategoryForControl(x.Type)))
                 .OrderBy(x => x.Order)
                 .ToList();
 
@@ -37,5 +42,42 @@ namespace CyanTools.Navigation
         }
 
         public static void ResetCache() => _cached = null;
+
+        private static ToolPageCategory GetCategoryForControl(Type controlType)
+        {
+            if (controlType == typeof(global::CyanTools.PipelineSchedulerView) ||
+                controlType == typeof(global::CyanTools.TrainingSetBalancerView) ||
+                controlType == typeof(global::CyanTools.XyzToolView) ||
+                controlType == typeof(global::CyanTools.ToolLLM) ||
+                controlType == typeof(global::CyanTools.ModelTrainingView) ||
+                controlType == typeof(global::CyanTools.LoraTrainingView))
+            {
+                return ToolPageCategory.Training;
+            }
+
+            if (controlType == typeof(global::CyanTools.DanbooruCrawlerView) ||
+                controlType == typeof(global::CyanTools.GeminiImageGenerationView))
+            {
+                return ToolPageCategory.DatasetAcquisition;
+            }
+
+            if (controlType == typeof(global::CyanTools.ImageBucketingView) ||
+                controlType == typeof(global::CyanTools.ThreeStageView) ||
+                controlType == typeof(global::CyanTools.ResolutionFilterView) ||
+                controlType == typeof(global::CyanTools.ImageClusteringView) ||
+                controlType == typeof(global::CyanTools.SameSourceImageGroupingView) ||
+                controlType == typeof(global::CyanTools.KeepFilesView) ||
+                controlType == typeof(global::CyanTools.HandIntegrityFilterView))
+            {
+                return ToolPageCategory.DatasetClassification;
+            }
+
+            if (controlType == typeof(global::CyanTools.OptionsView))
+            {
+                return ToolPageCategory.EnvironmentSettings;
+            }
+
+            return ToolPageCategory.DatasetProcessing;
+        }
     }
 }
