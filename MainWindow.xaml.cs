@@ -265,6 +265,11 @@ namespace CyanTools
                 return SymbolRegular.Scales24;
             }
 
+            if (controlType == typeof(LayeredLoraMergeView))
+            {
+                return SymbolRegular.Layer24;
+            }
+
             if (controlType == typeof(XyzToolView))
             {
                 return SymbolRegular.NumberSymbolSquare24;
