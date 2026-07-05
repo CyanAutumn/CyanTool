@@ -18,7 +18,7 @@ namespace CyanTools.ViewModel
 {
     public sealed class LayeredLoraMergeViewModel : INotifyPropertyChanged
     {
-        private const int DefaultAnimaBlockCount = 28;
+        private const int DefaultAnimaBlockCount = 32;
         private const double DefaultAnimaBlockWeight = 0.5d;
         private const string SafetensorsFilter = "safetensors (*.safetensors)|*.safetensors|所有文件 (*.*)|*.*";
         private const string ReportExampleWeights = "1,1,0.8,0.6,0.4,0.2,0.1,0,0,0,0,0,0,0.3,0.5,0.6,0.7,0.8,0.9,1,1,1,1,1,1";
@@ -330,7 +330,11 @@ namespace CyanTools.ViewModel
                 if (report.Architecture == LayeredLoraArchitecture.Anima ||
                     report.Architecture == LayeredLoraArchitecture.AnimaFullModel)
                 {
-                    AppendLog($"Anima Block 权重: {options.Weights.AnimaBlockWeights.Count} 个滑动条。");
+                    AppendLog($"Anima Block 权重: {options.Weights.AnimaBlockWeights.Count} 个滑动条，命中 {report.AnimaBlockTensorCount} 个 block 张量。");
+                    if (report.AnimaBlockTensorCount == 0)
+                    {
+                        AppendLog("警告: 未命中 Anima block 张量，本次融合会退回 base_alpha 或非 block 层权重。");
+                    }
                 }
                 else
                 {

@@ -39,12 +39,14 @@ namespace CyanTools.Utils
             int mergedTensorCount,
             int copiedTensorCount,
             IReadOnlyDictionary<LoraLayerSlot, int> layerTensorCounts,
+            int animaBlockTensorCount,
             IReadOnlyList<string> warnings)
         {
             Architecture = architecture;
             MergedTensorCount = mergedTensorCount;
             CopiedTensorCount = copiedTensorCount;
             LayerTensorCounts = layerTensorCounts;
+            AnimaBlockTensorCount = animaBlockTensorCount;
             Warnings = warnings;
         }
 
@@ -52,6 +54,7 @@ namespace CyanTools.Utils
         public int MergedTensorCount { get; }
         public int CopiedTensorCount { get; }
         public IReadOnlyDictionary<LoraLayerSlot, int> LayerTensorCounts { get; }
+        public int AnimaBlockTensorCount { get; }
         public IReadOnlyList<string> Warnings { get; }
     }
 
@@ -86,6 +89,7 @@ namespace CyanTools.Utils
             var layerCounts = new Dictionary<LoraLayerSlot, int>();
             int mergedCount = 0;
             int copiedCount = 0;
+            int animaBlockTensorCount = 0;
 
             var keys = new SortedSet<string>(modelA.Tensors.Keys, StringComparer.Ordinal);
             keys.UnionWith(modelB.Tensors.Keys);
@@ -96,6 +100,11 @@ namespace CyanTools.Utils
                 modelB.Tensors.TryGetValue(key, out var tensorB);
                 var slot = LoraLayerMapper.MapKey(key, architecture, animaBlockCount);
                 IncrementLayerCount(layerCounts, slot);
+                if (UsesDirectAnimaBlockWeight(key, architecture))
+                {
+                    animaBlockTensorCount++;
+                }
+
                 double weightB = ResolveWeight(key, architecture, slot, options.Weights);
                 var merged = MergeTensor(key, tensorA, tensorB, weightB, warnings, ref mergedCount, ref copiedCount);
                 outputTensors.Add(merged);
@@ -104,7 +113,7 @@ namespace CyanTools.Utils
             var metadata = MergeMetadata(modelA.Metadata, modelB.Metadata, architecture, options.Weights);
             SafetensorsFile.Save(options.OutputPath, outputTensors, metadata);
 
-            return new LayeredLoraMergeReport(architecture, mergedCount, copiedCount, layerCounts, warnings);
+            return new LayeredLoraMergeReport(architecture, mergedCount, copiedCount, layerCounts, animaBlockTensorCount, warnings);
         }
 
         private static SafetensorsTensor MergeTensor(
@@ -308,6 +317,13 @@ namespace CyanTools.Utils
             }
 
             return weights.GetLayerWeight(slot);
+        }
+
+        private static bool UsesDirectAnimaBlockWeight(string key, LayeredLoraArchitecture architecture)
+        {
+            return (architecture == LayeredLoraArchitecture.Anima ||
+                    architecture == LayeredLoraArchitecture.AnimaFullModel) &&
+                LoraLayerMapper.TryGetAnimaBlockIndex(key).HasValue;
         }
 
         private static void IncrementLayerCount(Dictionary<LoraLayerSlot, int> counts, LoraLayerSlot slot)

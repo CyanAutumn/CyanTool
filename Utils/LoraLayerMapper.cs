@@ -11,7 +11,8 @@ namespace CyanTools.Utils
         private static readonly Regex SdxlOutputBlockRegex = new(@"(?:^|_)output_blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
         private static readonly Regex AnimaAdapterBlockRegex = new(@"^diffusion_model\.blocks\.(\d+)(?:\.|$)", RegexOptions.Compiled);
         private static readonly Regex AnimaAdapterUnderscoreBlockRegex = new(@"^diffusion_model_blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
-        private static readonly Regex AnimaFullModelBlockRegex = new(@"^net\.blocks\.(\d+)(?:\.|$)", RegexOptions.Compiled);
+        private static readonly Regex AnimaFullModelBlockRegex = new(@"(?:^|\.)net\.blocks\.(\d+)(?:\.|$)", RegexOptions.Compiled);
+        private static readonly Regex AnimaFullModelUnderscoreBlockRegex = new(@"(?:^|_)net_blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
 
         public static LoraLayerSlot MapKey(string key, LayeredLoraArchitecture architecture, int? animaBlockCount = null)
         {
@@ -42,7 +43,7 @@ namespace CyanTools.Utils
                 return LayeredLoraArchitecture.Sdxl;
             }
 
-            if (key.StartsWith("net.", StringComparison.OrdinalIgnoreCase))
+            if (IsAnimaFullModelKey(key))
             {
                 return LayeredLoraArchitecture.AnimaFullModel;
             }
@@ -145,12 +146,24 @@ namespace CyanTools.Utils
                 match = AnimaFullModelBlockRegex.Match(key);
             }
 
+            if (!match.Success)
+            {
+                match = AnimaFullModelUnderscoreBlockRegex.Match(key);
+            }
+
             if (match.Success && int.TryParse(match.Groups[1].Value, out int index))
             {
                 return index;
             }
 
             return null;
+        }
+
+        private static bool IsAnimaFullModelKey(string key)
+        {
+            return key.StartsWith("net.", StringComparison.OrdinalIgnoreCase) ||
+                AnimaFullModelBlockRegex.IsMatch(key) ||
+                AnimaFullModelUnderscoreBlockRegex.IsMatch(key);
         }
 
         private static LoraLayerSlot ToInputSlot(int index)

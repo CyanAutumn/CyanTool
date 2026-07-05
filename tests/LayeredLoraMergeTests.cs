@@ -176,6 +176,16 @@ public sealed class LayeredLoraMergeTests
         Assert.Null(LoraLayerMapper.TryGetAnimaBlockIndex("net.llm_adapter.blocks.3.self_attn.q_proj.weight"));
     }
 
+    [Theory]
+    [InlineData("diffusion_model.net.blocks.14.self_attn.q_proj.weight")]
+    [InlineData("model.diffusion_model.net.blocks.14.self_attn.q_proj.weight")]
+    [InlineData("diffusion_model_net_blocks_14_self_attn_q_proj.weight")]
+    public void GuessArchitecture_DetectsPrefixedAnimaFullModelNetBlockKeys(string key)
+    {
+        Assert.Equal(LayeredLoraArchitecture.AnimaFullModel, LoraLayerMapper.GuessArchitectureFromKey(key));
+        Assert.Equal(14, LoraLayerMapper.TryGetAnimaBlockIndex(key));
+    }
+
     [Fact]
     public void Merge_BlendsSdxlTensorUsingMappedLayerWeight()
     {
@@ -350,11 +360,55 @@ public sealed class LayeredLoraMergeTests
 
         var merged = SafetensorsFile.Load(output);
         Assert.Equal(LayeredLoraArchitecture.AnimaFullModel, report.Architecture);
+        Assert.Equal(1, report.AnimaBlockTensorCount);
         Assert.Equal(new[] { 8f, 16f }, merged.GetTensor(blockKey).ToSingleArray());
         Assert.Equal(new[] { 15f, 25f }, merged.GetTensor(llmAdapterKey).ToSingleArray());
         Assert.Equal(new[] { 150f, 250f }, merged.GetTensor(embedderKey).ToSingleArray());
         Assert.Equal("AnimaFullModel", merged.Metadata["cyan_merge_architecture"]);
         Assert.Contains("14:0.75", merged.Metadata["cyan_merge_anima_blocks"]);
+    }
+
+    [Fact]
+    public void Merge_BlendsPrefixedAnimaFullModelBlocksUsingBlockWeight()
+    {
+        using var workspace = TemporaryWorkspace.Create();
+        var blockKey = "model.diffusion_model.net.blocks.14.self_attn.q_proj.weight";
+        var embedderKey = "model.diffusion_model.net.x_embedder.proj.1.weight";
+        var modelA = workspace.GetPath("prefixed-anima-model-a.safetensors");
+        var modelB = workspace.GetPath("prefixed-anima-model-b.safetensors");
+        var output = workspace.GetPath("prefixed-anima-model-out.safetensors");
+        SafetensorsFile.Save(
+            modelA,
+            new[]
+            {
+                SafetensorsTensor.FromSingleArray(blockKey, new long[] { 2 }, new[] { 2f, 4f }),
+                SafetensorsTensor.FromSingleArray(embedderKey, new long[] { 2 }, new[] { 100f, 200f })
+            },
+            new Dictionary<string, string>());
+        SafetensorsFile.Save(
+            modelB,
+            new[]
+            {
+                SafetensorsTensor.FromSingleArray(blockKey, new long[] { 2 }, new[] { 10f, 20f }),
+                SafetensorsTensor.FromSingleArray(embedderKey, new long[] { 2 }, new[] { 300f, 400f })
+            },
+            new Dictionary<string, string>());
+        var weights = LayeredLoraWeights.CreateFromAnimaBlockItems(
+            baseAlpha: 0.25d,
+            LayeredLoraWeights.CreateAnimaBlockItems(new[] { 14 }, defaultValue: 0.75d));
+
+        var report = LayeredLoraMerger.Merge(new LayeredLoraMergeOptions(
+            modelA,
+            modelB,
+            output,
+            LayeredLoraArchitecture.Auto,
+            weights));
+
+        var merged = SafetensorsFile.Load(output);
+        Assert.Equal(LayeredLoraArchitecture.AnimaFullModel, report.Architecture);
+        Assert.Equal(1, report.AnimaBlockTensorCount);
+        Assert.Equal(new[] { 8f, 16f }, merged.GetTensor(blockKey).ToSingleArray());
+        Assert.Equal(new[] { 150f, 250f }, merged.GetTensor(embedderKey).ToSingleArray());
     }
 
     private static LayeredLoraWeights CreateWeights(LoraLayerSlot targetSlot, double targetValue, double baseAlpha)
