@@ -163,10 +163,12 @@ namespace CyanTools.Localization
             Add(translations, "25 层权重", "25 Layer Weights", "25 層重み");
             Add(translations, "Anima Block 权重", "Anima Block Weights", "Anima Block 重み");
             Add(translations, "Anima 25 层权重", "Anima 25 Layer Weights", "Anima 25 層重み");
+            Add(translations, "批量权重", "Batch Weights", "一括重み");
             Add(translations, "全 A", "All A", "すべて A");
             Add(translations, "全 B", "All B", "すべて B");
             Add(translations, "均衡 0.5", "Balanced 0.5", "均等 0.5");
             Add(translations, "报告示例", "Report Example", "レポート例");
+            Add(translations, "A画风到B构图", "A Style to B Layout", "A の画風を B の構図へ");
             Add(translations, "开始融合", "Start Merge", "融合開始");
             Add(translations, "融合日志", "Merge Log", "融合ログ");
             Add(translations, "正在融合...", "Merging...", "融合中...");

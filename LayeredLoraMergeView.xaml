@@ -138,6 +138,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -190,6 +191,11 @@
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                                     Visibility="{Binding IsReportExampleVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                     Style="{StaticResource CyanCommandButtonStyle}" />
+                            <Button Command="{Binding UseAnimaStyleToCompositionCommand}"
+                                    Content="A画风到B构图"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
+                                    Visibility="{Binding IsAnimaStylePresetVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                    Style="{StaticResource CyanCommandButtonStyle}" />
                         </StackPanel>
 
                         <TextBlock Grid.Row="1"
@@ -231,11 +237,13 @@
                                                         Value="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                         VerticalAlignment="Center"
                                                         Margin="8,0,12,0" />
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding ValueText}"
-                                                           FontFamily="Consolas"
-                                                           HorizontalAlignment="Right"
-                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Column="2"
+                                                         Text="{Binding ValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontFamily="Consolas"
+                                                         MinWidth="58"
+                                                         Padding="4,1"
+                                                         HorizontalContentAlignment="Right"
+                                                         VerticalContentAlignment="Center" />
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -276,11 +284,13 @@
                                                         Value="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                         VerticalAlignment="Center"
                                                         Margin="8,0,12,0" />
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding ValueText}"
-                                                           FontFamily="Consolas"
-                                                           HorizontalAlignment="Right"
-                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Column="2"
+                                                         Text="{Binding ValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontFamily="Consolas"
+                                                         MinWidth="58"
+                                                         Padding="4,1"
+                                                         HorizontalContentAlignment="Right"
+                                                         VerticalContentAlignment="Center" />
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -289,6 +299,19 @@
                         </Border>
 
                         <TextBlock Grid.Row="2"
+                                   Text="批量权重"
+                                   Style="{StaticResource CyanFormLabelStyle}"
+                                   Margin="0,12,10,0"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Row="2"
+                                 Grid.Column="1"
+                                 Grid.ColumnSpan="4"
+                                 Text="{Binding LayerWeightsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 FontFamily="Consolas"
+                                 Margin="0,10,0,0"
+                                 VerticalContentAlignment="Center" />
+
+                        <TextBlock Grid.Row="3"
                                    Grid.Column="1"
                                    Grid.ColumnSpan="4"
                                    Text="{Binding StatusText, Converter={StaticResource LocalizedTextConverter}}"

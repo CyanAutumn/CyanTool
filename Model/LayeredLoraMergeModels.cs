@@ -6,6 +6,99 @@ using System.Linq;
 
 namespace CyanTools.Model
 {
+    public static class LayeredLoraWeightText
+    {
+        private static readonly char[] ValueSeparators = { ',', '，', ';', '；', '\r', '\n', '\t', ' ' };
+
+        public static IReadOnlyList<double> ParseValues(string text)
+        {
+            if (text == null)
+            {
+                throw new ArgumentNullException(nameof(text));
+            }
+
+            var values = new List<double>();
+            foreach (var part in text.Split(ValueSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!TryParseValue(part, out var value))
+                {
+                    throw new FormatException($"Invalid LoRA layer weight: {part}");
+                }
+
+                values.Add(value);
+            }
+
+            return values;
+        }
+
+        public static bool TryParseValues(string text, out IReadOnlyList<double> values)
+        {
+            try
+            {
+                values = ParseValues(text ?? string.Empty);
+                return true;
+            }
+            catch (FormatException)
+            {
+                values = Array.Empty<double>();
+                return false;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                values = Array.Empty<double>();
+                return false;
+            }
+        }
+
+        public static bool TryParseValue(string? text, out double value)
+        {
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+            {
+                value = 0d;
+                return false;
+            }
+
+            if (double.IsNaN(parsed) || double.IsInfinity(parsed))
+            {
+                value = 0d;
+                return false;
+            }
+
+            value = NormalizeSliderValue(parsed);
+            return true;
+        }
+
+        public static string ToCommaText(IEnumerable<double> values)
+        {
+            if (values == null)
+            {
+                throw new ArgumentNullException(nameof(values));
+            }
+
+            return string.Join(",", values.Select(FormatCompactValue));
+        }
+
+        public static string FormatEditorValue(double value)
+        {
+            return NormalizeSliderValue(value).ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        public static string FormatCompactValue(double value)
+        {
+            return NormalizeSliderValue(value).ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        public static double NormalizeSliderValue(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Layer slider values must be finite numbers.");
+            }
+
+            return Math.Max(0d, Math.Min(1d, value));
+        }
+    }
+
     public enum LayeredLoraArchitecture
     {
         Auto,
@@ -48,6 +141,18 @@ namespace CyanTools.Model
     public sealed class LayeredLoraWeights
     {
         public const int ReportLayerCount = 25;
+        private static readonly (double Position, double Value)[] AnimaStyleToCompositionAnchors =
+        {
+            (0.00d, 1.00d),
+            (0.12d, 0.95d),
+            (0.25d, 0.82d),
+            (0.38d, 0.45d),
+            (0.50d, 0.20d),
+            (0.62d, 0.20d),
+            (0.75d, 0.35d),
+            (0.88d, 0.60d),
+            (1.00d, 0.80d)
+        };
 
         public static readonly IReadOnlyList<LoraLayerSlot> ReportLayerSlots = new[]
         {
@@ -193,6 +298,33 @@ namespace CyanTools.Model
                 .ToArray();
         }
 
+        public static IReadOnlyList<LayeredLoraBlockWeight> CreateAnimaStyleToCompositionPresetItems(IEnumerable<int> blockIndices)
+        {
+            if (blockIndices == null)
+            {
+                throw new ArgumentNullException(nameof(blockIndices));
+            }
+
+            var indices = blockIndices
+                .Where(index => index >= 0)
+                .Distinct()
+                .OrderBy(index => index)
+                .ToArray();
+            if (indices.Length == 0)
+            {
+                return Array.Empty<LayeredLoraBlockWeight>();
+            }
+
+            int maxIndex = indices[^1];
+            return indices
+                .Select(index =>
+                {
+                    double position = maxIndex > 0 ? index / (double)maxIndex : 0d;
+                    return new LayeredLoraBlockWeight(index, $"Block {index:00}", InterpolateAnimaStyleToCompositionWeight(position));
+                })
+                .ToArray();
+        }
+
         public static LayeredLoraWeights CreateFromLayerItems(double baseAlpha, IEnumerable<LayeredLoraLayerWeight> items)
         {
             if (items == null)
@@ -274,6 +406,29 @@ namespace CyanTools.Model
 
             return value;
         }
+
+        private static double InterpolateAnimaStyleToCompositionWeight(double position)
+        {
+            position = Math.Max(0d, Math.Min(1d, position));
+            for (int i = 1; i < AnimaStyleToCompositionAnchors.Length; i++)
+            {
+                var previous = AnimaStyleToCompositionAnchors[i - 1];
+                var current = AnimaStyleToCompositionAnchors[i];
+                if (position <= current.Position)
+                {
+                    double range = current.Position - previous.Position;
+                    if (range <= 0d)
+                    {
+                        return current.Value;
+                    }
+
+                    double t = (position - previous.Position) / range;
+                    return previous.Value + ((current.Value - previous.Value) * t);
+                }
+            }
+
+            return AnimaStyleToCompositionAnchors[^1].Value;
+        }
     }
 
     public sealed class LayeredLoraLayerWeight : INotifyPropertyChanged
@@ -294,32 +449,42 @@ namespace CyanTools.Model
         public double Value
         {
             get => _value;
-            set
-            {
-                var normalized = ValidateSliderValue(value);
-                if (Math.Abs(_value - normalized) < 0.0000001d)
-                {
-                    return;
-                }
-
-                _value = normalized;
-                OnPropertyChanged(nameof(Value));
-                OnPropertyChanged(nameof(ValueText));
-            }
+            set => SetValue(value, notifyText: true);
         }
 
-        public string ValueText => _value.ToString("0.00", CultureInfo.InvariantCulture);
+        public string ValueText
+        {
+            get => LayeredLoraWeightText.FormatEditorValue(_value);
+            set
+            {
+                if (LayeredLoraWeightText.TryParseValue(value, out var parsed))
+                {
+                    SetValue(parsed, notifyText: false);
+                }
+            }
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private static double ValidateSliderValue(double value)
         {
-            if (double.IsNaN(value) || double.IsInfinity(value))
+            return LayeredLoraWeightText.NormalizeSliderValue(value);
+        }
+
+        private void SetValue(double value, bool notifyText)
+        {
+            var normalized = ValidateSliderValue(value);
+            if (Math.Abs(_value - normalized) < 0.0000001d)
             {
-                throw new ArgumentOutOfRangeException(nameof(value), "Layer slider values must be finite numbers.");
+                return;
             }
 
-            return Math.Max(0d, Math.Min(1d, value));
+            _value = normalized;
+            OnPropertyChanged(nameof(Value));
+            if (notifyText)
+            {
+                OnPropertyChanged(nameof(ValueText));
+            }
         }
 
         private void OnPropertyChanged(string propertyName)
@@ -351,32 +516,42 @@ namespace CyanTools.Model
         public double Value
         {
             get => _value;
-            set
-            {
-                var normalized = ValidateSliderValue(value);
-                if (Math.Abs(_value - normalized) < 0.0000001d)
-                {
-                    return;
-                }
-
-                _value = normalized;
-                OnPropertyChanged(nameof(Value));
-                OnPropertyChanged(nameof(ValueText));
-            }
+            set => SetValue(value, notifyText: true);
         }
 
-        public string ValueText => _value.ToString("0.00", CultureInfo.InvariantCulture);
+        public string ValueText
+        {
+            get => LayeredLoraWeightText.FormatEditorValue(_value);
+            set
+            {
+                if (LayeredLoraWeightText.TryParseValue(value, out var parsed))
+                {
+                    SetValue(parsed, notifyText: false);
+                }
+            }
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private static double ValidateSliderValue(double value)
         {
-            if (double.IsNaN(value) || double.IsInfinity(value))
+            return LayeredLoraWeightText.NormalizeSliderValue(value);
+        }
+
+        private void SetValue(double value, bool notifyText)
+        {
+            var normalized = ValidateSliderValue(value);
+            if (Math.Abs(_value - normalized) < 0.0000001d)
             {
-                throw new ArgumentOutOfRangeException(nameof(value), "Layer slider values must be finite numbers.");
+                return;
             }
 
-            return Math.Max(0d, Math.Min(1d, value));
+            _value = normalized;
+            OnPropertyChanged(nameof(Value));
+            if (notifyText)
+            {
+                OnPropertyChanged(nameof(ValueText));
+            }
         }
 
         private void OnPropertyChanged(string propertyName)

@@ -55,6 +55,26 @@ public sealed class LayeredLoraMergeTests
     }
 
     [Fact]
+    public void LayerWeightValueText_UpdatesSliderValueFromManualInput()
+    {
+        var item = LayeredLoraWeights.CreateReportLayerItems(Enumerable.Repeat(0d, LayeredLoraWeights.ReportLayerCount))[0];
+
+        item.ValueText = "0.125";
+
+        Assert.Equal(0.125d, item.Value, precision: 6);
+        Assert.Equal("0.13", item.ValueText);
+    }
+
+    [Fact]
+    public void ParseEditableWeightText_AcceptsCommaSeparatedValues()
+    {
+        var values = LayeredLoraWeightText.ParseValues("1,0.1, 0.25").ToArray();
+
+        Assert.Equal(new[] { 1d, 0.1d, 0.25d }, values);
+        Assert.Equal("1,0.1,0.25", LayeredLoraWeightText.ToCommaText(values));
+    }
+
+    [Fact]
     public void CreateAnimaBlockItems_RoundTripsBlockWeightsByBlockIndex()
     {
         var items = LayeredLoraWeights.CreateAnimaBlockItems(new[] { 14, 0, 2, 2 }, defaultValue: 0.5d).ToArray();
@@ -70,6 +90,21 @@ public sealed class LayeredLoraMergeTests
         Assert.Equal(0.5d, weights.GetAnimaBlockWeight(0), precision: 6);
         Assert.Equal(0.75d, weights.GetAnimaBlockWeight(14), precision: 6);
         Assert.Equal(0.2d, weights.GetAnimaBlockWeight(99), precision: 6);
+    }
+
+    [Fact]
+    public void CreateAnimaStyleToCompositionPreset_InjectsAStyleWhileKeepingBLayout()
+    {
+        var items = LayeredLoraWeights.CreateAnimaStyleToCompositionPresetItems(Enumerable.Range(0, 28)).ToArray();
+
+        Assert.Equal(28, items.Length);
+        Assert.Equal(0, items[0].BlockIndex);
+        Assert.Equal(27, items[^1].BlockIndex);
+        Assert.Equal(1d, items[0].Value, precision: 6);
+        Assert.Equal(0.2d, items[14].Value, precision: 6);
+        Assert.Equal(0.8d, items[27].Value, precision: 6);
+        Assert.True(items[14].Value < items[7].Value);
+        Assert.True(items[14].Value < items[24].Value);
     }
 
     [Fact]

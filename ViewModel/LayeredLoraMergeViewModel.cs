@@ -3,6 +3,7 @@ using CyanTools.Utils;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -27,11 +28,14 @@ namespace CyanTools.ViewModel
         private string _modelBPath = string.Empty;
         private string _outputPath = string.Empty;
         private string _baseAlphaText = "0";
+        private string _layerWeightsText = string.Empty;
         private string _logText = string.Empty;
         private string _statusText = "准备就绪";
         private bool _isBusy;
         private bool _isSdxlWeightEditorVisible = true;
         private bool _isAnimaWeightEditorVisible;
+        private bool _isApplyingLayerWeightsText;
+        private bool _isSynchronizingLayerWeightsText;
         private LayeredLoraArchitectureOption _selectedArchitectureOption;
 
         public LayeredLoraMergeViewModel()
@@ -49,6 +53,11 @@ namespace CyanTools.ViewModel
                 LayeredLoraWeights.CreateReportLayerItems(reportExample.LayerWeights));
             AnimaBlockWeights = new ObservableCollection<LayeredLoraBlockWeight>(
                 LayeredLoraWeights.CreateAnimaBlockItems(Enumerable.Range(0, DefaultAnimaBlockCount), DefaultAnimaBlockWeight));
+            LayerWeights.CollectionChanged += OnWeightCollectionChanged;
+            AnimaBlockWeights.CollectionChanged += OnWeightCollectionChanged;
+            SubscribeWeightItems(LayerWeights);
+            SubscribeWeightItems(AnimaBlockWeights);
+            UpdateLayerWeightsTextFromCurrentEditor();
 
             BrowseModelACommand = new RelayCommand(BrowseModelA, () => !IsBusy);
             BrowseModelBCommand = new RelayCommand(BrowseModelB, () => !IsBusy);
@@ -58,6 +67,7 @@ namespace CyanTools.ViewModel
             UseAllBCommand = new RelayCommand(() => ApplyPreset(1d, 1d), () => !IsBusy);
             UseBalancedCommand = new RelayCommand(() => ApplyPreset(0.5d, 0.5d), () => !IsBusy);
             UseReportExampleCommand = new RelayCommand(ApplyReportExample, () => !IsBusy && IsSdxlWeightEditorVisible);
+            UseAnimaStyleToCompositionCommand = new RelayCommand(ApplyAnimaStyleToCompositionPreset, () => !IsBusy && IsAnimaWeightEditorVisible);
         }
 
         public ObservableCollection<LayeredLoraArchitectureOption> ArchitectureOptions { get; }
@@ -115,6 +125,21 @@ namespace CyanTools.ViewModel
             set => SetField(ref _baseAlphaText, value ?? string.Empty, nameof(BaseAlphaText));
         }
 
+        public string LayerWeightsText
+        {
+            get => _layerWeightsText;
+            set
+            {
+                if (!SetField(ref _layerWeightsText, value ?? string.Empty, nameof(LayerWeightsText))
+                    || _isSynchronizingLayerWeightsText)
+                {
+                    return;
+                }
+
+                ApplyLayerWeightsText(_layerWeightsText);
+            }
+        }
+
         public string LogText
         {
             get => _logText;
@@ -161,11 +186,15 @@ namespace CyanTools.ViewModel
                 if (SetField(ref _isAnimaWeightEditorVisible, value, nameof(IsAnimaWeightEditorVisible)))
                 {
                     OnPropertyChanged(nameof(WeightEditorLabel));
+                    OnPropertyChanged(nameof(IsAnimaStylePresetVisible));
+                    CommandManager.InvalidateRequerySuggested();
                 }
             }
         }
 
         public bool IsReportExampleVisible => IsSdxlWeightEditorVisible;
+
+        public bool IsAnimaStylePresetVisible => IsAnimaWeightEditorVisible;
 
         public string WeightEditorLabel
         {
@@ -190,6 +219,7 @@ namespace CyanTools.ViewModel
         public ICommand UseAllBCommand { get; }
         public ICommand UseBalancedCommand { get; }
         public ICommand UseReportExampleCommand { get; }
+        public ICommand UseAnimaStyleToCompositionCommand { get; }
 
         private void BrowseModelA()
         {
@@ -367,6 +397,26 @@ namespace CyanTools.ViewModel
             ApplyLayerValues(reportExample.LayerWeights);
         }
 
+        private void ApplyAnimaStyleToCompositionPreset()
+        {
+            if (!IsAnimaWeightEditorVisible)
+            {
+                return;
+            }
+
+            BaseAlphaText = "1";
+            var presetValues = LayeredLoraWeights
+                .CreateAnimaStyleToCompositionPresetItems(AnimaBlockWeights.Select(item => item.BlockIndex))
+                .ToDictionary(item => item.BlockIndex, item => item.Value);
+            foreach (var item in AnimaBlockWeights)
+            {
+                if (presetValues.TryGetValue(item.BlockIndex, out var value))
+                {
+                    item.Value = value;
+                }
+            }
+        }
+
         private void ApplyLayerValues(IEnumerable<double> values)
         {
             var layerValues = values.ToArray();
@@ -401,7 +451,9 @@ namespace CyanTools.ViewModel
             }
 
             OnPropertyChanged(nameof(IsReportExampleVisible));
+            OnPropertyChanged(nameof(IsAnimaStylePresetVisible));
             OnPropertyChanged(nameof(WeightEditorLabel));
+            UpdateLayerWeightsTextFromCurrentEditor();
             CommandManager.InvalidateRequerySuggested();
         }
 
@@ -453,6 +505,108 @@ namespace CyanTools.ViewModel
                 }
 
                 AnimaBlockWeights.Add(item);
+            }
+        }
+
+        private void OnWeightCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (var item in e.OldItems.OfType<INotifyPropertyChanged>())
+                {
+                    item.PropertyChanged -= OnWeightItemPropertyChanged;
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (var item in e.NewItems.OfType<INotifyPropertyChanged>())
+                {
+                    item.PropertyChanged += OnWeightItemPropertyChanged;
+                }
+            }
+
+            UpdateLayerWeightsTextFromCurrentEditor();
+        }
+
+        private void SubscribeWeightItems(IEnumerable<INotifyPropertyChanged> items)
+        {
+            foreach (var item in items)
+            {
+                item.PropertyChanged += OnWeightItemPropertyChanged;
+            }
+        }
+
+        private void OnWeightItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_isApplyingLayerWeightsText || e.PropertyName != nameof(LayeredLoraLayerWeight.Value))
+            {
+                return;
+            }
+
+            UpdateLayerWeightsTextFromCurrentEditor();
+        }
+
+        private void ApplyLayerWeightsText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)
+                || !LayeredLoraWeightText.TryParseValues(text, out var values)
+                || values.Count == 0)
+            {
+                return;
+            }
+
+            _isApplyingLayerWeightsText = true;
+            try
+            {
+                if (IsAnimaWeightEditorVisible)
+                {
+                    int count = Math.Min(values.Count, AnimaBlockWeights.Count);
+                    for (int i = 0; i < count; i++)
+                    {
+                        AnimaBlockWeights[i].Value = values[i];
+                    }
+                }
+                else
+                {
+                    int count = Math.Min(values.Count, LayerWeights.Count);
+                    for (int i = 0; i < count; i++)
+                    {
+                        LayerWeights[i].Value = values[i];
+                    }
+                }
+            }
+            finally
+            {
+                _isApplyingLayerWeightsText = false;
+            }
+        }
+
+        private void UpdateLayerWeightsTextFromCurrentEditor()
+        {
+            if (_isApplyingLayerWeightsText)
+            {
+                return;
+            }
+
+            var values = IsAnimaWeightEditorVisible
+                ? AnimaBlockWeights.Select(item => item.Value)
+                : LayerWeights.Select(item => item.Value);
+            var text = LayeredLoraWeightText.ToCommaText(values);
+            if (_layerWeightsText == text)
+            {
+                return;
+            }
+
+            _isSynchronizingLayerWeightsText = true;
+            try
+            {
+                _layerWeightsText = text;
+                OnPropertyChanged(nameof(LayerWeightsText));
+            }
+            finally
+            {
+                _isSynchronizingLayerWeightsText = false;
             }
         }
 
