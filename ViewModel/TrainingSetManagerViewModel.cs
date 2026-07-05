@@ -46,8 +46,7 @@ namespace CyanTools.ViewModel
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _git = git ?? throw new ArgumentNullException(nameof(git));
 
-            HistoryNodes = new ObservableCollection<TrainingSetHistoryCanvasNodeViewModel>();
-            HistoryConnections = new ObservableCollection<TrainingSetHistoryConnectionViewModel>();
+            HistoryNodes = new ObservableCollection<TrainingSetCommitNodeViewModel>();
             ConfigDiffRows = new ObservableCollection<TrainingSetConfigDiffRow>();
             LogLines = new ObservableCollection<string>();
 
@@ -82,8 +81,7 @@ namespace CyanTools.ViewModel
             };
         }
 
-        public ObservableCollection<TrainingSetHistoryCanvasNodeViewModel> HistoryNodes { get; }
-        public ObservableCollection<TrainingSetHistoryConnectionViewModel> HistoryConnections { get; }
+        public ObservableCollection<TrainingSetCommitNodeViewModel> HistoryNodes { get; }
         public ObservableCollection<TrainingSetConfigDiffRow> ConfigDiffRows { get; }
         public ObservableCollection<string> LogLines { get; }
 
@@ -306,7 +304,7 @@ namespace CyanTools.ViewModel
         public ICommand InsertNoteChecklistCommand { get; }
         public ICommand OpenProjectFolderCommand { get; }
 
-        public void SelectCanvasNode(TrainingSetHistoryCanvasNodeViewModel node)
+        public void SelectCommitNode(TrainingSetCommitNodeViewModel node)
         {
             SelectedNode = node.Node;
         }
@@ -782,36 +780,28 @@ namespace CyanTools.ViewModel
         private void RebuildGraph()
         {
             HistoryNodes.Clear();
-            HistoryConnections.Clear();
             if (Project == null)
             {
                 return;
             }
 
-            var nodeMap = new Dictionary<string, TrainingSetHistoryCanvasNodeViewModel>(StringComparer.OrdinalIgnoreCase);
+            var titleById = Project.Nodes.ToDictionary(
+                node => node.NodeId,
+                node => node.Title,
+                StringComparer.OrdinalIgnoreCase);
             foreach (var node in Project.Nodes)
             {
-                var canvasNode = new TrainingSetHistoryCanvasNodeViewModel(node, this)
-                {
-                    IsCurrent = string.Equals(Project.CurrentNodeId, node.NodeId, StringComparison.OrdinalIgnoreCase)
-                };
-                nodeMap[node.NodeId] = canvasNode;
-                HistoryNodes.Add(canvasNode);
-            }
-
-            foreach (var edge in Project.Edges)
-            {
-                if (nodeMap.TryGetValue(edge.SourceNodeId, out var source) &&
-                    nodeMap.TryGetValue(edge.TargetNodeId, out var target))
-                {
-                    HistoryConnections.Add(new TrainingSetHistoryConnectionViewModel
+                var parentTitles = Project.Edges
+                    .Where(edge => string.Equals(edge.TargetNodeId, node.NodeId, StringComparison.OrdinalIgnoreCase))
+                    .Select(edge => titleById.TryGetValue(edge.SourceNodeId, out var title) ? title : edge.SourceNodeId)
+                    .ToList();
+                HistoryNodes.Add(new TrainingSetCommitNodeViewModel(node, this)
                     {
-                        Output = source.Output.First(),
-                        Input = target.Input.First()
+                        ParentSummary = parentTitles.Count == 0
+                            ? "根提交 / 初始快照"
+                            : $"父提交: {string.Join(", ", parentTitles)}",
+                        IsCurrent = string.Equals(Project.CurrentNodeId, node.NodeId, StringComparison.OrdinalIgnoreCase)
                     });
-                    source.Output.First().IsConnected = true;
-                    target.Input.First().IsConnected = true;
-                }
             }
 
             RefreshCanvasSelection();
@@ -838,11 +828,6 @@ namespace CyanTools.ViewModel
 
             _autoSaveTimer.Stop();
             _autoSaveTimer.Start();
-        }
-
-        public void SaveCanvasLayoutSoon()
-        {
-            RequestAutoSave();
         }
 
         private void AutoSave()
@@ -943,63 +928,29 @@ namespace CyanTools.ViewModel
         }
     }
 
-    public sealed class TrainingSetHistoryCanvasNodeViewModel : INotifyPropertyChanged
+    public sealed class TrainingSetCommitNodeViewModel : INotifyPropertyChanged
     {
         private bool _isSelected;
         private bool _isCurrent;
+        private string _parentSummary = string.Empty;
 
-        public TrainingSetHistoryCanvasNodeViewModel(TrainingSetVersionNode node, TrainingSetManagerViewModel owner)
+        public TrainingSetCommitNodeViewModel(TrainingSetVersionNode node, TrainingSetManagerViewModel owner)
         {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             Owner = owner ?? throw new ArgumentNullException(nameof(owner));
-            Input.Add(new TrainingSetHistoryConnectorViewModel(this, "父节点", true));
-            Output.Add(new TrainingSetHistoryConnectorViewModel(this, "子节点", false));
         }
 
         public TrainingSetVersionNode Node { get; }
         public TrainingSetManagerViewModel Owner { get; }
-        public ObservableCollection<TrainingSetHistoryConnectorViewModel> Input { get; } = new();
-        public ObservableCollection<TrainingSetHistoryConnectorViewModel> Output { get; } = new();
         public string Title => Node.Title;
         public string CommitShort => string.IsNullOrWhiteSpace(Node.CommitShort) ? "未提交" : Node.CommitShort;
         public string Branch => string.IsNullOrWhiteSpace(Node.Branch) ? "未记录分支" : Node.Branch;
         public BitmapImage? CoverImage => TrainingSetManagerViewModel.LoadBitmapForBinding(Owner.ProjectRootPath, Node.CoverPath);
-        public double X
-        {
-            get => Node.X;
-            set
-            {
-                if (Math.Abs(Node.X - value) > 0.1)
-                {
-                    Node.X = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
 
-        public double Y
+        public string ParentSummary
         {
-            get => Node.Y;
-            set
-            {
-                if (Math.Abs(Node.Y - value) > 0.1)
-                {
-                    Node.Y = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public Point Location
-        {
-            get => new(X, Y);
-            set
-            {
-                X = value.X;
-                Y = value.Y;
-                Owner.SaveCanvasLayoutSoon();
-                OnPropertyChanged();
-            }
+            get => _parentSummary;
+            set => SetField(ref _parentSummary, value);
         }
 
         public bool IsSelected
@@ -1014,7 +965,7 @@ namespace CyanTools.ViewModel
             set => SetField(ref _isCurrent, value);
         }
 
-        public ICommand SelectCommand => new RelayCommand(_ => Owner.SelectCanvasNode(this));
+        public ICommand SelectCommand => new RelayCommand(_ => Owner.SelectCommitNode(this));
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -1034,59 +985,5 @@ namespace CyanTools.ViewModel
             OnPropertyChanged(propertyName);
             return true;
         }
-    }
-
-    public sealed class TrainingSetHistoryConnectorViewModel : INotifyPropertyChanged
-    {
-        private Point _anchor;
-        private bool _isConnected;
-
-        public TrainingSetHistoryConnectorViewModel(TrainingSetHistoryCanvasNodeViewModel node, string title, bool isInput)
-        {
-            Node = node;
-            Title = title;
-            IsInput = isInput;
-        }
-
-        public TrainingSetHistoryCanvasNodeViewModel Node { get; }
-        public string Title { get; }
-        public bool IsInput { get; }
-
-        public Point Anchor
-        {
-            get => _anchor;
-            set => SetField(ref _anchor, value);
-        }
-
-        public bool IsConnected
-        {
-            get => _isConnected;
-            set => SetField(ref _isConnected, value);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value))
-            {
-                return false;
-            }
-
-            field = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
-    }
-
-    public sealed class TrainingSetHistoryConnectionViewModel
-    {
-        public TrainingSetHistoryConnectorViewModel Input { get; init; } = null!;
-        public TrainingSetHistoryConnectorViewModel Output { get; init; } = null!;
     }
 }
