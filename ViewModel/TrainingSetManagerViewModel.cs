@@ -54,7 +54,7 @@ namespace CyanTools.ViewModel
             OpenProjectCommand = new RelayCommand(_ => OpenProject(), _ => !IsBusy);
             RefreshGitStatusCommand = new RelayCommand(_ => RefreshGitStatus(), _ => HasProject && !IsBusy);
             CreateNodeCommand = new RelayCommand(_ => CreateNode(), _ => HasProject && !IsBusy);
-            SaveNodeCommand = new RelayCommand(_ => SaveNodeAsCommit(), _ => HasProject && SelectedNode != null && !IsBusy);
+            SaveNodeCommand = new RelayCommand(async _ => await SaveNodeAsCommitAsync(), _ => HasProject && SelectedNode != null && !IsBusy);
             CheckoutNodeCommand = new RelayCommand(_ => CheckoutSelectedNode(), _ => HasProject && !string.IsNullOrWhiteSpace(SelectedNode?.GitCommit) && !IsBusy);
             CreateBranchFromNodeCommand = new RelayCommand(_ => CreateBranchFromSelectedNode(), _ => HasProject && !string.IsNullOrWhiteSpace(SelectedNode?.GitCommit) && !IsBusy);
             ImportConfigCommand = new RelayCommand(_ => ImportConfig(), _ => HasProject && SelectedNode != null && !IsBusy);
@@ -421,7 +421,7 @@ namespace CyanTools.ViewModel
             AppendLog($"已创建节点: {node.Title}");
         }
 
-        private void SaveNodeAsCommit()
+        private async Task SaveNodeAsCommitAsync()
         {
             if (Project == null || SelectedNode == null)
             {
@@ -433,7 +433,9 @@ namespace CyanTools.ViewModel
             {
                 _store.SaveProject(Project);
                 var message = $"CyanTools node {SelectedNode.NodeId}: {SelectedNode.Title}";
-                var commit = _git.Commit(Project.RootPath, message);
+                StatusText = "正在保存节点：Git/LFS 正在后台扫描训练集文件，图片较多时可能需要几分钟。";
+                AppendLog("开始执行 git add -A / git commit。窗口不会再被 Git 操作冻结。");
+                var commit = await _git.CommitAsync(Project.RootPath, message);
                 if (!commit.IsSuccess)
                 {
                     AppendLog(string.IsNullOrWhiteSpace(commit.StandardError) ? commit.StandardOutput : commit.StandardError);
@@ -441,13 +443,18 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                SelectedNode.GitCommit = _git.GetHeadCommit(Project.RootPath);
-                SelectedNode.Branch = _git.GetCurrentBranch(Project.RootPath);
+                SelectedNode.GitCommit = await _git.GetHeadCommitAsync(Project.RootPath);
+                SelectedNode.Branch = await _git.GetCurrentBranchAsync(Project.RootPath);
                 SelectedNode.UpdatedAt = DateTime.Now;
                 _store.SaveProject(Project);
                 RebuildGraph();
-                RefreshGitStatus();
+                await RefreshGitStatusAsync();
                 AppendLog($"节点已保存为 Git 提交: {SelectedNode.CommitShort}");
+            }
+            catch (OperationCanceledException)
+            {
+                StatusText = "保存节点已取消。";
+                AppendLog("保存节点已取消。");
             }
             catch (Exception ex)
             {
@@ -774,6 +781,20 @@ namespace CyanTools.ViewModel
             var branch = _git.GetCurrentBranch(Project.RootPath);
             var head = _git.GetHeadCommit(Project.RootPath);
             var status = _git.GetShortStatus(Project.RootPath);
+            GitStatusText = $"分支: {(string.IsNullOrWhiteSpace(branch) ? "(detached)" : branch)} | HEAD: {(head.Length > 7 ? head.Substring(0, 7) : head)} | {(string.IsNullOrWhiteSpace(status) ? "工作区干净" : "有未提交改动")}";
+        }
+
+        private async Task RefreshGitStatusAsync()
+        {
+            if (Project == null)
+            {
+                GitStatusText = "Git 未连接";
+                return;
+            }
+
+            var branch = await _git.GetCurrentBranchAsync(Project.RootPath);
+            var head = await _git.GetHeadCommitAsync(Project.RootPath);
+            var status = await _git.GetShortStatusAsync(Project.RootPath);
             GitStatusText = $"分支: {(string.IsNullOrWhiteSpace(branch) ? "(detached)" : branch)} | HEAD: {(head.Length > 7 ? head.Substring(0, 7) : head)} | {(string.IsNullOrWhiteSpace(status) ? "工作区干净" : "有未提交改动")}";
         }
 
