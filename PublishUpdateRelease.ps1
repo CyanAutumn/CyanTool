@@ -34,6 +34,7 @@ param(
     [string]$SevenZipPath = "",
     [string]$VersionXmlPath = "version.xml",
     [string]$VersionXmlBranch = "main",
+    [string[]]$RuntimeIdentifiersToPackage = @("win-x64", "win-x86"),
     [switch]$PublishGitUpdateRepo,
     [string]$GitUpdateRepoWorkingDirectory = "",
     [string]$GitUpdateBranch = "main",
@@ -418,14 +419,39 @@ function Ensure-GitUpdateRepository {
     Invoke-GitChecked -WorkingDirectory $WorkingDirectory -Arguments @("pull", "--ff-only", "origin", $Branch)
 }
 
-function Get-PublishBuildItems {
-    param([string]$BuildDir)
+function Get-PublishRuntimeDirectories {
+    param(
+        [string]$BuildDir,
+        [string[]]$RuntimeIdentifiers
+    )
+
+    $runtimesPath = Join-Path $BuildDir "runtimes"
+    if (-not (Test-Path -LiteralPath $runtimesPath -PathType Container)) {
+        return @()
+    }
+
+    $normalizedRuntimeIdentifiers = @()
+    if ($null -ne $RuntimeIdentifiers) {
+        foreach ($rid in $RuntimeIdentifiers) {
+            if (-not [string]::IsNullOrWhiteSpace($rid)) {
+                $normalizedRuntimeIdentifiers += $rid.Trim()
+            }
+        }
+    }
+
+    if ($normalizedRuntimeIdentifiers.Count -eq 0 -or $normalizedRuntimeIdentifiers -contains "*") {
+        return @(Get-ChildItem -LiteralPath $runtimesPath -Force -Directory)
+    }
 
     $items = @()
-    $items += @(Get-ChildItem -LiteralPath $BuildDir -Force -File)
-    $runtimesPath = Join-Path $BuildDir "runtimes"
-    if (Test-Path -LiteralPath $runtimesPath -PathType Container) {
-        $items += Get-Item -LiteralPath $runtimesPath
+    foreach ($rid in @($normalizedRuntimeIdentifiers | Select-Object -Unique)) {
+        $runtimePath = Join-Path $runtimesPath $rid
+        if (Test-Path -LiteralPath $runtimePath -PathType Container) {
+            $items += Get-Item -LiteralPath $runtimePath
+        }
+        else {
+            Write-Warning "指定 runtime 目录不存在，已跳过：runtimes\$rid"
+        }
     }
 
     return @($items)
@@ -434,7 +460,8 @@ function Get-PublishBuildItems {
 function Copy-PublishItemsToPayload {
     param(
         [string]$BuildDir,
-        [string]$PayloadDirectory
+        [string]$PayloadDirectory,
+        [string[]]$RuntimeIdentifiers
     )
 
     if (Test-Path -LiteralPath $PayloadDirectory) {
@@ -442,13 +469,22 @@ function Copy-PublishItemsToPayload {
     }
     New-Item -ItemType Directory -Force -Path $PayloadDirectory | Out-Null
 
-    $items = Get-PublishBuildItems -BuildDir $BuildDir
-    if ($items.Count -eq 0) {
-        throw "目标目录下没有可发布内容（顶层文件或 runtimes 目录）：$BuildDir"
+    $files = @(Get-ChildItem -LiteralPath $BuildDir -Force -File | Where-Object { $_.Name -notin @("AGENTS.md", "CLAUDE.md", "memory.md", "memory_index.md", "cookies.txt") -and $_.Name -notlike ".env*" })
+    $runtimeDirectories = @(Get-PublishRuntimeDirectories -BuildDir $BuildDir -RuntimeIdentifiers $RuntimeIdentifiers)
+    if (($files.Count + $runtimeDirectories.Count) -eq 0) {
+        throw "目标目录下没有可发布内容（顶层文件或匹配的 runtimes 目录）：$BuildDir"
     }
 
-    foreach ($item in $items) {
-        Copy-Item -LiteralPath $item.FullName -Destination $PayloadDirectory -Recurse -Force
+    foreach ($file in $files) {
+        Copy-Item -LiteralPath $file.FullName -Destination $PayloadDirectory -Force
+    }
+
+    if ($runtimeDirectories.Count -gt 0) {
+        $payloadRuntimesDirectory = Join-Path $PayloadDirectory "runtimes"
+        New-Item -ItemType Directory -Force -Path $payloadRuntimesDirectory | Out-Null
+        foreach ($runtimeDirectory in $runtimeDirectories) {
+            Copy-Item -LiteralPath $runtimeDirectory.FullName -Destination $payloadRuntimesDirectory -Recurse -Force
+        }
     }
 }
 
@@ -509,6 +545,7 @@ function Publish-GitUpdateRepository {
         [string]$PayloadPath,
         [string]$ManifestPath,
         [string]$BuildDir,
+        [string[]]$RuntimeIdentifiers,
         [string]$Version,
         [string]$ReleaseNotes
     )
@@ -517,7 +554,7 @@ function Publish-GitUpdateRepository {
 
     $normalizedPayloadPath = ($PayloadPath -replace "\\", [System.IO.Path]::DirectorySeparatorChar).Trim([System.IO.Path]::DirectorySeparatorChar)
     $payloadDirectory = Join-Path $WorkingDirectory $normalizedPayloadPath
-    Copy-PublishItemsToPayload -BuildDir $BuildDir -PayloadDirectory $payloadDirectory
+    Copy-PublishItemsToPayload -BuildDir $BuildDir -PayloadDirectory $payloadDirectory -RuntimeIdentifiers $RuntimeIdentifiers
 
     $manifestFile = Join-Path $WorkingDirectory $ManifestPath
     $manifestDirectory = Split-Path -Parent $manifestFile
@@ -693,6 +730,7 @@ if ($PublishGitUpdateRepo) {
         -PayloadPath $GitUpdatePayloadPath `
         -ManifestPath $GitUpdateManifestPath `
         -BuildDir $BuildDir `
+        -RuntimeIdentifiers $RuntimeIdentifiersToPackage `
         -Version $Version `
         -ReleaseNotes $releaseNotes
 }
@@ -704,31 +742,45 @@ if (-not $SkipReleaseAssetUpload) {
 
     Write-Host "打包目录: $BuildDir"
     Write-Host "输出文件: $zipArchivePath"
+    Write-Host "打包 runtime: $($RuntimeIdentifiersToPackage -join ', ')"
 
-    Push-Location $BuildDir
+    $packageStagingDirectory = Join-Path $OutDir "_package_$Version"
     try {
-        $items = @((Get-PublishBuildItems -BuildDir $BuildDir) | ForEach-Object { $_.Name } | Select-Object -Unique)
+        Copy-PublishItemsToPayload `
+            -BuildDir $BuildDir `
+            -PayloadDirectory $packageStagingDirectory `
+            -RuntimeIdentifiers $RuntimeIdentifiersToPackage
 
-        if ($items.Count -eq 0) {
-            throw "目标目录下没有可打包内容（顶层文件或 runtimes 目录）：$BuildDir"
-        }
+        Push-Location $packageStagingDirectory
+        try {
+            $items = @(Get-ChildItem -LiteralPath $packageStagingDirectory -Force | ForEach-Object { $_.Name })
 
-        if ($null -ne $sevenZip) {
-            & $sevenZip a -tzip -mx=9 $zipArchivePath @items | Out-Host
-            if ($LASTEXITCODE -ne 0) {
-                throw "打包 zip 失败（7z exit code: $LASTEXITCODE）"
+            if ($items.Count -eq 0) {
+                throw "目标目录下没有可打包内容（顶层文件或匹配的 runtimes 目录）：$BuildDir"
+            }
+
+            if ($null -ne $sevenZip) {
+                & $sevenZip a -tzip -mx=9 $zipArchivePath @items | Out-Host
+                if ($LASTEXITCODE -ne 0) {
+                    throw "打包 zip 失败（7z exit code: $LASTEXITCODE）"
+                }
+            }
+            else {
+                $compress = Get-Command Compress-Archive -ErrorAction SilentlyContinue
+                if (-not $compress) {
+                    throw "未检测到 7z.exe 且当前 PowerShell 不支持 Compress-Archive。请安装 7-Zip，或升级 PowerShell。"
+                }
+                Compress-Archive -Path $items -DestinationPath $zipArchivePath -Force
             }
         }
-        else {
-            $compress = Get-Command Compress-Archive -ErrorAction SilentlyContinue
-            if (-not $compress) {
-                throw "未检测到 7z.exe 且当前 PowerShell 不支持 Compress-Archive。请安装 7-Zip，或升级 PowerShell。"
-            }
-            Compress-Archive -Path $items -DestinationPath $zipArchivePath -Force
+        finally {
+            Pop-Location
         }
     }
     finally {
-        Pop-Location
+        if (Test-Path -LiteralPath $packageStagingDirectory) {
+            Remove-Item -LiteralPath $packageStagingDirectory -Recurse -Force
+        }
     }
 
     $releaseExists = $false

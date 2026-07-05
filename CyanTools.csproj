@@ -8,6 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;.tmp/**</DefaultItemExcludes>
+    <CyanToolsRuntimeIdentifiersToCopy>win-x64;win-x86</CyanToolsRuntimeIdentifiersToCopy>
+    <_CyanToolsRuntimeIdentifierFilter>;$(CyanToolsRuntimeIdentifiersToCopy);</_CyanToolsRuntimeIdentifierFilter>
+    <WebView2NeverCopyLoaderDllToOutputDirectory>true</WebView2NeverCopyLoaderDllToOutputDirectory>
 
     <Version>1.0.0.15</Version>
     <AssemblyVersion>1.0.0.15</AssemblyVersion>
@@ -88,5 +91,15 @@
   <PropertyGroup>
     <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <Target Name="FilterPackageRuntimeCopyLocalItems"
+          AfterTargets="ResolvePackageAssets"
+          BeforeTargets="ResolveLockFileCopyLocalFiles">
+    <ItemGroup>
+      <_CyanToolsPackageRuntimeCopyLocalItemsToRemove Include="@(RuntimeTargetsCopyLocalItems)"
+                                                       Condition="'%(RuntimeTargetsCopyLocalItems.RuntimeIdentifier)' != '' and !$([System.String]::Copy('$(_CyanToolsRuntimeIdentifierFilter)').Contains(';%(RuntimeTargetsCopyLocalItems.RuntimeIdentifier);'))" />
+      <RuntimeTargetsCopyLocalItems Remove="@(_CyanToolsPackageRuntimeCopyLocalItemsToRemove)" />
+    </ItemGroup>
+  </Target>
 
 </Project>
