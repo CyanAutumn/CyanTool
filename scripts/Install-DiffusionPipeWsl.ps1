@@ -120,6 +120,67 @@ function Format-CommandLine {
     return Join-NativeArguments $Command
 }
 
+function Test-Utf16LittleEndianBytes {
+    param([byte[]]$Bytes)
+
+    if ($null -eq $Bytes -or $Bytes.Length -lt 2) {
+        return $false
+    }
+
+    if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
+        return $true
+    }
+
+    $pairs = [Math]::Min([int]($Bytes.Length / 2), 4096)
+    if ($pairs -eq 0) {
+        return $false
+    }
+
+    $oddZeroCount = 0
+    $evenZeroCount = 0
+    for ($index = 0; $index -lt $pairs; $index++) {
+        if ($Bytes[($index * 2) + 1] -eq 0) {
+            $oddZeroCount++
+        }
+        if ($Bytes[($index * 2)] -eq 0) {
+            $evenZeroCount++
+        }
+    }
+
+    return ($oddZeroCount -ge [Math]::Max(2, [int]($pairs * 0.08))) -and ($oddZeroCount -gt ($evenZeroCount * 3))
+}
+
+function Convert-NativeOutputBytesToString {
+    param(
+        [byte[]]$Bytes,
+        [System.Text.Encoding]$PreferredEncoding = [System.Text.Encoding]::UTF8
+    )
+
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) {
+        return ""
+    }
+
+    if (Test-Utf16LittleEndianBytes -Bytes $Bytes) {
+        return [System.Text.Encoding]::Unicode.GetString($Bytes)
+    }
+
+    if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) {
+        return [System.Text.Encoding]::UTF8.GetString($Bytes)
+    }
+
+    if ($PreferredEncoding -and $PreferredEncoding.CodePage -ne [System.Text.Encoding]::UTF8.CodePage) {
+        return $PreferredEncoding.GetString($Bytes)
+    }
+
+    try {
+        $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
+        return $strictUtf8.GetString($Bytes)
+    }
+    catch {
+        return [System.Text.Encoding]::Default.GetString($Bytes)
+    }
+}
+
 function Invoke-Native {
     param(
         [Parameter(Mandatory = $true)]
@@ -152,11 +213,13 @@ function Invoke-Native {
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $psi
+    $stdoutBuffer = [System.IO.MemoryStream]::new()
+    $stderrBuffer = [System.IO.MemoryStream]::new()
 
     try {
         [void]$process.Start()
-        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $stdoutTask = $process.StandardOutput.BaseStream.CopyToAsync($stdoutBuffer)
+        $stderrTask = $process.StandardError.BaseStream.CopyToAsync($stderrBuffer)
 
         if ($TimeoutSeconds -gt 0) {
             if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
@@ -174,8 +237,10 @@ function Invoke-Native {
         }
 
         $process.WaitForExit()
-        $stdoutText = $stdoutTask.GetAwaiter().GetResult()
-        $stderrText = $stderrTask.GetAwaiter().GetResult()
+        $stdoutTask.GetAwaiter().GetResult()
+        $stderrTask.GetAwaiter().GetResult()
+        $stdoutText = Convert-NativeOutputBytesToString -Bytes $stdoutBuffer.ToArray() -PreferredEncoding $NativeOutputEncoding
+        $stderrText = Convert-NativeOutputBytesToString -Bytes $stderrBuffer.ToArray() -PreferredEncoding $NativeOutputEncoding
         if (-not [string]::IsNullOrWhiteSpace($stdoutText)) {
             Write-Host $stdoutText.TrimEnd()
         }
@@ -198,6 +263,8 @@ function Invoke-Native {
         }
     }
     finally {
+        $stdoutBuffer.Dispose()
+        $stderrBuffer.Dispose()
         $process.Dispose()
     }
 }
