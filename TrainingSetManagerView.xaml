@@ -1,0 +1,611 @@
+<UserControl x:Class="CyanTools.TrainingSetManagerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
+             xmlns:model="clr-namespace:CyanTools.Model"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:nodify="https://miroiu.github.io/nodify"
+             mc:Ignorable="d"
+             d:DesignHeight="760"
+             d:DesignWidth="1280">
+    <UserControl.Resources>
+        <DataTemplate x:Key="TrainingSetConnectionTemplate"
+                      DataType="{x:Type viewModel:TrainingSetHistoryConnectionViewModel}">
+            <nodify:CircuitConnection Source="{Binding Output.Anchor}"
+                                      Target="{Binding Input.Anchor}"
+                                      Direction="Forward"
+                                      Stroke="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                      StrokeThickness="3" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="HistoryConnectorHeaderTemplate"
+                      DataType="{x:Type viewModel:TrainingSetHistoryConnectorViewModel}">
+            <TextBlock Text="{Binding Title}"
+                       FontSize="11"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </DataTemplate>
+
+        <Style x:Key="HistoryItemContainerStyle"
+               TargetType="{x:Type nodify:ItemContainer}">
+            <Setter Property="Location" Value="{Binding Location, Mode=TwoWay}" />
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="Panel.ZIndex" Value="1" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Panel.ZIndex" Value="2" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate DataType="{x:Type viewModel:TrainingSetHistoryCanvasNodeViewModel}">
+            <nodify:Node Header="{Binding}"
+                         Input="{Binding Input}"
+                         Output="{Binding Output}"
+                         Content="{Binding}"
+                         MinWidth="230"
+                         MaxWidth="260"
+                         ContentPadding="0"
+                         HeaderBrush="{StaticResource CyanNodeHeaderBrush}"
+                         ContentBrush="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                <nodify:Node.HeaderTemplate>
+                    <DataTemplate DataType="{x:Type viewModel:TrainingSetHistoryCanvasNodeViewModel}">
+                        <Grid Margin="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Symbol="BranchFork24"
+                                           Foreground="White"
+                                           FontSize="16"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,7,0" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="White"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding CommitShort}"
+                                           Foreground="{StaticResource CyanNodeHeaderSecondaryBrush}"
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2"
+                                       Text="当前"
+                                       Foreground="White"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Margin="8,0,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </DataTemplate>
+                </nodify:Node.HeaderTemplate>
+                <nodify:Node.ContentTemplate>
+                    <DataTemplate DataType="{x:Type viewModel:TrainingSetHistoryCanvasNodeViewModel}">
+                        <Grid Margin="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="92" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border Style="{StaticResource CyanImageWellStyle}">
+                                <Grid>
+                                    <Image Source="{Binding CoverImage}"
+                                           Stretch="UniformToFill" />
+                                    <TextBlock Text="未设置封面"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock"
+                                                   BasedOn="{StaticResource CyanTinyTextBlockStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CoverImage}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding Branch}"
+                                       Style="{StaticResource CyanTinyTextBlockStyle}"
+                                       Margin="0,8,0,8"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Row="2"
+                                    Command="{Binding SelectCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}">
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <ui:SymbolIcon Symbol="CursorClick24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="选中节点" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </nodify:Node.ContentTemplate>
+            </nodify:Node>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <UserControl.DataContext>
+        <viewModel:TrainingSetManagerViewModel />
+    </UserControl.DataContext>
+
+    <Grid Style="{StaticResource CyanPageGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="150" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="8" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="8" />
+            <ColumnDefinition Width="420" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0"
+                Grid.ColumnSpan="5"
+                Style="{StaticResource CyanCardStyle}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CyanIconBadgeStyle}"
+                        Margin="0,0,14,0">
+                    <ui:SymbolIcon Symbol="DatabaseLink24"
+                                   FontSize="22"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="训练集管理器"
+                               Style="{StaticResource CyanSectionTitleStyle}" />
+                    <TextBlock Text="用 Git/LFS 管理图片训练集历史、节点配置、笔记、日志和训练产物。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+                <Border Grid.Column="2"
+                        Style="{StaticResource CyanStatusStripStyle}"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="{Binding GitStatusText}"
+                               FontWeight="SemiBold" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Grid.ColumnSpan="5"
+                Style="{StaticResource CyanToolbarSurfaceStyle}"
+                Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalContentAlignment="Center"
+                         Margin="0,0,8,0" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding ProjectRootPath}"
+                         IsReadOnly="True"
+                         VerticalContentAlignment="Center"
+                         Margin="0,0,8,0" />
+                <Button Grid.Column="2"
+                        Command="{Binding CreateProjectCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="AddSquare24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="新建" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3"
+                        Command="{Binding OpenProjectCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="FolderOpen24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="打开" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="4"
+                        Command="{Binding OpenProjectFolderCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <ui:SymbolIcon Symbol="Open24" />
+                </Button>
+                <Button Grid.Column="5"
+                        Command="{Binding RefreshGitStatusCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <ui:SymbolIcon Symbol="ArrowClockwise24" />
+                </Button>
+                <Button Grid.Column="6"
+                        Command="{Binding CreateNodeCommand}"
+                        Style="{StaticResource CyanCommandButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="BranchForkHint24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="新节点" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="7"
+                        Command="{Binding SaveNodeCommand}"
+                        Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Save24"
+                                       Margin="0,0,6,0" />
+                        <TextBlock Text="保存节点" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="2"
+                  Grid.Column="0"
+                  Header="训练集节点"
+                  Style="{StaticResource CyanGroupBoxStyle}"
+                  Margin="0,0,0,12">
+            <DockPanel>
+                <Border DockPanel.Dock="Top"
+                        Style="{StaticResource CyanImageWellStyle}"
+                        Height="126"
+                        Margin="0,0,0,10">
+                    <Grid>
+                        <Image Source="{Binding ProjectCoverImage}"
+                               Stretch="UniformToFill" />
+                        <Button Command="{Binding SelectProjectCoverCommand}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Margin="8"
+                                Style="{StaticResource CyanCommandButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ImageEdit24"
+                                               Margin="0,0,6,0" />
+                                <TextBlock Text="训练集封面" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+                <ListBox ItemsSource="{Binding ProjectNodes}"
+                         SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+                         Style="{StaticResource CyanListBoxSurfaceStyle}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type model:TrainingSetVersionNode}">
+                            <Border Style="{StaticResource CyanThumbnailCardStyle}"
+                                    Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding CommitShort}"
+                                               Style="{StaticResource CyanTinyTextBlockStyle}"
+                                               Margin="0,3,0,0" />
+                                    <TextBlock Text="{Binding Branch}"
+                                               Style="{StaticResource CyanTinyTextBlockStyle}"
+                                               Margin="0,3,0,0"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </GroupBox>
+
+        <GridSplitter Grid.Row="2"
+                      Grid.Column="1"
+                      Style="{StaticResource CyanGridSplitterStyle}" />
+
+        <Border Grid.Row="2"
+                Grid.Column="2"
+                Style="{StaticResource CyanImageWellStyle}"
+                Margin="0,0,0,12">
+            <nodify:NodifyEditor ItemsSource="{Binding HistoryNodes}"
+                                 Connections="{Binding HistoryConnections}"
+                                 ConnectionTemplate="{StaticResource TrainingSetConnectionTemplate}"
+                                 ItemContainerStyle="{StaticResource HistoryItemContainerStyle}"
+                                 GridCellSize="20"
+                                 Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                <nodify:NodifyEditor.Resources>
+                    <Style TargetType="{x:Type nodify:NodeInput}">
+                        <Setter Property="Header" Value="{Binding}" />
+                        <Setter Property="HeaderTemplate" Value="{StaticResource HistoryConnectorHeaderTemplate}" />
+                        <Setter Property="IsConnected" Value="{Binding IsConnected}" />
+                        <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}" />
+                    </Style>
+                    <Style TargetType="{x:Type nodify:NodeOutput}">
+                        <Setter Property="Header" Value="{Binding}" />
+                        <Setter Property="HeaderTemplate" Value="{StaticResource HistoryConnectorHeaderTemplate}" />
+                        <Setter Property="IsConnected" Value="{Binding IsConnected}" />
+                        <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}" />
+                    </Style>
+                </nodify:NodifyEditor.Resources>
+            </nodify:NodifyEditor>
+        </Border>
+
+        <GridSplitter Grid.Row="2"
+                      Grid.Column="3"
+                      Style="{StaticResource CyanGridSplitterStyle}" />
+
+        <TabControl Grid.Row="2"
+                    Grid.Column="4"
+                    Margin="0,0,0,12">
+            <TabItem Header="节点">
+                <ScrollViewer Style="{StaticResource CyanPageScrollViewerStyle}">
+                    <StackPanel Margin="2,8,2,2">
+                        <Border Style="{StaticResource CyanImageWellStyle}"
+                                Height="150"
+                                Margin="0,0,0,10">
+                            <Grid>
+                                <Image Source="{Binding SelectedNodeCoverImage}"
+                                       Stretch="UniformToFill" />
+                                <Button Command="{Binding SelectNodeCoverCommand}"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Margin="8"
+                                        Style="{StaticResource CyanCommandButtonStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="ImageEdit24"
+                                                       Margin="0,0,6,0" />
+                                        <TextBlock Text="节点封面" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="标题"
+                                   Style="{StaticResource CyanFormLabelStyle}" />
+                        <TextBox Text="{Binding SelectedNodeTitle, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,4,0,10" />
+                        <TextBlock Text="说明"
+                                   Style="{StaticResource CyanFormLabelStyle}" />
+                        <TextBox Text="{Binding SelectedNodeDescription, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="62"
+                                 Margin="0,4,0,12" />
+
+                        <WrapPanel Margin="0,0,0,12">
+                            <Button Command="{Binding CheckoutNodeCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ArrowUndo24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="回退到节点" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding CreateBranchFromNodeCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="BranchFork24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="从此派生分支" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ImportConfigCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="DocumentAdd24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="导入配置" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+
+                        <TextBlock Text="配置文件"
+                                   Style="{StaticResource CyanSectionTitleStyle}"
+                                   Margin="0,0,0,8" />
+                        <ItemsControl ItemsSource="{Binding SelectedNode.ConfigFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type model:TrainingSetConfigFile}">
+                                    <Border Style="{StaticResource CyanParameterRowStyle}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding RelativePath}"
+                                                       Style="{StaticResource CyanTinyTextBlockStyle}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="训练产物与输出"
+                                   Style="{StaticResource CyanSectionTitleStyle}"
+                                   Margin="0,12,0,8" />
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Command="{Binding AttachOutputImageCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ImageAdd24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="输出图片" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding AttachModelCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Archive24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="成品模型" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding AttachTensorBoardLogCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ChartMultiple24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="TensorBoard" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                        <ItemsControl ItemsSource="{Binding SelectedNode.Artifacts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type model:TrainingSetArtifact}">
+                                    <Border Style="{StaticResource CyanParameterRowStyle}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding RelativePath}"
+                                                       Style="{StaticResource CyanTinyTextBlockStyle}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="笔记">
+                <DockPanel Margin="2,8,2,2">
+                    <WrapPanel DockPanel.Dock="Top"
+                               Margin="0,0,0,8">
+                        <Button Command="{Binding InsertNoteHeadingCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Margin="0,0,8,8">
+                            <ui:SymbolIcon Symbol="TextHeader124" />
+                        </Button>
+                        <Button Command="{Binding InsertNoteTableCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Margin="0,0,8,8">
+                            <ui:SymbolIcon Symbol="Table24" />
+                        </Button>
+                        <Button Command="{Binding InsertNoteImageRecordCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Margin="0,0,8,8">
+                            <ui:SymbolIcon Symbol="ImageMultiple24" />
+                        </Button>
+                        <Button Command="{Binding InsertNoteChecklistCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Margin="0,0,8,8">
+                            <ui:SymbolIcon Symbol="CheckboxChecked24" />
+                        </Button>
+                    </WrapPanel>
+                    <TextBox Text="{Binding NoteEditorText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             MinHeight="360" />
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="对比">
+                <DockPanel Margin="2,8,2,2">
+                    <Grid DockPanel.Dock="Top"
+                          Margin="0,0,0,8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox ItemsSource="{Binding ProjectNodes}"
+                                  SelectedItem="{Binding CompareSourceNode}"
+                                  DisplayMemberPath="Title"
+                                  Margin="0,0,8,0" />
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding ProjectNodes}"
+                                  SelectedItem="{Binding CompareTargetNode}"
+                                  DisplayMemberPath="Title"
+                                  Margin="0,0,8,0" />
+                        <Button Grid.Column="2"
+                                Grid.RowSpan="2"
+                                Command="{Binding CompareNodesCommand}"
+                                Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="DataUsageEdit24"
+                                               Margin="0,0,6,0" />
+                                <TextBlock Text="仅更改" />
+                            </StackPanel>
+                        </Button>
+                        <ComboBox Grid.Row="1"
+                                  ItemsSource="{Binding CompareSourceConfigs}"
+                                  SelectedItem="{Binding CompareSourceConfig}"
+                                  DisplayMemberPath="DisplayName"
+                                  Margin="0,8,8,0" />
+                        <ComboBox Grid.Row="1"
+                                  Grid.Column="1"
+                                  ItemsSource="{Binding CompareTargetConfigs}"
+                                  SelectedItem="{Binding CompareTargetConfig}"
+                                  DisplayMemberPath="DisplayName"
+                                  Margin="0,8,8,0" />
+                    </Grid>
+                    <DataGrid ItemsSource="{Binding ConfigDiffRows}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="类型"
+                                                Binding="{Binding Kind}"
+                                                Width="80" />
+                            <DataGridTextColumn Header="参数"
+                                                Binding="{Binding Key}"
+                                                Width="*" />
+                            <DataGridTextColumn Header="旧值"
+                                                Binding="{Binding OldValue}"
+                                                Width="*" />
+                            <DataGridTextColumn Header="新值"
+                                                Binding="{Binding NewValue}"
+                                                Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+
+        <GroupBox Grid.Row="3"
+                  Grid.ColumnSpan="5"
+                  Header="日志"
+                  Style="{StaticResource CyanGroupBoxStyle}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding StatusText}"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           Margin="0,0,0,8" />
+                <ListBox ItemsSource="{Binding LogLines}"
+                         Style="{StaticResource CyanListBoxSurfaceStyle}" />
+            </DockPanel>
+        </GroupBox>
+    </Grid>
+</UserControl>

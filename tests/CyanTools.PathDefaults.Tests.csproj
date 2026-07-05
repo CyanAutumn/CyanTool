@@ -26,6 +26,10 @@
 
   <ItemGroup>
     <Compile Include="../Utils/FolderProcessingOperation.cs" Link="Utils/FolderProcessingOperation.cs" />
+    <Compile Include="../Model/TrainingSetManagerModels.cs" Link="Model/TrainingSetManagerModels.cs" />
+    <Compile Include="../Utils/TrainingSetGitService.cs" Link="Utils/TrainingSetGitService.cs" />
+    <Compile Include="../Utils/TrainingSetProjectStore.cs" Link="Utils/TrainingSetProjectStore.cs" />
+    <Compile Include="../Utils/TrainingSetConfigDiffService.cs" Link="Utils/TrainingSetConfigDiffService.cs" />
     <Compile Include="../Model/LayeredLoraMergeModels.cs" Link="Model/LayeredLoraMergeModels.cs" />
     <Compile Include="../Utils/LayeredLoraWeightParser.cs" Link="Utils/LayeredLoraWeightParser.cs" />
     <Compile Include="../Utils/LayeredLoraPresetStore.cs" Link="Utils/LayeredLoraPresetStore.cs" />

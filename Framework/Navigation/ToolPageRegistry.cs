@@ -50,6 +50,7 @@ namespace CyanTools.Navigation
                 controlType == typeof(global::CyanTools.XyzToolView) ||
                 controlType == typeof(global::CyanTools.ToolLLM) ||
                 controlType == typeof(global::CyanTools.ModelTrainingView) ||
+                controlType == typeof(global::CyanTools.TrainingSetManagerView) ||
                 controlType == typeof(global::CyanTools.LayeredLoraMergeView) ||
                 controlType == typeof(global::CyanTools.LoraTrainingView))
             {

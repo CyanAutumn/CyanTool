@@ -265,6 +265,11 @@ namespace CyanTools
                 return SymbolRegular.Scales24;
             }
 
+            if (controlType == typeof(TrainingSetManagerView))
+            {
+                return SymbolRegular.DatabaseLink24;
+            }
+
             if (controlType == typeof(LayeredLoraMergeView))
             {
                 return SymbolRegular.Layer24;
