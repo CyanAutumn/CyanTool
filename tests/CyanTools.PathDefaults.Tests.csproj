@@ -28,6 +28,7 @@
     <Compile Include="../Utils/FolderProcessingOperation.cs" Link="Utils/FolderProcessingOperation.cs" />
     <Compile Include="../Model/LayeredLoraMergeModels.cs" Link="Model/LayeredLoraMergeModels.cs" />
     <Compile Include="../Utils/LayeredLoraWeightParser.cs" Link="Utils/LayeredLoraWeightParser.cs" />
+    <Compile Include="../Utils/LayeredLoraPresetStore.cs" Link="Utils/LayeredLoraPresetStore.cs" />
     <Compile Include="../Utils/LoraLayerMapper.cs" Link="Utils/LoraLayerMapper.cs" />
     <Compile Include="../Utils/SafetensorsFile.cs" Link="Utils/SafetensorsFile.cs" />
     <Compile Include="../Utils/LayeredLoraMerger.cs" Link="Utils/LayeredLoraMerger.cs" />

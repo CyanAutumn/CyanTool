@@ -214,6 +214,7 @@ namespace CyanTools.Utils
 
             int sdxlScore = 0;
             int animaScore = 0;
+            int animaFullModelScore = 0;
             foreach (var key in modelA.Tensors.Keys.Concat(modelB.Tensors.Keys))
             {
                 var guess = LoraLayerMapper.GuessArchitectureFromKey(key);
@@ -225,6 +226,15 @@ namespace CyanTools.Utils
                 {
                     animaScore++;
                 }
+                else if (guess == LayeredLoraArchitecture.AnimaFullModel)
+                {
+                    animaFullModelScore++;
+                }
+            }
+
+            if (animaFullModelScore > 0 && animaFullModelScore >= animaScore && animaFullModelScore >= sdxlScore)
+            {
+                return LayeredLoraArchitecture.AnimaFullModel;
             }
 
             if (animaScore > 0 && animaScore >= sdxlScore)
@@ -268,7 +278,8 @@ namespace CyanTools.Utils
             metadata["cyan_merge_type"] = "layered_lora";
             metadata["cyan_merge_architecture"] = architecture.ToString();
             metadata["cyan_merge_base_alpha"] = weights.BaseAlpha.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture);
-            if (architecture == LayeredLoraArchitecture.Anima)
+            if (architecture == LayeredLoraArchitecture.Anima ||
+                architecture == LayeredLoraArchitecture.AnimaFullModel)
             {
                 metadata["cyan_merge_anima_blocks"] = weights.ToAnimaBlockText();
             }
@@ -286,7 +297,8 @@ namespace CyanTools.Utils
             LoraLayerSlot slot,
             LayeredLoraWeights weights)
         {
-            if (architecture == LayeredLoraArchitecture.Anima)
+            if (architecture == LayeredLoraArchitecture.Anima ||
+                architecture == LayeredLoraArchitecture.AnimaFullModel)
             {
                 var blockIndex = LoraLayerMapper.TryGetAnimaBlockIndex(key);
                 if (blockIndex.HasValue)

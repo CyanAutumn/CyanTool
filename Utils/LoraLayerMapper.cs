@@ -9,8 +9,9 @@ namespace CyanTools.Utils
         private static readonly Regex SdxlInputBlockRegex = new(@"(?:^|_)input_blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
         private static readonly Regex SdxlMiddleBlockRegex = new(@"(?:^|_)middle_block_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
         private static readonly Regex SdxlOutputBlockRegex = new(@"(?:^|_)output_blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
-        private static readonly Regex AnimaDotBlockRegex = new(@"(?:^|\.)blocks\.(\d+)(?:\.|$)", RegexOptions.Compiled);
-        private static readonly Regex AnimaUnderscoreBlockRegex = new(@"(?:^|_)blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
+        private static readonly Regex AnimaAdapterBlockRegex = new(@"^diffusion_model\.blocks\.(\d+)(?:\.|$)", RegexOptions.Compiled);
+        private static readonly Regex AnimaAdapterUnderscoreBlockRegex = new(@"^diffusion_model_blocks_(\d+)(?:_|\.|$)", RegexOptions.Compiled);
+        private static readonly Regex AnimaFullModelBlockRegex = new(@"^net\.blocks\.(\d+)(?:\.|$)", RegexOptions.Compiled);
 
         public static LoraLayerSlot MapKey(string key, LayeredLoraArchitecture architecture, int? animaBlockCount = null)
         {
@@ -27,6 +28,7 @@ namespace CyanTools.Utils
             {
                 LayeredLoraArchitecture.Sdxl => MapSdxlKey(key),
                 LayeredLoraArchitecture.Anima => MapAnimaKey(key),
+                LayeredLoraArchitecture.AnimaFullModel => MapAnimaFullModelKey(key),
                 LayeredLoraArchitecture.AnimaSdxlCompatible => MapAnimaSdxlCompatibleKey(key, animaBlockCount),
                 _ => LoraLayerSlot.Unknown
             };
@@ -38,6 +40,11 @@ namespace CyanTools.Utils
                 key.StartsWith("lora_te", StringComparison.OrdinalIgnoreCase))
             {
                 return LayeredLoraArchitecture.Sdxl;
+            }
+
+            if (key.StartsWith("net.", StringComparison.OrdinalIgnoreCase))
+            {
+                return LayeredLoraArchitecture.AnimaFullModel;
             }
 
             if (key.Contains("diffusion_model.", StringComparison.OrdinalIgnoreCase) ||
@@ -87,6 +94,18 @@ namespace CyanTools.Utils
             return LoraLayerSlot.Unknown;
         }
 
+        private static LoraLayerSlot MapAnimaFullModelKey(string key)
+        {
+            if (key.StartsWith("net.llm_adapter.", StringComparison.OrdinalIgnoreCase))
+            {
+                return LoraLayerSlot.Base;
+            }
+
+            return TryGetAnimaBlockIndex(key).HasValue
+                ? LoraLayerSlot.Unknown
+                : LoraLayerSlot.Base;
+        }
+
         private static LoraLayerSlot MapAnimaSdxlCompatibleKey(string key, int? blockCount)
         {
             if (key.Contains("llm_adapter", StringComparison.OrdinalIgnoreCase))
@@ -109,10 +128,21 @@ namespace CyanTools.Utils
 
         public static int? TryGetAnimaBlockIndex(string key)
         {
-            var match = AnimaDotBlockRegex.Match(key);
+            if (string.IsNullOrWhiteSpace(key) ||
+                key.Contains("llm_adapter", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var match = AnimaAdapterBlockRegex.Match(key);
             if (!match.Success)
             {
-                match = AnimaUnderscoreBlockRegex.Match(key);
+                match = AnimaAdapterUnderscoreBlockRegex.Match(key);
+            }
+
+            if (!match.Success)
+            {
+                match = AnimaFullModelBlockRegex.Match(key);
             }
 
             if (match.Success && int.TryParse(match.Groups[1].Value, out int index))

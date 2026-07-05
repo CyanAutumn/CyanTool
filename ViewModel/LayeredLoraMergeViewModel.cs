@@ -20,14 +20,16 @@ namespace CyanTools.ViewModel
     {
         private const int DefaultAnimaBlockCount = 28;
         private const double DefaultAnimaBlockWeight = 0.5d;
-        private const string SafetensorsFilter = "LoRA safetensors (*.safetensors)|*.safetensors|所有文件 (*.*)|*.*";
+        private const string SafetensorsFilter = "safetensors (*.safetensors)|*.safetensors|所有文件 (*.*)|*.*";
         private const string ReportExampleWeights = "1,1,0.8,0.6,0.4,0.2,0.1,0,0,0,0,0,0,0.3,0.5,0.6,0.7,0.8,0.9,1,1,1,1,1,1";
 
+        private readonly LayeredLoraPresetStore _presetStore = new LayeredLoraPresetStore();
         private readonly StringBuilder _logBuilder = new StringBuilder();
         private string _modelAPath = string.Empty;
         private string _modelBPath = string.Empty;
         private string _outputPath = string.Empty;
         private string _baseAlphaText = "0";
+        private string _presetConfigName = string.Empty;
         private string _layerWeightsText = string.Empty;
         private string _logText = string.Empty;
         private string _statusText = "准备就绪";
@@ -37,6 +39,7 @@ namespace CyanTools.ViewModel
         private bool _isApplyingLayerWeightsText;
         private bool _isSynchronizingLayerWeightsText;
         private LayeredLoraArchitectureOption _selectedArchitectureOption;
+        private LayeredLoraPresetOption? _selectedPresetOption;
 
         public LayeredLoraMergeViewModel()
         {
@@ -45,6 +48,7 @@ namespace CyanTools.ViewModel
                 new LayeredLoraArchitectureOption(LayeredLoraArchitecture.Auto, "自动识别"),
                 new LayeredLoraArchitectureOption(LayeredLoraArchitecture.Sdxl, "SDXL / Kohya"),
                 new LayeredLoraArchitectureOption(LayeredLoraArchitecture.Anima, "Anima / diffusion-pipe"),
+                new LayeredLoraArchitectureOption(LayeredLoraArchitecture.AnimaFullModel, "Anima 大模型 / diffusion-pipe"),
                 new LayeredLoraArchitectureOption(LayeredLoraArchitecture.AnimaSdxlCompatible, "Anima / SDXL 25层习惯")
             };
             _selectedArchitectureOption = ArchitectureOptions[0];
@@ -63,14 +67,15 @@ namespace CyanTools.ViewModel
             BrowseModelBCommand = new RelayCommand(BrowseModelB, () => !IsBusy);
             BrowseOutputCommand = new RelayCommand(BrowseOutput, () => !IsBusy);
             MergeCommand = new RelayCommand(async () => await MergeAsync(), () => !IsBusy);
-            UseAllACommand = new RelayCommand(() => ApplyPreset(0d, 0d), () => !IsBusy);
-            UseAllBCommand = new RelayCommand(() => ApplyPreset(1d, 1d), () => !IsBusy);
-            UseBalancedCommand = new RelayCommand(() => ApplyPreset(0.5d, 0.5d), () => !IsBusy);
-            UseReportExampleCommand = new RelayCommand(ApplyReportExample, () => !IsBusy && IsSdxlWeightEditorVisible);
-            UseAnimaStyleToCompositionCommand = new RelayCommand(ApplyAnimaStyleToCompositionPreset, () => !IsBusy && IsAnimaWeightEditorVisible);
+            SavePresetConfigCommand = new RelayCommand(SavePresetConfig, CanSavePresetConfig);
+            DeletePresetConfigCommand = new RelayCommand(DeletePresetConfig, CanDeletePresetConfig);
+            PresetOptions = new ObservableCollection<LayeredLoraPresetOption>();
+            RefreshPresetOptions();
         }
 
         public ObservableCollection<LayeredLoraArchitectureOption> ArchitectureOptions { get; }
+
+        public ObservableCollection<LayeredLoraPresetOption> PresetOptions { get; }
 
         public ObservableCollection<LayeredLoraLayerWeight> LayerWeights { get; }
 
@@ -125,6 +130,31 @@ namespace CyanTools.ViewModel
             set => SetField(ref _baseAlphaText, value ?? string.Empty, nameof(BaseAlphaText));
         }
 
+        public string PresetConfigName
+        {
+            get => _presetConfigName;
+            set
+            {
+                if (SetField(ref _presetConfigName, value ?? string.Empty, nameof(PresetConfigName)))
+                {
+                    RaisePresetCommandStates();
+                }
+            }
+        }
+
+        public LayeredLoraPresetOption? SelectedPresetOption
+        {
+            get => _selectedPresetOption;
+            set
+            {
+                if (SetField(ref _selectedPresetOption, value, nameof(SelectedPresetOption)) && value != null)
+                {
+                    PresetConfigName = value.Name;
+                    ApplyPresetOption(value);
+                }
+            }
+        }
+
         public string LayerWeightsText
         {
             get => _layerWeightsText;
@@ -160,6 +190,7 @@ namespace CyanTools.ViewModel
                 if (SetField(ref _isBusy, value, nameof(IsBusy)))
                 {
                     CommandManager.InvalidateRequerySuggested();
+                    RaisePresetCommandStates();
                 }
             }
         }
@@ -202,7 +233,9 @@ namespace CyanTools.ViewModel
             {
                 if (IsAnimaWeightEditorVisible)
                 {
-                    return "Anima Block 权重";
+                    return SelectedArchitectureOption?.Architecture == LayeredLoraArchitecture.AnimaFullModel
+                        ? "Anima 大模型 Block 权重"
+                        : "Anima Block 权重";
                 }
 
                 return SelectedArchitectureOption?.Architecture == LayeredLoraArchitecture.AnimaSdxlCompatible
@@ -215,27 +248,24 @@ namespace CyanTools.ViewModel
         public ICommand BrowseModelBCommand { get; }
         public ICommand BrowseOutputCommand { get; }
         public ICommand MergeCommand { get; }
-        public ICommand UseAllACommand { get; }
-        public ICommand UseAllBCommand { get; }
-        public ICommand UseBalancedCommand { get; }
-        public ICommand UseReportExampleCommand { get; }
-        public ICommand UseAnimaStyleToCompositionCommand { get; }
+        public ICommand SavePresetConfigCommand { get; }
+        public ICommand DeletePresetConfigCommand { get; }
 
         private void BrowseModelA()
         {
-            SelectInputFile("选择 LoRA A", path => ModelAPath = path);
+            SelectInputFile("选择模型 A", path => ModelAPath = path);
         }
 
         private void BrowseModelB()
         {
-            SelectInputFile("选择 LoRA B", path => ModelBPath = path);
+            SelectInputFile("选择模型 B", path => ModelBPath = path);
         }
 
         private void BrowseOutput()
         {
             var dialog = new SaveFileDialog
             {
-                Title = "选择输出 LoRA",
+                Title = "选择输出文件",
                 Filter = SafetensorsFilter,
                 DefaultExt = ".safetensors",
                 AddExtension = true,
@@ -290,14 +320,15 @@ namespace CyanTools.ViewModel
                 ClearLog();
                 AppendLog("开始分层融合。");
                 AppendLog($"架构: {SelectedArchitectureOption.DisplayName}");
-                AppendLog($"LoRA A: {options.ModelAPath}");
-                AppendLog($"LoRA B: {options.ModelBPath}");
+                AppendLog($"模型 A: {options.ModelAPath}");
+                AppendLog($"模型 B: {options.ModelBPath}");
                 AppendLog($"输出: {options.OutputPath}");
 
                 var report = await Task.Run(() => LayeredLoraMerger.Merge(options));
                 AppendLog($"完成: 架构识别为 {report.Architecture}。");
                 AppendLog($"张量: 插值/缩放 {report.MergedTensorCount}，直接复制 {report.CopiedTensorCount}。");
-                if (report.Architecture == LayeredLoraArchitecture.Anima)
+                if (report.Architecture == LayeredLoraArchitecture.Anima ||
+                    report.Architecture == LayeredLoraArchitecture.AnimaFullModel)
                 {
                     AppendLog($"Anima Block 权重: {options.Weights.AnimaBlockWeights.Count} 个滑动条。");
                 }
@@ -317,7 +348,7 @@ namespace CyanTools.ViewModel
                 }
 
                 StatusText = "融合完成";
-                MessageBox.Show("LoRA 分层融合完成。", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("分层融合完成。", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -335,17 +366,17 @@ namespace CyanTools.ViewModel
         {
             if (string.IsNullOrWhiteSpace(ModelAPath) || !File.Exists(ModelAPath))
             {
-                throw new InvalidOperationException("请先选择有效的 LoRA A 文件。");
+                throw new InvalidOperationException("请先选择有效的模型 A 文件。");
             }
 
             if (string.IsNullOrWhiteSpace(ModelBPath) || !File.Exists(ModelBPath))
             {
-                throw new InvalidOperationException("请先选择有效的 LoRA B 文件。");
+                throw new InvalidOperationException("请先选择有效的模型 B 文件。");
             }
 
             if (string.IsNullOrWhiteSpace(OutputPath))
             {
-                throw new InvalidOperationException("请设置输出 LoRA 路径。");
+                throw new InvalidOperationException("请设置输出文件路径。");
             }
 
             var outputDirectory = Path.GetDirectoryName(OutputPath);
@@ -360,7 +391,8 @@ namespace CyanTools.ViewModel
             }
 
             var effectiveArchitecture = ResolveWeightEditorArchitecture();
-            var weights = effectiveArchitecture == LayeredLoraArchitecture.Anima
+            var weights = effectiveArchitecture == LayeredLoraArchitecture.Anima ||
+                effectiveArchitecture == LayeredLoraArchitecture.AnimaFullModel
                 ? LayeredLoraWeights.CreateFromAnimaBlockItems(baseAlpha, AnimaBlockWeights)
                 : LayeredLoraWeights.CreateFromLayerItems(baseAlpha, LayerWeights);
             return new LayeredLoraMergeOptions(
@@ -370,6 +402,243 @@ namespace CyanTools.ViewModel
                 SelectedArchitectureOption.Architecture,
                 weights,
                 overwrite: true);
+        }
+
+        private void RefreshPresetOptions()
+        {
+            var selectedName = SelectedPresetOption?.Name;
+            PresetOptions.Clear();
+            PresetOptions.Add(LayeredLoraPresetOption.CreateBuiltIn("全 A", LayeredLoraPresetKind.AllA));
+            PresetOptions.Add(LayeredLoraPresetOption.CreateBuiltIn("全 B", LayeredLoraPresetKind.AllB));
+            PresetOptions.Add(LayeredLoraPresetOption.CreateBuiltIn("均衡 0.5", LayeredLoraPresetKind.Balanced));
+
+            if (IsSdxlWeightEditorVisible)
+            {
+                PresetOptions.Add(LayeredLoraPresetOption.CreateBuiltIn("报告示例", LayeredLoraPresetKind.ReportExample));
+            }
+
+            if (IsAnimaWeightEditorVisible)
+            {
+                PresetOptions.Add(LayeredLoraPresetOption.CreateBuiltIn("A画风到B构图", LayeredLoraPresetKind.AnimaStyleToComposition));
+            }
+
+            try
+            {
+                foreach (var name in _presetStore.LoadNames())
+                {
+                    PresetOptions.Add(LayeredLoraPresetOption.CreateCustom(name));
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"加载配置列表失败: {ex.Message}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedName))
+            {
+                _selectedPresetOption = PresetOptions.FirstOrDefault(item => string.Equals(item.Name, selectedName, StringComparison.OrdinalIgnoreCase));
+                OnPropertyChanged(nameof(SelectedPresetOption));
+            }
+
+            RaisePresetCommandStates();
+        }
+
+        private void ApplyPresetOption(LayeredLoraPresetOption option)
+        {
+            if (IsBusy)
+            {
+                return;
+            }
+
+            try
+            {
+                switch (option.Kind)
+                {
+                    case LayeredLoraPresetKind.AllA:
+                        ApplyPreset(0d, 0d);
+                        StatusText = "已加载配置: 全 A";
+                        break;
+                    case LayeredLoraPresetKind.AllB:
+                        ApplyPreset(1d, 1d);
+                        StatusText = "已加载配置: 全 B";
+                        break;
+                    case LayeredLoraPresetKind.Balanced:
+                        ApplyPreset(0.5d, 0.5d);
+                        StatusText = "已加载配置: 均衡 0.5";
+                        break;
+                    case LayeredLoraPresetKind.ReportExample:
+                        ApplyReportExample();
+                        StatusText = "已加载配置: 报告示例";
+                        break;
+                    case LayeredLoraPresetKind.AnimaStyleToComposition:
+                        ApplyAnimaStyleToCompositionPreset();
+                        StatusText = "已加载配置: A画风到B构图";
+                        break;
+                    case LayeredLoraPresetKind.Custom:
+                        LoadPresetConfig(option.Name);
+                        break;
+                }
+            }
+            finally
+            {
+                RaisePresetCommandStates();
+            }
+        }
+
+        private void SavePresetConfig()
+        {
+            var name = LayeredLoraPresetStore.SanitizeFileName(PresetConfigName);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                StatusText = "配置名不能为空。";
+                return;
+            }
+
+            try
+            {
+                _presetStore.Save(CreateCurrentPresetConfig(name));
+                RefreshPresetOptions();
+                SelectedPresetOption = PresetOptions.FirstOrDefault(item =>
+                    item.Kind == LayeredLoraPresetKind.Custom &&
+                    string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+                StatusText = $"配置已保存: {name}";
+                AppendLog(StatusText);
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"保存配置失败: {ex.Message}";
+                AppendLog(StatusText);
+            }
+            finally
+            {
+                RaisePresetCommandStates();
+            }
+        }
+
+        private void DeletePresetConfig()
+        {
+            var name = LayeredLoraPresetStore.SanitizeFileName(PresetConfigName);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                StatusText = "配置名不能为空。";
+                return;
+            }
+
+            try
+            {
+                _presetStore.Delete(name);
+                RefreshPresetOptions();
+                SelectedPresetOption = null;
+                StatusText = $"配置已删除: {name}";
+                AppendLog(StatusText);
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"删除配置失败: {ex.Message}";
+                AppendLog(StatusText);
+            }
+            finally
+            {
+                RaisePresetCommandStates();
+            }
+        }
+
+        private bool CanSavePresetConfig()
+        {
+            return !IsBusy && !string.IsNullOrWhiteSpace(PresetConfigName);
+        }
+
+        private bool CanDeletePresetConfig()
+        {
+            return !IsBusy && _presetStore.Exists(PresetConfigName);
+        }
+
+        private void RaisePresetCommandStates()
+        {
+            (SavePresetConfigCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeletePresetConfigCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+
+        private LayeredLoraPresetConfig CreateCurrentPresetConfig(string name)
+        {
+            if (!double.TryParse(BaseAlphaText, NumberStyles.Float, CultureInfo.InvariantCulture, out var baseAlpha))
+            {
+                throw new FormatException("base_alpha 必须是数字，例如 0、0.5 或 1。");
+            }
+
+            return new LayeredLoraPresetConfig
+            {
+                Name = name,
+                Architecture = SelectedArchitectureOption?.Architecture ?? LayeredLoraArchitecture.Auto,
+                BaseAlpha = baseAlpha,
+                LayerWeights = LayerWeights.Select(item => item.Value).ToList(),
+                AnimaBlockWeights = AnimaBlockWeights
+                    .Select(item => new LayeredLoraBlockPresetWeight
+                    {
+                        BlockIndex = item.BlockIndex,
+                        Value = item.Value
+                    })
+                    .ToList()
+            };
+        }
+
+        private void LoadPresetConfig(string name)
+        {
+            var config = _presetStore.Load(name);
+            if (config == null)
+            {
+                StatusText = "配置文件不存在。";
+                RaisePresetCommandStates();
+                return;
+            }
+
+            ApplyPresetConfig(config);
+            StatusText = $"已加载配置: {config.Name}";
+            AppendLog(StatusText);
+        }
+
+        private void ApplyPresetConfig(LayeredLoraPresetConfig config)
+        {
+            var architectureOption = ArchitectureOptions.FirstOrDefault(item => item.Architecture == config.Architecture)
+                ?? ArchitectureOptions[0];
+            SelectedArchitectureOption = architectureOption;
+            BaseAlphaText = config.BaseAlpha.ToString("0.###", CultureInfo.InvariantCulture);
+
+            if (config.LayerWeights.Count == LayeredLoraWeights.ReportLayerCount)
+            {
+                ApplyLayerValues(config.LayerWeights);
+            }
+
+            if (config.AnimaBlockWeights.Count > 0 &&
+                (config.Architecture == LayeredLoraArchitecture.Anima ||
+                 config.Architecture == LayeredLoraArchitecture.AnimaFullModel))
+            {
+                ApplyAnimaBlockPresetWeights(config.AnimaBlockWeights);
+            }
+        }
+
+        private void ApplyAnimaBlockPresetWeights(IEnumerable<LayeredLoraBlockPresetWeight> weights)
+        {
+            var values = weights
+                .Where(item => item.BlockIndex >= 0)
+                .GroupBy(item => item.BlockIndex)
+                .ToDictionary(group => group.Key, group => group.Last().Value);
+            if (values.Count == 0)
+            {
+                return;
+            }
+
+            var refreshedItems = LayeredLoraWeights.CreateAnimaBlockItems(values.Keys, DefaultAnimaBlockWeight);
+            AnimaBlockWeights.Clear();
+            foreach (var item in refreshedItems)
+            {
+                if (values.TryGetValue(item.BlockIndex, out var value))
+                {
+                    item.Value = value;
+                }
+
+                AnimaBlockWeights.Add(item);
+            }
         }
 
         private void ApplyPreset(double baseAlpha, double layerWeight)
@@ -442,8 +711,10 @@ namespace CyanTools.ViewModel
         private void RefreshWeightEditorForInputs()
         {
             var architecture = ResolveWeightEditorArchitecture();
-            IsSdxlWeightEditorVisible = architecture != LayeredLoraArchitecture.Anima;
-            IsAnimaWeightEditorVisible = architecture == LayeredLoraArchitecture.Anima;
+            IsSdxlWeightEditorVisible = architecture != LayeredLoraArchitecture.Anima &&
+                architecture != LayeredLoraArchitecture.AnimaFullModel;
+            IsAnimaWeightEditorVisible = architecture == LayeredLoraArchitecture.Anima ||
+                architecture == LayeredLoraArchitecture.AnimaFullModel;
 
             if (IsAnimaWeightEditorVisible)
             {
@@ -454,6 +725,7 @@ namespace CyanTools.ViewModel
             OnPropertyChanged(nameof(IsAnimaStylePresetVisible));
             OnPropertyChanged(nameof(WeightEditorLabel));
             UpdateLayerWeightsTextFromCurrentEditor();
+            RefreshPresetOptions();
             CommandManager.InvalidateRequerySuggested();
         }
 
@@ -468,6 +740,11 @@ namespace CyanTools.ViewModel
             foreach (var key in ReadSelectedTensorKeys())
             {
                 var guess = LoraLayerMapper.GuessArchitectureFromKey(key);
+                if (guess == LayeredLoraArchitecture.AnimaFullModel)
+                {
+                    return LayeredLoraArchitecture.AnimaFullModel;
+                }
+
                 if (guess == LayeredLoraArchitecture.Anima)
                 {
                     return LayeredLoraArchitecture.Anima;
@@ -742,5 +1019,47 @@ namespace CyanTools.ViewModel
         public LayeredLoraArchitecture Architecture { get; }
 
         public string DisplayName { get; }
+    }
+
+    public enum LayeredLoraPresetKind
+    {
+        Custom,
+        AllA,
+        AllB,
+        Balanced,
+        ReportExample,
+        AnimaStyleToComposition
+    }
+
+    public sealed class LayeredLoraPresetOption
+    {
+        private LayeredLoraPresetOption(string name, LayeredLoraPresetKind kind)
+        {
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            Kind = kind;
+        }
+
+        public string Name { get; }
+
+        public string DisplayName => Name;
+
+        public LayeredLoraPresetKind Kind { get; }
+
+        public bool IsCustom => Kind == LayeredLoraPresetKind.Custom;
+
+        public static LayeredLoraPresetOption CreateBuiltIn(string name, LayeredLoraPresetKind kind)
+        {
+            if (kind == LayeredLoraPresetKind.Custom)
+            {
+                throw new ArgumentException("Use CreateCustom for custom presets.", nameof(kind));
+            }
+
+            return new LayeredLoraPresetOption(name, kind);
+        }
+
+        public static LayeredLoraPresetOption CreateCustom(string name)
+        {
+            return new LayeredLoraPresetOption(name, LayeredLoraPresetKind.Custom);
+        }
     }
 }

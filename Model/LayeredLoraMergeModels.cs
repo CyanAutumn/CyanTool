@@ -104,6 +104,7 @@ namespace CyanTools.Model
         Auto,
         Sdxl,
         Anima,
+        AnimaFullModel,
         AnimaSdxlCompatible
     }
 
@@ -136,6 +137,26 @@ namespace CyanTools.Model
         Out10,
         Out11,
         Unknown
+    }
+
+    public sealed class LayeredLoraPresetConfig
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public LayeredLoraArchitecture Architecture { get; set; } = LayeredLoraArchitecture.Auto;
+
+        public double BaseAlpha { get; set; }
+
+        public IReadOnlyList<double> LayerWeights { get; set; } = Array.Empty<double>();
+
+        public IReadOnlyList<LayeredLoraBlockPresetWeight> AnimaBlockWeights { get; set; } = Array.Empty<LayeredLoraBlockPresetWeight>();
+    }
+
+    public sealed class LayeredLoraBlockPresetWeight
+    {
+        public int BlockIndex { get; set; }
+
+        public double Value { get; set; }
     }
 
     public sealed class LayeredLoraWeights

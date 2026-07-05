@@ -46,9 +46,9 @@
                     </Border>
 
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="LoRA 分层融合"
+                        <TextBlock Text="LoRA / 大模型分层融合"
                                    Style="{StaticResource CyanSectionTitleStyle}" />
-                        <TextBlock Text="按 SDXL 25 层、Anima Block 或 Anima 25 层习惯融合 LoRA。"
+                        <TextBlock Text="按 SDXL 25 层、Anima LoRA Block 或 Anima 大模型 Block 融合。"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                    Margin="0,4,0,0" />
                     </StackPanel>
@@ -56,7 +56,7 @@
             </Border>
 
             <GroupBox Grid.Row="1"
-                      Header="LoRA 路径"
+                      Header="模型路径"
                       Style="{StaticResource CyanGroupBoxStyle}"
                       Margin="0,0,0,14">
                 <Grid>
@@ -71,7 +71,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="LoRA A"
+                    <TextBlock Text="模型 A"
                                Style="{StaticResource CyanFormLabelStyle}" />
                     <TextBox Grid.Column="1"
                              Text="{Binding ModelAPath, UpdateSourceTrigger=PropertyChanged}"
@@ -80,12 +80,12 @@
                             Command="{Binding BrowseModelACommand}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
-                            ToolTip="选择 LoRA A">
+                            ToolTip="选择模型 A">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
                     </Button>
 
                     <TextBlock Grid.Row="1"
-                               Text="LoRA B"
+                               Text="模型 B"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0" />
                     <TextBox Grid.Row="1"
@@ -98,12 +98,12 @@
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             Margin="0,12,0,0"
-                            ToolTip="选择 LoRA B">
+                            ToolTip="选择模型 B">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
                     </Button>
 
                     <TextBlock Grid.Row="2"
-                               Text="输出 LoRA"
+                               Text="输出文件"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0" />
                     <TextBox Grid.Row="2"
@@ -116,7 +116,7 @@
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             Margin="0,12,0,0"
-                            ToolTip="选择输出 LoRA">
+                            ToolTip="选择输出文件">
                         <ui:SymbolIcon Symbol="Save24" />
                     </Button>
                 </Grid>
@@ -168,35 +168,38 @@
                                  Text="{Binding BaseAlphaText, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,14,0" />
 
-                        <StackPanel Grid.Column="4"
-                                    Orientation="Horizontal"
-                                    HorizontalAlignment="Left">
-                            <Button Command="{Binding UseAllACommand}"
-                                    Content="全 A"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
+                        <Grid Grid.Column="4"
+                              HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="260" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ComboBox ItemsSource="{Binding PresetOptions}"
+                                      SelectedItem="{Binding SelectedPresetOption, Mode=TwoWay}"
+                                      Text="{Binding PresetConfigName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEditable="True"
+                                      TextSearch.TextPath="Name"
+                                      IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
+                                      VerticalContentAlignment="Center"
+                                      Margin="0,0,8,0">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button Grid.Column="1"
+                                    Command="{Binding SavePresetConfigCommand}"
+                                    Content="保存当前"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Margin="0,0,8,0" />
-                            <Button Command="{Binding UseAllBCommand}"
-                                    Content="全 B"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
-                                    Style="{StaticResource CyanCommandButtonStyle}"
-                                    Margin="0,0,8,0" />
-                            <Button Command="{Binding UseBalancedCommand}"
-                                    Content="均衡 0.5"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
-                                    Style="{StaticResource CyanCommandButtonStyle}"
-                                    Margin="0,0,8,0" />
-                            <Button Command="{Binding UseReportExampleCommand}"
-                                    Content="报告示例"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
-                                    Visibility="{Binding IsReportExampleVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            <Button Grid.Column="2"
+                                    Command="{Binding DeletePresetConfigCommand}"
+                                    Content="删除配置"
                                     Style="{StaticResource CyanCommandButtonStyle}" />
-                            <Button Command="{Binding UseAnimaStyleToCompositionCommand}"
-                                    Content="A画风到B构图"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
-                                    Visibility="{Binding IsAnimaStylePresetVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                    Style="{StaticResource CyanCommandButtonStyle}" />
-                        </StackPanel>
+                        </Grid>
 
                         <TextBlock Grid.Row="1"
                                    Text="{Binding WeightEditorLabel, Converter={StaticResource LocalizedTextConverter}}"
