@@ -39,6 +39,44 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
         Assert.Contains(restored.Summary, restored.Logs);
     }
 
+    [Fact]
+    public void DiffusionPipePreviewInjectionIsWiredAndKeepsTheUpstreamDiffMinimal()
+    {
+        string root = FindRepositoryRoot();
+        string installer = File.ReadAllText(Path.Combine(root, "scripts", "Install-DiffusionPipeWsl.ps1"));
+        string dispatcher = File.ReadAllText(Path.Combine(root, "scripts", "Install-TrainingBackends.ps1"));
+        string view = File.ReadAllText(Path.Combine(root, "OptionsView.xaml"));
+        string viewModel = File.ReadAllText(Path.Combine(root, "ViewModel", "OptionsViewModel.cs"));
+        string deployer = File.ReadAllText(Path.Combine(root, "Utils", "TrainingBackendDeployer.cs"));
+
+        Assert.Contains("InjectDiffusionPipePreviewCommand", view);
+        Assert.Contains("TrainingBackendAction.InjectPreview", viewModel);
+        Assert.Contains("InjectPreview", deployer);
+        Assert.Contains("\"InjectPreview\" { Install-DiffusionPipePreviewHook }", dispatcher);
+        Assert.Contains("function Install-DiffusionPipePreviewHook", installer);
+        Assert.Contains("import_line='import local_anima_epoch_preview'", installer);
+        Assert.Contains("/local_anima_epoch_preview.py", installer);
+        Assert.Contains("git -C \"$repo\" rev-parse --git-path info/exclude", installer);
+        Assert.Contains("WIDTH = 1024", installer);
+        Assert.Contains("HEIGHT = 1024", installer);
+        Assert.Contains("preview_epoch{epoch}.png", installer);
+        Assert.Contains("kwargs['keep_models_loaded'] = True", installer);
+        Assert.Contains("Anima epoch 预览图功能已完整注入，无需修改。", installer);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "CyanTools.csproj")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the CyanTools repository root.");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, true);

@@ -11,6 +11,7 @@ using System.Windows;
 using System.Threading.Tasks;
 using AutoUpdaterDotNET;
 using CyanTools.Localization;
+using CyanTools.Utils;
 
 namespace CyanTools
 {
@@ -31,7 +32,27 @@ namespace CyanTools
         {
             LocalizationManager.InitializeApplication();
             base.OnStartup(e);
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                new Action(InitializeSystemMonitorWidget));
             _ = CheckForRepositoryUpdateOrFallbackAsync();
+        }
+
+        private void InitializeSystemMonitorWidget()
+        {
+            if (MainWindow != null)
+            {
+                MainWindow.Closing += (_, _) => SystemMonitorWidgetController.PrepareForApplicationShutdown();
+            }
+
+            SystemMonitorWidgetController.RestoreFromSettings();
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            SystemMonitorWidgetController.PrepareForApplicationShutdown();
+            SystemMonitorWidgetController.Shutdown();
+            base.OnExit(e);
         }
 
         private async Task CheckForRepositoryUpdateOrFallbackAsync()

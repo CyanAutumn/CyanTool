@@ -4,7 +4,8 @@
              xmlns:local="clr-namespace:CyanTools"
              xmlns:loc="clr-namespace:CyanTools.Localization"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             StartupUri="MainWindow.xaml">
+             StartupUri="MainWindow.xaml"
+             ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <ResourceDictionary>
             <loc:LocalizedTextConverter x:Key="LocalizedTextConverter" />

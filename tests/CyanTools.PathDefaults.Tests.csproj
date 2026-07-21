@@ -35,6 +35,7 @@
     <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
     <Compile Include="../Utils/TrainingBridgeProjectStore.cs" Link="Utils/TrainingBridgeProjectStore.cs" />
     <Compile Include="../Utils/TrainingBridgeSystemMetricsService.cs" Link="Utils/TrainingBridgeSystemMetricsService.cs" />
+    <Compile Include="../Utils/DesktopWidgetSettingsStore.cs" Link="Utils/DesktopWidgetSettingsStore.cs" />
     <Compile Include="../Model/LayeredLoraMergeModels.cs" Link="Model/LayeredLoraMergeModels.cs" />
     <Compile Include="../Utils/LayeredLoraWeightParser.cs" Link="Utils/LayeredLoraWeightParser.cs" />
     <Compile Include="../Utils/LayeredLoraPresetStore.cs" Link="Utils/LayeredLoraPresetStore.cs" />

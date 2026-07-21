@@ -20,6 +20,7 @@ namespace CyanTools.Utils
         Update,
         Reinstall,
         Validate,
+        InjectPreview,
         DeleteUbuntu
     }
 

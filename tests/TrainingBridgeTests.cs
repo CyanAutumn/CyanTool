@@ -197,6 +197,54 @@ public sealed class TrainingBridgeTests
         Assert.Equal(52d, metrics.TemperatureC);
     }
 
+    [Fact]
+    public void DesktopWidgetSettingsStore_RoundTripsEnabledStateAndPosition()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"cyan-widget-{Guid.NewGuid():N}");
+        string settingsPath = Path.Combine(root, "desktop-widgets.json");
+        try
+        {
+            var store = new DesktopWidgetSettingsStore(settingsPath);
+            store.Save(new DesktopWidgetSettings
+            {
+                ShowSystemMonitorWidget = true,
+                SystemMonitorLeft = 128.5,
+                SystemMonitorTop = 64.25
+            });
+
+            DesktopWidgetSettings loaded = store.Load();
+
+            Assert.True(loaded.ShowSystemMonitorWidget);
+            Assert.Equal(128.5, loaded.SystemMonitorLeft);
+            Assert.Equal(64.25, loaded.SystemMonitorTop);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void DesktopSystemMonitor_IsAlwaysOnTopDraggableAndOptionControlled()
+    {
+        string root = FindRepositoryRoot();
+        string widgetXaml = File.ReadAllText(Path.Combine(root, "SystemMonitorWidgetWindow.xaml"));
+        string widgetCode = File.ReadAllText(Path.Combine(root, "SystemMonitorWidgetWindow.xaml.cs"));
+        string optionsXaml = File.ReadAllText(Path.Combine(root, "OptionsView.xaml"));
+        string appXaml = File.ReadAllText(Path.Combine(root, "App.xaml"));
+        string appCode = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
+
+        Assert.Contains("Topmost=\"True\"", widgetXaml);
+        Assert.Contains("ShowInTaskbar=\"False\"", widgetXaml);
+        Assert.Contains("DragMove();", widgetCode);
+        Assert.Contains("IsChecked=\"{Binding ShowSystemMonitorWidget", optionsXaml);
+        Assert.Contains("ShutdownMode=\"OnMainWindowClose\"", appXaml);
+        Assert.Contains("PrepareForApplicationShutdown", appCode);
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);

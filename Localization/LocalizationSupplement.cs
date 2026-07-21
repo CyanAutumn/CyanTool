@@ -250,6 +250,12 @@ namespace CyanTools.Localization
             Add(translations, "训练配置", "Training Configuration", "学習設定");
             Add(translations, "删除选中参数", "Delete Selected Parameter", "選択したパラメーターを削除");
             Add(translations, "系统监控", "System Monitor", "システムモニター");
+            Add(translations, "桌面小控件", "Desktop Widget", "デスクトップウィジェット");
+            Add(translations, "置顶系统监控小窗", "Always-on-top System Monitor", "常に手前に表示するシステムモニター");
+            Add(translations, "在桌面显示可拖动、始终置顶且不占任务栏的 GPU、显存、CPU、内存与磁盘监控。关闭小窗会自动取消此选项。", "Show a draggable, always-on-top GPU, VRAM, CPU, memory, and disk monitor without a taskbar entry. Closing it also clears this option.", "タスクバーに表示せず、ドラッグ可能で常に手前に表示する GPU、VRAM、CPU、メモリ、ディスクモニターです。閉じるとこの設定も解除されます。");
+            Add(translations, "打开", "Open", "開く");
+            Add(translations, "关闭系统监控小窗", "Close system monitor widget", "システムモニターウィジェットを閉じる");
+            Add(translations, "系统磁盘", "System Disk", "システムディスク");
             Add(translations, "实时负载", "Live Load", "リアルタイム負荷");
             Add(translations, "输出磁盘", "Output Disk", "出力ディスク");
             Add(translations, "磁盘占用", "Disk Usage", "ディスク使用率");
@@ -302,6 +308,9 @@ namespace CyanTools.Localization
             Add(translations, "校验", "Validate", "検証");
             Add(translations, "更新", "Update", "更新");
             Add(translations, "重装", "Reinstall", "再インストール");
+            Add(translations, "注入预览图", "Inject Preview", "プレビューを注入");
+            Add(translations, "正在检查并注入 Anima epoch 预览图功能...", "Checking and injecting Anima epoch previews...", "Anima epoch プレビューを確認して注入中...");
+            Add(translations, "Anima epoch 预览图功能已就绪。", "Anima epoch previews are ready.", "Anima epoch プレビューの準備が完了しました。");
             Add(translations, "删除 Ubuntu", "Delete Ubuntu", "Ubuntu を削除");
             Add(translations, "选择路径", "Choose Path", "パスを選択");
             Add(translations, "管线调度", "Pipeline Scheduler", "パイプラインスケジューラー");

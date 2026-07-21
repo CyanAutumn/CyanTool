@@ -24,6 +24,7 @@ namespace CyanTools.ViewModel
         private readonly Dictionary<string, TrainingBackendStatus> _trainingBackendStatuses = new(StringComparer.OrdinalIgnoreCase);
         private CancellationTokenSource? _trainingDeploymentCancellation;
         private bool _isBusy;
+        private bool _showSystemMonitorWidget = SystemMonitorWidgetController.IsEnabled;
         private string _cudnnPackageStatus = "拖入 NVIDIA cuDNN 9 的 Windows zip 安装包，或点击选择文件。";
         private string _nvidiaAppStatus = "尚未检测。";
         private string _trainingDeploymentStatus = "尚未检测训练后端部署环境。";
@@ -64,6 +65,7 @@ namespace CyanTools.ViewModel
             ValidateTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Validate), _ => !IsBusy);
             UpdateTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Update), _ => !IsBusy);
             ReinstallTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Reinstall), _ => !IsBusy);
+            InjectDiffusionPipePreviewCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("diffusion-pipe", TrainingBackendAction.InjectPreview), _ => !IsBusy);
             DeployAllTrainingBackendsCommand = new RelayCommand(async _ => await DeployAllTrainingBackendsAsync(), _ => !IsBusy);
             InstallWslCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.InstallWsl), _ => !IsBusy);
             InstallUbuntuCommand = new RelayCommand(async _ => await InstallUbuntuAsync(), _ => !IsBusy);
@@ -78,6 +80,39 @@ namespace CyanTools.ViewModel
         public ObservableCollection<string> LogLines { get; }
         public string LogText => string.Join(Environment.NewLine, LogLines);
         public ObservableCollection<TrainingBackendMirrorOption> TrainingBackendMirrorOptions { get; }
+
+        public bool ShowSystemMonitorWidget
+        {
+            get => _showSystemMonitorWidget;
+            set
+            {
+                if (SetField(ref _showSystemMonitorWidget, value))
+                {
+                    SystemMonitorWidgetController.SetEnabled(value);
+                }
+            }
+        }
+
+        public void StartObservingSystemMonitorWidget()
+        {
+            SystemMonitorWidgetController.EnabledChanged -= SystemMonitorWidgetController_EnabledChanged;
+            SystemMonitorWidgetController.EnabledChanged += SystemMonitorWidgetController_EnabledChanged;
+            SystemMonitorWidgetController_EnabledChanged(SystemMonitorWidgetController.IsEnabled);
+        }
+
+        public void StopObservingSystemMonitorWidget()
+            => SystemMonitorWidgetController.EnabledChanged -= SystemMonitorWidgetController_EnabledChanged;
+
+        private void SystemMonitorWidgetController_EnabledChanged(bool enabled)
+        {
+            if (_showSystemMonitorWidget == enabled)
+            {
+                return;
+            }
+
+            _showSystemMonitorWidget = enabled;
+            OnPropertyChanged(nameof(ShowSystemMonitorWidget));
+        }
 
         public bool IsBusy
         {
@@ -181,6 +216,7 @@ namespace CyanTools.ViewModel
         public ICommand ValidateTrainingBackendCommand { get; }
         public ICommand UpdateTrainingBackendCommand { get; }
         public ICommand ReinstallTrainingBackendCommand { get; }
+        public ICommand InjectDiffusionPipePreviewCommand { get; }
         public ICommand DeployAllTrainingBackendsCommand { get; }
         public ICommand InstallWslCommand { get; }
         public ICommand InstallUbuntuCommand { get; }
@@ -685,6 +721,7 @@ namespace CyanTools.ViewModel
                 bool mirrorApplies = isWslBackend &&
                                      action is not TrainingBackendAction.Check and
                                      not TrainingBackendAction.Validate and
+                                     not TrainingBackendAction.InjectPreview and
                                      not TrainingBackendAction.DeleteUbuntu;
                 var options = new TrainingBackendOptions(
                     backendId,
@@ -702,7 +739,9 @@ namespace CyanTools.ViewModel
                 {
                     _trainingBackendStatuses[backendId] = status;
                 }
-                string completedStatus = status?.SummaryZh ?? GetTrainingBackendCompletedStatus(backendLabel, action);
+                string completedStatus = action == TrainingBackendAction.InjectPreview
+                    ? GetTrainingBackendCompletedStatus(backendLabel, action)
+                    : status?.SummaryZh ?? GetTrainingBackendCompletedStatus(backendLabel, action);
                 SetBackendStatus(backendId, completedStatus);
                 TrainingDeploymentStatus = completedStatus;
                 AddLog(completedStatus);
@@ -1043,6 +1082,7 @@ namespace CyanTools.ViewModel
                 TrainingBackendAction.Validate => $"正在校验 {backendLabel}...",
                 TrainingBackendAction.Update => $"正在更新 {backendLabel}...",
                 TrainingBackendAction.Reinstall => $"正在重装 {backendLabel}...",
+                TrainingBackendAction.InjectPreview => "正在检查并注入 Anima epoch 预览图功能...",
                 TrainingBackendAction.DeleteUbuntu => "正在删除 Ubuntu 子系统...",
                 _ => $"正在执行 {backendLabel} 操作..."
             };
@@ -1059,6 +1099,7 @@ namespace CyanTools.ViewModel
                 TrainingBackendAction.Validate => $"{backendLabel} 校验完成。",
                 TrainingBackendAction.Update => $"{backendLabel} 更新完成。",
                 TrainingBackendAction.Reinstall => $"{backendLabel} 重装完成。",
+                TrainingBackendAction.InjectPreview => "Anima epoch 预览图功能已就绪。",
                 TrainingBackendAction.DeleteUbuntu => "Ubuntu 子系统删除流程完成。",
                 _ => $"{backendLabel} 操作完成。"
             };
@@ -1078,6 +1119,7 @@ namespace CyanTools.ViewModel
             (ValidateTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (UpdateTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (ReinstallTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (InjectDiffusionPipePreviewCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (DeployAllTrainingBackendsCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (InstallWslCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (InstallUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();

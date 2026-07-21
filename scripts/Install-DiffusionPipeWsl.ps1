@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("Check", "InstallWsl", "InstallUbuntu", "Install", "Update", "Reinstall", "Validate", "DeleteUbuntu")]
+    [ValidateSet("Check", "InstallWsl", "InstallUbuntu", "Install", "Update", "Reinstall", "Validate", "InjectPreview", "DeleteUbuntu")]
     [string]$Action = "Check",
 
     [ValidateSet("default", "tsinghua", "aliyun")]
@@ -195,11 +195,14 @@ function Invoke-Native {
 
         [System.Text.Encoding]$NativeOutputEncoding = [System.Text.Encoding]::UTF8,
 
+        [string]$DisplayCommand = "",
+
         [switch]$Optional
     )
 
     Write-Step $Label
-    Write-Host ("$ " + (Format-CommandLine $Command))
+    $commandForLog = if ([string]::IsNullOrWhiteSpace($DisplayCommand)) { Format-CommandLine $Command } else { $DisplayCommand }
+    Write-Host ("$ " + $commandForLog)
 
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $Command[0]
@@ -295,7 +298,8 @@ function Invoke-WslBash {
     param(
         [string]$Label,
         [string]$Script,
-        [int]$TimeoutSeconds = 0
+        [int]$TimeoutSeconds = 0,
+        [string]$DisplayCommand = ""
     )
 
     return Invoke-Native -Label $Label -Command @(
@@ -308,7 +312,7 @@ function Invoke-WslBash {
         "bash",
         "-lc",
         (Escape-WslBashScript $Script)
-    ) -TimeoutSeconds $TimeoutSeconds
+    ) -TimeoutSeconds $TimeoutSeconds -DisplayCommand $DisplayCommand
 }
 
 function Get-CondaSourceSnippet {
@@ -1235,6 +1239,214 @@ echo "diffusion-pipe 1 step smoke training finished."
     Invoke-WslBash -Label "运行 diffusion-pipe 1 step smoke 训练" -Script $script | Out-Null
 }
 
+function Install-DiffusionPipePreviewHook {
+    if (-not (Test-Wsl2Available) -or -not (Test-UbuntuInstalled)) {
+        throw "diffusion-pipe WSL2 / Ubuntu 环境不可用。请先完成 diffusion-pipe 安装。"
+    }
+    Ensure-UbuntuRootInitialized
+
+    $previewHook = @'
+import importlib.util
+import sys
+from types import MethodType, ModuleType
+
+
+if importlib.util.find_spec('torchaudio') is None:
+    torchaudio = ModuleType('torchaudio')
+    torchaudio.functional = ModuleType('torchaudio.functional')
+    torchaudio.transforms = ModuleType('torchaudio.transforms')
+    sys.modules['torchaudio'] = torchaudio
+    sys.modules['torchaudio.functional'] = torchaudio.functional
+    sys.modules['torchaudio.transforms'] = torchaudio.transforms
+
+import torch
+import torchvision
+from deepspeed import comm as dist
+
+from utils.common import is_main_process
+from utils.dataset import DatasetManager
+from utils.saver import Saver
+
+
+PROMPT = 'a golden retriever running through a grassy field'
+CFG = 5
+WIDTH = 1024
+HEIGHT = 1024
+
+
+def _log_vram(stage):
+    free, total = torch.cuda.mem_get_info()
+    allocated = torch.cuda.memory_allocated()
+    reserved = torch.cuda.memory_reserved()
+    peak = torch.cuda.max_memory_allocated()
+    gib = 1024 ** 3
+    print(
+        f'[Anima preview VRAM] {stage}: '
+        f'allocated={allocated/gib:.2f} GiB, reserved={reserved/gib:.2f} GiB, '
+        f'peak={peak/gib:.2f} GiB, device_used={(total-free)/gib:.2f}/{total/gib:.2f} GiB'
+    )
+
+
+def _is_anima(model):
+    return model.config['model']['type'] == 'anima'
+
+
+def _get_conds(self, inputs):
+    return inputs['prompt_embeds'], inputs['attn_mask'], inputs['t5_input_ids'], inputs['t5_attn_mask']
+
+
+def _vae_decode(self, latents):
+    p = next(self.vae.model.parameters())
+    decoded = self.vae.model.decode(latents.to(p.device, p.dtype), self.vae.scale)
+    decoded = ((decoded.float() + 1) / 2).clamp_(0, 1)
+    return decoded.movedim(1, -1)
+
+
+def _prepare_sampling(model):
+    if getattr(model, '_local_epoch_preview_prepared', False):
+        return
+    from models.base import CommonPipeline
+    CommonPipeline.__init__(model)
+    model.is_video_vae = True
+    model.get_conds = MethodType(_get_conds, model)
+    model.vae_decode = MethodType(_vae_decode, model)
+    model.prepare_sample_test(PROMPT, cfg=CFG)
+    model._local_epoch_preview_prepared = True
+
+
+def _save_preview(saver, epoch):
+    if saver.config['pipeline_stages'] != 1:
+        raise RuntimeError('Local Anima epoch previews require pipeline_stages=1')
+    dist.barrier()
+    if is_main_process():
+        torch.cuda.reset_peak_memory_stats()
+        _log_vram('before preview')
+        _prepare_sampling(saver.model)
+        _log_vram('after prompt encoding')
+        img = saver.model.sample(w=WIDTH, h=HEIGHT)
+        _log_vram('after sampling and VAE decode')
+        img = img.squeeze(0).movedim(-1, 0)
+        output_path = saver.save_root / f'preview_epoch{epoch}.png'
+        torchvision.utils.save_image(img, output_path)
+        print(f'Saved preview image to {output_path}')
+        del img
+        torch.cuda.empty_cache()
+        _log_vram('after cleanup')
+    dist.barrier()
+
+
+_original_dataset_manager_init = DatasetManager.__init__
+
+
+def _dataset_manager_init(self, model, *args, **kwargs):
+    if _is_anima(model) and is_main_process():
+        kwargs['keep_models_loaded'] = True
+    _original_dataset_manager_init(self, model, *args, **kwargs)
+
+
+DatasetManager.__init__ = _dataset_manager_init
+
+
+_original_process_epoch = Saver.process_epoch
+
+
+def _process_epoch(self, epoch, step, examples):
+    result = _original_process_epoch(self, epoch, step, examples)
+    new_epoch = result[0]
+    if _is_anima(self.model) and new_epoch != epoch:
+        _save_preview(self, epoch)
+    return result
+
+
+Saver.process_epoch = _process_epoch
+'@
+    $hookBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($previewHook + "`n"))
+    $script = @'
+set -euo pipefail
+repo="$HOME/diffusion-pipe"
+train_path="$repo/train.py"
+hook_path="$repo/local_anima_epoch_preview.py"
+import_line='import local_anima_epoch_preview'
+
+test -f "$train_path" || { echo "未找到 $train_path，请先安装 diffusion-pipe。" >&2; exit 1; }
+git -C "$repo" rev-parse --is-inside-work-tree >/dev/null
+
+changed=0
+hook_tmp=$(mktemp "$repo/.local_anima_epoch_preview.py.XXXXXX")
+printf '%s' '__HOOK_BASE64__' | base64 --decode > "$hook_tmp"
+if [ -f "$hook_path" ] && cmp -s "$hook_tmp" "$hook_path"; then
+  rm -f "$hook_tmp"
+  echo "预览图钩子文件已是最新版本。"
+else
+  chmod 0644 "$hook_tmp"
+  mv -f "$hook_tmp" "$hook_path"
+  changed=1
+  echo "已创建或更新 local_anima_epoch_preview.py。"
+fi
+
+if grep -Eq '^[[:space:]]*import[[:space:]]+local_anima_epoch_preview[[:space:]]*(#.*)?$' "$train_path"; then
+  echo "train.py 已包含预览图 import。"
+else
+  python3 - "$train_path" <<'PY'
+import ast
+import os
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+raw = path.read_bytes()
+bom = b'\xef\xbb\xbf' if raw.startswith(b'\xef\xbb\xbf') else b''
+text = raw[len(bom):].decode('utf-8')
+newline = '\r\n' if '\r\n' in text else '\n'
+lines = text.splitlines(keepends=True)
+anchor = 'from utils.pipeline import ManualPipelineModule'
+insert_at = next((index + 1 for index, line in enumerate(lines) if line.rstrip('\r\n') == anchor), None)
+if insert_at is None:
+    tree = ast.parse(text, filename=str(path))
+    import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+    if not import_nodes:
+        raise RuntimeError('train.py 中未找到可用的 import 插入点')
+    insert_at = max(node.end_lineno or node.lineno for node in import_nodes)
+lines.insert(insert_at, 'import local_anima_epoch_preview' + newline)
+temporary = path.with_name(path.name + '.cyantools-preview.tmp')
+temporary.write_bytes(bom + ''.join(lines).encode('utf-8'))
+os.chmod(temporary, stat.S_IMODE(path.stat().st_mode))
+os.replace(temporary, path)
+PY
+  changed=1
+  echo "已在 train.py 中注入一行 import。"
+fi
+
+exclude_path=$(git -C "$repo" rev-parse --git-path info/exclude)
+case "$exclude_path" in
+  /*) ;;
+  *) exclude_path="$repo/$exclude_path" ;;
+esac
+mkdir -p "$(dirname "$exclude_path")"
+touch "$exclude_path"
+if grep -Fxq '/local_anima_epoch_preview.py' "$exclude_path"; then
+  echo "Git 本地忽略规则已存在。"
+else
+  printf '\n/local_anima_epoch_preview.py\n' >> "$exclude_path"
+  changed=1
+  echo "已写入 .git/info/exclude，钩子文件不会进入上游 diff。"
+fi
+
+python3 -m py_compile "$hook_path"
+if [ "$changed" -eq 0 ]; then
+  echo "Anima epoch 预览图功能已完整注入，无需修改。"
+else
+  echo "Anima epoch 预览图功能注入完成：1024x1024，每个 epoch 生成一张。"
+fi
+'@.Replace('__HOOK_BASE64__', $hookBase64)
+
+    Invoke-WslBash `
+        -Label "检查并注入 Anima epoch 预览图功能" `
+        -Script $script `
+        -DisplayCommand "wsl.exe -d $Distro -u root -- bash -lc <Anima preview injection script>" | Out-Null
+}
+
 function Validate-DiffusionPipe {
     if (-not (Test-Wsl2Available)) {
         throw "diffusion-pipe WSL2 环境不可用。请先安装 WSL2 和 NVIDIA WSL 驱动。"
@@ -1404,6 +1616,9 @@ try {
         }
         "Validate" {
             Validate-DiffusionPipe
+        }
+        "InjectPreview" {
+            Install-DiffusionPipePreviewHook
         }
         "DeleteUbuntu" {
             Write-Host "注意：该操作会删除 Ubuntu 子系统内的全部数据。"

@@ -14,6 +14,24 @@ namespace CyanTools
         {
             InitializeComponent();
             DataContext = new OptionsViewModel();
+            Loaded += OptionsView_Loaded;
+            Unloaded += OptionsView_Unloaded;
+        }
+
+        private void OptionsView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is OptionsViewModel viewModel)
+            {
+                viewModel.StartObservingSystemMonitorWidget();
+            }
+        }
+
+        private void OptionsView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is OptionsViewModel viewModel)
+            {
+                viewModel.StopObservingSystemMonitorWidget();
+            }
         }
 
         private void CudnnPackage_DragEnter(object sender, DragEventArgs e)

@@ -1,0 +1,183 @@
+<Window x:Class="CyanTools.SystemMonitorWidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="系统监控"
+        Width="336"
+        Height="430"
+        MinWidth="336"
+        MinHeight="430"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        SnapsToDevicePixels="True">
+    <Border Margin="10"
+            Padding="14"
+            CornerRadius="12"
+            Background="{DynamicResource CyanSurfaceElevatedBrush}"
+            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            Effect="{StaticResource CyanSoftShadowEffect}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid MouseLeftButtonDown="Header_MouseLeftButtonDown"
+                  Cursor="SizeAll"
+                  Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="8"
+                            Height="8"
+                            Margin="0,0,8,0"
+                            CornerRadius="4"
+                            Background="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+                    <TextBlock Text="系统监控"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <Border Grid.Column="1"
+                        Style="{StaticResource CyanPillStyle}"
+                        Padding="8,3"
+                        Margin="8,0">
+                    <TextBlock Text="{Binding MonitorStateText, Converter={StaticResource LocalizedTextConverter}}"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                </Border>
+                <Button Grid.Column="2"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        Content="×"
+                        FontSize="18"
+                        ToolTip="关闭系统监控小窗"
+                        Cursor="Arrow"
+                        Click="CloseButton_Click"/>
+            </Grid>
+
+            <StackPanel Grid.Row="1">
+                <Border Style="{StaticResource CyanParameterRowStyle}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="GPU" Style="{StaticResource CyanFormLabelStyle}"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding GpuTemperatureText}"
+                                       FontWeight="Bold"/>
+                        </Grid>
+                        <TextBlock Text="{Binding GpuName, Converter={StaticResource LocalizedTextConverter}}"
+                                   Margin="0,3,0,8"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding GpuName}"/>
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="GPU Load" FontSize="11"/>
+                            <TextBlock Grid.Column="1" Text="{Binding GpuLoadText}" FontSize="11" FontWeight="SemiBold"/>
+                        </Grid>
+                        <ProgressBar Value="{Binding GpuLoadPercent}"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Height="7"
+                                     Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                     Margin="0,0,0,8"/>
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="VRAM" FontSize="11"/>
+                            <TextBlock Grid.Column="1" Text="{Binding VramText}" FontSize="11" FontWeight="SemiBold"/>
+                        </Grid>
+                        <ProgressBar Value="{Binding VramLoadPercent}"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Height="7"
+                                     Foreground="#FF38BDF8"/>
+                    </StackPanel>
+                </Border>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CyanParameterRowStyle}" Margin="0,0,4,0">
+                        <StackPanel>
+                            <TextBlock Text="CPU" Style="{StaticResource CyanFormLabelStyle}"/>
+                            <TextBlock Text="{Binding CpuText}" Margin="0,4,0,2" FontSize="18" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding CpuDetailText}"
+                                       Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                       FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource CyanParameterRowStyle}" Margin="4,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="RAM" Style="{StaticResource CyanFormLabelStyle}"/>
+                            <TextBlock Text="{Binding RamText}"
+                                       Margin="0,4,0,2"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding RamDetailText}"
+                                       Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                       FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Style="{StaticResource CyanParameterRowStyle}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="系统磁盘" Style="{StaticResource CyanFormLabelStyle}"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding DiskPathText}"
+                                       FontSize="11"
+                                       ToolTip="{Binding DiskPathText}"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="磁盘占用" FontSize="11"/>
+                            <TextBlock Grid.Column="1" Text="{Binding DiskUsageText}" FontSize="11" FontWeight="SemiBold"/>
+                        </Grid>
+                        <ProgressBar Value="{Binding DiskLoadPercent}"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Height="7"
+                                     Foreground="#FF22C55E"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding MonitorSampleText}"
+                       HorizontalAlignment="Right"
+                       Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                       FontSize="11"/>
+        </Grid>
+    </Border>
+</Window>

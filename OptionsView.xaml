@@ -20,32 +20,29 @@
                 <RowDefinition Height="320"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
-                    Style="{StaticResource CyanCardStyle}"
-                    Margin="0,0,0,14"
-                    Visibility="Collapsed">
+            <GroupBox Grid.Row="0"
+                      Header="桌面小控件"
+                      Margin="0,0,0,12"
+                      Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource CyanIconBadgeStyle}"
-                            Margin="0,0,14,0">
-                        <ui:SymbolIcon Symbol="Settings24"
-                                       FontSize="22"
-                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="选项"
-                                   Style="{StaticResource CyanSectionTitleStyle}" />
-                        <TextBlock Text="管理本机运行环境与共享工具设置。"
+                    <StackPanel>
+                        <TextBlock Text="置顶系统监控小窗"
+                                   Style="{StaticResource CyanSectionTitleStyle}"
+                                   FontSize="15"/>
+                        <TextBlock Text="在桌面显示可拖动、始终置顶且不占任务栏的 GPU、显存、CPU、内存与磁盘监控。关闭小窗会自动取消此选项。"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
-                                   Margin="0,4,0,0" />
+                                   Margin="0,4,18,0"/>
                     </StackPanel>
+                    <CheckBox Grid.Column="1"
+                              Content="打开"
+                              IsChecked="{Binding ShowSystemMonitorWidget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              VerticalAlignment="Center"/>
                 </Grid>
-            </Border>
+            </GroupBox>
 
             <GroupBox Grid.Row="1"
                       Header="CUDA / cuDNN"
@@ -419,6 +416,7 @@
                                 <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
                                 <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
                                 <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
+                                <Button Command="{Binding InjectDiffusionPipePreviewCommand}" Style="{StaticResource CyanCommandButtonStyle}" Content="注入预览图"/>
                             </WrapPanel>
                         </Grid>
                     </Border>
