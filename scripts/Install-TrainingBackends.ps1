@@ -112,33 +112,6 @@ function Resolve-WindowsCommand {
     return $null
 }
 
-function Ensure-WindowsGit {
-    $git = Resolve-WindowsCommand -Name "git.exe" -FallbackPaths @(
-        (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
-        (Join-Path ${env:ProgramFiles(x86)} "Git\cmd\git.exe"),
-        (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")
-    )
-    if ($git) {
-        return $git
-    }
-
-    $winget = Resolve-WindowsCommand -Name "winget.exe"
-    if ($winget) {
-        Invoke-Native -Label "安装 Windows Git" -Command @(
-            $winget, "install", "-e", "--id", "Git.Git", "-s", "winget",
-            "--accept-source-agreements", "--accept-package-agreements", "--silent"
-        ) -TimeoutSeconds 1800 | Out-Null
-        $git = Resolve-WindowsCommand -Name "git.exe" -FallbackPaths @(
-            (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
-            (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")
-        )
-    }
-    if (-not $git) {
-        throw "Windows 后端需要 Git。自动安装未成功，请先安装 Git for Windows 后重试。"
-    }
-    return $git
-}
-
 function Ensure-WindowsUv {
     $portableUv = Join-Path $ManagedRoot "tools\uv\uv.exe"
     $packagedUv = if ($RuntimeToolsRoot) { Join-Path $RuntimeToolsRoot "uv\uv.exe" } else { "" }
@@ -424,12 +397,6 @@ function Save-BackendManifest {
         created_at = (Get-Date).ToUniversalTime().ToString("o")
     } | ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding UTF8
     Write-Host "Manifest saved: $manifestPath"
-}
-
-function Get-WindowsRevision {
-    param([string]$Git, [string]$RepoPath)
-    $result = Invoke-Native -Label "记录 $Backend 当前版本" -Command @($Git, "-C", $RepoPath, "rev-parse", "HEAD") -TimeoutSeconds 60
-    return (($result.StdOut + "`n" + $result.StdErr).Trim())
 }
 
 function Assert-PathsExist {

@@ -593,7 +593,12 @@ function Install-UbuntuDistribution {
     param([bool]$Reinstall = $false)
 
     Write-Host "Ubuntu 子系统安装器使用 Windows 系统源；镜像源会用于后续 WSL 内 diffusion-pipe 部署。"
-    if (Test-UbuntuInstalled) {
+    $ubuntuInstalled = Test-UbuntuInstalled
+    if (-not $ubuntuInstalled -or $Reinstall) {
+        Invoke-Native -Label "更新 Windows WSL 组件" -Command @("wsl.exe", "--update", "--web-download") -TimeoutSeconds 900 | Out-Null
+        Invoke-Native -Label "列出可安装的 WSL 发行版" -Command @("wsl.exe", "--list", "--online") -TimeoutSeconds 120 -NativeOutputEncoding ([System.Text.Encoding]::Unicode) | Out-Null
+    }
+    if ($ubuntuInstalled) {
         if ($Reinstall) {
             Write-Host "检测到 Ubuntu WSL 发行版已存在，将重新安装。"
             Write-Host "注意：重新安装会删除 Ubuntu 子系统内的全部数据。"
@@ -607,9 +612,6 @@ function Install-UbuntuDistribution {
             return
         }
     }
-
-    Invoke-Native -Label "更新 Windows WSL 组件" -Command @("wsl.exe", "--update", "--web-download") -TimeoutSeconds 900 | Out-Null
-    Invoke-Native -Label "列出可安装的 WSL 发行版" -Command @("wsl.exe", "--list", "--online") -TimeoutSeconds 120 -NativeOutputEncoding ([System.Text.Encoding]::Unicode) | Out-Null
 
     $installCommand = @("wsl.exe", "--install", "--distribution", $Distro, "--no-launch")
     try {
