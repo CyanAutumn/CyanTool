@@ -2,15 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace CyanTools.Utils
 {
     public interface ITrainingSetGitCommandRunner
     {
         TrainingSetGitCommandResult Run(string repositoryPath, IReadOnlyList<string> arguments);
-        Task<TrainingSetGitCommandResult> RunAsync(string repositoryPath, IReadOnlyList<string> arguments, CancellationToken cancellationToken = default);
     }
 
     public sealed class TrainingSetGitCommandResult
@@ -58,11 +55,6 @@ namespace CyanTools.Utils
             return Run(repositoryPath, "add", "-A");
         }
 
-        public Task<TrainingSetGitCommandResult> AddAllAsync(string repositoryPath, CancellationToken cancellationToken = default)
-        {
-            return RunAsync(repositoryPath, cancellationToken, "add", "-A");
-        }
-
         public TrainingSetGitCommandResult Commit(string repositoryPath, string message)
         {
             var add = AddAll(repositoryPath);
@@ -72,22 +64,6 @@ namespace CyanTools.Utils
             }
 
             return Run(repositoryPath, "commit", "-m", string.IsNullOrWhiteSpace(message) ? "Save training set node" : message);
-        }
-
-        public async Task<TrainingSetGitCommandResult> CommitAsync(string repositoryPath, string message, CancellationToken cancellationToken = default)
-        {
-            var add = await AddAllAsync(repositoryPath, cancellationToken).ConfigureAwait(false);
-            if (!add.IsSuccess)
-            {
-                return add;
-            }
-
-            return await RunAsync(
-                repositoryPath,
-                cancellationToken,
-                "commit",
-                "-m",
-                string.IsNullOrWhiteSpace(message) ? "Save training set node" : message).ConfigureAwait(false);
         }
 
         public TrainingSetGitCommandResult CheckoutCommit(string repositoryPath, string commit)
@@ -118,21 +94,9 @@ namespace CyanTools.Utils
             return result.IsSuccess ? result.StandardOutput.Trim() : string.Empty;
         }
 
-        public async Task<string> GetHeadCommitAsync(string repositoryPath, CancellationToken cancellationToken = default)
-        {
-            var result = await RunAsync(repositoryPath, cancellationToken, "rev-parse", "HEAD").ConfigureAwait(false);
-            return result.IsSuccess ? result.StandardOutput.Trim() : string.Empty;
-        }
-
         public string GetCurrentBranch(string repositoryPath)
         {
             var result = Run(repositoryPath, "branch", "--show-current");
-            return result.IsSuccess ? result.StandardOutput.Trim() : string.Empty;
-        }
-
-        public async Task<string> GetCurrentBranchAsync(string repositoryPath, CancellationToken cancellationToken = default)
-        {
-            var result = await RunAsync(repositoryPath, cancellationToken, "branch", "--show-current").ConfigureAwait(false);
             return result.IsSuccess ? result.StandardOutput.Trim() : string.Empty;
         }
 
@@ -142,59 +106,15 @@ namespace CyanTools.Utils
             return result.IsSuccess ? result.StandardOutput.Trim() : result.StandardError.Trim();
         }
 
-        public async Task<string> GetShortStatusAsync(string repositoryPath, CancellationToken cancellationToken = default)
-        {
-            var result = await RunAsync(repositoryPath, cancellationToken, "status", "--short").ConfigureAwait(false);
-            return result.IsSuccess ? result.StandardOutput.Trim() : result.StandardError.Trim();
-        }
-
         private TrainingSetGitCommandResult Run(string repositoryPath, params string[] arguments)
         {
             return _runner.Run(repositoryPath, arguments);
-        }
-
-        private Task<TrainingSetGitCommandResult> RunAsync(string repositoryPath, CancellationToken cancellationToken, params string[] arguments)
-        {
-            return _runner.RunAsync(repositoryPath, arguments, cancellationToken);
         }
     }
 
     public sealed class ProcessTrainingSetGitCommandRunner : ITrainingSetGitCommandRunner
     {
         public TrainingSetGitCommandResult Run(string repositoryPath, IReadOnlyList<string> arguments)
-        {
-            return RunAsync(repositoryPath, arguments).GetAwaiter().GetResult();
-        }
-
-        public async Task<TrainingSetGitCommandResult> RunAsync(
-            string repositoryPath,
-            IReadOnlyList<string> arguments,
-            CancellationToken cancellationToken = default)
-        {
-            var startInfo = CreateStartInfo(repositoryPath, arguments);
-            using var process = Process.Start(startInfo);
-            if (process == null)
-            {
-                return new TrainingSetGitCommandResult(-1, string.Empty, "无法启动 git。");
-            }
-
-            try
-            {
-                var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-                var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                var stdout = await stdoutTask.ConfigureAwait(false);
-                var stderr = await stderrTask.ConfigureAwait(false);
-                return new TrainingSetGitCommandResult(process.ExitCode, stdout, stderr);
-            }
-            catch (OperationCanceledException)
-            {
-                TryKill(process);
-                throw;
-            }
-        }
-
-        private static ProcessStartInfo CreateStartInfo(string repositoryPath, IReadOnlyList<string> arguments)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -213,21 +133,16 @@ namespace CyanTools.Utils
                 startInfo.ArgumentList.Add(argument);
             }
 
-            return startInfo;
-        }
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return new TrainingSetGitCommandResult(-1, string.Empty, "无法启动 git。");
+            }
 
-        private static void TryKill(Process process)
-        {
-            try
-            {
-                if (!process.HasExited)
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-            }
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return new TrainingSetGitCommandResult(process.ExitCode, stdout, stderr);
         }
     }
 }

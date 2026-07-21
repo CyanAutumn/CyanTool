@@ -112,23 +112,6 @@ public sealed class TrainingSetManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task Git_service_commit_async_runs_add_and_commit_in_order()
-    {
-        var git = new RecordingTrainingSetGitCommandRunner();
-        var service = new TrainingSetGitService(git);
-
-        var result = await service.CommitAsync(_root, "save node");
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(
-            [
-                "add -A",
-                "commit -m save node"
-            ],
-            git.Commands.Select(command => string.Join(" ", command.Arguments)).ToArray());
-    }
-
-    [Fact]
     public void Config_diff_only_returns_changed_json_values()
     {
         const string before = """
@@ -219,14 +202,6 @@ public sealed class TrainingSetManagerTests : IDisposable
         {
             Commands.Add(new RecordedGitCommand(repositoryPath, arguments.ToArray()));
             return new TrainingSetGitCommandResult(0, string.Empty, string.Empty);
-        }
-
-        public Task<TrainingSetGitCommandResult> RunAsync(
-            string repositoryPath,
-            IReadOnlyList<string> arguments,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(Run(repositoryPath, arguments));
         }
     }
 

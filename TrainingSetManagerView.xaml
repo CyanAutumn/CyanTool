@@ -6,9 +6,143 @@
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              xmlns:model="clr-namespace:CyanTools.Model"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:nodify="https://miroiu.github.io/nodify"
              mc:Ignorable="d"
              d:DesignHeight="760"
              d:DesignWidth="1280">
+    <UserControl.Resources>
+        <DataTemplate x:Key="TrainingSetConnectionTemplate"
+                      DataType="{x:Type viewModel:TrainingSetHistoryConnectionViewModel}">
+            <nodify:CircuitConnection Source="{Binding Output.Anchor}"
+                                      Target="{Binding Input.Anchor}"
+                                      Direction="Forward"
+                                      Stroke="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                      StrokeThickness="3" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="HistoryConnectorHeaderTemplate"
+                      DataType="{x:Type viewModel:TrainingSetHistoryConnectorViewModel}">
+            <TextBlock Text="{Binding Title}"
+                       FontSize="11"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </DataTemplate>
+
+        <Style x:Key="HistoryItemContainerStyle"
+               TargetType="{x:Type nodify:ItemContainer}">
+            <Setter Property="Location" Value="{Binding Location, Mode=TwoWay}" />
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="Panel.ZIndex" Value="1" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Panel.ZIndex" Value="2" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate DataType="{x:Type viewModel:TrainingSetHistoryCanvasNodeViewModel}">
+            <nodify:Node Header="{Binding}"
+                         Input="{Binding Input}"
+                         Output="{Binding Output}"
+                         Content="{Binding}"
+                         MinWidth="230"
+                         MaxWidth="260"
+                         ContentPadding="0"
+                         HeaderBrush="{StaticResource CyanNodeHeaderBrush}"
+                         ContentBrush="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                <nodify:Node.HeaderTemplate>
+                    <DataTemplate DataType="{x:Type viewModel:TrainingSetHistoryCanvasNodeViewModel}">
+                        <Grid Margin="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Symbol="BranchFork24"
+                                           Foreground="White"
+                                           FontSize="16"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,7,0" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="White"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding CommitShort}"
+                                           Foreground="{StaticResource CyanNodeHeaderSecondaryBrush}"
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2"
+                                       Text="当前"
+                                       Foreground="White"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Margin="8,0,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </DataTemplate>
+                </nodify:Node.HeaderTemplate>
+                <nodify:Node.ContentTemplate>
+                    <DataTemplate DataType="{x:Type viewModel:TrainingSetHistoryCanvasNodeViewModel}">
+                        <Grid Margin="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="92" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border Style="{StaticResource CyanImageWellStyle}">
+                                <Grid>
+                                    <Image Source="{Binding CoverImage}"
+                                           Stretch="UniformToFill" />
+                                    <TextBlock Text="未设置封面"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock"
+                                                   BasedOn="{StaticResource CyanTinyTextBlockStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CoverImage}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding Branch}"
+                                       Style="{StaticResource CyanTinyTextBlockStyle}"
+                                       Margin="0,8,0,8"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Row="2"
+                                    Command="{Binding SelectCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}">
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <ui:SymbolIcon Symbol="CursorClick24"
+                                                   Margin="0,0,6,0" />
+                                    <TextBlock Text="选中节点" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </nodify:Node.ContentTemplate>
+            </nodify:Node>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <UserControl.DataContext>
         <viewModel:TrainingSetManagerViewModel />
     </UserControl.DataContext>
@@ -190,122 +324,32 @@
                       Grid.Column="1"
                       Style="{StaticResource CyanGridSplitterStyle}" />
 
-        <GroupBox Grid.Row="2"
-                  Grid.Column="2"
-                  Header="版本历史"
-                  Style="{StaticResource CyanGroupBoxStyle}"
-                  Margin="0,0,0,12">
-            <ListBox ItemsSource="{Binding HistoryNodes}"
-                     Style="{StaticResource CyanListBoxSurfaceStyle}">
-                <ListBox.ItemTemplate>
-                    <DataTemplate DataType="{x:Type viewModel:TrainingSetCommitNodeViewModel}">
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="34" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Grid>
-                                <Border Width="12"
-                                        Height="12"
-                                        CornerRadius="6"
-                                        Background="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Top"
-                                        Margin="0,14,0,0" />
-                                <Border Width="2"
-                                        Background="{DynamicResource ControlStrokeColorDefaultBrush}"
-                                        HorizontalAlignment="Center"
-                                        Margin="0,28,0,-12" />
-                            </Grid>
-
-                            <Border Grid.Column="1"
-                                    Style="{StaticResource CyanCardStyle}"
-                                    Padding="12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="112" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Style="{StaticResource CyanImageWellStyle}"
-                                            Height="82"
-                                            Margin="0,0,12,0">
-                                        <Grid>
-                                            <Image Source="{Binding CoverImage}"
-                                                   Stretch="UniformToFill" />
-                                            <TextBlock Text="未设置封面"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock"
-                                                           BasedOn="{StaticResource CyanTinyTextBlockStyle}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding CoverImage}" Value="{x:Null}">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Grid>
-                                    </Border>
-                                    <StackPanel Grid.Column="1">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Title}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <Border Padding="7,2"
-                                                    Margin="8,0,0,0">
-                                                <Border.Style>
-                                                    <Style TargetType="Border"
-                                                           BasedOn="{StaticResource CyanPillStyle}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <TextBlock Text="当前"
-                                                           FontSize="11"
-                                                           FontWeight="SemiBold" />
-                                            </Border>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding CommitShort}"
-                                                   Style="{StaticResource CyanTinyTextBlockStyle}"
-                                                   Margin="0,6,0,0" />
-                                        <TextBlock Text="{Binding Branch}"
-                                                   Style="{StaticResource CyanTinyTextBlockStyle}"
-                                                   Margin="0,3,0,0"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding ParentSummary}"
-                                                   Style="{StaticResource CyanTinyTextBlockStyle}"
-                                                   Margin="0,3,0,0"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <Button Grid.Column="2"
-                                            Command="{Binding SelectCommand}"
-                                            Style="{StaticResource CyanCommandButtonStyle}"
-                                            VerticalAlignment="Top">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:SymbolIcon Symbol="Eye24"
-                                                           Margin="0,0,6,0" />
-                                            <TextBlock Text="查看" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </GroupBox>
+        <Border Grid.Row="2"
+                Grid.Column="2"
+                Style="{StaticResource CyanImageWellStyle}"
+                Margin="0,0,0,12">
+            <nodify:NodifyEditor ItemsSource="{Binding HistoryNodes}"
+                                 Connections="{Binding HistoryConnections}"
+                                 ConnectionTemplate="{StaticResource TrainingSetConnectionTemplate}"
+                                 ItemContainerStyle="{StaticResource HistoryItemContainerStyle}"
+                                 GridCellSize="20"
+                                 Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                <nodify:NodifyEditor.Resources>
+                    <Style TargetType="{x:Type nodify:NodeInput}">
+                        <Setter Property="Header" Value="{Binding}" />
+                        <Setter Property="HeaderTemplate" Value="{StaticResource HistoryConnectorHeaderTemplate}" />
+                        <Setter Property="IsConnected" Value="{Binding IsConnected}" />
+                        <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}" />
+                    </Style>
+                    <Style TargetType="{x:Type nodify:NodeOutput}">
+                        <Setter Property="Header" Value="{Binding}" />
+                        <Setter Property="HeaderTemplate" Value="{StaticResource HistoryConnectorHeaderTemplate}" />
+                        <Setter Property="IsConnected" Value="{Binding IsConnected}" />
+                        <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}" />
+                    </Style>
+                </nodify:NodifyEditor.Resources>
+            </nodify:NodifyEditor>
+        </Border>
 
         <GridSplitter Grid.Row="2"
                       Grid.Column="3"
