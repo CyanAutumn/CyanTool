@@ -12,7 +12,9 @@ namespace CyanTools.Utils
             public int OriginalClusterCount { get; init; }
             public int FinalClusterCount { get; init; }
             public double CutDistance { get; init; }
+            public double PreviousMergeDistance { get; init; }
             public IReadOnlyList<MstEdge> CutEdges { get; init; } = Array.Empty<MstEdge>();
+            public bool StableDistanceGapFound { get; init; }
             public bool Changed => FinalClusterCount > 0 && FinalClusterCount < OriginalClusterCount;
         }
 
@@ -234,6 +236,242 @@ namespace CyanTools.Utils
                 FinalClusterCount = mergedGroups.Length,
                 CutDistance = lastMergeDistance
             };
+        }
+
+        public static Result MergeToMacroClusters(
+            IReadOnlyList<float[]> points,
+            IReadOnlyList<int> labels,
+            int minClusters,
+            int maxClusters,
+            bool useCosineDistance = false,
+            double minLocalJumpRatio = 1.18d,
+            double minRecentJumpRatio = 1.30d)
+        {
+            if (points == null)
+            {
+                throw new ArgumentNullException(nameof(points));
+            }
+
+            if (labels == null)
+            {
+                throw new ArgumentNullException(nameof(labels));
+            }
+
+            if (points.Count != labels.Count)
+            {
+                throw new ArgumentException("Point and label counts must match.", nameof(labels));
+            }
+
+            var clusterIds = labels
+                .Where(label => label >= 0)
+                .Distinct()
+                .OrderBy(label => label)
+                .ToArray();
+            if (clusterIds.Length == 0)
+            {
+                return new Result
+                {
+                    Labels = labels.ToArray(),
+                    OriginalClusterCount = 0,
+                    FinalClusterCount = 0,
+                    CutDistance = double.PositiveInfinity
+                };
+            }
+
+            int resolvedMaxClusters = Math.Clamp(maxClusters, 1, clusterIds.Length);
+            int resolvedMinClusters = Math.Clamp(minClusters, 1, resolvedMaxClusters);
+            var groupedIndices = clusterIds
+                .Select(id => Enumerable.Range(0, labels.Count).Where(index => labels[index] == id).ToArray())
+                .ToArray();
+            var centroids = groupedIndices
+                .Select(indices => ComputeCentroid(points, indices, useCosineDistance))
+                .ToArray();
+            var clusterWeights = groupedIndices
+                .Select(indices => Math.Max(1, indices.Length))
+                .ToArray();
+            var distanceMatrix = BuildDistanceMatrix(centroids, useCosineDistance);
+            var groups = Enumerable.Range(0, clusterIds.Length)
+                .Select(index => new List<int> { index })
+                .ToList();
+            var acceptedMergeDistances = new List<double>();
+
+            while (groups.Count > resolvedMaxClusters)
+            {
+                var closest = FindClosestAverageLinkPair(groups, distanceMatrix, clusterWeights);
+                if (closest.A < 0 || closest.B < 0)
+                {
+                    break;
+                }
+
+                MergeGroups(groups, closest.A, closest.B);
+                acceptedMergeDistances.Add(closest.Distance);
+            }
+
+            var conservativeGroups = CloneGroups(groups);
+            List<int>[]? bestGapGroups = null;
+            double bestGapScore = 0d;
+            double bestCutDistance = double.PositiveInfinity;
+            double bestPreviousMergeDistance = double.PositiveInfinity;
+
+            while (groups.Count > resolvedMinClusters)
+            {
+                var closest = FindClosestAverageLinkPair(groups, distanceMatrix, clusterWeights);
+                if (closest.A < 0 || closest.B < 0)
+                {
+                    break;
+                }
+
+                double gapScore = ComputeMacroDistanceGapScore(
+                    closest.Distance,
+                    acceptedMergeDistances,
+                    minLocalJumpRatio,
+                    minRecentJumpRatio);
+                if (gapScore > bestGapScore)
+                {
+                    bestGapScore = gapScore;
+                    bestGapGroups = CloneGroups(groups);
+                    bestCutDistance = closest.Distance;
+                    bestPreviousMergeDistance = acceptedMergeDistances[^1];
+                }
+
+                MergeGroups(groups, closest.A, closest.B);
+                acceptedMergeDistances.Add(closest.Distance);
+            }
+
+            bool stableDistanceGapFound = bestGapGroups != null;
+            groups = (bestGapGroups ?? conservativeGroups).ToList();
+
+            var mergedGroups = groups
+                .OrderBy(group => group.Min())
+                .ToArray();
+            var idToIndex = clusterIds
+                .Select((id, index) => new { id, index })
+                .ToDictionary(item => item.id, item => item.index);
+            var clusterIndexToMergedLabel = new Dictionary<int, int>();
+            for (int groupIndex = 0; groupIndex < mergedGroups.Length; groupIndex++)
+            {
+                foreach (int clusterIndex in mergedGroups[groupIndex])
+                {
+                    clusterIndexToMergedLabel[clusterIndex] = groupIndex;
+                }
+            }
+
+            var mergedLabels = new int[labels.Count];
+            for (int i = 0; i < labels.Count; i++)
+            {
+                int label = labels[i];
+                mergedLabels[i] = label < 0
+                    ? label
+                    : clusterIndexToMergedLabel[idToIndex[label]];
+            }
+
+            return new Result
+            {
+                Labels = mergedLabels,
+                OriginalClusterCount = clusterIds.Length,
+                FinalClusterCount = mergedGroups.Length,
+                CutDistance = bestCutDistance,
+                PreviousMergeDistance = bestPreviousMergeDistance,
+                StableDistanceGapFound = stableDistanceGapFound
+            };
+        }
+
+        private static (int A, int B, double Distance) FindClosestAverageLinkPair(
+            IReadOnlyList<List<int>> groups,
+            double[,] distances,
+            IReadOnlyList<int> clusterWeights)
+        {
+            int bestA = -1;
+            int bestB = -1;
+            double bestDistance = double.PositiveInfinity;
+            for (int a = 0; a < groups.Count; a++)
+            {
+                for (int b = a + 1; b < groups.Count; b++)
+                {
+                    double distance = WeightedAverageLinkDistance(
+                        groups[a],
+                        groups[b],
+                        distances,
+                        clusterWeights);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestA = a;
+                        bestB = b;
+                    }
+                }
+            }
+
+            return (bestA, bestB, bestDistance);
+        }
+
+        private static double WeightedAverageLinkDistance(
+            IReadOnlyList<int> left,
+            IReadOnlyList<int> right,
+            double[,] distances,
+            IReadOnlyList<int> clusterWeights)
+        {
+            double weightedDistance = 0d;
+            double totalWeight = 0d;
+            for (int i = 0; i < left.Count; i++)
+            {
+                int leftIndex = left[i];
+                for (int j = 0; j < right.Count; j++)
+                {
+                    int rightIndex = right[j];
+                    double pairWeight = (double)clusterWeights[leftIndex] * clusterWeights[rightIndex];
+                    weightedDistance += distances[leftIndex, rightIndex] * pairWeight;
+                    totalWeight += pairWeight;
+                }
+            }
+
+            return totalWeight <= 0d ? double.PositiveInfinity : weightedDistance / totalWeight;
+        }
+
+        private static double ComputeMacroDistanceGapScore(
+            double nextMergeDistance,
+            IReadOnlyList<double> acceptedMergeDistances,
+            double minLocalJumpRatio,
+            double minRecentJumpRatio)
+        {
+            if (acceptedMergeDistances.Count < 3 || !double.IsFinite(nextMergeDistance))
+            {
+                return 0d;
+            }
+
+            double previousDistance = acceptedMergeDistances[^1];
+            int recentStart = Math.Max(0, acceptedMergeDistances.Count - 8);
+            double[] recentDistances = acceptedMergeDistances
+                .Skip(recentStart)
+                .OrderBy(distance => distance)
+                .ToArray();
+            double recentMedian = ComputePercentile(recentDistances, 0.50d);
+            double epsilon = Math.Max(1e-9d, Math.Max(previousDistance, recentMedian) * 1e-6d);
+            double localRatio = (nextMergeDistance + epsilon) / (previousDistance + epsilon);
+            double recentRatio = (nextMergeDistance + epsilon) / (recentMedian + epsilon);
+            double localGap = nextMergeDistance - previousDistance;
+            double minimumGap = Math.Max(1e-6d, recentMedian * 0.12d);
+            if (localRatio < Math.Max(1.01d, minLocalJumpRatio) ||
+                recentRatio < Math.Max(1.01d, minRecentJumpRatio) ||
+                localGap < minimumGap)
+            {
+                return 0d;
+            }
+
+            double relativeGap = localGap / Math.Max(recentMedian, epsilon);
+            return Math.Log(localRatio) * Math.Log(recentRatio) * relativeGap;
+        }
+
+        private static void MergeGroups(List<List<int>> groups, int a, int b)
+        {
+            groups[a].AddRange(groups[b]);
+            groups[a].Sort();
+            groups.RemoveAt(b);
+        }
+
+        private static List<int>[] CloneGroups(IEnumerable<List<int>> groups)
+        {
+            return groups.Select(group => new List<int>(group)).ToArray();
         }
 
         private static int FindCutStart(IReadOnlyList<double> sortedDistances, double minJumpRatio)

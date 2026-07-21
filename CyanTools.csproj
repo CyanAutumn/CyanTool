@@ -7,10 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;.tmp/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;.tmp/**;**/*-DESKTOP-*;**/*-DESKTOP-*.*;**/*_DESKTOP_*;**/*_DESKTOP_*.*</DefaultItemExcludes>
     <CyanToolsRuntimeIdentifiersToCopy>win-x64;win-x86</CyanToolsRuntimeIdentifiersToCopy>
     <_CyanToolsRuntimeIdentifierFilter>;$(CyanToolsRuntimeIdentifiersToCopy);</_CyanToolsRuntimeIdentifierFilter>
     <WebView2NeverCopyLoaderDllToOutputDirectory>true</WebView2NeverCopyLoaderDllToOutputDirectory>
+    <EnableTrainingBackendBootstrapResources>true</EnableTrainingBackendBootstrapResources>
 
     <Version>1.0.0.15</Version>
     <AssemblyVersion>1.0.0.15</AssemblyVersion>
@@ -24,16 +25,6 @@
     <Folder Include="Model" />
     <Folder Include="Utils" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Utils\TaggingProcessor-DESKTOP-AIAI78G.cs" />
-    <Compile Remove="Utils\ImageClusteringProcessor-DESKTOP-16EQG8U.cs" />
-    <Compile Remove="ViewModel\TaggingViewModel-DESKTOP-AIAI78G.cs" />
-    <None Remove="TaggingView-DESKTOP-AIAI78G.xaml" />
-    <Page Remove="TaggingView-DESKTOP-AIAI78G.xaml" />
-  </ItemGroup>
-
-  
 
   <ItemGroup>
     
@@ -77,6 +68,34 @@
     <Content Include="scripts\*.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="dist\runtime-tools\**\*"
+             Condition="'$(EnableTrainingBackendBootstrapResources)' == 'true' and Exists('dist\runtime-tools')">
+      <Link>runtime-tools\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="dist\managed-root-seed\**\*"
+             Condition="'$(EnableTrainingBackendBootstrapResources)' == 'true' and Exists('dist\managed-root-seed')">
+      <Link>managed-root-seed\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="dist\offline-wheelhouse\**\*"
+             Condition="'$(EnableTrainingBackendBootstrapResources)' == 'true' and Exists('dist\offline-wheelhouse')">
+      <Link>offline-wheelhouse\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="dist\uv-cache\**\*"
+             Condition="'$(EnableTrainingBackendBootstrapResources)' == 'true' and Exists('dist\uv-cache')">
+      <Link>uv-cache\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="**\*-DESKTOP-*.cs;**\*_DESKTOP_*.cs" />
+    <ApplicationDefinition Remove="**\*-DESKTOP-*.xaml;**\*_DESKTOP_*.xaml" />
+    <Page Remove="**\*-DESKTOP-*.xaml;**\*_DESKTOP_*.xaml" />
+    <None Remove="**\*-DESKTOP-*;**\*-DESKTOP-*.*;**\*_DESKTOP_*;**\*_DESKTOP_*.*" />
+    <Content Remove="**\*-DESKTOP-*;**\*-DESKTOP-*.*;**\*_DESKTOP_*;**\*_DESKTOP_*.*" />
   </ItemGroup>
 
   <ItemGroup>

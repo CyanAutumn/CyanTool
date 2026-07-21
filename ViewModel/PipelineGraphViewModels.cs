@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using CyanTools.Pipeline;
@@ -17,28 +18,31 @@ namespace CyanTools.ViewModel
         {
             PipelineNode = pipelineNode ?? throw new ArgumentNullException(nameof(pipelineNode));
             Location = location;
+            EditableParameters = PipelineNodeParameterFactory.Create(PipelineNode);
 
             var directoryNode = PipelineNode.GetDirectoryAutomationNode();
             var runtimeOutputNode = PipelineNode.GetRuntimeOutputNode();
 
             if (directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None)
             {
-                Input.Add(new PipelineCanvasConnectorViewModel(this, "输入文件夹", isInput: true));
+                Input.Add(new PipelineCanvasConnectorViewModel(this, "输入", isInput: true));
             }
 
             if ((directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None) ||
                 runtimeOutputNode != null)
             {
-                Output.Add(new PipelineCanvasConnectorViewModel(this, GetOutputTitle(directoryNode, runtimeOutputNode), isInput: false));
+                Output.Add(new PipelineCanvasConnectorViewModel(this, "输出", isInput: false));
             }
 
             PipelineNode.PropertyChanged += OnPipelineNodePropertyChanged;
         }
 
         public PipelineNodeViewModelBase PipelineNode { get; }
+        public ObservableCollection<PipelineNodeParameterViewModel> EditableParameters { get; }
         public ObservableCollection<PipelineCanvasConnectorViewModel> Input { get; } = new();
         public ObservableCollection<PipelineCanvasConnectorViewModel> Output { get; } = new();
         public string DisplayName => PipelineNode.DisplayName;
+        public bool HasEditableParameters => EditableParameters.Count > 0;
         public bool HasInput => Input.Count > 0;
         public bool HasOutput => Output.Count > 0;
 
@@ -124,20 +128,13 @@ namespace CyanTools.ViewModel
             OnPropertyChanged(nameof(DirectoryBehaviorText));
         }
 
-        private static string GetOutputTitle(IPipelineDirectoryNode? directoryNode, IPipelineRuntimeOutputNode? runtimeOutputNode)
-        {
-            if (runtimeOutputNode != null && directoryNode == null)
-            {
-                return "输出文件夹";
-            }
-
-            return directoryNode?.DirectoryBehavior == PipelineDirectoryBehavior.InPlace
-                ? "同输入输出"
-                : "输出文件夹";
-        }
-
         private void OnPipelineNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            foreach (PipelineNodeParameterViewModel parameter in EditableParameters.Where(parameter => parameter.PropertyName == e.PropertyName))
+            {
+                parameter.Refresh();
+            }
+
             RefreshPathPreview();
         }
 

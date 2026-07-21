@@ -43,6 +43,7 @@ param(
     [switch]$SkipReleaseAssetUpload,
     [switch]$SkipVersionXmlUpdate,
     [switch]$SkipProjectVersionUpdate,
+    [switch]$SkipTrainingBackendBootstrapResources,
     [switch]$SkipBuild
 )
 
@@ -470,13 +471,18 @@ function Copy-PublishItemsToPayload {
     New-Item -ItemType Directory -Force -Path $PayloadDirectory | Out-Null
 
     $files = @(Get-ChildItem -LiteralPath $BuildDir -Force -File | Where-Object { $_.Name -notin @("AGENTS.md", "CLAUDE.md", "memory.md", "memory_index.md", "cookies.txt") -and $_.Name -notlike ".env*" })
+    $directories = @(Get-ChildItem -LiteralPath $BuildDir -Force -Directory | Where-Object { $_.Name -notin @("runtimes", ".git", ".codex", ".claude", ".vscode", "memory-bank", "Config", "Configs", "config") })
     $runtimeDirectories = @(Get-PublishRuntimeDirectories -BuildDir $BuildDir -RuntimeIdentifiers $RuntimeIdentifiers)
-    if (($files.Count + $runtimeDirectories.Count) -eq 0) {
-        throw "目标目录下没有可发布内容（顶层文件或匹配的 runtimes 目录）：$BuildDir"
+    if (($files.Count + $directories.Count + $runtimeDirectories.Count) -eq 0) {
+        throw "目标目录下没有可发布内容：$BuildDir"
     }
 
     foreach ($file in $files) {
         Copy-Item -LiteralPath $file.FullName -Destination $PayloadDirectory -Force
+    }
+
+    foreach ($directory in $directories) {
+        Copy-Item -LiteralPath $directory.FullName -Destination $PayloadDirectory -Recurse -Force
     }
 
     if ($runtimeDirectories.Count -gt 0) {
@@ -710,6 +716,10 @@ if (-not $SkipProjectVersionUpdate) {
     Update-LocalProjectVersion -ProjectPath $resolvedProjectFile -NewVersion $Version
 }
 if (-not $SkipBuild) {
+    if (-not $SkipTrainingBackendBootstrapResources) {
+        . (Join-Path $baseDir "scripts\Build-TrainingBackendBootstrap.ps1")
+        Build-TrainingBackendBootstrap -ProjectRoot $baseDir | Out-Host
+    }
     Invoke-DotNetBuild -ProjectPath $resolvedProjectFile -Configuration "Release"
 }
 

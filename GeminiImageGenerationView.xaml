@@ -28,7 +28,8 @@
 
             <Border Grid.Row="0"
                     Style="{StaticResource CyanHeroPanelStyle}"
-                    Margin="0,0,0,14">
+                    Margin="0,0,0,14"
+                    Visibility="Collapsed">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -279,6 +280,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -334,6 +336,18 @@
                                      VerticalContentAlignment="Center"
                                      MinWidth="220"
                                      Margin="0,10,0,0"/>
+
+                            <StackPanel Grid.Row="4"
+                                        Grid.ColumnSpan="4"
+                                        Margin="0,12,0,0">
+                                <TextBlock Text="{Binding StatusMessage, Converter={StaticResource LocalizedTextConverter}}"
+                                           TextWrapping="Wrap"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                <TextBlock Text="{Binding QueueStatusText, Converter={StaticResource LocalizedTextConverter}}"
+                                           Style="{StaticResource CyanTinyTextBlockStyle}"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
                         </Grid>
                     </GroupBox>
 

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -17,7 +19,10 @@ namespace CyanTools.ViewModel
     public sealed class OptionsViewModel : INotifyPropertyChanged
     {
         private const int MaxLogLines = 300;
+        private const string CudnnWindowsDownloadUrl = "https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/";
         private readonly TrainingBackendDeployer _trainingBackendDeployer = new();
+        private readonly Dictionary<string, TrainingBackendStatus> _trainingBackendStatuses = new(StringComparer.OrdinalIgnoreCase);
+        private CancellationTokenSource? _trainingDeploymentCancellation;
         private bool _isBusy;
         private string _cudnnPackageStatus = "拖入 NVIDIA cuDNN 9 的 Windows zip 安装包，或点击选择文件。";
         private string _nvidiaAppStatus = "尚未检测。";
@@ -27,23 +32,30 @@ namespace CyanTools.ViewModel
         private string _animaFastLoraStatus = "尚未检测 Anima Fast LoRA Windows。";
         private string _wslSdScriptsStatus = "尚未检测 wsl-sd-scripts。";
         private string _diffusionPipeStatus = "尚未检测 diffusion-pipe / WSL2 环境。";
-        private string _trainingBackendProxyPort = "7890";
-        private TrainingBackendMirrorOption _selectedTrainingBackendMirror = null!;
+        private string _wslSdScriptsProxyPort = "7897";
+        private string _diffusionPipeProxyPort = "7897";
+        private TrainingBackendMirrorOption _selectedWslMirror = null!;
+        private TrainingBackendMirrorOption _selectedWslSdScriptsMirror = null!;
+        private TrainingBackendMirrorOption _selectedDiffusionPipeMirror = null!;
 
         public OptionsViewModel()
         {
             LogLines = new ObservableCollection<string>();
+            LogLines.CollectionChanged += (_, _) => OnPropertyChanged(nameof(LogText));
             TrainingBackendMirrorOptions = new ObservableCollection<TrainingBackendMirrorOption>
             {
                 new("default", "官方源"),
                 new("tsinghua", "清华 TUNA"),
                 new("aliyun", "阿里云")
             };
-            _selectedTrainingBackendMirror = TrainingBackendMirrorOptions[0];
+            _selectedWslMirror = TrainingBackendMirrorOptions[0];
+            _selectedWslSdScriptsMirror = TrainingBackendMirrorOptions[0];
+            _selectedDiffusionPipeMirror = TrainingBackendMirrorOptions[0];
 
             CheckCudaCommand = new RelayCommand(async _ => await CheckOrInstallCudaAsync(), _ => !IsBusy);
             InstallCudaToolkitCommand = new RelayCommand(_ => TryLaunchWingetCudaInstall(), _ => !IsBusy);
             OpenCudaCudnnPagesCommand = new RelayCommand(_ => OpenCudaInstallPages(), _ => !IsBusy);
+            OpenCudnnDownloadPageCommand = new RelayCommand(_ => OpenCudnnDownloadPage(), _ => !IsBusy);
             SelectCudnnPackageCommand = new RelayCommand(async _ => await SelectAndInstallCudnnPackageAsync(), _ => !IsBusy);
             RefreshNvidiaAppStatusCommand = new RelayCommand(_ => RefreshNvidiaAppStatus(), _ => !IsBusy);
             OpenNvidiaAppPageCommand = new RelayCommand(_ => OpenNvidiaAppPage(), _ => !IsBusy);
@@ -54,13 +66,17 @@ namespace CyanTools.ViewModel
             ReinstallTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Reinstall), _ => !IsBusy);
             DeployAllTrainingBackendsCommand = new RelayCommand(async _ => await DeployAllTrainingBackendsAsync(), _ => !IsBusy);
             InstallWslCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.InstallWsl), _ => !IsBusy);
-            InstallUbuntuCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.InstallUbuntu), _ => !IsBusy);
+            InstallUbuntuCommand = new RelayCommand(async _ => await InstallUbuntuAsync(), _ => !IsBusy);
             DeleteUbuntuCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.DeleteUbuntu), _ => !IsBusy);
+            CancelTrainingDeploymentCommand = new RelayCommand(_ => CancelTrainingDeployment(), _ => IsBusy && _trainingDeploymentCancellation != null);
 
             RefreshNvidiaAppStatus();
+            _trainingBackendDeployer.RestoreTasksAndLogs(new Progress<string>(AddLog));
+            _ = InitializeTrainingDeploymentAsync();
         }
 
         public ObservableCollection<string> LogLines { get; }
+        public string LogText => string.Join(Environment.NewLine, LogLines);
         public ObservableCollection<TrainingBackendMirrorOption> TrainingBackendMirrorOptions { get; }
 
         public bool IsBusy
@@ -123,21 +139,40 @@ namespace CyanTools.ViewModel
             set => SetField(ref _diffusionPipeStatus, value);
         }
 
-        public string TrainingBackendProxyPort
+        public string WslSdScriptsProxyPort
         {
-            get => _trainingBackendProxyPort;
-            set => SetField(ref _trainingBackendProxyPort, value);
+            get => _wslSdScriptsProxyPort;
+            set => SetField(ref _wslSdScriptsProxyPort, value);
         }
 
-        public TrainingBackendMirrorOption SelectedTrainingBackendMirror
+        public string DiffusionPipeProxyPort
         {
-            get => _selectedTrainingBackendMirror;
-            set => SetField(ref _selectedTrainingBackendMirror, value);
+            get => _diffusionPipeProxyPort;
+            set => SetField(ref _diffusionPipeProxyPort, value);
+        }
+
+        public TrainingBackendMirrorOption SelectedWslMirror
+        {
+            get => _selectedWslMirror;
+            set => SetField(ref _selectedWslMirror, value);
+        }
+
+        public TrainingBackendMirrorOption SelectedWslSdScriptsMirror
+        {
+            get => _selectedWslSdScriptsMirror;
+            set => SetField(ref _selectedWslSdScriptsMirror, value);
+        }
+
+        public TrainingBackendMirrorOption SelectedDiffusionPipeMirror
+        {
+            get => _selectedDiffusionPipeMirror;
+            set => SetField(ref _selectedDiffusionPipeMirror, value);
         }
 
         public ICommand CheckCudaCommand { get; }
         public ICommand InstallCudaToolkitCommand { get; }
         public ICommand OpenCudaCudnnPagesCommand { get; }
+        public ICommand OpenCudnnDownloadPageCommand { get; }
         public ICommand SelectCudnnPackageCommand { get; }
         public ICommand RefreshNvidiaAppStatusCommand { get; }
         public ICommand OpenNvidiaAppPageCommand { get; }
@@ -150,6 +185,7 @@ namespace CyanTools.ViewModel
         public ICommand InstallWslCommand { get; }
         public ICommand InstallUbuntuCommand { get; }
         public ICommand DeleteUbuntuCommand { get; }
+        public ICommand CancelTrainingDeploymentCommand { get; }
 
         public async Task InstallCudnnPackageAsync(string packagePath)
         {
@@ -316,6 +352,19 @@ namespace CyanTools.ViewModel
             catch (Exception ex)
             {
                 AddLog($"打开下载页面失败: {ex.Message}");
+            }
+        }
+
+        private void OpenCudnnDownloadPage()
+        {
+            try
+            {
+                AddLog("正在打开 cuDNN Windows x86_64 下载目录。");
+                Process.Start(new ProcessStartInfo(CudnnWindowsDownloadUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AddLog($"打开 cuDNN 下载页失败: {ex.Message}");
             }
         }
 
@@ -593,15 +642,21 @@ namespace CyanTools.ViewModel
             TrainingBackendAction action,
             bool manageBusyState = true,
             bool showFailureDialog = true,
-            bool confirmAction = true)
+            bool confirmAction = true,
+            bool forceReinstallDistribution = false,
+            bool useDeploymentOptions = true)
         {
             if (confirmAction && !ConfirmTrainingBackendAction(backendId, action))
             {
                 return false;
             }
 
-            int? proxyPort = ParseTrainingBackendProxyPort();
-            if (proxyPort == -1)
+            bool proxyApplies = useDeploymentOptions &&
+                                (backendId is "wsl-sd-scripts" or "diffusion-pipe") &&
+                                (action is TrainingBackendAction.Install or TrainingBackendAction.Update or TrainingBackendAction.Reinstall);
+            string proxyText = backendId == "wsl-sd-scripts" ? WslSdScriptsProxyPort : DiffusionPipeProxyPort;
+            int? proxyPort = proxyApplies ? ParseTrainingBackendProxyPort(proxyText) : null;
+            if (proxyApplies && proxyPort == -1)
             {
                 return false;
             }
@@ -609,6 +664,13 @@ namespace CyanTools.ViewModel
             if (manageBusyState)
             {
                 IsBusy = true;
+            }
+
+            bool ownsCancellation = _trainingDeploymentCancellation == null;
+            if (ownsCancellation)
+            {
+                _trainingDeploymentCancellation = new CancellationTokenSource();
+                RaiseCommandStates();
             }
 
             string backendLabel = GetBackendLabel(backendId);
@@ -619,17 +681,28 @@ namespace CyanTools.ViewModel
                 TrainingDeploymentStatus = runningStatus;
                 AddLog(runningStatus);
 
+                bool isWslBackend = backendId is "wsl" or "wsl-sd-scripts" or "diffusion-pipe";
+                bool mirrorApplies = isWslBackend &&
+                                     action is not TrainingBackendAction.Check and
+                                     not TrainingBackendAction.Validate and
+                                     not TrainingBackendAction.DeleteUbuntu;
                 var options = new TrainingBackendOptions(
                     backendId,
-                    SelectedTrainingBackendMirror?.Id ?? "default",
-                    proxyPort);
+                    useDeploymentOptions && mirrorApplies ? GetSelectedMirrorId(backendId) : "default",
+                    proxyApplies ? proxyPort : null,
+                    ForceReinstallDistribution: forceReinstallDistribution);
 
-                await _trainingBackendDeployer.RunAsync(
+                TrainingBackendStatus? status = await _trainingBackendDeployer.RunAsync(
                     action,
                     options,
-                    new Progress<string>(AddLog));
+                    new Progress<string>(AddLog),
+                    _trainingDeploymentCancellation!.Token);
 
-                string completedStatus = GetTrainingBackendCompletedStatus(backendLabel, action);
+                if (status != null)
+                {
+                    _trainingBackendStatuses[backendId] = status;
+                }
+                string completedStatus = status?.SummaryZh ?? GetTrainingBackendCompletedStatus(backendLabel, action);
                 SetBackendStatus(backendId, completedStatus);
                 TrainingDeploymentStatus = completedStatus;
                 AddLog(completedStatus);
@@ -665,13 +738,147 @@ namespace CyanTools.ViewModel
                 {
                     IsBusy = false;
                 }
+                if (ownsCancellation)
+                {
+                    _trainingDeploymentCancellation?.Dispose();
+                    _trainingDeploymentCancellation = null;
+                    RaiseCommandStates();
+                }
             }
+        }
+
+        private async Task InstallUbuntuAsync()
+        {
+            TrainingBackendStatus status = await GetTrainingBackendStatusAsync("wsl", showFailureDialog: true);
+            bool ubuntuInstalled = status.State is TrainingBackendState.Available or TrainingBackendState.DetectedButUnusable;
+            if (ubuntuInstalled && MessageBox.Show(
+                    "检测到 Ubuntu 子系统已经存在。继续将注销并重新安装 Ubuntu，永久删除该子系统内的全部文件和训练环境。确认继续？",
+                    "重新安装 Ubuntu 子系统",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            await RunTrainingBackendActionAsync(
+                "wsl",
+                TrainingBackendAction.InstallUbuntu,
+                forceReinstallDistribution: ubuntuInstalled);
+        }
+
+        private void CancelTrainingDeployment()
+        {
+            if (_trainingDeploymentCancellation == null) return;
+            TrainingDeploymentStatus = "正在停止训练后端部署任务...";
+            AddLog("已请求停止训练后端部署任务。");
+            _trainingDeploymentCancellation.Cancel();
+        }
+
+        private async Task<TrainingBackendStatus> GetTrainingBackendStatusAsync(string backendId, bool showFailureDialog = false)
+        {
+            try
+            {
+                var options = new TrainingBackendOptions(backendId, "default", null);
+                TrainingBackendStatus status = await _trainingBackendDeployer.GetStatusAsync(
+                    options,
+                    new Progress<string>(AddLog));
+                _trainingBackendStatuses[backendId] = status;
+                SetBackendStatus(backendId, status.SummaryZh);
+                return status;
+            }
+            catch (Exception ex)
+            {
+                var status = new TrainingBackendStatus
+                {
+                    BackendId = backendId,
+                    RuntimeTarget = backendId is "sd-scripts" or "anima-fast-lora" ? "windows" : "wsl2",
+                    StateValue = "detected_but_unusable",
+                    SummaryZh = $"{GetBackendLabel(backendId)} 环境检测失败：{ex.Message}"
+                };
+                _trainingBackendStatuses[backendId] = status;
+                SetBackendStatus(backendId, status.SummaryZh);
+                AddLog(status.SummaryZh);
+                if (showFailureDialog)
+                {
+                    MessageBox.Show(status.SummaryZh, "训练后端部署", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                return status;
+            }
+        }
+
+        private async Task RefreshAllTrainingBackendStatusesAsync()
+        {
+            string[] backendIds = ["wsl", "sd-scripts", "wsl-sd-scripts", "anima-fast-lora", "diffusion-pipe"];
+            await Task.WhenAll(backendIds.Select(id => GetTrainingBackendStatusAsync(id)));
+            TrainingDeploymentStatus = "训练后端环境状态已刷新。";
+        }
+
+        private async Task InitializeTrainingDeploymentAsync()
+        {
+            await RefreshAllTrainingBackendStatusesAsync();
+            string? wheelhouse = ResolvePackagedDeploymentDirectory("CYANTOOLS_OFFLINE_WHEELHOUSE_DIR", "offline-wheelhouse");
+            if (wheelhouse == null || IsBusy) return;
+
+            string managedRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CyanTools",
+                "training-backends");
+            string markerPath = Path.Combine(managedRoot, "state", "packaged-auto-bootstrap.started");
+            if (File.Exists(markerPath)) return;
+
+            string[] backendIds = ["sd-scripts", "anima-fast-lora"];
+            string[] missingBackends = backendIds
+                .Where(id => _trainingBackendStatuses.TryGetValue(id, out TrainingBackendStatus? status) &&
+                             status.State == TrainingBackendState.Unavailable)
+                .ToArray();
+            if (missingBackends.Length == 0) return;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
+            await File.WriteAllTextAsync(markerPath, DateTimeOffset.UtcNow.ToString("O"));
+            IsBusy = true;
+            _trainingDeploymentCancellation = new CancellationTokenSource();
+            RaiseCommandStates();
+            TrainingDeploymentStatus = "检测到包内离线依赖，首次启动自动准备 Windows 训练环境。";
+            AddLog(TrainingDeploymentStatus);
+            try
+            {
+                foreach (string backendId in missingBackends)
+                {
+                    await RunTrainingBackendActionAsync(
+                        backendId,
+                        TrainingBackendAction.Install,
+                        manageBusyState: false,
+                        showFailureDialog: false,
+                        confirmAction: false,
+                        useDeploymentOptions: false);
+                }
+            }
+            finally
+            {
+                IsBusy = false;
+                _trainingDeploymentCancellation?.Dispose();
+                _trainingDeploymentCancellation = null;
+                RaiseCommandStates();
+            }
+        }
+
+        private static string? ResolvePackagedDeploymentDirectory(string environmentName, string directoryName)
+        {
+            string? explicitPath = Environment.GetEnvironmentVariable(environmentName);
+            string[] candidates =
+            [
+                explicitPath ?? "",
+                Path.Combine(AppContext.BaseDirectory, directoryName),
+                Path.Combine(AppContext.BaseDirectory, "resources", directoryName),
+                Path.GetFullPath(Path.Combine("dist", directoryName))
+            ];
+            return candidates.FirstOrDefault(Directory.Exists);
         }
 
         private async Task DeployAllTrainingBackendsAsync()
         {
             if (MessageBox.Show(
-                    "确认一键部署全部训练后端？\n\n将依次安装 Windows sd-scripts、Anima Fast LoRA、WSL sd-scripts 和 diffusion-pipe。WSL 后端要求先准备好 WSL2 与 Ubuntu。",
+                    "确认一键部署全部训练后端？\n\n将按当前状态依次处理 sd-scripts、wsl-sd-scripts、Anima Fast LoRA 和 diffusion-pipe：可用项执行校验，损坏项重装，未安装项安装。WSL 后端要求先准备好 WSL2 与 Ubuntu。",
                     "一键部署全部后端",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Information) != MessageBoxResult.Yes)
@@ -679,27 +886,31 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            int? proxyPort = ParseTrainingBackendProxyPort();
-            if (proxyPort == -1)
-            {
-                return;
-            }
-
-            string[] backendIds = ["sd-scripts", "anima-fast-lora", "wsl-sd-scripts", "diffusion-pipe"];
+            string[] backendIds = ["sd-scripts", "wsl-sd-scripts", "anima-fast-lora", "diffusion-pipe"];
             int succeeded = 0;
             IsBusy = true;
+            _trainingDeploymentCancellation = new CancellationTokenSource();
+            RaiseCommandStates();
             TrainingDeploymentStatus = "正在部署全部训练后端...";
             AddLog(TrainingDeploymentStatus);
             try
             {
                 foreach (string backendId in backendIds)
                 {
+                    TrainingBackendStatus status = await GetTrainingBackendStatusAsync(backendId);
+                    TrainingBackendAction action = status.State switch
+                    {
+                        TrainingBackendState.Available => TrainingBackendAction.Validate,
+                        TrainingBackendState.DetectedButUnusable => TrainingBackendAction.Reinstall,
+                        _ => TrainingBackendAction.Install
+                    };
                     if (await RunTrainingBackendActionAsync(
                             backendId,
-                            TrainingBackendAction.Install,
+                            action,
                             manageBusyState: false,
                             showFailureDialog: false,
-                            confirmAction: false))
+                            confirmAction: false,
+                            useDeploymentOptions: false))
                     {
                         succeeded++;
                     }
@@ -708,6 +919,9 @@ namespace CyanTools.ViewModel
             finally
             {
                 IsBusy = false;
+                _trainingDeploymentCancellation?.Dispose();
+                _trainingDeploymentCancellation = null;
+                RaiseCommandStates();
             }
 
             TrainingDeploymentStatus = succeeded == backendIds.Length
@@ -745,14 +959,25 @@ namespace CyanTools.ViewModel
             return true;
         }
 
-        private int? ParseTrainingBackendProxyPort()
+        private string GetSelectedMirrorId(string backendId)
         {
-            if (string.IsNullOrWhiteSpace(TrainingBackendProxyPort))
+            return backendId switch
+            {
+                "wsl" => SelectedWslMirror?.Id ?? "default",
+                "wsl-sd-scripts" => SelectedWslSdScriptsMirror?.Id ?? "default",
+                "diffusion-pipe" => SelectedDiffusionPipeMirror?.Id ?? "default",
+                _ => "default"
+            };
+        }
+
+        private static int? ParseTrainingBackendProxyPort(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
             {
                 return null;
             }
 
-            if (!int.TryParse(TrainingBackendProxyPort.Trim(), out int port) ||
+            if (!int.TryParse(value.Trim(), out int port) ||
                 port < 0 ||
                 port > 65535)
             {
@@ -844,6 +1069,7 @@ namespace CyanTools.ViewModel
             (CheckCudaCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (InstallCudaToolkitCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (OpenCudaCudnnPagesCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (OpenCudnnDownloadPageCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (SelectCudnnPackageCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (RefreshNvidiaAppStatusCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (OpenNvidiaAppPageCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -856,6 +1082,7 @@ namespace CyanTools.ViewModel
             (InstallWslCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (InstallUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (DeleteUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (CancelTrainingDeploymentCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
         private void AddLog(string message)

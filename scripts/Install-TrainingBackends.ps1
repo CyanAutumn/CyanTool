@@ -10,7 +10,17 @@
 
     [int]$LocalProxyPort = 0,
 
-    [string]$ManagedRoot = ""
+    [string]$ManagedRoot = "",
+
+    [string]$RuntimeToolsRoot = "",
+
+    [string]$OfflineWheelhouse = "",
+
+    [string]$ManagedRootSeed = "",
+
+    [string]$ResultPath = "",
+
+    [switch]$ForceReinstallDistribution
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +29,49 @@ $OutputEncoding = [Console]::OutputEncoding
 
 if ([string]::IsNullOrWhiteSpace($ManagedRoot)) {
     $ManagedRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "CyanTools\training-backends"
+}
+
+function Resolve-DeploymentResourceDirectory {
+    param([string]$ExplicitPath, [string]$EnvironmentName, [string]$DirectoryName)
+
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) { $candidates.Add($ExplicitPath) }
+    $environmentValue = [Environment]::GetEnvironmentVariable($EnvironmentName)
+    if (-not [string]::IsNullOrWhiteSpace($environmentValue)) { $candidates.Add($environmentValue) }
+    $candidates.Add((Join-Path (Split-Path -Parent $PSScriptRoot) $DirectoryName))
+    $candidates.Add((Join-Path (Split-Path -Parent $PSScriptRoot) "resources\$DirectoryName"))
+    $candidates.Add((Join-Path (Split-Path -Parent $PSScriptRoot) "dist\$DirectoryName"))
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Container) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+    return ""
+}
+
+$RuntimeToolsRoot = Resolve-DeploymentResourceDirectory $RuntimeToolsRoot "CYANTOOLS_RUNTIME_TOOLS_DIR" "runtime-tools"
+$OfflineWheelhouse = Resolve-DeploymentResourceDirectory $OfflineWheelhouse "CYANTOOLS_OFFLINE_WHEELHOUSE_DIR" "offline-wheelhouse"
+$ManagedRootSeed = Resolve-DeploymentResourceDirectory $ManagedRootSeed "CYANTOOLS_MANAGED_ROOT_SEED_DIR" "managed-root-seed"
+
+function Copy-MissingSeedEntries {
+    param([string]$Source, [string]$Destination)
+
+    if (-not (Test-Path -LiteralPath $Source -PathType Container)) { return }
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    foreach ($entry in Get-ChildItem -LiteralPath $Source -Force) {
+        $target = Join-Path $Destination $entry.Name
+        if ($entry.PSIsContainer) {
+            Copy-MissingSeedEntries -Source $entry.FullName -Destination $target
+        }
+        elseif (-not (Test-Path -LiteralPath $target)) {
+            Copy-Item -LiteralPath $entry.FullName -Destination $target
+        }
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ManagedRootSeed)) {
+    Copy-MissingSeedEntries -Source $ManagedRootSeed -Destination $ManagedRoot
+    Set-Content -LiteralPath (Join-Path $ManagedRoot ".cyantools-managed-root-seed") -Value ("managed-root-seed`t" + (Get-Date).ToUniversalTime().ToString("o")) -Encoding UTF8
 }
 
 $sharedScript = Join-Path $PSScriptRoot "Install-DiffusionPipeWsl.ps1"
@@ -88,7 +141,8 @@ function Ensure-WindowsGit {
 
 function Ensure-WindowsUv {
     $portableUv = Join-Path $ManagedRoot "tools\uv\uv.exe"
-    $uv = Resolve-WindowsCommand -Name "uv.exe" -FallbackPaths @($portableUv)
+    $packagedUv = if ($RuntimeToolsRoot) { Join-Path $RuntimeToolsRoot "uv\uv.exe" } else { "" }
+    $uv = Resolve-WindowsCommand -Name "uv.exe" -FallbackPaths @($packagedUv, $portableUv)
     if ($uv) {
         return $uv
     }
@@ -107,9 +161,63 @@ function Ensure-WindowsUv {
     return $portableUv
 }
 
+function Get-WindowsPipOfflineArgs {
+    if ($OfflineWheelhouse) {
+        return @("--no-index", "--find-links", $OfflineWheelhouse)
+    }
+    return @()
+}
+
+function Get-WindowsUvOfflineArgs {
+    if ($OfflineWheelhouse) {
+        return @("--no-index", "--find-links", $OfflineWheelhouse, "--no-sources")
+    }
+    return @()
+}
+
+function Get-CompatibleWindowsPython {
+    $candidateSpecs = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in @("ANIMA_PYTHON_310", "ANIMA_PYTHON")) {
+        $value = [Environment]::GetEnvironmentVariable($name)
+        if (-not [string]::IsNullOrWhiteSpace($value)) { $candidateSpecs.Add($value.Trim()) }
+    }
+    $extra = [Environment]::GetEnvironmentVariable("ANIMA_PYTHON_CANDIDATES")
+    if (-not [string]::IsNullOrWhiteSpace($extra)) {
+        foreach ($value in ($extra -split ';')) {
+            if (-not [string]::IsNullOrWhiteSpace($value)) { $candidateSpecs.Add($value.Trim()) }
+        }
+    }
+    if ($candidateSpecs.Count -eq 0) {
+        $command = Get-Command "python.exe" -ErrorAction SilentlyContinue
+        if ($command) { $candidateSpecs.Add($command.Source) }
+    }
+    $compatible = @()
+    foreach ($spec in $candidateSpecs) {
+        $parts = $spec -split '\|', 2
+        $path = $parts[0].Trim()
+        $declaredVersion = if ($parts.Count -gt 1) { $parts[1].Trim() } else { "" }
+        try {
+            $version = $declaredVersion
+            if (-not $version) {
+                $result = Invoke-Native -Label "读取 Python 版本" -Command @($path, "-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))") -TimeoutSeconds 20 -Optional
+                $version = ($result.StdOut + "`n" + $result.StdErr).Trim()
+            }
+            if ($version -match '^(3\.(10|11|12)\.\d+)') {
+                $compatible += [pscustomobject]@{ Path = $path; Version = $Matches[1] }
+            }
+        }
+        catch { }
+    }
+    foreach ($prefix in @("3.10", "3.11", "3.12")) {
+        $match = $compatible | Where-Object { $_.Version.StartsWith($prefix) } | Select-Object -First 1
+        if ($match) { return $match }
+    }
+    return $null
+}
+
 function Sync-WindowsRepository {
     param(
-        [string]$Git,
+        [AllowEmptyString()][string]$Git,
         [string]$RepoUrl,
         [string]$RepoPath,
         [bool]$Reinstall,
@@ -120,16 +228,21 @@ function Sync-WindowsRepository {
         Write-Step "清理旧仓库：$RepoPath"
         Remove-Item -LiteralPath $RepoPath -Recurse -Force
     }
+    $archiveMarker = Join-Path $RepoPath ".anima-archive-revision"
+    if (-not $Reinstall -and -not $UpdateOnly -and (Test-Path -LiteralPath $archiveMarker)) {
+        Write-Host "复用包内仓库快照：$RepoPath"
+        return
+    }
     if ($UpdateOnly -and -not (Test-Path -LiteralPath (Join-Path $RepoPath ".git"))) {
         throw "$Backend 尚未安装，无法更新。请先点击安装。"
     }
 
-    if (Test-Path -LiteralPath (Join-Path $RepoPath ".git")) {
+    if ($Git -and (Test-Path -LiteralPath (Join-Path $RepoPath ".git"))) {
         Invoke-Native -Label "更新 $Backend 仓库" -Command @(
             $Git, "-C", $RepoPath, "-c", "http.version=HTTP/1.1", "pull", "--ff-only"
         ) -TimeoutSeconds 1800 | Out-Null
     }
-    else {
+    elseif ($Git) {
         if (Test-Path -LiteralPath $RepoPath) {
             Remove-Item -LiteralPath $RepoPath -Recurse -Force
         }
@@ -140,13 +253,151 @@ function Sync-WindowsRepository {
             "--branch", "main", $RepoUrl, $RepoPath
         ) -TimeoutSeconds 1800 | Out-Null
     }
+    else {
+        Install-WindowsRepositoryArchive -RepoUrl $RepoUrl -RepoPath $RepoPath -RequestedRef "main"
+    }
+}
+
+function Install-WindowsRepositoryArchive {
+    param([string]$RepoUrl, [string]$RepoPath, [string]$RequestedRef)
+
+    if ($RepoUrl -notmatch '^https://github\.com/([^/]+)/([^/]+?)(?:\.git)?$') {
+        throw "未找到 Git，且当前仓库地址不支持 ZIP fallback。请安装 Git 后重试。"
+    }
+    $owner = $Matches[1]
+    $repo = $Matches[2]
+    $archiveUrl = "https://github.com/$owner/$repo/archive/$RequestedRef.zip"
+    $parent = Split-Path -Parent $RepoPath
+    $archive = Join-Path $parent ((Split-Path -Leaf $RepoPath) + ".zip")
+    $extract = Join-Path $parent ((Split-Path -Leaf $RepoPath) + "-extract")
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
+    try {
+        Write-Host "未找到 Git，使用 GitHub ZIP fallback：$archiveUrl"
+        Invoke-WebRequest -UseBasicParsing -Uri $archiveUrl -OutFile $archive
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead($archive)
+        try {
+            $extractRoot = [IO.Path]::GetFullPath($extract + [IO.Path]::DirectorySeparatorChar)
+            foreach ($entry in $zip.Entries) {
+                $target = [IO.Path]::GetFullPath((Join-Path $extract $entry.FullName))
+                if (-not $target.StartsWith($extractRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw "GitHub ZIP 包含不安全路径：$($entry.FullName)"
+                }
+            }
+        }
+        finally { $zip.Dispose() }
+        Expand-Archive -LiteralPath $archive -DestinationPath $extract -Force
+        $roots = @(Get-ChildItem -LiteralPath $extract -Directory)
+        if ($roots.Count -ne 1) { throw "GitHub ZIP 目录结构异常：$archiveUrl" }
+        Remove-Item -LiteralPath $RepoPath -Recurse -Force -ErrorAction SilentlyContinue
+        Move-Item -LiteralPath $roots[0].FullName -Destination $RepoPath
+        Set-Content -LiteralPath (Join-Path $RepoPath ".anima-archive-revision") -Value "archive:$RequestedRef" -Encoding UTF8
+    }
+    finally {
+        Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-WindowsPipMirrorArgs {
+    if ($OfflineWheelhouse) {
+        return @(Get-WindowsPipOfflineArgs)
+    }
     if ($MirrorProfile.Pip) {
         return @("--index-url", [string]$MirrorProfile.Pip)
     }
     return @()
+}
+
+function Write-BackendStatusResult {
+    param(
+        [string]$BackendId,
+        [string]$RuntimeTarget,
+        [ValidateSet("available", "unavailable", "detected_but_unusable")][string]$State,
+        [string]$Summary,
+        [hashtable]$Details = @{}
+    )
+
+    $status = [ordered]@{
+        backend_id = $BackendId
+        runtime_target = $RuntimeTarget
+        state = $State
+        summary_zh = $Summary
+        details = $Details
+    }
+    Write-Host $Summary
+    if ($ResultPath) {
+        $parent = Split-Path -Parent $ResultPath
+        if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+        $status | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ResultPath -Encoding UTF8
+    }
+    return [pscustomobject]$status
+}
+
+function Read-BackendManifest {
+    param([string]$BackendId)
+    $path = Join-Path $ManagedRoot "state\manifests\$BackendId.json"
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    try { return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch { return $null }
+}
+
+function Get-WindowsRepositoryRevision {
+    param([string]$RepoPath)
+    $archiveMarker = Join-Path $RepoPath ".anima-archive-revision"
+    if (Test-Path -LiteralPath $archiveMarker -PathType Leaf) {
+        return (Get-Content -LiteralPath $archiveMarker -Raw -Encoding UTF8).Trim()
+    }
+    $git = Resolve-WindowsCommand -Name "git.exe" -FallbackPaths @(
+        (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")
+    )
+    if (-not $git -or -not (Test-Path -LiteralPath (Join-Path $RepoPath ".git"))) { return "" }
+    $result = Invoke-Native -Label "读取已安装仓库版本" -Command @($git, "-C", $RepoPath, "rev-parse", "HEAD") -TimeoutSeconds 5 -Optional
+    return (($result.StdOut + "`n" + $result.StdErr).Trim())
+}
+
+function Get-WindowsBackendStatus {
+    param(
+        [string]$BackendId,
+        [string]$Label,
+        [string]$RepoPath,
+        [string]$PythonPath,
+        [string[]]$RequiredRelativePaths
+    )
+    $manifest = Read-BackendManifest $BackendId
+    if (-not $manifest) {
+        return Write-BackendStatusResult $BackendId "windows" "unavailable" "$Label 尚未安装。"
+    }
+    $missingCommands = @()
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoPath ".anima-archive-revision")) -and
+        -not (Resolve-WindowsCommand -Name "git.exe" -FallbackPaths @((Join-Path $env:ProgramFiles "Git\cmd\git.exe"), (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")))) {
+        $missingCommands += "git"
+    }
+    $required = @($PythonPath) + @($RequiredRelativePaths | ForEach-Object { Join-Path $RepoPath $_ })
+    $missingPaths = @($required | Where-Object { -not (Test-Path -LiteralPath $_) })
+    if ($missingCommands.Count -gt 0 -or $missingPaths.Count -gt 0) {
+        $allMissing = @($missingCommands) + @($missingPaths)
+        return Write-BackendStatusResult $BackendId "windows" "detected_but_unusable" "$Label 安装缺少必要命令或文件：$($allMissing -join ', ')" @{
+            missing_commands = $missingCommands
+            missing_paths = $missingPaths
+        }
+    }
+    try { $actualRevision = Get-WindowsRepositoryRevision $RepoPath }
+    catch {
+        return Write-BackendStatusResult $BackendId "windows" "detected_but_unusable" "$Label 版本检测超时或失败，请检查 Git 进程。" @{ drift_reason = "revision check failed" }
+    }
+    $expectedRevision = [string]$manifest.resolved_revision
+    if (-not $actualRevision -or $actualRevision -ne $expectedRevision) {
+        return Write-BackendStatusResult $BackendId "windows" "detected_but_unusable" "检测到 $Label 已安装版本与 manifest 记录不一致。" @{
+            drift_reason = "revision mismatch"
+            expected = $expectedRevision
+            actual = $actualRevision
+        }
+    }
+    return Write-BackendStatusResult $BackendId "windows" "available" "$Label 安装有效。"
 }
 
 function Save-BackendManifest {
@@ -193,31 +444,56 @@ function Install-SdScriptsWindows {
     param([bool]$Reinstall = $false, [bool]$UpdateOnly = $false)
 
     Write-Host "安装镜像源：$($MirrorProfile.Label)"
-    $git = Ensure-WindowsGit
-    $uv = Ensure-WindowsUv
+    $git = Resolve-WindowsCommand -Name "git.exe" -FallbackPaths @(
+        (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")
+    )
     if ($Reinstall -and (Test-Path -LiteralPath $SdScriptsWindowsVenv)) {
         Remove-Item -LiteralPath $SdScriptsWindowsVenv -Recurse -Force
     }
+    if ($Reinstall) {
+        Remove-Item -LiteralPath (Join-Path $ManagedRoot "state\manifests\sd-scripts.json") -Force -ErrorAction SilentlyContinue
+    }
     Sync-WindowsRepository -Git $git -RepoUrl $SdScriptsRepoUrl -RepoPath $SdScriptsWindowsRepo -Reinstall $Reinstall -UpdateOnly $UpdateOnly
 
-    Invoke-Native -Label "创建 sd-scripts Python 3.10 虚拟环境" -Command @(
-        $uv, "venv", "--clear", "--python", "3.10", "--seed", $SdScriptsWindowsVenv
-    ) -TimeoutSeconds 1800 | Out-Null
+    $interpreter = Get-CompatibleWindowsPython
+    $interpreterManifest = ""
+    if ($interpreter) {
+        Write-Host "复用 Windows Python $($interpreter.Version): $($interpreter.Path)"
+        Invoke-Native -Label "使用 Python $($interpreter.Version) 创建 sd-scripts 虚拟环境" -Command @(
+            $interpreter.Path, "-m", "venv", "--clear", $SdScriptsWindowsVenv
+        ) -TimeoutSeconds 1800 | Out-Null
+        $interpreterManifest = $interpreter.Path
+    }
+    else {
+        $uv = Ensure-WindowsUv
+        $uvVenvArgs = @($uv, "venv", "--clear", "--python", "3.10")
+        if ($OfflineWheelhouse) { $uvVenvArgs += "--offline" } else { $uvVenvArgs += "--seed" }
+        $uvVenvArgs += $SdScriptsWindowsVenv
+        Invoke-Native -Label "使用 uv 创建 sd-scripts Python 3.10 虚拟环境" -Command $uvVenvArgs -TimeoutSeconds 1800 | Out-Null
+        $interpreterManifest = "uv:3.10"
+        if ($OfflineWheelhouse) {
+            Invoke-Native -Label "离线安装 sd-scripts 虚拟环境基础工具" -Command @(
+                $uv, "pip", "install", "--python", (Join-Path $SdScriptsWindowsVenv "Scripts\python.exe"),
+                "--no-index", "--find-links", $OfflineWheelhouse, "--offline", "pip", "setuptools", "wheel"
+            ) -TimeoutSeconds 1800 | Out-Null
+        }
+    }
     $python = Join-Path $SdScriptsWindowsVenv "Scripts\python.exe"
     $pipMirror = @(Get-WindowsPipMirrorArgs)
 
     Invoke-Native -Label "安装 sd-scripts Python 依赖" -Command (@(
         $python, "-m", "pip", "install", "--retries", "5", "--timeout", "60"
     ) + $pipMirror + @("-r", (Join-Path $SdScriptsWindowsRepo "requirements.txt"))) -TimeoutSeconds 0 | Out-Null
-    Invoke-Native -Label "安装 CUDA 版 PyTorch / torchvision" -Command @(
+    $torchIndexArgs = if ($OfflineWheelhouse) { @(Get-WindowsPipOfflineArgs) } else { @("--index-url", "https://download.pytorch.org/whl/cu128") }
+    Invoke-Native -Label "安装 CUDA 版 PyTorch / torchvision" -Command (@(
         $python, "-m", "pip", "install", "--force-reinstall",
-        "torch==2.10.0+cu128", "torchvision==0.25.0+cu128", "torchaudio==2.10.0+cu128",
-        "--index-url", "https://download.pytorch.org/whl/cu128"
-    ) -TimeoutSeconds 0 | Out-Null
-    Invoke-Native -Label "安装 xformers 加速依赖" -Command @(
+        "torch==2.10.0+cu128", "torchvision==0.25.0+cu128", "torchaudio==2.10.0+cu128"
+    ) + $torchIndexArgs) -TimeoutSeconds 0 | Out-Null
+    Invoke-Native -Label "安装 xformers 加速依赖" -Command (@(
         $python, "-m", "pip", "install", "--force-reinstall", "--no-deps",
-        "xformers==0.0.35", "--index-url", "https://download.pytorch.org/whl/cu128"
-    ) -TimeoutSeconds 0 | Out-Null
+        "xformers==0.0.35"
+    ) + $torchIndexArgs) -TimeoutSeconds 0 | Out-Null
     Invoke-Native -Label "安装 Triton Windows 加速依赖" -Command (@(
         $python, "-m", "pip", "install", "--upgrade"
     ) + $pipMirror + @("triton-windows==3.6.0.post26")) -TimeoutSeconds 0 | Out-Null
@@ -226,7 +502,7 @@ function Install-SdScriptsWindows {
     ) + $pipMirror + @("lycoris-lora")) -TimeoutSeconds 0 | Out-Null
 
     Validate-SdScriptsWindows
-    Save-BackendManifest -BackendId "sd-scripts" -RepoUrl $SdScriptsRepoUrl -Revision (Get-WindowsRevision $git $SdScriptsWindowsRepo) -RuntimeTarget "windows" -InterpreterPath $python -InstallRoot $ManagedRoot
+    Save-BackendManifest -BackendId "sd-scripts" -RepoUrl $SdScriptsRepoUrl -Revision (Get-WindowsRepositoryRevision $SdScriptsWindowsRepo) -RuntimeTarget "windows" -InterpreterPath $interpreterManifest -InstallRoot $ManagedRoot
 }
 
 function Validate-SdScriptsWindows {
@@ -248,13 +524,11 @@ function Validate-SdScriptsWindows {
 
 function Show-SdScriptsWindowsStatus {
     $python = Join-Path $SdScriptsWindowsVenv "Scripts\python.exe"
-    if ((Test-Path -LiteralPath $python) -and (Test-Path -LiteralPath (Join-Path $SdScriptsWindowsRepo "train_network.py"))) {
-        Write-Host "sd-scripts Windows：已安装"
-        Invoke-OptionalNative -Label "读取 sd-scripts Python 版本" -Command @($python, "--version") -TimeoutSeconds 30
-    }
-    else {
-        Write-Host "sd-scripts Windows：未安装或文件不完整"
-    }
+    Get-WindowsBackendStatus -BackendId "sd-scripts" -Label "sd-scripts Windows" -RepoPath $SdScriptsWindowsRepo -PythonPath $python -RequiredRelativePaths @(
+        "README.md", "requirements.txt", "setup.py", "train_network.py", "sdxl_train_network.py",
+        "sd3_train_network.py", "flux_train_network.py", "lumina_train_network.py",
+        "hunyuan_image_train_network.py", "anima_train.py", "anima_train_network.py"
+    ) | Out-Null
 }
 
 function Ensure-AnimaFastWindowsUvEnvironment {
@@ -306,12 +580,22 @@ function Install-AnimaFastLoraWindows {
     param([bool]$Reinstall = $false, [bool]$UpdateOnly = $false)
 
     Write-Host "安装镜像源：$($MirrorProfile.Label)"
-    $git = Ensure-WindowsGit
+    $git = Resolve-WindowsCommand -Name "git.exe" -FallbackPaths @(
+        (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")
+    )
     $uv = Ensure-WindowsUv
+    if ($Reinstall) {
+        Remove-Item -LiteralPath (Join-Path $ManagedRoot "state\manifests\anima-fast-lora.json") -Force -ErrorAction SilentlyContinue
+    }
     Sync-WindowsRepository -Git $git -RepoUrl $AnimaFastLoraRepoUrl -RepoPath $AnimaFastLoraRepo -Reinstall $Reinstall -UpdateOnly $UpdateOnly
     Ensure-AnimaFastWindowsUvEnvironment
 
-    $uvArgs = @($uv, "sync", "--project", $AnimaFastLoraTrainRoot, "--python", "3.13", "--no-dev", "--no-default-groups")
+    $uvArgs = @($uv, "sync", "--project", $AnimaFastLoraTrainRoot, "--python", "3.13", "--no-dev", "--no-default-groups") + @(Get-WindowsUvOfflineArgs)
+    if ($OfflineWheelhouse) {
+        $env:UV_CACHE_DIR = (Join-Path (Split-Path -Parent $OfflineWheelhouse) "uv-cache")
+        $env:UV_LINK_MODE = "copy"
+    }
     if ($MirrorProfile.Pip) {
         $env:UV_DEFAULT_INDEX = [string]$MirrorProfile.Pip
     }
@@ -320,11 +604,13 @@ function Install-AnimaFastLoraWindows {
     }
     finally {
         Remove-Item Env:\UV_DEFAULT_INDEX -ErrorAction SilentlyContinue
+        Remove-Item Env:\UV_CACHE_DIR -ErrorAction SilentlyContinue
+        Remove-Item Env:\UV_LINK_MODE -ErrorAction SilentlyContinue
     }
 
     Validate-AnimaFastLoraWindows
     $python = Join-Path $AnimaFastLoraTrainRoot ".venv\Scripts\python.exe"
-    Save-BackendManifest -BackendId "anima-fast-lora" -RepoUrl $AnimaFastLoraRepoUrl -Revision (Get-WindowsRevision $git $AnimaFastLoraRepo) -RuntimeTarget "windows" -InterpreterPath $python -InstallRoot $ManagedRoot
+    Save-BackendManifest -BackendId "anima-fast-lora" -RepoUrl $AnimaFastLoraRepoUrl -Revision (Get-WindowsRepositoryRevision $AnimaFastLoraRepo) -RuntimeTarget "windows" -InterpreterPath $python -InstallRoot $ManagedRoot
 }
 
 function Validate-AnimaFastLoraWindows {
@@ -343,13 +629,11 @@ function Validate-AnimaFastLoraWindows {
 
 function Show-AnimaFastLoraWindowsStatus {
     $python = Join-Path $AnimaFastLoraTrainRoot ".venv\Scripts\python.exe"
-    if ((Test-Path -LiteralPath $python) -and (Test-Path -LiteralPath (Join-Path $AnimaFastLoraTrainRoot "train.py"))) {
-        Write-Host "Anima Fast LoRA Windows：已安装"
-        Invoke-OptionalNative -Label "读取 Anima Fast LoRA Python 版本" -Command @($python, "--version") -TimeoutSeconds 30
-    }
-    else {
-        Write-Host "Anima Fast LoRA Windows：未安装或文件不完整"
-    }
+    Get-WindowsBackendStatus -BackendId "anima-fast-lora" -Label "Anima Fast LoRA Windows" -RepoPath $AnimaFastLoraRepo -PythonPath $python -RequiredRelativePaths @(
+        "external\anima_lora\README.md", "external\anima_lora\pyproject.toml",
+        "external\anima_lora\train.py", "external\anima_lora\configs\base.toml",
+        "external\anima_lora\configs\gui-methods\lora.toml"
+    ) | Out-Null
 }
 
 function Remove-WslSdScriptsEnvironment {
@@ -513,34 +797,85 @@ function Install-WslSdScripts {
 }
 
 function Show-WslSdScriptsStatus {
+    Get-WslBackendStatus -BackendId "wsl-sd-scripts" -Label "wsl-sd-scripts" -RepoPath $WslSdScriptsRepo -CondaEnv $WslSdScriptsEnv -RequiredRelativePaths @(
+        "README.md", "requirements.txt", "setup.py", "train_network.py", "sdxl_train_network.py",
+        "sd3_train_network.py", "flux_train_network.py", "lumina_train_network.py",
+        "hunyuan_image_train_network.py", "anima_train_network.py"
+    ) | Out-Null
+}
+
+function Get-WslBackendStatus {
+    param(
+        [string]$BackendId,
+        [string]$Label,
+        [string]$RepoPath,
+        [string]$CondaEnv,
+        [string[]]$RequiredRelativePaths
+    )
     if (-not (Test-Wsl2Available) -or -not (Test-UbuntuInstalled)) {
-        Write-Host "wsl-sd-scripts：WSL2 / Ubuntu 不可用"
-        return
+        return Write-BackendStatusResult $BackendId "wsl2" "detected_but_unusable" "$Label 需要可用的 WSL2 / Ubuntu / NVIDIA WSL 训练环境。"
+    }
+    $manifest = Read-BackendManifest $BackendId
+    if (-not $manifest) {
+        return Write-BackendStatusResult $BackendId "wsl2" "unavailable" "$Label 尚未安装。"
     }
     $conda = Get-CondaSourceSnippet
+    $quotedPaths = @($RequiredRelativePaths | ForEach-Object { "'$RepoPath/$_'" }) -join " "
+    $script = @"
+set +e
+missing_commands=''
+missing_paths=''
+command -v git >/dev/null 2>&1 || missing_commands='git'
+$conda >/dev/null 2>&1 || missing_commands="`$missing_commands conda"
+for required_path in $quotedPaths; do
+  test -f "`$required_path" || missing_paths="`$missing_paths `$required_path"
+done
+conda run -n $CondaEnv python --version >/dev/null 2>&1 || missing_paths="`$missing_paths conda:$CondaEnv"
+printf 'CYANTOOLS_MISSING_COMMANDS=%s\n' "`$missing_commands"
+printf 'CYANTOOLS_MISSING_PATHS=%s\n' "`$missing_paths"
+"@
     try {
-        Invoke-WslBash -Label "读取 wsl-sd-scripts 状态" -Script "test -f $WslSdScriptsRepo/train_network.py && $conda && conda run -n $WslSdScriptsEnv python --version" -TimeoutSeconds 30 | Out-Null
-        Write-Host "wsl-sd-scripts：已安装"
+        $result = Invoke-WslBash -Label "读取 $Label 结构化状态" -Script $script -TimeoutSeconds 30
+        $text = $result.StdOut + "`n" + $result.StdErr
+        $commands = @()
+        $paths = @()
+        if ($text -match 'CYANTOOLS_MISSING_COMMANDS=([^\r\n]*)') { $commands = @($Matches[1].Trim() -split '\s+' | Where-Object { $_ }) }
+        if ($text -match 'CYANTOOLS_MISSING_PATHS=([^\r\n]*)') { $paths = @($Matches[1].Trim() -split '\s+' | Where-Object { $_ }) }
+        if ($commands.Count -gt 0 -or $paths.Count -gt 0) {
+            return Write-BackendStatusResult $BackendId "wsl2" "detected_but_unusable" "$Label 安装缺少必要命令或文件：$((@($commands) + @($paths)) -join ', ')" @{
+                missing_commands = $commands
+                missing_paths = $paths
+            }
+        }
     }
     catch {
-        Write-Host "wsl-sd-scripts：未安装或环境不完整"
+        return Write-BackendStatusResult $BackendId "wsl2" "detected_but_unusable" "$Label 环境检测失败：$($_.Exception.Message)" @{ detect_error = $_.Exception.Message }
+    }
+    return Write-BackendStatusResult $BackendId "wsl2" "available" "$Label 环境可用。" @{
+        repo_dir = $RepoPath
+        conda_env_name = $CondaEnv
     }
 }
 
 function Show-WslBaseStatus {
     Write-Host "托管目录：$ManagedRoot"
     if (-not (Test-WslExe)) {
-        Write-Host "WSL 基础环境：未找到 wsl.exe"
+        Write-BackendStatusResult "wsl" "wsl2" "unavailable" "未检测到 Windows WSL 命令，请先安装 WSL。" @{ supports_wsl_install = $true; is_wsl_base = $true; distro_name = "Ubuntu" } | Out-Null
         return
     }
     Invoke-Native -Label "WSL 发行版状态" -Command @("wsl.exe", "-l", "-v") -TimeoutSeconds 30 -NativeOutputEncoding ([Text.Encoding]::Unicode) -Optional | Out-Null
-    if (Test-UbuntuInstalled) {
-        Write-Host "Ubuntu 子系统：已安装"
-        if (Test-UbuntuRootReady) { Write-Host "Ubuntu root shell：可用" }
-        else { Write-Host "Ubuntu root shell：尚未初始化或不可用" }
+    $details = @{ supports_wsl_install = $true; is_wsl_base = $true; distro_name = "Ubuntu" }
+    if (-not (Test-Wsl2Available)) {
+        Write-BackendStatusResult "wsl" "wsl2" "unavailable" "未检测到可用的 WSL2 发行版，请先安装 WSL 和 Ubuntu 子系统。" $details | Out-Null
+    }
+    elseif (-not (Test-UbuntuInstalled)) {
+        Write-BackendStatusResult "wsl" "wsl2" "unavailable" "WSL2 已可用，但尚未检测到 Ubuntu 子系统。" $details | Out-Null
+    }
+    elseif (-not (Test-UbuntuRootReady)) {
+        Write-BackendStatusResult "wsl" "wsl2" "detected_but_unusable" "Ubuntu 子系统已安装，但 root 非交互启动尚未就绪。" $details | Out-Null
     }
     else {
-        Write-Host "Ubuntu 子系统：未安装"
+        Write-BackendStatusResult "wsl" "wsl2" "available" "WSL2 / Ubuntu 基础环境可用。" $details | Out-Null
     }
 }
 
@@ -548,12 +883,13 @@ function Invoke-WslBaseAction {
     switch ($Action) {
         "Check" { Show-WslBaseStatus }
         "InstallWsl" { Install-WindowsWslFeature }
-        "InstallUbuntu" { Install-UbuntuDistribution }
+        "InstallUbuntu" { Install-UbuntuDistribution -Reinstall:$ForceReinstallDistribution }
         "Install" {
             Install-WindowsWslFeature
             if (Test-WslExe) { Install-UbuntuDistribution }
         }
         "Update" { Install-WindowsWslFeature; if (Test-WslExe) { Install-UbuntuDistribution } }
+        "Reinstall" { Install-UbuntuDistribution -Reinstall:$true }
         "Validate" {
             if (-not (Test-Wsl2Available) -or -not (Test-UbuntuInstalled) -or -not (Test-UbuntuRootReady)) {
                 throw "WSL2 / Ubuntu 基础环境不可用。"
@@ -584,9 +920,13 @@ try {
         "wsl" { Invoke-WslBaseAction }
         "diffusion-pipe" {
             switch ($Action) {
-                "Check" { Show-Status }
+                "Check" {
+                    Get-WslBackendStatus -BackendId "diffusion-pipe" -Label "diffusion-pipe" -RepoPath '$HOME/diffusion-pipe' -CondaEnv "diffusion-pipe-cu128" -RequiredRelativePaths @(
+                        "README.md", ".gitmodules", "requirements.txt", "train.py"
+                    ) | Out-Null
+                }
                 "InstallWsl" { Install-WindowsWslFeature }
-                "InstallUbuntu" { Install-UbuntuDistribution }
+                "InstallUbuntu" { Install-UbuntuDistribution -Reinstall:$ForceReinstallDistribution }
                 "Install" { Install-DiffusionPipe }
                 "Update" { Install-DiffusionPipe -UpdateOnly:$true }
                 "Reinstall" { Install-DiffusionPipe -Reinstall:$true }
@@ -598,7 +938,7 @@ try {
             switch ($Action) {
                 "Check" { Show-SdScriptsWindowsStatus }
                 "Install" { Install-SdScriptsWindows }
-                "Update" { Install-SdScriptsWindows -UpdateOnly:$true }
+                "Update" { throw "sd-scripts Windows 暂不支持更新，请使用重装。" }
                 "Reinstall" { Install-SdScriptsWindows -Reinstall:$true }
                 "Validate" { Validate-SdScriptsWindows }
                 default { throw "sd-scripts Windows 不支持操作：$Action" }
@@ -608,7 +948,7 @@ try {
             switch ($Action) {
                 "Check" { Show-AnimaFastLoraWindowsStatus }
                 "Install" { Install-AnimaFastLoraWindows }
-                "Update" { Install-AnimaFastLoraWindows -UpdateOnly:$true }
+                "Update" { throw "Anima Fast LoRA Windows 暂不支持更新，请使用重装。" }
                 "Reinstall" { Install-AnimaFastLoraWindows -Reinstall:$true }
                 "Validate" { Validate-AnimaFastLoraWindows }
                 default { throw "Anima Fast LoRA Windows 不支持操作：$Action" }

@@ -52,5 +52,13 @@ namespace CyanTools
                 file.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
             return !string.IsNullOrWhiteSpace(packagePath);
         }
+
+        private void DeploymentLogTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is TextBox textBox && !textBox.IsKeyboardFocusWithin)
+            {
+                textBox.ScrollToEnd();
+            }
+        }
     }
 }

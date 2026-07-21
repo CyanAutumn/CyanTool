@@ -1,9 +1,7 @@
 using System;
-using System.Diagnostics;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 
 namespace CyanTools
 {
@@ -34,12 +32,6 @@ namespace CyanTools
             {
                 SecretImageClicked?.Invoke(this, EventArgs.Empty);
             }
-        }
-
-        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
-        {
-            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
-            e.Handled = true;
         }
     }
 }

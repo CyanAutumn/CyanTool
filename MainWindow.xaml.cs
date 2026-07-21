@@ -18,6 +18,42 @@ namespace CyanTools
         private readonly ToolNavigationService _navigationService = new();
         private readonly Dictionary<NavigationViewItem, NavigationMenuEntry> _navigationItems = new();
         private readonly HomeView _homeView = new();
+        private static readonly IReadOnlyDictionary<Type, string> PageDescriptions = new Dictionary<Type, string>
+        {
+            [typeof(ToolLLM)] = "集中管理模型、提示词、工作目录和分类路径，右侧持续显示执行日志。",
+            [typeof(RealEsrganView)] = "统一管理超分工具、模型参数、输出选项和运行日志。",
+            [typeof(ImageScalingView)] = "按目标分辨率批量上采样或下采样图片。",
+            [typeof(ImageProcessingView)] = "对目标路径中的图片执行镜像等轻量批处理操作。",
+            [typeof(DatasetManagerView)] = "浏览图片、编辑提示词标签、分配分类并保存数据集改动。",
+            [typeof(TrainingSetManagerView)] = "用 Git/LFS 管理图片训练集历史、节点配置、笔记、日志和训练产物。",
+            [typeof(TrainingBridgeView)] = "在 Windows 与 WSL 训练后端之间导入、映射、预览和导出训练配置。",
+            [typeof(ModelTrainingView)] = "管理训练脚本、TOML 输出和参数分组，生成配置后可直接启动训练。",
+            [typeof(LoraTrainingView)] = "管理 LoRA 训练脚本、TOML 输出和参数分组，生成配置后可直接启动训练。",
+            [typeof(LayeredLoraMergeView)] = "按 SDXL 25 层、Anima LoRA Block 或 Anima 大模型 Block 融合。",
+            [typeof(ImageBucketingView)] = "根据图片宽高比和尺寸规则，将图片归入对应分辨率分组。",
+            [typeof(ThreeStageView)] = "人物、半身、头部与眼部裁切参数集中配置。",
+            [typeof(ResolutionFilterView)] = "按高度、宽度或分辨率阈值筛掉不符合要求的图片。",
+            [typeof(HandIntegrityFilterView)] = "按模型检测手部关键点，将疑似异常图片分流到输出路径。",
+            [typeof(KeepFilesView)] = "按扩展名保留需要的文件类型，其余文件会被清理。",
+            [typeof(FolderProcessingView)] = "对整批文件执行移动、清理、整理和训练输出转换等目录级操作。",
+            [typeof(ExportVideoFrameView)] = "预览视频帧并导出当前帧、全部帧或 GIF。",
+            [typeof(ImageMetadataView)] = "拖入图片后查看并编辑元数据 JSON。",
+            [typeof(GaussianBlurView)] = "批量生成指定半径的模糊图片。",
+            [typeof(ImageClusteringView)] = "按特征空间、聚类算法和 UMAP 参数整理图片分组。",
+            [typeof(SameSourceImageGroupingView)] = "识别原图、缩略图、副本、被包含图和差分图，并导出清晰的分组结果。",
+            [typeof(ConvertImageFormatView)] = "批量转换图片格式并保留原有目录结构。",
+            [typeof(ConvertTransparentChannelView)] = "将透明像素填充为白色，支持 PNG / WEBP / BMP / JPEG。",
+            [typeof(TaggingView)] = "选择输入路径、打标模型和阈值后批量生成标签文件。",
+            [typeof(TrainingSetBalancerView)] = "按子文件夹图片数量计算重复次数，让训练步数占比更均衡。",
+            [typeof(TrainingOutputOrganizerView)] = "将 diffusion-pipe epoch 输出整理为 sd-script 可识别的 adapter_model 序列。",
+            [typeof(XyzToolView)] = "按开始、结束和间隔生成可复制的序号提示词。",
+            [typeof(ImageRenameView)] = "按前缀、起始编号和位数批量预览并重命名图片。",
+            [typeof(DanbooruCrawlerView)] = "集中配置来源、令牌、标签和输出目录，下载日志在右侧持续追踪。",
+            [typeof(GeminiImageGenerationView)] = "素材、提示词、模型参数和生成结果集中在一个更清爽的工作台里。",
+            [typeof(PipelineSchedulerView)] = "在节点画布中编排处理流程，保存工作流并查看执行日志。",
+            [typeof(OptionsView)] = "管理本机运行环境与共享工具设置。",
+            [typeof(PromptManagerView)] = "维护本地提示词文件，快速创建、编辑、随机复制和自增添加。"
+        };
         private static readonly IReadOnlyList<NavigationCategoryDefinition> NavigationCategories =
         [
             new NavigationCategoryDefinition(ToolPageCategory.Training, "训练", SymbolRegular.HatGraduation24),
@@ -114,6 +150,7 @@ namespace CyanTools
 
             _currentEntry = entry;
             RootNavigationView.Header = LocalizationManager.Translate(page.DisplayName);
+            UpdateShellPageHeader();
             RootNavigationView.ReplaceContent(control);
             LocalizationManager.ApplyTo(control);
             MarkActiveItem(activeItem);
@@ -270,6 +307,11 @@ namespace CyanTools
                 return SymbolRegular.DatabaseLink24;
             }
 
+            if (controlType == typeof(TrainingBridgeView))
+            {
+                return SymbolRegular.ArrowSync24;
+            }
+
             if (controlType == typeof(LayeredLoraMergeView))
             {
                 return SymbolRegular.Layer24;
@@ -392,6 +434,7 @@ namespace CyanTools
         {
             _currentEntry = NavigationMenuEntry.Home;
             RootNavigationView.Header = LocalizationManager.Translate("主页");
+            UpdateShellPageHeader();
             RootNavigationView.ReplaceContent(_homeView);
             LocalizationManager.ApplyTo(_homeView);
             MarkActiveItem(activeItem ?? FindItemForEntry(NavigationMenuEntry.Home));
@@ -546,6 +589,7 @@ namespace CyanTools
             RefreshMenuItems();
             UpdateNavigationHeader();
             LocalizationManager.ApplyTo(this);
+            UpdateShellPageHeader();
         }
 
         private void UpdateNavigationHeader()
@@ -553,6 +597,23 @@ namespace CyanTools
             RootNavigationView.Header = _currentEntry == null || _currentEntry.IsHome
                 ? LocalizationManager.Translate("主页")
                 : LocalizationManager.Translate(_currentEntry.DisplayName);
+            UpdateShellPageHeader();
+        }
+
+        private void UpdateShellPageHeader()
+        {
+            if (_currentEntry == null || _currentEntry.IsHome || _currentEntry.Metadata == null)
+            {
+                ShellPageTitleText.Text = "Cyan Tools";
+                ShellPageDescriptionText.Text = LocalizationManager.Translate("AI 图像与数据集工作台");
+                return;
+            }
+
+            var metadata = _currentEntry.Metadata;
+            ShellPageTitleText.Text = LocalizationManager.Translate(metadata.DisplayName);
+            ShellPageDescriptionText.Text = PageDescriptions.TryGetValue(metadata.ControlType, out var description)
+                ? LocalizationManager.Translate(description)
+                : LocalizationManager.Translate("AI 图像与数据集工作台");
         }
 
         private static void ApplyCyanPalette(bool useDarkTheme)

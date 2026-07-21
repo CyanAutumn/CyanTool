@@ -60,11 +60,13 @@
                                                VerticalAlignment="Center" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Cyan Tools"
+                                <TextBlock x:Name="ShellPageTitleText"
+                                           Text="Cyan Tools"
                                            FontSize="19"
                                            FontWeight="SemiBold"
                                            VerticalAlignment="Center" />
-                                <TextBlock Text="AI 图像与数据集工作台"
+                                <TextBlock x:Name="ShellPageDescriptionText"
+                                           Text="AI 图像与数据集工作台"
                                            Style="{StaticResource CyanTinyTextBlockStyle}" />
                             </StackPanel>
                         </StackPanel>

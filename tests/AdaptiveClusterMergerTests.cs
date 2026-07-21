@@ -128,4 +128,80 @@ public sealed class AdaptiveClusterMergerTests
         Assert.Equal(3, result.FinalClusterCount);
         Assert.Equal(new[] { 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2 }, result.Labels);
     }
+
+    [Fact]
+    public void MergeToMacroClusters_StopsAtFourMacroStyleGroups()
+    {
+        var points = new List<float[]>();
+        var labels = new List<int>();
+        int label = 0;
+        foreach (float macroCenter in new[] { 0f, 2f, 4f, 6f })
+        {
+            foreach (float offset in new[] { 0f, 0.04f, 0.08f })
+            {
+                points.Add(new[] { macroCenter + offset, 0f });
+                labels.Add(label++);
+            }
+        }
+
+        var result = AdaptiveClusterMerger.MergeToMacroClusters(
+            points,
+            labels,
+            minClusters: 2,
+            maxClusters: 8);
+
+        Assert.True(result.StableDistanceGapFound);
+        Assert.Equal(12, result.OriginalClusterCount);
+        Assert.Equal(4, result.FinalClusterCount);
+        Assert.True(result.CutDistance > result.PreviousMergeDistance * 10d);
+        Assert.Equal(new[] { 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3 }, result.Labels);
+    }
+
+    [Fact]
+    public void MergeToMacroClusters_UsesDataDistanceInsteadOfFixedTarget()
+    {
+        var points = new List<float[]>();
+        var labels = new List<int>();
+        int label = 0;
+        foreach (float macroCenter in new[] { 0f, 3f, 6f })
+        {
+            foreach (float offset in new[] { 0f, 0.03f, 0.06f, 0.09f })
+            {
+                points.Add(new[] { macroCenter + offset, 0f });
+                labels.Add(label++);
+            }
+        }
+
+        var result = AdaptiveClusterMerger.MergeToMacroClusters(
+            points,
+            labels,
+            minClusters: 2,
+            maxClusters: 8);
+
+        Assert.True(result.StableDistanceGapFound);
+        Assert.Equal(3, result.FinalClusterCount);
+        Assert.NotEqual(8, result.FinalClusterCount);
+    }
+
+    [Fact]
+    public void MergeToMacroClusters_KeepsConservativeMaximumWithoutStableGap()
+    {
+        var points = new List<float[]>
+        {
+            new[] { 0f, 0f },
+            new[] { 1f, 0f },
+            new[] { 2f, 0f }
+        };
+        int[] labels = { 0, 1, 2 };
+
+        var result = AdaptiveClusterMerger.MergeToMacroClusters(
+            points,
+            labels,
+            minClusters: 1,
+            maxClusters: 3);
+
+        Assert.False(result.StableDistanceGapFound);
+        Assert.Equal(3, result.FinalClusterCount);
+        Assert.Equal(labels, result.Labels);
+    }
 }

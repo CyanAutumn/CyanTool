@@ -799,8 +799,9 @@ namespace CyanTools.ViewModel
 
                 int resolvedKMeansK = NumClusters;
                 bool mergeKMeansClustersAfterClustering = false;
-                int preferredHeadStyleAutoClusterCount = 0;
-                int preferredStrictGrayStyleAutoClusterCount = 0;
+                bool useMacroStyleOptimalMode = false;
+                int macroStyleMinClusterCount = 0;
+                int macroStyleMaxClusterCount = 0;
                 if (useKMeansFamily)
                 {
                     if (UseBestKBySilhouette)
@@ -814,17 +815,18 @@ namespace CyanTools.ViewModel
                         {
                             resolvedKMeansK = ResolveAutoMergeInitialClusterCount(clusteringSpace.Count);
                             mergeKMeansClustersAfterClustering = true;
-                            if (useHeadLineStyleFeature)
+                            useMacroStyleOptimalMode = IsStyleLikeFeatureType(effectiveFeatureType);
+                            if (useMacroStyleOptimalMode)
                             {
-                                preferredHeadStyleAutoClusterCount = ResolvePreferredHeadStyleAutoClusterCount(clusteringSpace.Count);
+                                (macroStyleMinClusterCount, macroStyleMaxClusterCount) =
+                                    ResolveMacroStyleClusterRange(clusteringSpace.Count);
+                                string styleMode = useHeadLineStyleFeature
+                                    ? "头部画法/线条"
+                                    : useStrictGrayStyleFeature
+                                        ? "严格灰度画风"
+                                        : "画风";
                                 AppendLog(
-                                    $"最优模式：头部画法/线条特征先过分割为 K={resolvedKMeansK}，再尝试合并到约 {preferredHeadStyleAutoClusterCount} 个以内；若簇间画风距离过大则提前停止。");
-                            }
-                            else if (useStrictGrayStyleFeature)
-                            {
-                                preferredStrictGrayStyleAutoClusterCount = ResolvePreferredStrictGrayStyleAutoClusterCount(clusteringSpace.Count);
-                                AppendLog(
-                                    $"最优模式：严格灰度画风先过分割为 K={resolvedKMeansK}，再合并到约 {preferredStrictGrayStyleAutoClusterCount} 个以内，避免自动细分生成数百个文件夹。");
+                                    $"最优模式：{styleMode}先过分割为 K={resolvedKMeansK}，再做宏观层次合并；将在 {macroStyleMinClusterCount}-{macroStyleMaxClusterCount} 类范围内根据合并距离跃升自动停止，而不是合并到固定数量。");
                             }
                             else
                             {
@@ -872,25 +874,29 @@ namespace CyanTools.ViewModel
                     var mergeReferenceSpace = useUmapSpace && !useTwoStageStyleClustering
                         ? clusteringSpace
                         : clusteringSourcePoints;
-                    var mergeResult = useHeadLineStyleFeature && UseBestKBySilhouette
-                        ? Utils.AdaptiveClusterMerger.MergeToPreferredClusterCount(
-                            headStyleMergePoints ?? mergeReferenceSpace,
+                    var mergeResult = useMacroStyleOptimalMode
+                        ? Utils.AdaptiveClusterMerger.MergeToMacroClusters(
+                            useHeadLineStyleFeature ? headStyleMergePoints ?? mergeReferenceSpace : mergeReferenceSpace,
                             assignments,
-                            preferredHeadStyleAutoClusterCount,
-                            useCosineDistance: mergeInCosineSpace,
-                            maxCompleteLinkDistance: ResolveHeadStyleMergeMaxCompleteLinkDistance())
-                        : useStrictGrayStyleFeature && UseBestKBySilhouette
-                            ? Utils.AdaptiveClusterMerger.MergeToPreferredClusterCount(
-                                mergeReferenceSpace,
-                                assignments,
-                                preferredStrictGrayStyleAutoClusterCount,
-                                useCosineDistance: mergeInCosineSpace)
-                            : Utils.AdaptiveClusterMerger.MergeNearbyClusters(
-                                mergeReferenceSpace,
-                                assignments,
-                                useCosineDistance: mergeInCosineSpace);
+                            macroStyleMinClusterCount,
+                            macroStyleMaxClusterCount,
+                            useCosineDistance: mergeInCosineSpace)
+                        : Utils.AdaptiveClusterMerger.MergeNearbyClusters(
+                            mergeReferenceSpace,
+                            assignments,
+                            useCosineDistance: mergeInCosineSpace);
                     assignments = mergeResult.Labels;
-                    if (mergeResult.Changed)
+                    if (useMacroStyleOptimalMode && mergeResult.StableDistanceGapFound)
+                    {
+                        AppendLog(
+                            $"宏观画风断点已找到：初始 {mergeResult.OriginalClusterCount} 簇 -> 最终 {mergeResult.FinalClusterCount} 个文件夹；相邻合并距离由 {mergeResult.PreviousMergeDistance:F4} 跃升到 {mergeResult.CutDistance:F4}。");
+                    }
+                    else if (useMacroStyleOptimalMode)
+                    {
+                        AppendLog(
+                            $"宏观画风未发现足够稳定的距离断点，保守保留 {mergeResult.FinalClusterCount} 个文件夹，避免强行合并不同画风。");
+                    }
+                    else if (mergeResult.Changed)
                     {
                         AppendLog(
                             $"最优模式合并完成：初始 {mergeResult.OriginalClusterCount} 簇 -> 最终 {mergeResult.FinalClusterCount} 个文件夹，断点距离 {mergeResult.CutDistance:F4}。");
@@ -903,10 +909,10 @@ namespace CyanTools.ViewModel
 
                 if (useKMeansFamily &&
                     UseBestKBySilhouette &&
+                    !useMacroStyleOptimalMode &&
                     !useUmapSpace &&
                     IsStyleLikeFeatureType(effectiveFeatureType) &&
-                    !(useHeadLineStyleFeature && UseBestKBySilhouette) &&
-                    !(useStrictGrayStyleFeature && UseBestKBySilhouette))
+                    !(useHeadLineStyleFeature && UseBestKBySilhouette))
                 {
                     var purityResult = useHeadLineStyleFeature
                         ? Utils.StyleClusterPurityRefiner.SplitLooseClusters(
@@ -927,13 +933,9 @@ namespace CyanTools.ViewModel
                             $"风格可靠性细分完成：拆分 {purityResult.SplitClusterCount} 个松散簇，文件夹数 {purityResult.OriginalClusterCount} -> {purityResult.FinalClusterCount}，完全链接阈值 {purityResult.CompleteLinkThreshold:F4}。");
                     }
                 }
-                else if (useHeadLineStyleFeature && UseBestKBySilhouette)
+                else if (useMacroStyleOptimalMode)
                 {
-                    AppendLog("头部画法/线条最优模式已跳过全局松散簇细分，避免把训练文件夹重新拆成数百个小簇。");
-                }
-                else if (useStrictGrayStyleFeature && UseBestKBySilhouette)
-                {
-                    AppendLog("严格灰度画风最优模式已跳过全局松散簇细分，避免把结果重新拆成数百个文件夹。");
+                    AppendLog("宏观画风模式已跳过全局松散簇细分，保留相近画风的大类结构。");
                 }
                 else if (useKMeansFamily && !UseBestKBySilhouette)
                 {
@@ -942,21 +944,7 @@ namespace CyanTools.ViewModel
 
                 if (useHeadLineStyleFeature && UseBestKBySilhouette)
                 {
-                    var sizeSplitResult = SplitOversizedHeadStyleClusters(
-                        clusteringSourcePoints,
-                        assignments,
-                        ResolveHeadStyleOversizedClusterMaxSize());
-                    assignments = sizeSplitResult.Labels;
-                    if (sizeSplitResult.SplitClusterCount > 0)
-                    {
-                        AppendLog(
-                            $"头部画法/线条最优模式已对 {sizeSplitResult.SplitClusterCount} 个过大簇做有限再聚类，当前文件夹数 {sizeSplitResult.FinalClusterCount}，最大目标簇大小约 {ResolveHeadStyleOversizedClusterMaxSize()} 张。");
-                    }
-                }
-
-                if (useHeadLineStyleFeature && UseBestKBySilhouette)
-                {
-                    AppendLog("头部画法/线条最优模式已保留低可信/兜底头部与可靠头部的合并结果，避免同画风因正脸/侧脸/背面构图被拆开。");
+                    AppendLog("头部画法/线条最优模式已保留大型同画风簇及低可信/兜底头部的合并结果，不再因文件夹图片较多或构图差异而拆分。");
                 }
 
                 bool shouldApplySameSourcePageCohesion =
@@ -1230,38 +1218,25 @@ namespace CyanTools.ViewModel
             return Math.Clamp(Math.Max(4, byDatasetSize), 2, Math.Min(80, sampleCount - 1));
         }
 
-        private static int ResolvePreferredHeadStyleAutoClusterCount(int sampleCount)
+        private static (int MinClusters, int MaxClusters) ResolveMacroStyleClusterRange(int sampleCount)
         {
-            if (sampleCount <= 1)
+            if (sampleCount <= 2)
             {
-                return Math.Max(sampleCount, 1);
+                int count = Math.Max(sampleCount, 1);
+                return (count, count);
             }
 
-            int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount) * 1.05d);
-            int lowerBound = sampleCount < 240 ? 6 : 12;
-            return Math.Clamp(bySqrt, lowerBound, Math.Min(48, sampleCount));
-        }
-
-        private static int ResolvePreferredStrictGrayStyleAutoClusterCount(int sampleCount)
-        {
-            if (sampleCount <= 1)
+            if (sampleCount < 40)
             {
-                return Math.Max(sampleCount, 1);
+                return (2, Math.Min(8, sampleCount));
             }
 
-            int bySqrt = (int)Math.Round(Math.Sqrt(sampleCount) * 0.75d);
-            int lowerBound = sampleCount < 240 ? 6 : 12;
-            return Math.Clamp(bySqrt, lowerBound, Math.Min(36, sampleCount));
-        }
-
-        private static double ResolveHeadStyleMergeMaxCompleteLinkDistance()
-        {
-            return 0.045d;
-        }
-
-        private static int ResolveHeadStyleOversizedClusterMaxSize()
-        {
-            return 40;
+            return sampleCount switch
+            {
+                < 120 => (3, 12),
+                < 240 => (4, 18),
+                _ => (6, 24)
+            };
         }
 
         private static bool IsValidTwoDimensionalSpace(IReadOnlyList<float[]> points)
@@ -1785,57 +1760,6 @@ namespace CyanTools.ViewModel
 
                     splitCount++;
                 }
-            }
-
-            int finalCount = labels.Where(label => label >= 0).Distinct().Count();
-            return new HeadReliabilitySplitResult(labels, splitCount, finalCount);
-        }
-
-        private static HeadReliabilitySplitResult SplitOversizedHeadStyleClusters(
-            IReadOnlyList<float[]> vectors,
-            IReadOnlyList<int> assignments,
-            int maxClusterSize)
-        {
-            if (vectors.Count != assignments.Count)
-            {
-                throw new InvalidOperationException("特征数量与聚类标签数量不一致。");
-            }
-
-            int targetMaxSize = Math.Max(2, maxClusterSize);
-            var labels = assignments.ToArray();
-            int nextLabel = labels.Where(label => label >= 0).DefaultIfEmpty(-1).Max() + 1;
-            int splitCount = 0;
-            var groups = Enumerable.Range(0, labels.Length)
-                .Where(i => labels[i] >= 0)
-                .GroupBy(i => labels[i])
-                .Select(group => group.ToArray())
-                .Where(indices => indices.Length > targetMaxSize)
-                .ToArray();
-
-            foreach (var indices in groups)
-            {
-                int localK = Math.Clamp(
-                    (int)Math.Ceiling(indices.Length / (double)targetMaxSize),
-                    2,
-                    indices.Length);
-                var localVectors = indices.Select(index => vectors[index]).ToList();
-                int[] localLabels = Utils.SphericalKMeansClusterer.Cluster(
-                    localVectors,
-                    localK,
-                    randomState: 420 + splitCount);
-
-                foreach (var localGroup in Enumerable.Range(0, localLabels.Length)
-                    .GroupBy(i => localLabels[i])
-                    .OrderBy(group => indices[group.Min()]))
-                {
-                    int label = nextLabel++;
-                    foreach (int localIndex in localGroup)
-                    {
-                        labels[indices[localIndex]] = label;
-                    }
-                }
-
-                splitCount++;
             }
 
             int finalCount = labels.Where(label => label >= 0).Distinct().Count();

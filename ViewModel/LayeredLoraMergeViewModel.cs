@@ -36,6 +36,8 @@ namespace CyanTools.ViewModel
         private bool _isBusy;
         private bool _isSdxlWeightEditorVisible = true;
         private bool _isAnimaWeightEditorVisible;
+        private bool _isAnimaFullModelKeyRepairVisible;
+        private bool _isAnimaFullModelKeyRepairEnabled;
         private bool _isApplyingLayerWeightsText;
         private bool _isSynchronizingLayerWeightsText;
         private LayeredLoraArchitectureOption _selectedArchitectureOption;
@@ -223,6 +225,18 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public bool IsAnimaFullModelKeyRepairVisible
+        {
+            get => _isAnimaFullModelKeyRepairVisible;
+            private set => SetField(ref _isAnimaFullModelKeyRepairVisible, value, nameof(IsAnimaFullModelKeyRepairVisible));
+        }
+
+        public bool IsAnimaFullModelKeyRepairEnabled
+        {
+            get => _isAnimaFullModelKeyRepairEnabled;
+            set => SetField(ref _isAnimaFullModelKeyRepairEnabled, value, nameof(IsAnimaFullModelKeyRepairEnabled));
+        }
+
         public bool IsReportExampleVisible => IsSdxlWeightEditorVisible;
 
         public bool IsAnimaStylePresetVisible => IsAnimaWeightEditorVisible;
@@ -323,10 +337,19 @@ namespace CyanTools.ViewModel
                 AppendLog($"模型 A: {options.ModelAPath}");
                 AppendLog($"模型 B: {options.ModelBPath}");
                 AppendLog($"输出: {options.OutputPath}");
+                if (options.RepairAnimaFullModelKeys)
+                {
+                    AppendLog("Key 修复: 已启用，将以模型 A 的 shape 顺序修复模型 B 的 Anima 大模型 key。");
+                }
 
                 var report = await Task.Run(() => LayeredLoraMerger.Merge(options));
                 AppendLog($"完成: 架构识别为 {report.Architecture}。");
                 AppendLog($"张量: 插值/缩放 {report.MergedTensorCount}，直接复制 {report.CopiedTensorCount}。");
+                if (report.AnimaFullModelKeyRepairTensorCount > 0)
+                {
+                    AppendLog($"Key 修复: 已修复模型 B 的 {report.AnimaFullModelKeyRepairTensorCount} 个 tensor key。");
+                }
+
                 if (report.Architecture == LayeredLoraArchitecture.Anima ||
                     report.Architecture == LayeredLoraArchitecture.AnimaFullModel)
                 {
@@ -405,7 +428,9 @@ namespace CyanTools.ViewModel
                 OutputPath,
                 SelectedArchitectureOption.Architecture,
                 weights,
-                overwrite: true);
+                overwrite: true,
+                repairAnimaFullModelKeys: effectiveArchitecture == LayeredLoraArchitecture.AnimaFullModel &&
+                    IsAnimaFullModelKeyRepairEnabled);
         }
 
         private void RefreshPresetOptions()
@@ -719,6 +744,11 @@ namespace CyanTools.ViewModel
                 architecture != LayeredLoraArchitecture.AnimaFullModel;
             IsAnimaWeightEditorVisible = architecture == LayeredLoraArchitecture.Anima ||
                 architecture == LayeredLoraArchitecture.AnimaFullModel;
+            IsAnimaFullModelKeyRepairVisible = architecture == LayeredLoraArchitecture.AnimaFullModel;
+            if (!IsAnimaFullModelKeyRepairVisible)
+            {
+                IsAnimaFullModelKeyRepairEnabled = false;
+            }
 
             if (IsAnimaWeightEditorVisible)
             {
