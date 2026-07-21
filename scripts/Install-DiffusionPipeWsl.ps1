@@ -7,7 +7,9 @@
 
     [int]$LocalProxyPort = 0,
 
-    [string]$ManagedRoot = ""
+    [string]$ManagedRoot = "",
+
+    [switch]$LibraryMode
 )
 
 $ErrorActionPreference = "Stop"
@@ -1368,6 +1370,10 @@ function Show-Status {
     catch {
         Write-Host "diffusion-pipe conda 环境尚不可用。"
     }
+}
+
+if ($LibraryMode) {
+    return
 }
 
 try {

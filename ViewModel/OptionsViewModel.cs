@@ -17,24 +17,29 @@ namespace CyanTools.ViewModel
     public sealed class OptionsViewModel : INotifyPropertyChanged
     {
         private const int MaxLogLines = 300;
-        private readonly DiffusionPipeWslDeployer _diffusionPipeDeployer = new();
+        private readonly TrainingBackendDeployer _trainingBackendDeployer = new();
         private bool _isBusy;
         private string _cudnnPackageStatus = "拖入 NVIDIA cuDNN 9 的 Windows zip 安装包，或点击选择文件。";
         private string _nvidiaAppStatus = "尚未检测。";
+        private string _trainingDeploymentStatus = "尚未检测训练后端部署环境。";
+        private string _wslStatus = "尚未检测 WSL2 / Ubuntu。";
+        private string _sdScriptsStatus = "尚未检测 sd-scripts Windows。";
+        private string _animaFastLoraStatus = "尚未检测 Anima Fast LoRA Windows。";
+        private string _wslSdScriptsStatus = "尚未检测 wsl-sd-scripts。";
         private string _diffusionPipeStatus = "尚未检测 diffusion-pipe / WSL2 环境。";
-        private string _diffusionPipeProxyPort = "7890";
-        private DiffusionPipeMirrorOption _selectedDiffusionPipeMirror = null!;
+        private string _trainingBackendProxyPort = "7890";
+        private TrainingBackendMirrorOption _selectedTrainingBackendMirror = null!;
 
         public OptionsViewModel()
         {
             LogLines = new ObservableCollection<string>();
-            DiffusionPipeMirrorOptions = new ObservableCollection<DiffusionPipeMirrorOption>
+            TrainingBackendMirrorOptions = new ObservableCollection<TrainingBackendMirrorOption>
             {
                 new("default", "官方源"),
                 new("tsinghua", "清华 TUNA"),
                 new("aliyun", "阿里云")
             };
-            _selectedDiffusionPipeMirror = DiffusionPipeMirrorOptions[0];
+            _selectedTrainingBackendMirror = TrainingBackendMirrorOptions[0];
 
             CheckCudaCommand = new RelayCommand(async _ => await CheckOrInstallCudaAsync(), _ => !IsBusy);
             InstallCudaToolkitCommand = new RelayCommand(_ => TryLaunchWingetCudaInstall(), _ => !IsBusy);
@@ -42,20 +47,21 @@ namespace CyanTools.ViewModel
             SelectCudnnPackageCommand = new RelayCommand(async _ => await SelectAndInstallCudnnPackageAsync(), _ => !IsBusy);
             RefreshNvidiaAppStatusCommand = new RelayCommand(_ => RefreshNvidiaAppStatus(), _ => !IsBusy);
             OpenNvidiaAppPageCommand = new RelayCommand(_ => OpenNvidiaAppPage(), _ => !IsBusy);
-            CheckDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Check), _ => !IsBusy);
-            InstallWslCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.InstallWsl), _ => !IsBusy);
-            InstallUbuntuCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.InstallUbuntu), _ => !IsBusy);
-            InstallDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Install), _ => !IsBusy);
-            ValidateDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Validate), _ => !IsBusy);
-            UpdateDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Update), _ => !IsBusy);
-            ReinstallDiffusionPipeCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.Reinstall), _ => !IsBusy);
-            DeleteUbuntuCommand = new RelayCommand(async _ => await RunDiffusionPipeActionAsync(DiffusionPipeWslAction.DeleteUbuntu), _ => !IsBusy);
+            CheckTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Check), _ => !IsBusy);
+            InstallTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Install), _ => !IsBusy);
+            ValidateTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Validate), _ => !IsBusy);
+            UpdateTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Update), _ => !IsBusy);
+            ReinstallTrainingBackendCommand = new RelayCommand(async parameter => await RunTrainingBackendActionAsync(GetBackendId(parameter), TrainingBackendAction.Reinstall), _ => !IsBusy);
+            DeployAllTrainingBackendsCommand = new RelayCommand(async _ => await DeployAllTrainingBackendsAsync(), _ => !IsBusy);
+            InstallWslCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.InstallWsl), _ => !IsBusy);
+            InstallUbuntuCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.InstallUbuntu), _ => !IsBusy);
+            DeleteUbuntuCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.DeleteUbuntu), _ => !IsBusy);
 
             RefreshNvidiaAppStatus();
         }
 
         public ObservableCollection<string> LogLines { get; }
-        public ObservableCollection<DiffusionPipeMirrorOption> DiffusionPipeMirrorOptions { get; }
+        public ObservableCollection<TrainingBackendMirrorOption> TrainingBackendMirrorOptions { get; }
 
         public bool IsBusy
         {
@@ -81,22 +87,52 @@ namespace CyanTools.ViewModel
             set => SetField(ref _nvidiaAppStatus, value);
         }
 
+        public string TrainingDeploymentStatus
+        {
+            get => _trainingDeploymentStatus;
+            set => SetField(ref _trainingDeploymentStatus, value);
+        }
+
+        public string WslStatus
+        {
+            get => _wslStatus;
+            set => SetField(ref _wslStatus, value);
+        }
+
+        public string SdScriptsStatus
+        {
+            get => _sdScriptsStatus;
+            set => SetField(ref _sdScriptsStatus, value);
+        }
+
+        public string AnimaFastLoraStatus
+        {
+            get => _animaFastLoraStatus;
+            set => SetField(ref _animaFastLoraStatus, value);
+        }
+
+        public string WslSdScriptsStatus
+        {
+            get => _wslSdScriptsStatus;
+            set => SetField(ref _wslSdScriptsStatus, value);
+        }
+
         public string DiffusionPipeStatus
         {
             get => _diffusionPipeStatus;
             set => SetField(ref _diffusionPipeStatus, value);
         }
 
-        public string DiffusionPipeProxyPort
+        public string TrainingBackendProxyPort
         {
-            get => _diffusionPipeProxyPort;
-            set => SetField(ref _diffusionPipeProxyPort, value);
+            get => _trainingBackendProxyPort;
+            set => SetField(ref _trainingBackendProxyPort, value);
         }
 
-        public DiffusionPipeMirrorOption SelectedDiffusionPipeMirror
+        public TrainingBackendMirrorOption SelectedTrainingBackendMirror
         {
-            get => _selectedDiffusionPipeMirror;
-            set => SetField(ref _selectedDiffusionPipeMirror, value);
+            get => _selectedTrainingBackendMirror;
+            set => SetField(ref _selectedTrainingBackendMirror, value);
         }
 
         public ICommand CheckCudaCommand { get; }
@@ -105,13 +141,14 @@ namespace CyanTools.ViewModel
         public ICommand SelectCudnnPackageCommand { get; }
         public ICommand RefreshNvidiaAppStatusCommand { get; }
         public ICommand OpenNvidiaAppPageCommand { get; }
-        public ICommand CheckDiffusionPipeCommand { get; }
+        public ICommand CheckTrainingBackendCommand { get; }
+        public ICommand InstallTrainingBackendCommand { get; }
+        public ICommand ValidateTrainingBackendCommand { get; }
+        public ICommand UpdateTrainingBackendCommand { get; }
+        public ICommand ReinstallTrainingBackendCommand { get; }
+        public ICommand DeployAllTrainingBackendsCommand { get; }
         public ICommand InstallWslCommand { get; }
         public ICommand InstallUbuntuCommand { get; }
-        public ICommand InstallDiffusionPipeCommand { get; }
-        public ICommand ValidateDiffusionPipeCommand { get; }
-        public ICommand UpdateDiffusionPipeCommand { get; }
-        public ICommand ReinstallDiffusionPipeCommand { get; }
         public ICommand DeleteUbuntuCommand { get; }
 
         public async Task InstallCudnnPackageAsync(string packagePath)
@@ -551,74 +588,156 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task RunDiffusionPipeActionAsync(DiffusionPipeWslAction action)
+        private async Task<bool> RunTrainingBackendActionAsync(
+            string backendId,
+            TrainingBackendAction action,
+            bool manageBusyState = true,
+            bool showFailureDialog = true,
+            bool confirmAction = true)
         {
-            if (!ConfirmDiffusionPipeAction(action))
+            if (confirmAction && !ConfirmTrainingBackendAction(backendId, action))
+            {
+                return false;
+            }
+
+            int? proxyPort = ParseTrainingBackendProxyPort();
+            if (proxyPort == -1)
+            {
+                return false;
+            }
+
+            if (manageBusyState)
+            {
+                IsBusy = true;
+            }
+
+            string backendLabel = GetBackendLabel(backendId);
+            try
+            {
+                string runningStatus = GetTrainingBackendRunningStatus(backendLabel, action);
+                SetBackendStatus(backendId, runningStatus);
+                TrainingDeploymentStatus = runningStatus;
+                AddLog(runningStatus);
+
+                var options = new TrainingBackendOptions(
+                    backendId,
+                    SelectedTrainingBackendMirror?.Id ?? "default",
+                    proxyPort);
+
+                await _trainingBackendDeployer.RunAsync(
+                    action,
+                    options,
+                    new Progress<string>(AddLog));
+
+                string completedStatus = GetTrainingBackendCompletedStatus(backendLabel, action);
+                SetBackendStatus(backendId, completedStatus);
+                TrainingDeploymentStatus = completedStatus;
+                AddLog(completedStatus);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                string canceledStatus = $"{backendLabel} 操作已取消。";
+                SetBackendStatus(backendId, canceledStatus);
+                TrainingDeploymentStatus = canceledStatus;
+                AddLog(canceledStatus);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                string failedStatus = $"{backendLabel} 操作失败: {ex.Message}";
+                SetBackendStatus(backendId, failedStatus);
+                TrainingDeploymentStatus = failedStatus;
+                AddLog(failedStatus);
+                if (showFailureDialog)
+                {
+                    MessageBox.Show(
+                        $"{ex.Message}\n\n请查看选项页日志。WSL/Ubuntu 安装可能需要管理员权限或重启 Windows；Windows 后端首次部署会下载 Git、uv、Python 与 CUDA 依赖。",
+                        $"{backendLabel} 部署",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+                return false;
+            }
+            finally
+            {
+                if (manageBusyState)
+                {
+                    IsBusy = false;
+                }
+            }
+        }
+
+        private async Task DeployAllTrainingBackendsAsync()
+        {
+            if (MessageBox.Show(
+                    "确认一键部署全部训练后端？\n\n将依次安装 Windows sd-scripts、Anima Fast LoRA、WSL sd-scripts 和 diffusion-pipe。WSL 后端要求先准备好 WSL2 与 Ubuntu。",
+                    "一键部署全部后端",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information) != MessageBoxResult.Yes)
             {
                 return;
             }
 
-            int? proxyPort = ParseDiffusionPipeProxyPort();
+            int? proxyPort = ParseTrainingBackendProxyPort();
             if (proxyPort == -1)
             {
                 return;
             }
 
+            string[] backendIds = ["sd-scripts", "anima-fast-lora", "wsl-sd-scripts", "diffusion-pipe"];
+            int succeeded = 0;
             IsBusy = true;
+            TrainingDeploymentStatus = "正在部署全部训练后端...";
+            AddLog(TrainingDeploymentStatus);
             try
             {
-                DiffusionPipeStatus = GetDiffusionPipeRunningStatus(action);
-                AddLog(DiffusionPipeStatus);
-
-                var options = new DiffusionPipeWslOptions(
-                    SelectedDiffusionPipeMirror?.Id ?? "default",
-                    proxyPort);
-
-                await _diffusionPipeDeployer.RunAsync(
-                    action,
-                    options,
-                    new Progress<string>(AddLog));
-
-                DiffusionPipeStatus = GetDiffusionPipeCompletedStatus(action);
-                AddLog(DiffusionPipeStatus);
-            }
-            catch (OperationCanceledException)
-            {
-                DiffusionPipeStatus = "diffusion-pipe 操作已取消。";
-                AddLog(DiffusionPipeStatus);
-            }
-            catch (Exception ex)
-            {
-                DiffusionPipeStatus = $"diffusion-pipe 操作失败: {ex.Message}";
-                AddLog(DiffusionPipeStatus);
-                MessageBox.Show(
-                    $"{ex.Message}\n\n请查看选项页日志。WSL/Ubuntu 安装步骤可能需要管理员权限或重启 Windows。",
-                    "diffusion-pipe / WSL2",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                foreach (string backendId in backendIds)
+                {
+                    if (await RunTrainingBackendActionAsync(
+                            backendId,
+                            TrainingBackendAction.Install,
+                            manageBusyState: false,
+                            showFailureDialog: false,
+                            confirmAction: false))
+                    {
+                        succeeded++;
+                    }
+                }
             }
             finally
             {
                 IsBusy = false;
             }
+
+            TrainingDeploymentStatus = succeeded == backendIds.Length
+                ? "全部训练后端部署完成。"
+                : $"训练后端批量部署完成：{succeeded}/{backendIds.Length} 成功，请查看日志处理失败项。";
+            AddLog(TrainingDeploymentStatus);
+            MessageBox.Show(
+                TrainingDeploymentStatus,
+                "训练后端部署",
+                MessageBoxButton.OK,
+                succeeded == backendIds.Length ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
-        private bool ConfirmDiffusionPipeAction(DiffusionPipeWslAction action)
+        private bool ConfirmTrainingBackendAction(string backendId, TrainingBackendAction action)
         {
-            if (action == DiffusionPipeWslAction.DeleteUbuntu)
+            if (action == TrainingBackendAction.DeleteUbuntu)
             {
                 return MessageBox.Show(
-                    "确认删除 Ubuntu 子系统？\n\n注意：这会删除 Ubuntu 子系统内的全部数据。",
+                    "确认删除 Ubuntu 子系统？\n\n注意：这会删除 Ubuntu 子系统内的全部数据，包括所有 WSL 训练后端。",
                     "删除 Ubuntu 子系统",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) == MessageBoxResult.Yes;
             }
 
-            if (action == DiffusionPipeWslAction.Reinstall)
+            if (action == TrainingBackendAction.Reinstall)
             {
+                string backendLabel = GetBackendLabel(backendId);
                 return MessageBox.Show(
-                    "确认重装 diffusion-pipe？\n\n这会删除旧的 ~/diffusion-pipe 仓库和 diffusion-pipe-cu128 conda 环境，但不会删除 Ubuntu 子系统。",
-                    "重装 diffusion-pipe",
+                    $"确认重装 {backendLabel}？\n\n这会删除该后端的旧仓库和独立 Python/conda 环境，然后重新下载；不会删除训练集、模型或整个 Ubuntu 子系统。",
+                    $"重装 {backendLabel}",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) == MessageBoxResult.Yes;
             }
@@ -626,20 +745,20 @@ namespace CyanTools.ViewModel
             return true;
         }
 
-        private int? ParseDiffusionPipeProxyPort()
+        private int? ParseTrainingBackendProxyPort()
         {
-            if (string.IsNullOrWhiteSpace(DiffusionPipeProxyPort))
+            if (string.IsNullOrWhiteSpace(TrainingBackendProxyPort))
             {
                 return null;
             }
 
-            if (!int.TryParse(DiffusionPipeProxyPort.Trim(), out int port) ||
+            if (!int.TryParse(TrainingBackendProxyPort.Trim(), out int port) ||
                 port < 0 ||
                 port > 65535)
             {
                 MessageBox.Show(
                     "WSL 本地代理端口必须是 0-65535 的整数；填 0 或留空表示不使用代理。",
-                    "diffusion-pipe / WSL2",
+                    "训练后端部署",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return -1;
@@ -648,35 +767,75 @@ namespace CyanTools.ViewModel
             return port == 0 ? null : port;
         }
 
-        private static string GetDiffusionPipeRunningStatus(DiffusionPipeWslAction action)
+        private void SetBackendStatus(string backendId, string status)
         {
-            return action switch
+            switch (backendId)
             {
-                DiffusionPipeWslAction.Check => "正在检测 diffusion-pipe / WSL2 环境...",
-                DiffusionPipeWslAction.InstallWsl => "正在安装或启用 Windows WSL 功能...",
-                DiffusionPipeWslAction.InstallUbuntu => "正在安装或初始化 Ubuntu 子系统...",
-                DiffusionPipeWslAction.Install => "正在部署 diffusion-pipe / WSL2 环境...",
-                DiffusionPipeWslAction.Validate => "正在校验 diffusion-pipe / WSL2 环境...",
-                DiffusionPipeWslAction.Update => "正在更新 diffusion-pipe / WSL2 环境...",
-                DiffusionPipeWslAction.Reinstall => "正在重装 diffusion-pipe / WSL2 环境...",
-                DiffusionPipeWslAction.DeleteUbuntu => "正在删除 Ubuntu 子系统...",
-                _ => "正在执行 diffusion-pipe 操作..."
+                case "wsl":
+                    WslStatus = status;
+                    break;
+                case "sd-scripts":
+                    SdScriptsStatus = status;
+                    break;
+                case "anima-fast-lora":
+                    AnimaFastLoraStatus = status;
+                    break;
+                case "wsl-sd-scripts":
+                    WslSdScriptsStatus = status;
+                    break;
+                case "diffusion-pipe":
+                    DiffusionPipeStatus = status;
+                    break;
+            }
+        }
+
+        private static string GetBackendId(object? parameter)
+        {
+            return parameter as string ?? "diffusion-pipe";
+        }
+
+        private static string GetBackendLabel(string backendId)
+        {
+            return backendId switch
+            {
+                "wsl" => "WSL 基础环境",
+                "sd-scripts" => "sd-scripts Windows",
+                "anima-fast-lora" => "Anima Fast LoRA Windows",
+                "wsl-sd-scripts" => "wsl-sd-scripts",
+                "diffusion-pipe" => "diffusion-pipe",
+                _ => backendId
             };
         }
 
-        private static string GetDiffusionPipeCompletedStatus(DiffusionPipeWslAction action)
+        private static string GetTrainingBackendRunningStatus(string backendLabel, TrainingBackendAction action)
         {
             return action switch
             {
-                DiffusionPipeWslAction.Check => "diffusion-pipe / WSL2 环境检测完成。",
-                DiffusionPipeWslAction.InstallWsl => "WSL 功能安装命令已完成；如系统提示，请重启 Windows。",
-                DiffusionPipeWslAction.InstallUbuntu => "Ubuntu 子系统已就绪。",
-                DiffusionPipeWslAction.Install => "diffusion-pipe / WSL2 部署完成。",
-                DiffusionPipeWslAction.Validate => "diffusion-pipe / WSL2 校验完成。",
-                DiffusionPipeWslAction.Update => "diffusion-pipe / WSL2 更新完成。",
-                DiffusionPipeWslAction.Reinstall => "diffusion-pipe / WSL2 重装完成。",
-                DiffusionPipeWslAction.DeleteUbuntu => "Ubuntu 子系统删除流程完成。",
-                _ => "diffusion-pipe 操作完成。"
+                TrainingBackendAction.Check => $"正在检测 {backendLabel}...",
+                TrainingBackendAction.InstallWsl => "正在安装或启用 Windows WSL 功能...",
+                TrainingBackendAction.InstallUbuntu => "正在安装或初始化 Ubuntu 子系统...",
+                TrainingBackendAction.Install => $"正在安装 {backendLabel}...",
+                TrainingBackendAction.Validate => $"正在校验 {backendLabel}...",
+                TrainingBackendAction.Update => $"正在更新 {backendLabel}...",
+                TrainingBackendAction.Reinstall => $"正在重装 {backendLabel}...",
+                TrainingBackendAction.DeleteUbuntu => "正在删除 Ubuntu 子系统...",
+                _ => $"正在执行 {backendLabel} 操作..."
+            };
+        }
+
+        private static string GetTrainingBackendCompletedStatus(string backendLabel, TrainingBackendAction action)
+        {
+            return action switch
+            {
+                TrainingBackendAction.Check => $"{backendLabel} 环境检测完成。",
+                TrainingBackendAction.InstallWsl => "WSL 功能安装命令已完成；如系统提示，请重启 Windows。",
+                TrainingBackendAction.InstallUbuntu => "Ubuntu 子系统已就绪。",
+                TrainingBackendAction.Install => $"{backendLabel} 安装完成。",
+                TrainingBackendAction.Validate => $"{backendLabel} 校验完成。",
+                TrainingBackendAction.Update => $"{backendLabel} 更新完成。",
+                TrainingBackendAction.Reinstall => $"{backendLabel} 重装完成。",
+                TrainingBackendAction.DeleteUbuntu => "Ubuntu 子系统删除流程完成。",
+                _ => $"{backendLabel} 操作完成。"
             };
         }
 
@@ -688,13 +847,14 @@ namespace CyanTools.ViewModel
             (SelectCudnnPackageCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (RefreshNvidiaAppStatusCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (OpenNvidiaAppPageCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            (CheckDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (CheckTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (InstallTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (ValidateTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (UpdateTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (ReinstallTrainingBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeployAllTrainingBackendsCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (InstallWslCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (InstallUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            (InstallDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            (ValidateDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            (UpdateDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            (ReinstallDiffusionPipeCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (DeleteUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
@@ -732,9 +892,9 @@ namespace CyanTools.ViewModel
 
         private sealed record CudnnInstallResult(string StatusMessage, string LogMessage);
 
-        public sealed class DiffusionPipeMirrorOption
+        public sealed class TrainingBackendMirrorOption
         {
-            public DiffusionPipeMirrorOption(string id, string label)
+            public TrainingBackendMirrorOption(string id, string label)
             {
                 Id = id;
                 Label = label;

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CyanTools.Utils
 {
-    public enum DiffusionPipeWslAction
+    public enum TrainingBackendAction
     {
         Check,
         InstallWsl,
@@ -19,18 +19,19 @@ namespace CyanTools.Utils
         DeleteUbuntu
     }
 
-    public sealed record DiffusionPipeWslOptions(
+    public sealed record TrainingBackendOptions(
+        string BackendId,
         string MirrorId,
         int? LocalProxyPort,
         string? ManagedRoot = null);
 
-    public sealed class DiffusionPipeWslDeployer
+    public sealed class TrainingBackendDeployer
     {
-        private const string ScriptRelativePath = "scripts\\Install-DiffusionPipeWsl.ps1";
+        private const string ScriptRelativePath = "scripts\\Install-TrainingBackends.ps1";
 
         public async Task RunAsync(
-            DiffusionPipeWslAction action,
-            DiffusionPipeWslOptions options,
+            TrainingBackendAction action,
+            TrainingBackendOptions options,
             IProgress<string> progress,
             CancellationToken cancellationToken = default)
         {
@@ -53,6 +54,8 @@ namespace CyanTools.Utils
             startInfo.ArgumentList.Add("Bypass");
             startInfo.ArgumentList.Add("-File");
             startInfo.ArgumentList.Add(scriptPath);
+            startInfo.ArgumentList.Add("-Backend");
+            startInfo.ArgumentList.Add(string.IsNullOrWhiteSpace(options.BackendId) ? "diffusion-pipe" : options.BackendId);
             startInfo.ArgumentList.Add("-Action");
             startInfo.ArgumentList.Add(action.ToString());
             startInfo.ArgumentList.Add("-Mirror");
@@ -86,7 +89,7 @@ namespace CyanTools.Utils
                 }
             };
 
-            progress.Report($"启动 diffusion-pipe 部署脚本: {action}");
+            progress.Report($"启动训练后端部署脚本: {options.BackendId} / {action}");
             progress.Report($"脚本路径: {scriptPath}");
 
             if (!process.Start())
@@ -110,7 +113,7 @@ namespace CyanTools.Utils
 
             if (process.ExitCode != 0)
             {
-                throw new InvalidOperationException($"diffusion-pipe 部署脚本失败，退出码 {process.ExitCode}。请查看上方日志。");
+                throw new InvalidOperationException($"{options.BackendId} 部署脚本失败，退出码 {process.ExitCode}。请查看上方日志。");
             }
         }
 
@@ -130,7 +133,7 @@ namespace CyanTools.Utils
                 }
             }
 
-            throw new FileNotFoundException("未找到 diffusion-pipe WSL 部署脚本。", candidates[0]);
+            throw new FileNotFoundException("未找到训练后端统一部署脚本。", candidates[0]);
         }
 
         private static void TryKillProcess(Process process)

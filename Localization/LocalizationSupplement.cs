@@ -214,6 +214,18 @@ namespace CyanTools.Localization
             Add(translations, "选择训练脚本", "Choose training script", "学習スクリプトを選択");
             Add(translations, "附加参数", "Additional Arguments", "追加引数");
             Add(translations, "管理训练脚本、TOML 输出和参数分组，生成配置后可直接启动训练。", "Manage training scripts, TOML output, and parameter groups. Start training directly after generating config.", "学習スクリプト、TOML 出力、パラメータグループを管理し、設定生成後に直接学習を開始できます。");
+            Add(translations, "训练后端部署", "Training Backend Deployment", "学習バックエンド展開");
+            Add(translations, "WSL 基础环境", "WSL Base Environment", "WSL 基本環境");
+            Add(translations, "Windows 原生训练后端", "Native Windows Training Backends", "Windows ネイティブ学習バックエンド");
+            Add(translations, "WSL2 训练后端", "WSL2 Training Backends", "WSL2 学習バックエンド");
+            Add(translations, "从今宵训练器部署逻辑移植的完整安装中心：管理 Windows 与 WSL2 训练后端、独立 Python/conda 环境、镜像源、代理、校验、更新和重装。", "Complete installer ported from the Konya trainer deployment flow: manage Windows and WSL2 training backends, isolated Python/conda environments, mirrors, proxy, validation, updates, and reinstalls.", "今宵トレーナーの展開ロジックを移植した完全なインストールセンターです。Windows/WSL2 学習バックエンド、独立 Python/conda 環境、ミラー、プロキシ、検証、更新、再インストールを管理します。");
+            Add(translations, "一键部署全部后端", "Deploy All Backends", "全バックエンドを一括展開");
+            Add(translations, "sd-scripts Windows", "sd-scripts Windows", "sd-scripts Windows");
+            Add(translations, "Anima Fast LoRA Windows", "Anima Fast LoRA Windows", "Anima Fast LoRA Windows");
+            Add(translations, "支持 LoRA、LyCORIS、DoRA、LoHa、LoKr 与 Anima；部署 Python 3.10、torch cu128、xformers 和 triton-windows。", "Supports LoRA, LyCORIS, DoRA, LoHa, LoKr, and Anima; deploys Python 3.10, torch cu128, xformers, and triton-windows.", "LoRA、LyCORIS、DoRA、LoHa、LoKr、Anima に対応し、Python 3.10、torch cu128、xformers、triton-windows を導入します。");
+            Add(translations, "克隆 GALIAIS/LoraHub，仅部署 external/anima_lora 训练核心，并使用 uv 创建 Python 3.13 独立环境。", "Clones GALIAIS/LoraHub, deploys only the external/anima_lora training core, and creates an isolated Python 3.13 environment with uv.", "GALIAIS/LoraHub をクローンし、external/anima_lora 学習コアのみを展開して、uv で独立した Python 3.13 環境を作成します。");
+            Add(translations, "在 Ubuntu 中部署 sd-scripts、Python 3.10、torch cu128、LyCORIS 和 accelerate，并执行 1 step / 1 epoch smoke。", "Deploys sd-scripts, Python 3.10, torch cu128, LyCORIS, and accelerate in Ubuntu, then runs a 1-step / 1-epoch smoke test.", "Ubuntu に sd-scripts、Python 3.10、torch cu128、LyCORIS、accelerate を展開し、1 step / 1 epoch のスモークテストを実行します。");
+            Add(translations, "部署 tdrussell/diffusion-pipe、cu128 conda 环境、torch、flash-attn、Anima 补丁与 1 step smoke 训练。", "Deploys tdrussell/diffusion-pipe, a cu128 conda environment, torch, flash-attn, Anima patches, and a 1-step smoke training run.", "tdrussell/diffusion-pipe、cu128 conda 環境、torch、flash-attn、Anima パッチを展開し、1 step のスモーク学習を実行します。");
             Add(translations, "在 Ubuntu WSL2 中部署 tdrussell/diffusion-pipe：安装 WSL/Ubuntu、准备基础依赖、克隆仓库、创建 cu128 conda 环境、安装 torch/flash-attn、应用 Anima 补丁并执行 1 step smoke 训练。", "Deploy tdrussell/diffusion-pipe in Ubuntu WSL2: install WSL/Ubuntu, prepare dependencies, clone the repo, create a cu128 conda environment, install torch/flash-attn, apply Anima patches, and run a 1-step smoke training.", "Ubuntu WSL2 に tdrussell/diffusion-pipe を展開します。WSL/Ubuntu のインストール、基本依存関係の準備、リポジトリのクローン、cu128 conda 環境作成、torch/flash-attn の導入、Anima パッチ適用、1 step のスモーク学習を実行します。");
             Add(translations, "镜像源", "Mirror Source", "ミラーソース");
             Add(translations, "WSL 本地代理端口", "WSL Local Proxy Port", "WSL ローカルプロキシポート");
@@ -221,6 +233,8 @@ namespace CyanTools.Localization
             Add(translations, "安装 WSL", "Install WSL", "WSL をインストール");
             Add(translations, "安装 Ubuntu 子系统", "Install Ubuntu Subsystem", "Ubuntu サブシステムをインストール");
             Add(translations, "安装 diffusion-pipe", "Install diffusion-pipe", "diffusion-pipe をインストール");
+            Add(translations, "检测", "Check", "確認");
+            Add(translations, "安装", "Install", "インストール");
             Add(translations, "校验", "Validate", "検証");
             Add(translations, "更新", "Update", "更新");
             Add(translations, "重装", "Reinstall", "再インストール");
@@ -375,6 +389,11 @@ namespace CyanTools.Localization
 
             Add(translations, "拖入 NVIDIA cuDNN 9 的 Windows zip 安装包，或点击选择文件。", "Drop an NVIDIA cuDNN 9 Windows zip package here, or choose a file.", "NVIDIA cuDNN 9 の Windows zip パッケージをドロップするか、ファイルを選択してください。");
             Add(translations, "尚未检测。", "Not checked yet.", "未確認です。");
+            Add(translations, "尚未检测训练后端部署环境。", "Training backend deployment environment has not been checked yet.", "学習バックエンド展開環境はまだ確認されていません。");
+            Add(translations, "尚未检测 WSL2 / Ubuntu。", "WSL2 / Ubuntu has not been checked yet.", "WSL2 / Ubuntu はまだ確認されていません。");
+            Add(translations, "尚未检测 sd-scripts Windows。", "sd-scripts Windows has not been checked yet.", "sd-scripts Windows はまだ確認されていません。");
+            Add(translations, "尚未检测 Anima Fast LoRA Windows。", "Anima Fast LoRA Windows has not been checked yet.", "Anima Fast LoRA Windows はまだ確認されていません。");
+            Add(translations, "尚未检测 wsl-sd-scripts。", "wsl-sd-scripts has not been checked yet.", "wsl-sd-scripts はまだ確認されていません。");
             Add(translations, "尚未检测 diffusion-pipe / WSL2 环境。", "diffusion-pipe / WSL2 environment not checked yet.", "diffusion-pipe / WSL2 環境はまだ確認されていません。");
             Add(translations, "未找到拖入的 cuDNN 安装包。", "No dropped cuDNN package was found.", "ドロップされた cuDNN パッケージが見つかりません。");
             Add(translations, "请拖入 NVIDIA cuDNN 的 Windows zip 安装包。", "Drop an NVIDIA cuDNN Windows zip package.", "NVIDIA cuDNN の Windows zip パッケージをドロップしてください。");
