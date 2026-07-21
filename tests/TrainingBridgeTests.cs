@@ -156,4 +156,29 @@ public sealed class TrainingBridgeTests
             }
         }
     }
+
+    [Fact]
+    public void View_UsesAvailableImportSymbol()
+    {
+        string xaml = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "TrainingBridgeView.xaml"));
+
+        Assert.Contains("Symbol=\"ArrowUpload24\"", xaml);
+        Assert.DoesNotContain("Symbol=\"DocumentArrowUp24\"", xaml);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "CyanTools.sln")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
+    }
 }

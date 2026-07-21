@@ -131,7 +131,7 @@
                             <Button Command="{Binding ImportConfigCommand}"
                                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="DocumentArrowUp24" Margin="0,0,6,0"/>
+                                    <ui:SymbolIcon Symbol="ArrowUpload24" Margin="0,0,6,0"/>
                                     <TextBlock Text="导入配置"/>
                                 </StackPanel>
                             </Button>
