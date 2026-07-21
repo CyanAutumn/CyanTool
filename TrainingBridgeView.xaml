@@ -5,13 +5,83 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d"
-             d:DesignHeight="760"
-             d:DesignWidth="1120">
+             d:DesignHeight="800"
+             d:DesignWidth="1180">
+    <UserControl.Resources>
+        <DataTemplate x:Key="TrainingBridgeTextEditorTemplate">
+            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                     MinHeight="32"
+                     VerticalContentAlignment="Center"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TrainingBridgeSelectEditorTemplate">
+            <ComboBox ItemsSource="{Binding Options}"
+                      IsEditable="True"
+                      Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                      MinHeight="32"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TrainingBridgeBooleanEditorTemplate">
+            <CheckBox IsChecked="{Binding BooleanValue, UpdateSourceTrigger=PropertyChanged}"
+                      Content="启用"
+                      MinHeight="32"
+                      VerticalContentAlignment="Center"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TrainingBridgeTextareaEditorTemplate">
+            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     MinHeight="64"/>
+        </DataTemplate>
+
+        <Style x:Key="TrainingBridgeParameterListItemStyle" TargetType="{x:Type ListBoxItem}">
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border x:Name="SelectionBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SelectionBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource CyanSurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SelectionBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource CyanMutedAccentBrush}"/>
+                                <Setter TargetName="SelectionBorder"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="160"/>
+            <RowDefinition Height="150"/>
         </Grid.RowDefinitions>
 
         <GroupBox Grid.Row="0"
@@ -105,28 +175,35 @@
             </Grid>
         </GroupBox>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.4*"/>
-                <ColumnDefinition Width="0.95*"/>
+                <ColumnDefinition Width="1.75*"/>
+                <ColumnDefinition Width="0.9*"/>
             </Grid.ColumnDefinitions>
 
-            <GroupBox Header="参数映射"
+            <GroupBox Header="参数信息"
                       Style="{StaticResource CyanGroupBoxStyle}"
-                      Margin="0,0,12,12">
+                      Margin="0,0,12,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Grid Margin="0,0,0,10">
+
+                    <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding ParameterCountText}"
-                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
-                                   VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="训练配置"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource CyanPillStyle}" Margin="10,0,0,0">
+                                <TextBlock Text="{Binding ParameterCountText}"
+                                           Style="{StaticResource CyanSecondaryTextBlockStyle}"/>
+                            </Border>
+                        </StackPanel>
                         <WrapPanel Grid.Column="1">
                             <Button Command="{Binding ImportConfigCommand}"
                                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
@@ -143,74 +220,295 @@
                                     Content="添加参数"/>
                             <Button Command="{Binding RemoveParameterCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
-                                    Content="删除参数"/>
+                                    Content="删除选中参数"/>
                         </WrapPanel>
                     </Grid>
 
-                    <DataGrid Grid.Row="1"
-                              ItemsSource="{Binding Parameters}"
-                              SelectedItem="{Binding SelectedParameter}"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              CanUserDeleteRows="False"
-                              SelectionMode="Single"
-                              Style="{StaticResource CyanDataGridStyle}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="参数键"
-                                                Binding="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="2*"/>
-                            <DataGridTextColumn Header="值"
-                                                Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="3*"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
-            </GroupBox>
-
-            <GroupBox Grid.Column="1"
-                      Header="导出配置包"
-                      Style="{StaticResource CyanGroupBoxStyle}"
-                      Margin="0,0,0,12">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="110"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <WrapPanel Margin="0,0,0,10">
-                        <Button Command="{Binding PreviewExportCommand}"
-                                Style="{StaticResource CyanCommandButtonStyle}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Eye24" Margin="0,0,6,0"/>
-                                <TextBlock Text="生成预览"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding ExportConfigCommand}"
-                                Style="{StaticResource CyanPrimaryActionButtonStyle}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="FolderArrowRight24" Margin="0,0,6,0"/>
-                                <TextBlock Text="导出到目录"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding CopyPreviewCommand}"
-                                Style="{StaticResource CyanCommandButtonStyle}"
-                                Content="复制当前文件"/>
-                    </WrapPanel>
-
                     <ListBox Grid.Row="1"
-                             ItemsSource="{Binding GeneratedFiles}"
-                             SelectedItem="{Binding SelectedGeneratedFile}"
-                             DisplayMemberPath="FileName"
-                             Style="{StaticResource CyanListBoxSurfaceStyle}"
-                             Margin="0,0,0,10"/>
-
-                    <TextBox Grid.Row="2"
-                             Text="{Binding PreviewText, Mode=OneWay, Converter={StaticResource LocalizedTextConverter}}"
-                             Style="{StaticResource CyanLogTextBoxStyle}"
-                             HorizontalScrollBarVisibility="Auto"
-                             TextWrapping="NoWrap"/>
+                             ItemsSource="{Binding Parameters}"
+                             SelectedItem="{Binding SelectedParameter}"
+                             ItemContainerStyle="{StaticResource TrainingBridgeParameterListItemStyle}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="220"
+                                        MinHeight="142"
+                                        Padding="10"
+                                        CornerRadius="8"
+                                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="{Binding DisplayLabel, Converter={StaticResource LocalizedTextConverter}}"
+                                                   FontSize="12"
+                                                   FontWeight="Bold"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBox Grid.Row="1"
+                                                 Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsReadOnly="{Binding IsKnownParameter}"
+                                                 Margin="0,5,0,6"
+                                                 Padding="6,2"
+                                                 MinHeight="24"
+                                                 FontSize="11"
+                                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                 ToolTip="后端参数键"/>
+                                        <ContentControl Grid.Row="2" Content="{Binding}">
+                                            <ContentControl.Style>
+                                                <Style TargetType="{x:Type ContentControl}">
+                                                    <Setter Property="ContentTemplate"
+                                                            Value="{StaticResource TrainingBridgeTextEditorTemplate}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding EditorKind}" Value="select">
+                                                            <Setter Property="ContentTemplate"
+                                                                    Value="{StaticResource TrainingBridgeSelectEditorTemplate}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding EditorKind}" Value="boolean">
+                                                            <Setter Property="ContentTemplate"
+                                                                    Value="{StaticResource TrainingBridgeBooleanEditorTemplate}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding EditorKind}" Value="textarea">
+                                                            <Setter Property="ContentTemplate"
+                                                                    Value="{StaticResource TrainingBridgeTextareaEditorTemplate}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ContentControl.Style>
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="3"
+                                                   Text="{Binding HelpText, Converter={StaticResource LocalizedTextConverter}}"
+                                                   Margin="0,6,0,0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   MaxHeight="32"
+                                                   ToolTip="{Binding HelpText}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
             </GroupBox>
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1.15*"/>
+                    <RowDefinition Height="0.85*"/>
+                </Grid.RowDefinitions>
+
+                <GroupBox Header="系统监控"
+                          Style="{StaticResource CyanGroupBoxStyle}"
+                          Margin="0,0,0,10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="实时负载"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource CyanPillStyle}">
+                                    <TextBlock Text="{Binding MonitorStateText, Converter={StaticResource LocalizedTextConverter}}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                </Border>
+                            </Grid>
+
+                            <Border Style="{StaticResource CyanParameterRowStyle}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="GPU"
+                                                   Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding GpuTemperatureText}"
+                                                   FontWeight="Bold"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding GpuName, Converter={StaticResource LocalizedTextConverter}}"
+                                               Margin="0,3,0,8"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding GpuName}"/>
+                                    <Grid Margin="0,0,0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="GPU Load" FontSize="11"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding GpuLoadText}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <ProgressBar Value="{Binding GpuLoadPercent}"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Height="7"
+                                                 Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                 Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="VRAM" FontSize="11"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding VramText}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <ProgressBar Value="{Binding VramLoadPercent}"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Height="7"
+                                                 Foreground="#FF38BDF8"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource CyanParameterRowStyle}"
+                                        Margin="0,0,4,0">
+                                    <StackPanel>
+                                        <TextBlock Text="CPU"
+                                                   Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBlock Text="{Binding CpuText}"
+                                                   Margin="0,4,0,2"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding CpuDetailText}"
+                                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                                   FontSize="11"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1"
+                                        Style="{StaticResource CyanParameterRowStyle}"
+                                        Margin="4,0,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="RAM"
+                                                   Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBlock Text="{Binding RamText}"
+                                                   Margin="0,4,0,2"
+                                                   FontSize="15"
+                                                   FontWeight="Bold"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding RamDetailText}"
+                                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                                   FontSize="11"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Border Style="{StaticResource CyanParameterRowStyle}">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="输出磁盘"
+                                                   Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding DiskPathText}"
+                                                   FontSize="11"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="110"
+                                                   ToolTip="{Binding DiskPathText}"/>
+                                    </Grid>
+                                    <Grid Margin="0,0,0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="磁盘占用" FontSize="11"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding DiskUsageText}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <ProgressBar Value="{Binding DiskLoadPercent}"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Height="7"
+                                                 Foreground="#FF22C55E"/>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="{Binding MonitorSampleText}"
+                                       HorizontalAlignment="Right"
+                                       Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                       FontSize="11"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </GroupBox>
+
+                <GroupBox Grid.Row="1"
+                          Header="导出配置包"
+                          Style="{StaticResource CyanGroupBoxStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="64"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Command="{Binding PreviewExportCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Eye24" Margin="0,0,6,0"/>
+                                    <TextBlock Text="生成预览"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ExportConfigCommand}"
+                                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="FolderArrowRight24" Margin="0,0,6,0"/>
+                                    <TextBlock Text="导出到目录"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding CopyPreviewCommand}"
+                                    Style="{StaticResource CyanCommandButtonStyle}"
+                                    Content="复制当前文件"/>
+                        </WrapPanel>
+
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding GeneratedFiles}"
+                                 SelectedItem="{Binding SelectedGeneratedFile}"
+                                 DisplayMemberPath="FileName"
+                                 Style="{StaticResource CyanListBoxSurfaceStyle}"
+                                 Margin="0,0,0,8"/>
+
+                        <TextBox Grid.Row="2"
+                                 Text="{Binding PreviewText, Mode=OneWay, Converter={StaticResource LocalizedTextConverter}}"
+                                 Style="{StaticResource CyanLogTextBoxStyle}"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 TextWrapping="NoWrap"/>
+                    </Grid>
+                </GroupBox>
+            </Grid>
         </Grid>
 
         <GroupBox Grid.Row="2"

@@ -166,6 +166,37 @@ public sealed class TrainingBridgeTests
         Assert.DoesNotContain("Symbol=\"DocumentArrowUp24\"", xaml);
     }
 
+    [Fact]
+    public void View_UsesParameterCardsAndSystemMonitor()
+    {
+        string xaml = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "TrainingBridgeView.xaml"));
+
+        Assert.Contains("<WrapPanel Orientation=\"Horizontal\"/>", xaml);
+        Assert.Contains("Binding DisplayLabel", xaml);
+        Assert.DoesNotContain("<DataGrid", xaml);
+        Assert.Contains("Header=\"系统监控\"", xaml);
+        Assert.Contains("Value=\"{Binding GpuLoadPercent}\"", xaml);
+        Assert.Contains("Value=\"{Binding VramLoadPercent}\"", xaml);
+        Assert.Contains("Text=\"{Binding CpuText}\"", xaml);
+        Assert.Contains("Text=\"{Binding RamText}\"", xaml);
+        Assert.Contains("Value=\"{Binding DiskLoadPercent}\"", xaml);
+    }
+
+    [Fact]
+    public void SystemMetricsParser_ReadsPrimaryNvidiaGpu()
+    {
+        TrainingBridgeGpuMetrics? metrics = TrainingBridgeSystemMetricsService.ParsePrimaryGpuCsv(
+            "NVIDIA GeForce RTX 5090 D, 32, 5325, 32568, 52");
+
+        Assert.NotNull(metrics);
+        Assert.Equal("NVIDIA GeForce RTX 5090 D", metrics.Name);
+        Assert.Equal(32d, metrics.LoadPercent);
+        Assert.Equal(5.2d, metrics.MemoryUsedGb);
+        Assert.Equal(31.8d, metrics.MemoryTotalGb);
+        Assert.Equal(16.4d, metrics.MemoryLoadPercent);
+        Assert.Equal(52d, metrics.TemperatureC);
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);

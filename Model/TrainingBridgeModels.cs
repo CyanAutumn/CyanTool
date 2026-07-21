@@ -7,6 +7,33 @@ namespace CyanTools.Model
 
     public sealed record TrainingBridgeConfigFile(string FileName, string Content);
 
+    public sealed record TrainingBridgeGpuMetrics(
+        string Name,
+        double? LoadPercent,
+        double? MemoryUsedGb,
+        double? MemoryTotalGb,
+        double? MemoryLoadPercent,
+        double? TemperatureC);
+
+    public sealed record TrainingBridgeMemoryMetrics(
+        double? UsedGb,
+        double? TotalGb,
+        double? LoadPercent);
+
+    public sealed record TrainingBridgeDiskMetrics(
+        string Path,
+        double? UsedGb,
+        double? TotalGb,
+        double? LoadPercent);
+
+    public sealed record TrainingBridgeSystemMetrics(
+        DateTimeOffset SampledAt,
+        double? CpuLoadPercent,
+        int LogicalProcessors,
+        TrainingBridgeMemoryMetrics Memory,
+        TrainingBridgeDiskMetrics Disk,
+        TrainingBridgeGpuMetrics? PrimaryGpu);
+
     public sealed class TrainingBridgeProjectDraft
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("D");

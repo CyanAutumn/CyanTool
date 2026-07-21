@@ -11,6 +11,24 @@ namespace CyanTools
         {
             InitializeComponent();
             DataContext = new TrainingBridgeViewModel();
+            Loaded += TrainingBridgeView_Loaded;
+            Unloaded += TrainingBridgeView_Unloaded;
+        }
+
+        private void TrainingBridgeView_Loaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (DataContext is TrainingBridgeViewModel viewModel)
+            {
+                viewModel.StartMonitoring();
+            }
+        }
+
+        private void TrainingBridgeView_Unloaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (DataContext is TrainingBridgeViewModel viewModel)
+            {
+                viewModel.StopMonitoring();
+            }
         }
 
         private void LogTextBox_TextChanged(object sender, TextChangedEventArgs e)

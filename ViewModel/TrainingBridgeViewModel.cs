@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -19,6 +20,7 @@ namespace CyanTools.ViewModel
     public sealed class TrainingBridgeViewModel : INotifyPropertyChanged
     {
         private readonly TrainingBridgeProjectStore _projectStore;
+        private CancellationTokenSource? _monitorCancellation;
         private bool _isBusy;
         private bool _hasUnsavedChanges;
         private bool _suppressDraftSelection;
@@ -32,6 +34,21 @@ namespace CyanTools.ViewModel
         private TrainingBridgeProjectDraft? _selectedDraft;
         private TrainingBridgeParameterViewModel? _selectedParameter;
         private TrainingBridgeGeneratedFileViewModel? _selectedGeneratedFile;
+        private string _monitorStateText = "读取中";
+        private string _gpuName = "正在检测 NVIDIA GPU";
+        private string _gpuTemperatureText = "--";
+        private double _gpuLoadPercent;
+        private string _gpuLoadText = "--";
+        private double _vramLoadPercent;
+        private string _vramText = "--";
+        private string _cpuText = "--";
+        private string _cpuDetailText = "本机处理器";
+        private string _ramText = "--";
+        private string _ramDetailText = "--";
+        private double _diskLoadPercent;
+        private string _diskPathText = "--";
+        private string _diskUsageText = "--";
+        private string _monitorSampleText = "正在读取本机负载...";
 
         public TrainingBridgeViewModel()
             : this(new TrainingBridgeProjectStore())
@@ -210,6 +227,183 @@ namespace CyanTools.ViewModel
         }
 
         public string ParameterCountText => $"{Parameters.Count} 项";
+
+        public string MonitorStateText
+        {
+            get => _monitorStateText;
+            private set => SetField(ref _monitorStateText, value);
+        }
+
+        public string GpuName
+        {
+            get => _gpuName;
+            private set => SetField(ref _gpuName, value);
+        }
+
+        public string GpuTemperatureText
+        {
+            get => _gpuTemperatureText;
+            private set => SetField(ref _gpuTemperatureText, value);
+        }
+
+        public double GpuLoadPercent
+        {
+            get => _gpuLoadPercent;
+            private set => SetField(ref _gpuLoadPercent, value);
+        }
+
+        public string GpuLoadText
+        {
+            get => _gpuLoadText;
+            private set => SetField(ref _gpuLoadText, value);
+        }
+
+        public double VramLoadPercent
+        {
+            get => _vramLoadPercent;
+            private set => SetField(ref _vramLoadPercent, value);
+        }
+
+        public string VramText
+        {
+            get => _vramText;
+            private set => SetField(ref _vramText, value);
+        }
+
+        public string CpuText
+        {
+            get => _cpuText;
+            private set => SetField(ref _cpuText, value);
+        }
+
+        public string CpuDetailText
+        {
+            get => _cpuDetailText;
+            private set => SetField(ref _cpuDetailText, value);
+        }
+
+        public string RamText
+        {
+            get => _ramText;
+            private set => SetField(ref _ramText, value);
+        }
+
+        public string RamDetailText
+        {
+            get => _ramDetailText;
+            private set => SetField(ref _ramDetailText, value);
+        }
+
+        public double DiskLoadPercent
+        {
+            get => _diskLoadPercent;
+            private set => SetField(ref _diskLoadPercent, value);
+        }
+
+        public string DiskPathText
+        {
+            get => _diskPathText;
+            private set => SetField(ref _diskPathText, value);
+        }
+
+        public string DiskUsageText
+        {
+            get => _diskUsageText;
+            private set => SetField(ref _diskUsageText, value);
+        }
+
+        public string MonitorSampleText
+        {
+            get => _monitorSampleText;
+            private set => SetField(ref _monitorSampleText, value);
+        }
+
+        public void StartMonitoring()
+        {
+            if (_monitorCancellation != null)
+            {
+                return;
+            }
+
+            _monitorCancellation = new CancellationTokenSource();
+            MonitorStateText = "读取中";
+            MonitorSampleText = "正在读取本机负载...";
+            _ = MonitorSystemAsync(_monitorCancellation.Token);
+        }
+
+        public void StopMonitoring()
+        {
+            CancellationTokenSource? cancellation = _monitorCancellation;
+            _monitorCancellation = null;
+            if (cancellation == null)
+            {
+                return;
+            }
+
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
+
+        private async Task MonitorSystemAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    TrainingBridgeSystemMetrics metrics = await TrainingBridgeSystemMetricsService.CollectAsync(
+                        FindOutputDirectory(),
+                        cancellationToken);
+                    ApplySystemMetrics(metrics);
+                    await Task.Delay(TimeSpan.FromSeconds(2.5), cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch
+                {
+                    MonitorStateText = "离线";
+                    MonitorSampleText = "系统监控暂不可用";
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void ApplySystemMetrics(TrainingBridgeSystemMetrics metrics)
+        {
+            TrainingBridgeGpuMetrics? gpu = metrics.PrimaryGpu;
+            MonitorStateText = "在线";
+            GpuName = gpu?.Name ?? "未检测到 NVIDIA GPU";
+            GpuTemperatureText = gpu?.TemperatureC is double temperature ? $"{temperature:0.#}°C" : "--";
+            GpuLoadPercent = gpu?.LoadPercent ?? 0d;
+            GpuLoadText = FormatPercent(gpu?.LoadPercent);
+            VramLoadPercent = gpu?.MemoryLoadPercent ?? 0d;
+            VramText = FormatGbPair(gpu?.MemoryUsedGb, gpu?.MemoryTotalGb);
+            CpuText = FormatPercent(metrics.CpuLoadPercent);
+            CpuDetailText = metrics.LogicalProcessors > 0 ? $"{metrics.LogicalProcessors} 线程" : "本机处理器";
+            RamText = FormatGbPair(metrics.Memory.UsedGb, metrics.Memory.TotalGb);
+            RamDetailText = FormatPercent(metrics.Memory.LoadPercent);
+            DiskLoadPercent = metrics.Disk.LoadPercent ?? 0d;
+            DiskPathText = string.IsNullOrWhiteSpace(metrics.Disk.Path) ? "--" : metrics.Disk.Path;
+            DiskUsageText = FormatGbPair(metrics.Disk.UsedGb, metrics.Disk.TotalGb);
+            MonitorSampleText = $"更新于 {metrics.SampledAt:HH:mm:ss}";
+        }
+
+        private string? FindOutputDirectory()
+            => Parameters.FirstOrDefault(parameter => parameter.Key.Trim() == "output_dir")?.Value;
+
+        private static string FormatPercent(double? value)
+            => value.HasValue ? $"{Math.Clamp(value.Value, 0d, 100d):0.#}%" : "--";
+
+        private static string FormatGbPair(double? used, double? total)
+            => used.HasValue && total.HasValue ? $"{used.Value:0.#} GB / {total.Value:0.#} GB" : "--";
 
         private void NewProject()
         {
@@ -648,6 +842,51 @@ namespace CyanTools.ViewModel
 
     public sealed class TrainingBridgeParameterViewModel : INotifyPropertyChanged
     {
+        private static readonly IReadOnlyDictionary<string, ParameterPresentation> Presentations =
+            new Dictionary<string, ParameterPresentation>(StringComparer.Ordinal)
+            {
+                ["model_family"] = new("模型家族", "select", "决定 sd-scripts 导出时使用的模型训练入口。", ["anima", "sd15", "sd2", "sdxl", "sd3", "flux", "lumina", "hunyuan_image"]),
+                ["dataset_path"] = new("训练集根目录", "path", "图片与同名标签所在的数据集目录。"),
+                ["output_dir"] = new("输出目录", "path", "配置与训练结果的保存位置。"),
+                ["pretrained_model_path"] = new("基础模型路径", "path", "sd-scripts 系后端使用的基础模型。"),
+                ["transformer_path"] = new("Anima transformer 模型", "path", "diffusion-pipe 使用的 Anima transformer 权重。"),
+                ["qwen3_path"] = new("Qwen3 路径", "path", "Anima 文本编码器路径。"),
+                ["llm_path"] = new("Qwen3 0.6B 模型", "path", "diffusion-pipe 使用的 LLM 路径。"),
+                ["vae_path"] = new("VAE 路径", "path", "Anima 训练使用的 VAE 权重。"),
+                ["dataset_resolution"] = new("数据集分辨率", "number", "sd-scripts 数据集分桶基准分辨率。"),
+                ["resolution"] = new("训练分辨率", "number", "diffusion-pipe 数据集尺寸桶分辨率。"),
+                ["dataset_repeats"] = new("默认重复次数", "number", "sd-scripts 每轮重复读取数据集的次数。"),
+                ["num_repeats"] = new("数据集重复次数", "number", "diffusion-pipe 每轮重复读取数据集的次数。"),
+                ["caption_extension"] = new("标签扩展名", "text", "例如 .txt。"),
+                ["keep_tokens"] = new("保留前 N 个标签", "number", "打乱标签时保留开头的标签数。"),
+                ["enable_bucket"] = new("启用分桶", "boolean", "按长宽比组合训练 batch。"),
+                ["shuffle_caption"] = new("打乱标签", "boolean", "每轮训练打乱 caption 标签顺序。"),
+                ["output_name"] = new("输出名称", "text", "训练模型的基础文件名。"),
+                ["save_model_as"] = new("模型保存格式", "select", "建议使用 safetensors。", ["safetensors", "ckpt"]),
+                ["learning_rate"] = new("学习率", "number", "优化器的基础学习率。"),
+                ["optimizer_type"] = new("优化器", "select", "训练使用的优化器。", ["AdamW8bit", "AdamW", "Prodigy", "Adafactor"]),
+                ["lr_scheduler"] = new("学习率调度器", "select", "学习率随训练进度的变化规则。", ["constant", "constant_with_warmup", "cosine", "cosine_with_restarts"]),
+                ["train_batch_size"] = new("Batch Size", "number", "sd-scripts 单次迭代处理的样本数。"),
+                ["micro_batch_size_per_gpu"] = new("单卡 micro batch", "number", "diffusion-pipe 每张 GPU 的微批量。"),
+                ["max_train_epochs"] = new("最大 Epoch", "number", "sd-scripts 训练轮数。"),
+                ["epochs"] = new("训练轮数", "number", "diffusion-pipe 训练轮数。"),
+                ["gradient_accumulation_steps"] = new("梯度累积步数", "number", "增大等效 batch 而不额外占用同等显存。"),
+                ["save_every_n_epochs"] = new("每 N Epoch 保存", "number", "按 Epoch 保存训练检查点。"),
+                ["save_every_n_steps"] = new("每 N Step 保存", "number", "按 Step 保存训练检查点。"),
+                ["network_dim"] = new("LoRA 维度", "number", "sd-scripts LoRA rank。"),
+                ["rank"] = new("LoRA rank", "number", "diffusion-pipe LoRA rank。"),
+                ["network_alpha"] = new("LoRA alpha", "number", "sd-scripts LoRA alpha。"),
+                ["rank_alpha"] = new("Rank alpha", "number", "LoRA 缩放参数。"),
+                ["network_module"] = new("网络模块", "text", "例如 networks.lora_anima。"),
+                ["gradient_checkpointing"] = new("梯度检查点", "boolean", "用额外计算换取更低显存占用。"),
+                ["cache_latents"] = new("缓存 Latent", "boolean", "预计算 VAE latent 以加快训练。"),
+                ["blocks_to_swap"] = new("Block swap 数量", "number", "diffusion-pipe 在 CPU/GPU 间换入换出的 block 数。"),
+                ["max_sequence_length"] = new("最大文本长度", "number", "Anima 文本编码的 token 上限。"),
+                ["eval_every_n_epochs"] = new("每 N Epoch 评估", "number", "diffusion-pipe 评估间隔。"),
+                ["conditioning_data_dir"] = new("条件数据目录", "path", "可选的配对条件数据。"),
+                ["additional_args"] = new("额外训练参数", "textarea", "一行一个需要原样保留的附加参数。")
+            };
+
         private string _key;
         private string _value;
 
@@ -660,26 +899,73 @@ namespace CyanTools.ViewModel
         public string Key
         {
             get => _key;
-            set => SetField(ref _key, value);
+            set
+            {
+                if (SetField(ref _key, value))
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HelpText)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EditorKind)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Options)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsKnownParameter)));
+                }
+            }
         }
 
         public string Value
         {
             get => _value;
-            set => SetField(ref _value, value);
+            set
+            {
+                if (SetField(ref _value, value))
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BooleanValue)));
+                }
+            }
         }
+
+        public string DisplayLabel => Presentation.Label;
+
+        public string HelpText => Presentation.HelpText;
+
+        public string EditorKind => Presentation.EditorKind;
+
+        public IReadOnlyList<string> Options => Presentation.Options;
+
+        public bool IsKnownParameter => Presentations.ContainsKey(Key.Trim());
+
+        public bool BooleanValue
+        {
+            get => Value.Equals("true", StringComparison.OrdinalIgnoreCase) || Value == "1";
+            set => Value = value ? "true" : "false";
+        }
+
+        private ParameterPresentation Presentation
+            => Presentations.TryGetValue(Key.Trim(), out ParameterPresentation? presentation)
+                ? presentation
+                : new ParameterPresentation(Key.Trim().Length > 0 ? Key.Trim() : "自定义参数", "text", "导入或手动添加的原始后端参数。");
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        private void SetField(ref string field, string value, [CallerMemberName] string? propertyName = null)
+        private bool SetField(ref string field, string value, [CallerMemberName] string? propertyName = null)
         {
             value ??= string.Empty;
             if (field == value)
             {
-                return;
+                return false;
             }
             field = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            return true;
+        }
+
+        private sealed record ParameterPresentation(
+            string Label,
+            string EditorKind,
+            string HelpText,
+            IReadOnlyList<string>? OptionValues = null)
+        {
+            public IReadOnlyList<string> Options { get; } = OptionValues ?? Array.Empty<string>();
         }
     }
 
