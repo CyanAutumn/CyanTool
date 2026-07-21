@@ -1433,7 +1433,13 @@ else
   echo "已写入 .git/info/exclude，钩子文件不会进入上游 diff。"
 fi
 
-python3 -m py_compile "$hook_path"
+python3 - "$hook_path" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+compile(path.read_text(encoding='utf-8'), str(path), 'exec')
+PY
 if [ "$changed" -eq 0 ]; then
   echo "Anima epoch 预览图功能已完整注入，无需修改。"
 else
