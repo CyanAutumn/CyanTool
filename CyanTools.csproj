@@ -68,6 +68,9 @@
     <Content Include="scripts\*.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="scripts\local_anima_epoch_preview.py">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="dist\runtime-tools\**\*"
              Condition="'$(EnableTrainingBackendBootstrapResources)' == 'true' and Exists('dist\runtime-tools')">
       <Link>runtime-tools\%(RecursiveDir)%(Filename)%(Extension)</Link>

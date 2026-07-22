@@ -1245,122 +1245,12 @@ function Install-DiffusionPipePreviewHook {
     }
     Ensure-UbuntuRootInitialized
 
-    $previewHook = @'
-import importlib.util
-import sys
-from types import MethodType, ModuleType
-
-
-if importlib.util.find_spec('torchaudio') is None:
-    torchaudio = ModuleType('torchaudio')
-    torchaudio.functional = ModuleType('torchaudio.functional')
-    torchaudio.transforms = ModuleType('torchaudio.transforms')
-    sys.modules['torchaudio'] = torchaudio
-    sys.modules['torchaudio.functional'] = torchaudio.functional
-    sys.modules['torchaudio.transforms'] = torchaudio.transforms
-
-import torch
-import torchvision
-from deepspeed import comm as dist
-
-from utils.common import is_main_process
-from utils.dataset import DatasetManager
-from utils.saver import Saver
-
-
-PROMPT = 'a golden retriever running through a grassy field'
-CFG = 5
-WIDTH = 1024
-HEIGHT = 1024
-
-
-def _log_vram(stage):
-    free, total = torch.cuda.mem_get_info()
-    allocated = torch.cuda.memory_allocated()
-    reserved = torch.cuda.memory_reserved()
-    peak = torch.cuda.max_memory_allocated()
-    gib = 1024 ** 3
-    print(
-        f'[Anima preview VRAM] {stage}: '
-        f'allocated={allocated/gib:.2f} GiB, reserved={reserved/gib:.2f} GiB, '
-        f'peak={peak/gib:.2f} GiB, device_used={(total-free)/gib:.2f}/{total/gib:.2f} GiB'
-    )
-
-
-def _is_anima(model):
-    return model.config['model']['type'] == 'anima'
-
-
-def _get_conds(self, inputs):
-    return inputs['prompt_embeds'], inputs['attn_mask'], inputs['t5_input_ids'], inputs['t5_attn_mask']
-
-
-def _vae_decode(self, latents):
-    p = next(self.vae.model.parameters())
-    decoded = self.vae.model.decode(latents.to(p.device, p.dtype), self.vae.scale)
-    decoded = ((decoded.float() + 1) / 2).clamp_(0, 1)
-    return decoded.movedim(1, -1)
-
-
-def _prepare_sampling(model):
-    if getattr(model, '_local_epoch_preview_prepared', False):
-        return
-    from models.base import CommonPipeline
-    CommonPipeline.__init__(model)
-    model.is_video_vae = True
-    model.get_conds = MethodType(_get_conds, model)
-    model.vae_decode = MethodType(_vae_decode, model)
-    model.prepare_sample_test(PROMPT, cfg=CFG)
-    model._local_epoch_preview_prepared = True
-
-
-def _save_preview(saver, epoch):
-    if saver.config['pipeline_stages'] != 1:
-        raise RuntimeError('Local Anima epoch previews require pipeline_stages=1')
-    dist.barrier()
-    if is_main_process():
-        torch.cuda.reset_peak_memory_stats()
-        _log_vram('before preview')
-        _prepare_sampling(saver.model)
-        _log_vram('after prompt encoding')
-        img = saver.model.sample(w=WIDTH, h=HEIGHT)
-        _log_vram('after sampling and VAE decode')
-        img = img.squeeze(0).movedim(-1, 0)
-        output_path = saver.save_root / f'preview_epoch{epoch}.png'
-        torchvision.utils.save_image(img, output_path)
-        print(f'Saved preview image to {output_path}')
-        del img
-        torch.cuda.empty_cache()
-        _log_vram('after cleanup')
-    dist.barrier()
-
-
-_original_dataset_manager_init = DatasetManager.__init__
-
-
-def _dataset_manager_init(self, model, *args, **kwargs):
-    if _is_anima(model) and is_main_process():
-        kwargs['keep_models_loaded'] = True
-    _original_dataset_manager_init(self, model, *args, **kwargs)
-
-
-DatasetManager.__init__ = _dataset_manager_init
-
-
-_original_process_epoch = Saver.process_epoch
-
-
-def _process_epoch(self, epoch, step, examples):
-    result = _original_process_epoch(self, epoch, step, examples)
-    new_epoch = result[0]
-    if _is_anima(self.model) and new_epoch != epoch:
-        _save_preview(self, epoch)
-    return result
-
-
-Saver.process_epoch = _process_epoch
-'@
-    $hookBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($previewHook + "`n"))
+    $previewHookPath = Join-Path $PSScriptRoot "local_anima_epoch_preview.py"
+    if (-not (Test-Path -LiteralPath $previewHookPath -PathType Leaf)) {
+        throw "缺少预览图钩子资源：$previewHookPath"
+    }
+    $previewHook = [IO.File]::ReadAllText($previewHookPath, [Text.Encoding]::UTF8)
+    $hookBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($previewHook))
     $script = @'
 set -euo pipefail
 repo="$HOME/diffusion-pipe"
@@ -1443,7 +1333,7 @@ PY
 if [ "$changed" -eq 0 ]; then
   echo "Anima epoch 预览图功能已完整注入，无需修改。"
 else
-  echo "Anima epoch 预览图功能注入完成：1024x1024，每个 epoch 生成一张。"
+  echo "Anima epoch 预览图功能注入完成：默认 1024x1024，每个 epoch 生成一张，可通过 [preview] 配置。"
 fi
 '@.Replace('__HOOK_BASE64__', $hookBase64)
 

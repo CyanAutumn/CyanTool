@@ -44,6 +44,7 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
     {
         string root = FindRepositoryRoot();
         string installer = File.ReadAllText(Path.Combine(root, "scripts", "Install-DiffusionPipeWsl.ps1"));
+        string hook = File.ReadAllText(Path.Combine(root, "scripts", "local_anima_epoch_preview.py"));
         string dispatcher = File.ReadAllText(Path.Combine(root, "scripts", "Install-TrainingBackends.ps1"));
         string view = File.ReadAllText(Path.Combine(root, "OptionsView.xaml"));
         string viewModel = File.ReadAllText(Path.Combine(root, "ViewModel", "OptionsViewModel.cs"));
@@ -57,10 +58,18 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
         Assert.Contains("import_line='import local_anima_epoch_preview'", installer);
         Assert.Contains("/local_anima_epoch_preview.py", installer);
         Assert.Contains("git -C \"$repo\" rev-parse --git-path info/exclude", installer);
-        Assert.Contains("WIDTH = 1024", installer);
-        Assert.Contains("HEIGHT = 1024", installer);
-        Assert.Contains("preview_epoch{epoch}.png", installer);
-        Assert.Contains("kwargs['keep_models_loaded'] = True", installer);
+        Assert.Contains("local_anima_epoch_preview.py", installer);
+        Assert.Contains("HOOK_VERSION = 2", hook);
+        Assert.Contains("'width': 1024", hook);
+        Assert.Contains("'height': 1024", hook);
+        Assert.Contains("'every_n_epochs': 1", hook);
+        Assert.Contains("'offload_pipeline_for_vae': True", hook);
+        Assert.Contains("kwargs['keep_models_loaded'] = True", hook);
+        Assert.Contains("saver.pipeline_model.to('cpu')", hook);
+        Assert.Contains("saver.pipeline_model.to('cuda')", hook);
+        Assert.Contains("failed without stopping training", hook);
+        Assert.Contains("DIFFPIPEFORGE_PREVIEW_CONFIG_B64", hook);
+        Assert.Contains("output_dir = Path(saver.save_root) / 'sample'", hook);
         Assert.Contains("Anima epoch 预览图功能已完整注入，无需修改。", installer);
     }
 
