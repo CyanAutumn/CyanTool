@@ -391,7 +391,6 @@
                                 <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
                                 <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
                                 <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
-                                <Button Command="{Binding InjectDiffusionPipePreviewCommand}" Style="{StaticResource CyanCommandButtonStyle}" Content="注入预览图"/>
                             </WrapPanel>
                         </Grid>
                     </Border>

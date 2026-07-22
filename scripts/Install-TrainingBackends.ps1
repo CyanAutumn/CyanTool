@@ -2,7 +2,7 @@
     [ValidateSet("wsl", "sd-scripts", "anima-fast-lora", "wsl-sd-scripts", "diffusion-pipe")]
     [string]$Backend = "diffusion-pipe",
 
-    [ValidateSet("Check", "InstallWsl", "InstallUbuntu", "Install", "Update", "Reinstall", "Validate", "InjectPreview", "DeleteUbuntu")]
+    [ValidateSet("Check", "InstallWsl", "InstallUbuntu", "Install", "Update", "Reinstall", "Validate", "DeleteUbuntu")]
     [string]$Action = "Check",
 
     [ValidateSet("default", "tsinghua", "aliyun")]
@@ -898,7 +898,6 @@ try {
                 "Update" { Install-DiffusionPipe -UpdateOnly:$true }
                 "Reinstall" { Install-DiffusionPipe -Reinstall:$true }
                 "Validate" { Validate-DiffusionPipe }
-                "InjectPreview" { Install-DiffusionPipePreviewHook }
                 "DeleteUbuntu" { Invoke-WslBaseAction }
             }
         }

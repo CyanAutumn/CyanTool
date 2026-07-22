@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("Check", "InstallWsl", "InstallUbuntu", "Install", "Update", "Reinstall", "Validate", "InjectPreview", "DeleteUbuntu")]
+    [ValidateSet("Check", "InstallWsl", "InstallUbuntu", "Install", "Update", "Reinstall", "Validate", "DeleteUbuntu")]
     [string]$Action = "Check",
 
     [ValidateSet("default", "tsinghua", "aliyun")]
@@ -743,10 +743,16 @@ function Clone-Or-UpdateRepo {
     }
 
     if ($repoExists) {
-        Invoke-WithRetries -Label "更新 diffusion-pipe 仓库" -Operation {
-            param($attempt)
-            $label = if ($attempt -eq 1) { "更新 diffusion-pipe 仓库" } else { "更新 diffusion-pipe 仓库（第 $attempt 次）" }
-            Invoke-WslGit -Label $label -GitArgs "-C $RepoDir -c http.version=HTTP/1.1 -c http.lowSpeedLimit=0 -c core.compression=0 pull --ff-only"
+        Suspend-DiffusionPipePreviewHook
+        try {
+            Invoke-WithRetries -Label "更新 diffusion-pipe 仓库" -Operation {
+                param($attempt)
+                $label = if ($attempt -eq 1) { "更新 diffusion-pipe 仓库" } else { "更新 diffusion-pipe 仓库（第 $attempt 次）" }
+                Invoke-WslGit -Label $label -GitArgs "-C $RepoDir -c http.version=HTTP/1.1 -c http.lowSpeedLimit=0 -c core.compression=0 pull --ff-only"
+            }
+        }
+        finally {
+            Install-DiffusionPipePreviewHook
         }
     }
     else {
@@ -1239,6 +1245,37 @@ echo "diffusion-pipe 1 step smoke training finished."
     Invoke-WslBash -Label "运行 diffusion-pipe 1 step smoke 训练" -Script $script | Out-Null
 }
 
+function Suspend-DiffusionPipePreviewHook {
+    $script = @'
+set -euo pipefail
+train_path="$HOME/diffusion-pipe/train.py"
+test -f "$train_path" || exit 0
+python3 - "$train_path" <<'PY'
+import os
+import re
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+raw = path.read_bytes()
+bom = b'\xef\xbb\xbf' if raw.startswith(b'\xef\xbb\xbf') else b''
+text = raw[len(bom):].decode('utf-8')
+pattern = re.compile(r'^[ \t]*import[ \t]+local_anima_epoch_preview[ \t]*(?:#.*)?(?:\r?\n|\Z)', re.MULTILINE)
+updated, count = pattern.subn('', text)
+if count:
+    temporary = path.with_name(path.name + '.cyantools-preview-suspend.tmp')
+    temporary.write_bytes(bom + updated.encode('utf-8'))
+    os.chmod(temporary, stat.S_IMODE(path.stat().st_mode))
+    os.replace(temporary, path)
+    print('更新前已暂时撤下 train.py 中的预览图 import。')
+else:
+    print('train.py 中没有需要暂时撤下的预览图 import。')
+PY
+'@
+    Invoke-WslBash -Label "更新前暂时撤下 Anima 预览图 import" -Script $script | Out-Null
+}
+
 function Install-DiffusionPipePreviewHook {
     if (-not (Test-Wsl2Available) -or -not (Test-UbuntuInstalled)) {
         throw "diffusion-pipe WSL2 / Ubuntu 环境不可用。请先完成 diffusion-pipe 安装。"
@@ -1372,6 +1409,7 @@ PY
 echo "diffusion-pipe validation flow finished."
 "@
     Invoke-WslBash -Label "校验 diffusion-pipe" -Script $script | Out-Null
+    Install-DiffusionPipePreviewHook
     Apply-SmokePatch
     Run-SmokeTraining
     Write-Host "diffusion-pipe WSL 环境校验完成，1 step 训练 smoke 已通过。"
@@ -1439,6 +1477,7 @@ function Install-DiffusionPipe {
     }
 
     Apply-AnimaPatch
+    Install-DiffusionPipePreviewHook
     Apply-SmokePatch
     Run-SmokeTraining
     Save-DiffusionPipeManifest
@@ -1512,9 +1551,6 @@ try {
         }
         "Validate" {
             Validate-DiffusionPipe
-        }
-        "InjectPreview" {
-            Install-DiffusionPipePreviewHook
         }
         "DeleteUbuntu" {
             Write-Host "注意：该操作会删除 Ubuntu 子系统内的全部数据。"

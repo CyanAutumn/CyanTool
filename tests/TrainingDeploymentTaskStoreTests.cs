@@ -40,7 +40,7 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
     }
 
     [Fact]
-    public void DiffusionPipePreviewInjectionIsWiredAndKeepsTheUpstreamDiffMinimal()
+    public void DiffusionPipePreviewInjectionIsPartOfEveryLifecycleAndKeepsTheUpstreamDiffMinimal()
     {
         string root = FindRepositoryRoot();
         string installer = File.ReadAllText(Path.Combine(root, "scripts", "Install-DiffusionPipeWsl.ps1"));
@@ -50,11 +50,15 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
         string viewModel = File.ReadAllText(Path.Combine(root, "ViewModel", "OptionsViewModel.cs"));
         string deployer = File.ReadAllText(Path.Combine(root, "Utils", "TrainingBackendDeployer.cs"));
 
-        Assert.Contains("InjectDiffusionPipePreviewCommand", view);
-        Assert.Contains("TrainingBackendAction.InjectPreview", viewModel);
-        Assert.Contains("InjectPreview", deployer);
-        Assert.Contains("\"InjectPreview\" { Install-DiffusionPipePreviewHook }", dispatcher);
+        Assert.DoesNotContain("InjectDiffusionPipePreviewCommand", view);
+        Assert.DoesNotContain("TrainingBackendAction.InjectPreview", viewModel);
+        Assert.DoesNotContain("InjectPreview", deployer);
+        Assert.DoesNotContain("InjectPreview", dispatcher);
         Assert.Contains("function Install-DiffusionPipePreviewHook", installer);
+        Assert.Contains("function Suspend-DiffusionPipePreviewHook", installer);
+        Assert.Contains("Suspend-DiffusionPipePreviewHook", installer);
+        Assert.Contains("finally {", installer);
+        Assert.Contains("Install-DiffusionPipePreviewHook\n    Apply-SmokePatch\n    Run-SmokeTraining", installer.Replace("\r\n", "\n"));
         Assert.Contains("import_line='import local_anima_epoch_preview'", installer);
         Assert.Contains("/local_anima_epoch_preview.py", installer);
         Assert.Contains("git -C \"$repo\" rev-parse --git-path info/exclude", installer);

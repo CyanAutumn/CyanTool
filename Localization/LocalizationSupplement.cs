@@ -309,7 +309,6 @@ namespace CyanTools.Localization
             Add(translations, "校验", "Validate", "検証");
             Add(translations, "更新", "Update", "更新");
             Add(translations, "重装", "Reinstall", "再インストール");
-            Add(translations, "注入预览图", "Inject Preview", "プレビューを注入");
             Add(translations, "正在检查并注入 Anima epoch 预览图功能...", "Checking and injecting Anima epoch previews...", "Anima epoch プレビューを確認して注入中...");
             Add(translations, "Anima epoch 预览图功能已就绪。", "Anima epoch previews are ready.", "Anima epoch プレビューの準備が完了しました。");
             Add(translations, "删除 Ubuntu", "Delete Ubuntu", "Ubuntu を削除");
