@@ -26,6 +26,20 @@ public sealed class TrainingBridgeTests
                 epochs = 2
                 micro_batch_size_per_gpu = 1
 
+                [preview]
+                enabled = true
+                every_n_epochs = 2
+                positive_prompt = "1girl, rainy street"
+                negative_prompt = "blurry"
+                sampler = "flow_euler"
+                scheduler = "normal"
+                width = 768
+                height = 1152
+                steps = 12
+                cfg = 4.5
+                seed = 123
+                offload_pipeline_for_vae = false
+
                 [model]
                 transformer_path = "/mnt/d/models/anima.safetensors"
                 vae_path = "/mnt/d/models/vae.safetensors"
@@ -69,6 +83,18 @@ public sealed class TrainingBridgeTests
         Assert.Equal("8", values["rank"]);
         Assert.Equal(values["rank"], values["network_dim"]);
         Assert.Equal(0.0002d, double.Parse(values["learning_rate"], System.Globalization.CultureInfo.InvariantCulture), precision: 8);
+        Assert.Equal("true", values["preview_enabled"]);
+        Assert.Equal("2", values["preview_every_n_epochs"]);
+        Assert.Equal("1girl, rainy street", values["preview_positive_prompt"]);
+        Assert.Equal("blurry", values["preview_negative_prompt"]);
+        Assert.Equal("flow_euler", values["preview_sampler"]);
+        Assert.Equal("normal", values["preview_scheduler"]);
+        Assert.Equal("768", values["preview_width"]);
+        Assert.Equal("1152", values["preview_height"]);
+        Assert.Equal("12", values["preview_steps"]);
+        Assert.Equal("4.5", values["preview_cfg"]);
+        Assert.Equal("123", values["preview_seed"]);
+        Assert.Equal("false", values["preview_offload_pipeline_for_vae"]);
     }
 
     [Fact]
@@ -86,7 +112,19 @@ public sealed class TrainingBridgeTests
             ["max_train_epochs"] = "1",
             ["train_batch_size"] = "1",
             ["network_dim"] = "8",
-            ["learning_rate"] = "0.0002"
+            ["learning_rate"] = "0.0002",
+            ["preview_enabled"] = "true",
+            ["preview_every_n_epochs"] = "2",
+            ["preview_positive_prompt"] = "1girl, rainy street",
+            ["preview_negative_prompt"] = "blurry",
+            ["preview_sampler"] = "flow_euler",
+            ["preview_scheduler"] = "normal",
+            ["preview_width"] = "768",
+            ["preview_height"] = "1152",
+            ["preview_steps"] = "12",
+            ["preview_cfg"] = "4.5",
+            ["preview_seed"] = "123",
+            ["preview_offload_pipeline_for_vae"] = "false"
         };
 
         var files = TrainingBridgeConfigService.Export(
@@ -98,6 +136,19 @@ public sealed class TrainingBridgeTests
         Assert.Contains("transformer_path = \"/mnt/d/models/anima.safetensors\"", files["anima_train.toml"].Content);
         Assert.Contains("llm_path = \"/mnt/d/models/qwen3\"", files["anima_train.toml"].Content);
         Assert.Contains("rank = 8", files["anima_train.toml"].Content);
+        Assert.Contains("[preview]", files["anima_train.toml"].Content);
+        Assert.Contains("enabled = true", files["anima_train.toml"].Content);
+        Assert.Contains("every_n_epochs = 2", files["anima_train.toml"].Content);
+        Assert.Contains("positive_prompt = \"1girl, rainy street\"", files["anima_train.toml"].Content);
+        Assert.Contains("negative_prompt = \"blurry\"", files["anima_train.toml"].Content);
+        Assert.Contains("sampler = \"flow_euler\"", files["anima_train.toml"].Content);
+        Assert.Contains("scheduler = \"normal\"", files["anima_train.toml"].Content);
+        Assert.Contains("width = 768", files["anima_train.toml"].Content);
+        Assert.Contains("height = 1152", files["anima_train.toml"].Content);
+        Assert.Contains("steps = 12", files["anima_train.toml"].Content);
+        Assert.Contains("cfg = 4.5", files["anima_train.toml"].Content);
+        Assert.Contains("seed = 123", files["anima_train.toml"].Content);
+        Assert.Contains("offload_pipeline_for_vae = false", files["anima_train.toml"].Content);
         Assert.Contains("[768, 768, 1]", files["anima_dataset.toml"].Content);
         Assert.Contains("path = \"/mnt/d/datasets/anime\"", files["anima_dataset.toml"].Content);
         Assert.Contains("num_repeats = 2", files["anima_dataset.toml"].Content);
@@ -192,6 +243,12 @@ public sealed class TrainingBridgeTests
         Assert.Contains("Text=\"{Binding CpuText}\"", xaml);
         Assert.Contains("Text=\"{Binding RamText}\"", xaml);
         Assert.Contains("Value=\"{Binding DiskLoadPercent}\"", xaml);
+        Assert.Contains("Header=\"Epoch 预览图\"", xaml);
+        Assert.Contains("ItemsSource=\"{Binding CoreParameters}\"", xaml);
+        Assert.Contains("Text=\"{Binding PreviewPositivePrompt", xaml);
+        Assert.Contains("SelectedItem=\"{Binding PreviewSampler", xaml);
+        Assert.Contains("Text=\"{Binding PreviewWidth", xaml);
+        Assert.Contains("Text=\"{Binding PreviewHeight", xaml);
     }
 
     [Fact]

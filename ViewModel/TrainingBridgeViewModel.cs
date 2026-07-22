@@ -93,6 +93,12 @@ namespace CyanTools.ViewModel
         public ObservableCollection<TrainingBridgeParameterViewModel> Parameters { get; }
         public ObservableCollection<TrainingBridgeGeneratedFileViewModel> GeneratedFiles { get; }
 
+        public IReadOnlyList<TrainingBridgeParameterViewModel> CoreParameters
+            => Parameters.Where(parameter => !IsPreviewParameter(parameter.Key)).ToArray();
+
+        public IReadOnlyList<string> PreviewSamplerOptions { get; } = ["euler", "flow_euler"];
+        public IReadOnlyList<string> PreviewSchedulerOptions { get; } = ["normal"];
+
         public ICommand NewProjectCommand { get; }
         public ICommand SaveProjectCommand { get; }
         public ICommand DeleteProjectCommand { get; }
@@ -147,6 +153,7 @@ namespace CyanTools.ViewModel
             {
                 if (value != null && SetField(ref _selectedTargetBackend, value))
                 {
+                    OnPropertyChanged(nameof(IsDiffusionPipeTarget));
                     MarkDirty();
                     GeneratedFiles.Clear();
                     SelectedGeneratedFile = null;
@@ -228,6 +235,81 @@ namespace CyanTools.ViewModel
         }
 
         public string ParameterCountText => $"{Parameters.Count} 项";
+
+        public bool IsDiffusionPipeTarget
+            => SelectedTargetBackend.Id == TrainingBridgeConfigService.DiffusionPipeBackendId;
+
+        public bool PreviewEnabled
+        {
+            get => GetParameterBoolean("preview_enabled", true);
+            set => SetParameterValue("preview_enabled", value ? "true" : "false");
+        }
+
+        public string PreviewEveryNEpochs
+        {
+            get => GetParameterValue("preview_every_n_epochs", "1");
+            set => SetParameterValue("preview_every_n_epochs", value);
+        }
+
+        public string PreviewPositivePrompt
+        {
+            get => GetParameterValue("preview_positive_prompt", "a golden retriever running through a grassy field");
+            set => SetParameterValue("preview_positive_prompt", value);
+        }
+
+        public string PreviewNegativePrompt
+        {
+            get => GetParameterValue("preview_negative_prompt");
+            set => SetParameterValue("preview_negative_prompt", value);
+        }
+
+        public string PreviewSampler
+        {
+            get => GetParameterValue("preview_sampler", "euler");
+            set => SetParameterValue("preview_sampler", value);
+        }
+
+        public string PreviewScheduler
+        {
+            get => GetParameterValue("preview_scheduler", "normal");
+            set => SetParameterValue("preview_scheduler", value);
+        }
+
+        public string PreviewWidth
+        {
+            get => GetParameterValue("preview_width", "1024");
+            set => SetParameterValue("preview_width", value);
+        }
+
+        public string PreviewHeight
+        {
+            get => GetParameterValue("preview_height", "1024");
+            set => SetParameterValue("preview_height", value);
+        }
+
+        public string PreviewSteps
+        {
+            get => GetParameterValue("preview_steps", "20");
+            set => SetParameterValue("preview_steps", value);
+        }
+
+        public string PreviewCfg
+        {
+            get => GetParameterValue("preview_cfg", "5");
+            set => SetParameterValue("preview_cfg", value);
+        }
+
+        public string PreviewSeed
+        {
+            get => GetParameterValue("preview_seed", "42");
+            set => SetParameterValue("preview_seed", value);
+        }
+
+        public bool PreviewOffloadPipelineForVae
+        {
+            get => GetParameterBoolean("preview_offload_pipeline_for_vae", true);
+            set => SetParameterValue("preview_offload_pipeline_for_vae", value ? "true" : "false");
+        }
 
         public bool ShowSystemMonitorWidget
         {
@@ -651,6 +733,7 @@ namespace CyanTools.ViewModel
             Parameters.Add(parameter);
             SelectedParameter = parameter;
             OnPropertyChanged(nameof(ParameterCountText));
+            OnPropertyChanged(nameof(CoreParameters));
             MarkDirty();
         }
 
@@ -663,6 +746,8 @@ namespace CyanTools.ViewModel
             Parameters.Remove(SelectedParameter);
             SelectedParameter = null;
             OnPropertyChanged(nameof(ParameterCountText));
+            OnPropertyChanged(nameof(CoreParameters));
+            NotifyPreviewProperties();
             MarkDirty();
         }
 
@@ -679,6 +764,8 @@ namespace CyanTools.ViewModel
                 }
             }
             OnPropertyChanged(nameof(ParameterCountText));
+            OnPropertyChanged(nameof(CoreParameters));
+            NotifyPreviewProperties();
             MarkDirty();
             StatusMessage = added == 0 ? "常用参数已齐全。" : $"已补齐 {added} 个常用参数。";
             AppendLog(StatusMessage);
@@ -704,6 +791,7 @@ namespace CyanTools.ViewModel
             _selectedTargetBackend = FindBackend(draft.TargetBackendId);
             OnPropertyChanged(nameof(SelectedSourceBackend));
             OnPropertyChanged(nameof(SelectedTargetBackend));
+            OnPropertyChanged(nameof(IsDiffusionPipeTarget));
             ReplaceParameters(draft.Values);
             _suppressParameterChanges = false;
             GeneratedFiles.Clear();
@@ -742,6 +830,8 @@ namespace CyanTools.ViewModel
             }
             _suppressParameterChanges = false;
             OnPropertyChanged(nameof(ParameterCountText));
+            OnPropertyChanged(nameof(CoreParameters));
+            NotifyPreviewProperties();
         }
 
         private void MergeParameters(IReadOnlyDictionary<string, string> imported)
@@ -766,6 +856,8 @@ namespace CyanTools.ViewModel
             }
             _suppressParameterChanges = false;
             OnPropertyChanged(nameof(ParameterCountText));
+            OnPropertyChanged(nameof(CoreParameters));
+            NotifyPreviewProperties();
             MarkDirty();
         }
 
@@ -782,9 +874,98 @@ namespace CyanTools.ViewModel
             {
                 return;
             }
+            if (sender is TrainingBridgeParameterViewModel parameter)
+            {
+                if (e.PropertyName == nameof(TrainingBridgeParameterViewModel.Key))
+                {
+                    OnPropertyChanged(nameof(CoreParameters));
+                    NotifyPreviewProperties();
+                }
+                else
+                {
+                    NotifyPreviewProperty(parameter.Key);
+                }
+            }
             GeneratedFiles.Clear();
             SelectedGeneratedFile = null;
             MarkDirty();
+        }
+
+        private string GetParameterValue(string key, string fallback = "")
+            => Parameters.FirstOrDefault(parameter => parameter.Key.Trim() == key)?.Value ?? fallback;
+
+        private bool GetParameterBoolean(string key, bool fallback)
+        {
+            string value = GetParameterValue(key).Trim().ToLowerInvariant();
+            return value switch
+            {
+                "true" or "1" or "yes" or "on" => true,
+                "false" or "0" or "no" or "off" => false,
+                _ => fallback
+            };
+        }
+
+        private void SetParameterValue(string key, string? value)
+        {
+            value ??= string.Empty;
+            TrainingBridgeParameterViewModel? parameter = Parameters
+                .FirstOrDefault(candidate => candidate.Key.Trim() == key);
+            if (parameter != null)
+            {
+                parameter.Value = value;
+                return;
+            }
+
+            Parameters.Add(CreateParameter(key, value));
+            OnPropertyChanged(nameof(ParameterCountText));
+            OnPropertyChanged(nameof(CoreParameters));
+            NotifyPreviewProperty(key);
+            GeneratedFiles.Clear();
+            SelectedGeneratedFile = null;
+            MarkDirty();
+        }
+
+        private static bool IsPreviewParameter(string key)
+            => key.Trim().StartsWith("preview_", StringComparison.Ordinal);
+
+        private void NotifyPreviewProperties()
+        {
+            OnPropertyChanged(nameof(PreviewEnabled));
+            OnPropertyChanged(nameof(PreviewEveryNEpochs));
+            OnPropertyChanged(nameof(PreviewPositivePrompt));
+            OnPropertyChanged(nameof(PreviewNegativePrompt));
+            OnPropertyChanged(nameof(PreviewSampler));
+            OnPropertyChanged(nameof(PreviewScheduler));
+            OnPropertyChanged(nameof(PreviewWidth));
+            OnPropertyChanged(nameof(PreviewHeight));
+            OnPropertyChanged(nameof(PreviewSteps));
+            OnPropertyChanged(nameof(PreviewCfg));
+            OnPropertyChanged(nameof(PreviewSeed));
+            OnPropertyChanged(nameof(PreviewOffloadPipelineForVae));
+        }
+
+        private void NotifyPreviewProperty(string key)
+        {
+            string? propertyName = key.Trim() switch
+            {
+                "preview_enabled" => nameof(PreviewEnabled),
+                "preview_every_n_epochs" => nameof(PreviewEveryNEpochs),
+                "preview_positive_prompt" => nameof(PreviewPositivePrompt),
+                "preview_negative_prompt" => nameof(PreviewNegativePrompt),
+                "preview_sampler" => nameof(PreviewSampler),
+                "preview_scheduler" => nameof(PreviewScheduler),
+                "preview_width" => nameof(PreviewWidth),
+                "preview_height" => nameof(PreviewHeight),
+                "preview_steps" => nameof(PreviewSteps),
+                "preview_cfg" => nameof(PreviewCfg),
+                "preview_seed" => nameof(PreviewSeed),
+                "preview_offload_pipeline_for_vae" => nameof(PreviewOffloadPipelineForVae),
+                _ => null
+            };
+            if (propertyName != null)
+            {
+                OnPropertyChanged(propertyName);
+            }
         }
 
         private Dictionary<string, string> BuildValues()
@@ -917,6 +1098,18 @@ namespace CyanTools.ViewModel
                 ["blocks_to_swap"] = new("Block swap 数量", "number", "diffusion-pipe 在 CPU/GPU 间换入换出的 block 数。"),
                 ["max_sequence_length"] = new("最大文本长度", "number", "Anima 文本编码的 token 上限。"),
                 ["eval_every_n_epochs"] = new("每 N Epoch 评估", "number", "diffusion-pipe 评估间隔。"),
+                ["preview_enabled"] = new("启用 Epoch 预览图", "boolean", "在训练 Epoch 结束后生成固定条件的对比图。"),
+                ["preview_every_n_epochs"] = new("每 N 个 Epoch 预览", "number", "预览图生成间隔。"),
+                ["preview_positive_prompt"] = new("预览图正向 Prompt", "textarea", "固定 Prompt 便于比较不同 Epoch 的训练变化。"),
+                ["preview_negative_prompt"] = new("预览图负向 Prompt", "textarea", "预览图使用的负向 Prompt。"),
+                ["preview_sampler"] = new("预览图采样器", "select", "当前 Anima hook 支持 Euler 和 Flow Euler。", ["euler", "flow_euler"]),
+                ["preview_scheduler"] = new("预览图调度器", "select", "当前 Anima hook 使用 normal 调度。", ["normal"]),
+                ["preview_width"] = new("预览图宽度", "number", "生成时会向下对齐到 16 的倍数。"),
+                ["preview_height"] = new("预览图高度", "number", "生成时会向下对齐到 16 的倍数。"),
+                ["preview_steps"] = new("预览图步数", "number", "每张预览图的采样步数。"),
+                ["preview_cfg"] = new("预览图 CFG", "number", "预览图的提示词引导强度。"),
+                ["preview_seed"] = new("预览图 Seed", "number", "固定随机种子便于横向比较。"),
+                ["preview_offload_pipeline_for_vae"] = new("VAE 解码时下放训练模型", "boolean", "VAE 解码前临时将训练 pipeline 下放到 CPU，以增加显存余量。"),
                 ["conditioning_data_dir"] = new("条件数据目录", "path", "可选的配对条件数据。"),
                 ["additional_args"] = new("额外训练参数", "textarea", "一行一个需要原样保留的附加参数。")
             };

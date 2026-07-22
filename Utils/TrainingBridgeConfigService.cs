@@ -51,7 +51,9 @@ namespace CyanTools.Utils
             "micro_batch_size_per_gpu", "network_dim", "rank", "network_alpha",
             "rank_alpha", "learning_rate", "network_dropout", "gradient_accumulation_steps",
             "save_every_n_epochs", "save_every_n_steps", "eval_every_n_epochs",
-            "blocks_to_swap", "max_sequence_length", "lr_warmup_steps", "keep_tokens"
+            "blocks_to_swap", "max_sequence_length", "lr_warmup_steps", "keep_tokens",
+            "preview_every_n_epochs", "preview_width", "preview_height", "preview_steps",
+            "preview_cfg", "preview_seed"
         };
 
         private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal)
@@ -190,7 +192,19 @@ namespace CyanTools.Utils
                 ["network_alpha"] = "16",
                 ["network_module"] = "networks.lora_anima",
                 ["gradient_checkpointing"] = "true",
-                ["cache_latents"] = "true"
+                ["cache_latents"] = "true",
+                ["preview_enabled"] = "true",
+                ["preview_every_n_epochs"] = "1",
+                ["preview_positive_prompt"] = "a golden retriever running through a grassy field",
+                ["preview_negative_prompt"] = string.Empty,
+                ["preview_sampler"] = "euler",
+                ["preview_scheduler"] = "normal",
+                ["preview_width"] = "1024",
+                ["preview_height"] = "1024",
+                ["preview_steps"] = "20",
+                ["preview_cfg"] = "5",
+                ["preview_seed"] = "42",
+                ["preview_offload_pipeline_for_vae"] = "true"
             };
         }
 
@@ -330,6 +344,19 @@ namespace CyanTools.Utils
             if (document.TryGetScalar("optimizer", "type", out string optimizerType))
             {
                 values["optimizer_type"] = optimizerType;
+            }
+
+            foreach (string key in new[]
+                     {
+                         "enabled", "every_n_epochs", "positive_prompt", "negative_prompt",
+                         "sampler", "scheduler", "width", "height", "steps", "cfg", "seed",
+                         "offload_pipeline_for_vae"
+                     })
+            {
+                if (document.TryGetScalar("preview", key, out string value))
+                {
+                    values[$"preview_{key}"] = value;
+                }
             }
 
             if (document.TryGetScalar(string.Empty, "size_buckets", out string buckets))
@@ -516,6 +543,20 @@ namespace CyanTools.Utils
                 "caching_batch_size = 1",
                 "steps_per_print = 1",
                 $"blocks_to_swap = {GetInt(values, "blocks_to_swap", 0)}",
+                string.Empty,
+                "[preview]",
+                $"enabled = {TomlBool(GetBool(values, "preview_enabled", true))}",
+                $"every_n_epochs = {Math.Max(1, GetInt(values, "preview_every_n_epochs", 1))}",
+                $"positive_prompt = {TomlString(GetText(values, "preview_positive_prompt", "a golden retriever running through a grassy field"))}",
+                $"negative_prompt = {TomlString(GetText(values, "preview_negative_prompt"))}",
+                $"sampler = {TomlString(GetText(values, "preview_sampler", "euler").ToLowerInvariant())}",
+                $"scheduler = {TomlString(GetText(values, "preview_scheduler", "normal").ToLowerInvariant())}",
+                $"width = {Math.Max(64, GetInt(values, "preview_width", 1024))}",
+                $"height = {Math.Max(64, GetInt(values, "preview_height", 1024))}",
+                $"steps = {Math.Max(1, GetInt(values, "preview_steps", 20))}",
+                $"cfg = {GetDouble(values, "preview_cfg", 5).ToString("G17", CultureInfo.InvariantCulture)}",
+                $"seed = {GetInt(values, "preview_seed", 42)}",
+                $"offload_pipeline_for_vae = {TomlBool(GetBool(values, "preview_offload_pipeline_for_vae", true))}",
                 string.Empty,
                 "[model]",
                 "type = 'anima'",
