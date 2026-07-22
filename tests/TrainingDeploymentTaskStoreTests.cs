@@ -70,6 +70,8 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
         Assert.Contains("failed without stopping training", hook);
         Assert.Contains("DIFFPIPEFORGE_PREVIEW_CONFIG_B64", hook);
         Assert.Contains("output_dir = Path(saver.save_root) / 'sample'", hook);
+        Assert.Contains("Anima image preview expected one frame", hook);
+        Assert.Contains("Anima image preview expected HWC output", hook);
         Assert.Contains("Anima epoch 预览图功能已完整注入，无需修改。", installer);
     }
 

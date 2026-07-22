@@ -205,7 +205,14 @@ def _decode_to_cpu(saver, latents, config):
     try:
         vae.to('cuda')
         image = saver.model.vae_decode(latents)
-        return image.squeeze(0).movedim(-1, 0).cpu()
+        image = image.squeeze(0)
+        if image.ndim == 4:
+            if image.shape[0] != 1:
+                raise ValueError(f'Anima image preview expected one frame, got shape {tuple(image.shape)}')
+            image = image.squeeze(0)
+        if image.ndim != 3:
+            raise ValueError(f'Anima image preview expected HWC output, got shape {tuple(image.shape)}')
+        return image.movedim(-1, 0).cpu()
     finally:
         vae.to('cpu')
         del latents
