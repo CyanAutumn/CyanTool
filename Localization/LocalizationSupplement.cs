@@ -251,6 +251,7 @@ namespace CyanTools.Localization
             Add(translations, "删除选中参数", "Delete Selected Parameter", "選択したパラメーターを削除");
             Add(translations, "系统监控", "System Monitor", "システムモニター");
             Add(translations, "桌面小控件", "Desktop Widget", "デスクトップウィジェット");
+            Add(translations, "悬浮窗", "Floating Widget", "フローティングウィジェット");
             Add(translations, "置顶系统监控小窗", "Always-on-top System Monitor", "常に手前に表示するシステムモニター");
             Add(translations, "在桌面显示可拖动、始终置顶且不占任务栏的 GPU、显存、CPU、内存与磁盘监控。关闭小窗会自动取消此选项。", "Show a draggable, always-on-top GPU, VRAM, CPU, memory, and disk monitor without a taskbar entry. Closing it also clears this option.", "タスクバーに表示せず、ドラッグ可能で常に手前に表示する GPU、VRAM、CPU、メモリ、ディスクモニターです。閉じるとこの設定も解除されます。");
             Add(translations, "打开", "Open", "開く");

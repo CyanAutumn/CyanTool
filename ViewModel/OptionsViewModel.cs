@@ -24,7 +24,6 @@ namespace CyanTools.ViewModel
         private readonly Dictionary<string, TrainingBackendStatus> _trainingBackendStatuses = new(StringComparer.OrdinalIgnoreCase);
         private CancellationTokenSource? _trainingDeploymentCancellation;
         private bool _isBusy;
-        private bool _showSystemMonitorWidget = SystemMonitorWidgetController.IsEnabled;
         private string _cudnnPackageStatus = "拖入 NVIDIA cuDNN 9 的 Windows zip 安装包，或点击选择文件。";
         private string _nvidiaAppStatus = "尚未检测。";
         private string _trainingDeploymentStatus = "尚未检测训练后端部署环境。";
@@ -80,39 +79,6 @@ namespace CyanTools.ViewModel
         public ObservableCollection<string> LogLines { get; }
         public string LogText => string.Join(Environment.NewLine, LogLines);
         public ObservableCollection<TrainingBackendMirrorOption> TrainingBackendMirrorOptions { get; }
-
-        public bool ShowSystemMonitorWidget
-        {
-            get => _showSystemMonitorWidget;
-            set
-            {
-                if (SetField(ref _showSystemMonitorWidget, value))
-                {
-                    SystemMonitorWidgetController.SetEnabled(value);
-                }
-            }
-        }
-
-        public void StartObservingSystemMonitorWidget()
-        {
-            SystemMonitorWidgetController.EnabledChanged -= SystemMonitorWidgetController_EnabledChanged;
-            SystemMonitorWidgetController.EnabledChanged += SystemMonitorWidgetController_EnabledChanged;
-            SystemMonitorWidgetController_EnabledChanged(SystemMonitorWidgetController.IsEnabled);
-        }
-
-        public void StopObservingSystemMonitorWidget()
-            => SystemMonitorWidgetController.EnabledChanged -= SystemMonitorWidgetController_EnabledChanged;
-
-        private void SystemMonitorWidgetController_EnabledChanged(bool enabled)
-        {
-            if (_showSystemMonitorWidget == enabled)
-            {
-                return;
-            }
-
-            _showSystemMonitorWidget = enabled;
-            OnPropertyChanged(nameof(ShowSystemMonitorWidget));
-        }
 
         public bool IsBusy
         {

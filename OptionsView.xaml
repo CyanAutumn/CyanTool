@@ -16,35 +16,10 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="320"/>
             </Grid.RowDefinitions>
 
             <GroupBox Grid.Row="0"
-                      Header="桌面小控件"
-                      Margin="0,0,0,12"
-                      Style="{StaticResource CyanGroupBoxStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="置顶系统监控小窗"
-                                   Style="{StaticResource CyanSectionTitleStyle}"
-                                   FontSize="15"/>
-                        <TextBlock Text="在桌面显示可拖动、始终置顶且不占任务栏的 GPU、显存、CPU、内存与磁盘监控。关闭小窗会自动取消此选项。"
-                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
-                                   Margin="0,4,18,0"/>
-                    </StackPanel>
-                    <CheckBox Grid.Column="1"
-                              Content="打开"
-                              IsChecked="{Binding ShowSystemMonitorWidget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              VerticalAlignment="Center"/>
-                </Grid>
-            </GroupBox>
-
-            <GroupBox Grid.Row="1"
                       Header="CUDA / cuDNN"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -150,7 +125,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="2"
+            <GroupBox Grid.Row="1"
                       Header="NVIDIA 驱动应用"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -184,7 +159,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="3"
+            <GroupBox Grid.Row="2"
                       Header="训练后端部署"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -226,7 +201,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="4"
+            <GroupBox Grid.Row="3"
                       Header="WSL 基础环境"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -294,7 +269,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="5"
+            <GroupBox Grid.Row="4"
                       Header="Windows 原生训练后端"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -346,7 +321,7 @@
                 </StackPanel>
             </GroupBox>
 
-            <GroupBox Grid.Row="6"
+            <GroupBox Grid.Row="5"
                       Header="WSL2 训练后端"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -423,7 +398,7 @@
                 </StackPanel>
             </GroupBox>
 
-            <GroupBox Grid.Row="7"
+            <GroupBox Grid.Row="6"
                       Header="日志"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <TextBox Text="{Binding LogText, Mode=OneWay}"

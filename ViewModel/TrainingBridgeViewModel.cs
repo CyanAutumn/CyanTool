@@ -49,6 +49,7 @@ namespace CyanTools.ViewModel
         private string _diskPathText = "--";
         private string _diskUsageText = "--";
         private string _monitorSampleText = "正在读取本机负载...";
+        private bool _showSystemMonitorWidget = SystemMonitorWidgetController.IsEnabled;
 
         public TrainingBridgeViewModel()
             : this(new TrainingBridgeProjectStore())
@@ -227,6 +228,39 @@ namespace CyanTools.ViewModel
         }
 
         public string ParameterCountText => $"{Parameters.Count} 项";
+
+        public bool ShowSystemMonitorWidget
+        {
+            get => _showSystemMonitorWidget;
+            set
+            {
+                if (SetField(ref _showSystemMonitorWidget, value))
+                {
+                    SystemMonitorWidgetController.SetEnabled(value);
+                }
+            }
+        }
+
+        public void StartObservingSystemMonitorWidget()
+        {
+            SystemMonitorWidgetController.EnabledChanged -= SystemMonitorWidgetController_EnabledChanged;
+            SystemMonitorWidgetController.EnabledChanged += SystemMonitorWidgetController_EnabledChanged;
+            SystemMonitorWidgetController_EnabledChanged(SystemMonitorWidgetController.IsEnabled);
+        }
+
+        public void StopObservingSystemMonitorWidget()
+            => SystemMonitorWidgetController.EnabledChanged -= SystemMonitorWidgetController_EnabledChanged;
+
+        private void SystemMonitorWidgetController_EnabledChanged(bool enabled)
+        {
+            if (_showSystemMonitorWidget == enabled)
+            {
+                return;
+            }
+
+            _showSystemMonitorWidget = enabled;
+            OnPropertyChanged(nameof(ShowSystemMonitorWidget));
+        }
 
         public string MonitorStateText
         {

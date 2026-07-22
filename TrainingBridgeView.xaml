@@ -320,11 +320,18 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="实时负载"
                                            FontWeight="SemiBold"
                                            VerticalAlignment="Center"/>
-                                <Border Grid.Column="1" Style="{StaticResource CyanPillStyle}">
+                                <CheckBox Grid.Column="1"
+                                          Content="悬浮窗"
+                                          ToolTip="置顶系统监控小窗"
+                                          IsChecked="{Binding ShowSystemMonitorWidget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="0,0,8,0"
+                                          VerticalAlignment="Center"/>
+                                <Border Grid.Column="2" Style="{StaticResource CyanPillStyle}">
                                     <TextBlock Text="{Binding MonitorStateText, Converter={StaticResource LocalizedTextConverter}}"
                                                FontSize="12"
                                                FontWeight="SemiBold"/>

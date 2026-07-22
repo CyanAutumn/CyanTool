@@ -20,6 +20,7 @@ namespace CyanTools
             if (DataContext is TrainingBridgeViewModel viewModel)
             {
                 viewModel.StartMonitoring();
+                viewModel.StartObservingSystemMonitorWidget();
             }
         }
 
@@ -28,6 +29,7 @@ namespace CyanTools
             if (DataContext is TrainingBridgeViewModel viewModel)
             {
                 viewModel.StopMonitoring();
+                viewModel.StopObservingSystemMonitorWidget();
             }
         }
 

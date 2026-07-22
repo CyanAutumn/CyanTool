@@ -1,9 +1,21 @@
 using CyanTools.Model;
 using CyanTools.Utils;
+using CyanTools.ViewModel;
 using Xunit;
 
 public sealed class TrainingBridgeTests
 {
+    [Fact]
+    public void SystemMonitorWidget_FormatsElapsedAndTotalTimeWithDays()
+    {
+        Assert.Equal(
+            "1d 02:03:04/3d 10:20:30",
+            SystemMonitorWidgetViewModel.FormatTrainingDurationPair(
+                new TimeSpan(days: 1, hours: 2, minutes: 3, seconds: 4),
+                new TimeSpan(days: 3, hours: 10, minutes: 20, seconds: 30)));
+        Assert.Equal("--d --:--:--/--d --:--:--", SystemMonitorWidgetViewModel.FormatTrainingDurationPair(null, null));
+    }
+
     [Fact]
     public void Import_DiffusionPipeBundle_MapsAliasesAndRuntimePaths()
     {
@@ -228,19 +240,31 @@ public sealed class TrainingBridgeTests
     }
 
     [Fact]
-    public void DesktopSystemMonitor_IsAlwaysOnTopDraggableAndOptionControlled()
+    public void DesktopSystemMonitor_IsAlwaysOnTopDraggableAndTrainingBridgeControlled()
     {
         string root = FindRepositoryRoot();
         string widgetXaml = File.ReadAllText(Path.Combine(root, "SystemMonitorWidgetWindow.xaml"));
         string widgetCode = File.ReadAllText(Path.Combine(root, "SystemMonitorWidgetWindow.xaml.cs"));
+        string trainingBridgeXaml = File.ReadAllText(Path.Combine(root, "TrainingBridgeView.xaml"));
         string optionsXaml = File.ReadAllText(Path.Combine(root, "OptionsView.xaml"));
         string appXaml = File.ReadAllText(Path.Combine(root, "App.xaml"));
         string appCode = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
 
         Assert.Contains("Topmost=\"True\"", widgetXaml);
         Assert.Contains("ShowInTaskbar=\"False\"", widgetXaml);
+        Assert.Contains("Width=\"340\"", widgetXaml);
+        Assert.Contains("Height=\"64\"", widgetXaml);
+        Assert.Contains("Text=\"{Binding CpuText}\"", widgetXaml);
+        Assert.Contains("Text=\"{Binding GpuLoadText}\"", widgetXaml);
+        Assert.Contains("Text=\"{Binding TrainingEpochText}\"", widgetXaml);
+        Assert.Contains("Text=\"{Binding TrainingDurationText}\"", widgetXaml);
+        Assert.Contains("Text=\"{Binding TrainingLossText}\"", widgetXaml);
+        Assert.DoesNotContain("最近 10 个 Epoch", widgetXaml);
+        Assert.Contains("Points=\"{Binding LossCurvePoints}\"", widgetXaml);
+        Assert.DoesNotContain("ProgressBar", widgetXaml);
         Assert.Contains("DragMove();", widgetCode);
-        Assert.Contains("IsChecked=\"{Binding ShowSystemMonitorWidget", optionsXaml);
+        Assert.Contains("IsChecked=\"{Binding ShowSystemMonitorWidget", trainingBridgeXaml);
+        Assert.DoesNotContain("ShowSystemMonitorWidget", optionsXaml);
         Assert.Contains("ShutdownMode=\"OnMainWindowClose\"", appXaml);
         Assert.Contains("PrepareForApplicationShutdown", appCode);
     }

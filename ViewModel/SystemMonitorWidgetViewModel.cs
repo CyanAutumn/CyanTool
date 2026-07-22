@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Media;
 
 namespace CyanTools.ViewModel
 {
@@ -27,6 +28,10 @@ namespace CyanTools.ViewModel
         private string _diskPathText = "--";
         private string _diskUsageText = "--";
         private string _monitorSampleText = "正在读取本机负载...";
+        private string _trainingEpochText = "--/-- ep";
+        private string _trainingDurationText = "--d --:--:--/--d --:--:--";
+        private string _trainingLossText = "--";
+        private string _lossCurveStateText = "等待训练数据";
 
         public string MonitorStateText { get => _monitorStateText; private set => SetField(ref _monitorStateText, value); }
         public string GpuName { get => _gpuName; private set => SetField(ref _gpuName, value); }
@@ -43,6 +48,14 @@ namespace CyanTools.ViewModel
         public string DiskPathText { get => _diskPathText; private set => SetField(ref _diskPathText, value); }
         public string DiskUsageText { get => _diskUsageText; private set => SetField(ref _diskUsageText, value); }
         public string MonitorSampleText { get => _monitorSampleText; private set => SetField(ref _monitorSampleText, value); }
+        public string TrainingEpochText { get => _trainingEpochText; private set => SetField(ref _trainingEpochText, value); }
+        public string TrainingDurationText { get => _trainingDurationText; private set => SetField(ref _trainingDurationText, value); }
+        public string TrainingLossText { get => _trainingLossText; private set => SetField(ref _trainingLossText, value); }
+        public string LossCurveStateText { get => _lossCurveStateText; private set => SetField(ref _lossCurveStateText, value); }
+        public PointCollection LossCurvePoints { get; } = new();
+
+        public static string FormatTrainingDurationPair(TimeSpan? elapsed, TimeSpan? total)
+            => $"{FormatTrainingDuration(elapsed)}/{FormatTrainingDuration(total)}";
 
         public void StartMonitoring()
         {
@@ -124,6 +137,17 @@ namespace CyanTools.ViewModel
 
         private static string FormatPercent(double? value)
             => value.HasValue ? $"{Math.Clamp(value.Value, 0d, 100d):0.#}%" : "--";
+
+        private static string FormatTrainingDuration(TimeSpan? duration)
+        {
+            if (!duration.HasValue || duration.Value < TimeSpan.Zero)
+            {
+                return "--d --:--:--";
+            }
+
+            TimeSpan value = duration.Value;
+            return $"{(int)value.TotalDays}d {value.Hours:D2}:{value.Minutes:D2}:{value.Seconds:D2}";
+        }
 
         private static string FormatGbPair(double? used, double? total)
             => used.HasValue && total.HasValue ? $"{used.Value:0.#} GB / {total.Value:0.#} GB" : "--";
