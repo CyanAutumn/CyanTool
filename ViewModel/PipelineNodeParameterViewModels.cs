@@ -156,7 +156,12 @@ namespace CyanTools.ViewModel
         }
     }
 
-    internal static class PipelineNodeParameterFactory
+
+
+
+
+
+    public static class PipelineNodeParameterFactory
     {
         private static readonly IReadOnlyDictionary<Type, IReadOnlyList<PipelineNodeParameterDefinition>> Definitions =
             new Dictionary<Type, IReadOnlyList<PipelineNodeParameterDefinition>>

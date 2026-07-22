@@ -18,6 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../CyanTools.Agent/CyanTools.Agent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="PathUiConventionsTests.cs" />
+    <Compile Include="AgentToolCatalogTests.cs" />
   </ItemGroup>
 </Project>

@@ -20,6 +20,7 @@
 
 
 
+
 [CmdletBinding()]
 param(
     [string]$Repo = "CyanAutumn/CyanToolsUpdate",
@@ -208,6 +209,53 @@ function Invoke-DotNetBuild {
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build 失败（exit code: $LASTEXITCODE）"
     }
+}
+
+function Get-PathRelativeToRoot {
+    param(
+        [string]$Root,
+        [string]$Path
+    )
+
+    $rootPath = [System.IO.Path]::GetFullPath($Root)
+    if (-not $rootPath.EndsWith([string][System.IO.Path]::DirectorySeparatorChar)) {
+        $rootPath += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $rootUri = [System.Uri]$rootPath
+    $pathUri = [System.Uri]([System.IO.Path]::GetFullPath($Path))
+    return [System.Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+}
+
+function Stage-McpServerForRelease {
+    param(
+        [string]$ProjectRoot,
+        [string]$BuildDir,
+        [string]$Configuration = "Release"
+    )
+
+    $serverProject = Join-Path $ProjectRoot "CyanTools.McpServer\CyanTools.McpServer.csproj"
+    if (-not (Test-Path -LiteralPath $serverProject -PathType Leaf)) {
+        throw "找不到 MCP 服务项目：$serverProject"
+    }
+
+    Invoke-DotNetBuild -ProjectPath $serverProject -Configuration $Configuration
+
+    $serverOutput = Join-Path $ProjectRoot "CyanTools.McpServer\bin\$Configuration\net8.0-windows"
+    $serverExecutable = Join-Path $serverOutput "CyanTools.McpServer.exe"
+    if (-not (Test-Path -LiteralPath $serverExecutable -PathType Leaf)) {
+        throw "MCP 服务构建后未找到可执行文件：$serverExecutable"
+    }
+
+    foreach ($file in Get-ChildItem -LiteralPath $serverOutput -Force -Recurse -File) {
+        $relativePath = Get-PathRelativeToRoot -Root $serverOutput -Path $file.FullName
+        $destinationPath = Join-Path $BuildDir $relativePath
+        $destinationDirectory = Split-Path -Parent $destinationPath
+        New-Item -ItemType Directory -Force -Path $destinationDirectory | Out-Null
+        Copy-Item -LiteralPath $file.FullName -Destination $destinationPath -Force
+    }
+
+    Write-Host "已合并 MCP 服务到发布目录：$BuildDir"
 }
 
 function Derive-NextVersionFromLatestRelease {
@@ -721,10 +769,22 @@ if (-not $SkipBuild) {
         Build-TrainingBackendBootstrap -ProjectRoot $baseDir | Out-Host
     }
     Invoke-DotNetBuild -ProjectPath $resolvedProjectFile -Configuration "Release"
+    Stage-McpServerForRelease -ProjectRoot $baseDir -BuildDir $BuildDir -Configuration "Release"
 }
 
 if (-not (Test-Path -LiteralPath $BuildDir -PathType Container)) {
     throw "找不到构建输出目录：$BuildDir"
+}
+
+$requiredReleaseFiles = @(
+    "scripts\Install-CyanToolsMcp.ps1",
+    "CyanTools.McpServer.exe"
+)
+foreach ($requiredReleaseFile in $requiredReleaseFiles) {
+    $requiredReleasePath = Join-Path $BuildDir $requiredReleaseFile
+    if (-not (Test-Path -LiteralPath $requiredReleasePath -PathType Leaf)) {
+        throw "发布目录缺少 Agent MCP 自助安装所需文件：$requiredReleasePath。请不要在未完成构建和合并时使用 -SkipBuild。"
+    }
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null

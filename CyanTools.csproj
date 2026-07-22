@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;.tmp/**;**/*-DESKTOP-*;**/*-DESKTOP-*.*;**/*_DESKTOP_*;**/*_DESKTOP_*.*</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;.tmp/**;CyanTools.Agent/**;CyanTools.McpServer/**;**/*-DESKTOP-*;**/*-DESKTOP-*.*;**/*_DESKTOP_*;**/*_DESKTOP_*.*</DefaultItemExcludes>
     <CyanToolsRuntimeIdentifiersToCopy>win-x64;win-x86</CyanToolsRuntimeIdentifiersToCopy>
     <_CyanToolsRuntimeIdentifierFilter>;$(CyanToolsRuntimeIdentifiersToCopy);</_CyanToolsRuntimeIdentifierFilter>
     <WebView2NeverCopyLoaderDllToOutputDirectory>true</WebView2NeverCopyLoaderDllToOutputDirectory>
@@ -94,11 +94,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="**\*-DESKTOP-*.cs;**\*_DESKTOP_*.cs" />
+    <Compile Remove="CyanTools.Agent\**\*.cs;CyanTools.McpServer\**\*.cs;**\*-DESKTOP-*.cs;**\*_DESKTOP_*.cs" />
     <ApplicationDefinition Remove="**\*-DESKTOP-*.xaml;**\*_DESKTOP_*.xaml" />
     <Page Remove="**\*-DESKTOP-*.xaml;**\*_DESKTOP_*.xaml" />
-    <None Remove="**\*-DESKTOP-*;**\*-DESKTOP-*.*;**\*_DESKTOP_*;**\*_DESKTOP_*.*" />
-    <Content Remove="**\*-DESKTOP-*;**\*-DESKTOP-*.*;**\*_DESKTOP_*;**\*_DESKTOP_*.*" />
+    <None Remove="CyanTools.Agent\**;CyanTools.McpServer\**;**\*-DESKTOP-*;**\*-DESKTOP-*.*;**\*_DESKTOP_*;**\*_DESKTOP_*.*" />
+    <Content Remove="CyanTools.Agent\**;CyanTools.McpServer\**;**\*-DESKTOP-*;**\*-DESKTOP-*.*;**\*_DESKTOP_*;**\*_DESKTOP_*.*" />
   </ItemGroup>
 
   <ItemGroup>
