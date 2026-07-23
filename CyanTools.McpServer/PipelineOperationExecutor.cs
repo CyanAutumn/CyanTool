@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using CyanTools.Agent;
 using CyanTools.Pipeline;
+using CyanTools.Utils;
 using CyanTools.ViewModel;
 
 namespace CyanTools.McpServer;
@@ -32,6 +33,7 @@ public sealed class PipelineOperationExecutor
                 name = parameter.PropertyName,
                 label = parameter.Label,
                 type = GetParameterType(parameter),
+                default_value = GetParameterDefaultValue(parameter),
                 allowed_values = parameter.Options.Select(option => new
                 {
                     value = Convert.ToString(option.Value, CultureInfo.InvariantCulture),
@@ -115,8 +117,24 @@ public sealed class PipelineOperationExecutor
 
         PipelineNodeDescriptor? descriptor = PipelineCatalog.GetAll()
             .FirstOrDefault(candidate => string.Equals(candidate.NodeType.FullName, operation.PipelineNodeType, StringComparison.Ordinal));
-        return descriptor?.Factory()
+        PipelineNodeViewModelBase node = descriptor?.Factory()
             ?? throw new InvalidOperationException($"The registered pipeline node for {operation.Id} is unavailable.");
+
+        RestorePersistedDefaults(node);
+        return node;
+    }
+
+    private static void RestorePersistedDefaults(PipelineNodeViewModelBase node)
+    {
+        InputStateStore.Default.Restore(node);
+
+        object? innerViewModel = node.GetType()
+            .GetProperty("Inner", BindingFlags.Instance | BindingFlags.Public)
+            ?.GetValue(node);
+        if (innerViewModel != null)
+        {
+            InputStateStore.Default.Restore(innerViewModel);
+        }
     }
 
     private static void ApplyParameters(PipelineNodeViewModelBase node, string? parametersJson)
@@ -229,6 +247,14 @@ public sealed class PipelineOperationExecutor
             PipelineParameterEditorKind.Boolean => "boolean",
             _ => "string_or_number"
         };
+    }
+
+    private static object? GetParameterDefaultValue(PipelineNodeParameterViewModel parameter)
+    {
+        object? value = parameter.CurrentValue;
+        return parameter.Options.Count > 0
+            ? Convert.ToString(value, CultureInfo.InvariantCulture)
+            : value;
     }
 }
 

@@ -30,6 +30,7 @@ namespace CyanTools
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            UserControlInputState.Initialize();
             LocalizationManager.InitializeApplication();
             base.OnStartup(e);
             Dispatcher.BeginInvoke(
@@ -50,6 +51,7 @@ namespace CyanTools
 
         protected override void OnExit(ExitEventArgs e)
         {
+            UserControlInputState.SaveAll();
             SystemMonitorWidgetController.PrepareForApplicationShutdown();
             SystemMonitorWidgetController.Shutdown();
             base.OnExit(e);

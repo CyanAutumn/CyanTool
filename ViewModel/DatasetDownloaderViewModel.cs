@@ -119,6 +119,10 @@ namespace CyanTools.ViewModel
         private string _pixivRefreshToken = string.Empty;
         private string _outputDirectory = DefaultOutputDirectory;
         private string _logText = string.Empty;
+        private string _danbooruDownloadSummary = "Danbooru：等待下载";
+        private string _pixivDownloadSummary = "Pixiv：等待下载";
+        private string _kemonoDownloadSummary = "Kemono：等待下载";
+        private string _outputDirectoryImageTotalSummary = "输出目录总计：等待下载";
         private int _pixivDownloadIntervalSeconds = DefaultPixivIntervalSeconds;
         private bool _enableDanbooru = true;
         private bool _enablePixiv = true;
@@ -407,6 +411,14 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public string DanbooruDownloadSummary => _danbooruDownloadSummary;
+
+        public string PixivDownloadSummary => _pixivDownloadSummary;
+
+        public string KemonoDownloadSummary => _kemonoDownloadSummary;
+
+        public string OutputDirectoryImageTotalSummary => _outputDirectoryImageTotalSummary;
+
         public bool IsDownloading
         {
             get => _isDownloading;
@@ -679,7 +691,15 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                await RunSelectedTasksAsync(input, token);
+                ResetDownloadSummaries();
+                try
+                {
+                    await RunSelectedTasksAsync(input, token);
+                }
+                finally
+                {
+                    SetOutputDirectoryImageTotalSummary(BuildOutputDirectoryImageTotalSummary(resolvedOutputRoot));
+                }
 
                 if (!validateWorkflowOutput)
                 {
@@ -756,53 +776,112 @@ namespace CyanTools.ViewModel
         private async Task RunDanbooruAsync(string input, CancellationToken token)
         {
             AppendLog("[Danbooru] 任务开始。");
+            SetDanbooruDownloadSummary("Danbooru：正在获取下载清单…");
+            var counters = new SourceDownloadCounters(progress => SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", progress)));
+            string? outputDirectory = null;
 
-            switch (SelectedMode)
+            try
             {
-                case DatasetDownloadMode.ArtistId:
+                switch (SelectedMode)
                 {
-                    var artistTag = await ResolveDanbooruArtistTagByPixivUserIdAsync(input, token);
-                    if (string.IsNullOrWhiteSpace(artistTag))
+                    case DatasetDownloadMode.ArtistId:
                     {
-                        AppendLog($"[Danbooru] 未找到 Pixiv 画师 ID {input} 对应 artist 标签。");
-                        return;
-                    }
+                        var artistTag = await ResolveDanbooruArtistTagByPixivUserIdAsync(input, token);
+                        if (string.IsNullOrWhiteSpace(artistTag))
+                        {
+                            AppendLog($"[Danbooru] 未找到 Pixiv 画师 ID {input} 对应 artist 标签。");
+                            return;
+                        }
 
-                    AppendLog($"[Danbooru] 画师 ID {input} -> artist 标签 {artistTag}");
-                    await DownloadDanbooruByTagsAsync(artistTag, SanitizePathSegment(input, "artist"), token);
-                    break;
-                }
-                case DatasetDownloadMode.Tag:
-                    await DownloadDanbooruByTagsAsync(input, SanitizePathSegment(input, "tag"), token);
-                    break;
-                case DatasetDownloadMode.PostId:
-                {
-                    var ids = ParseIdentifiers(input);
-                    if (ids.Count == 0)
-                    {
-                        AppendLog("[Danbooru] 帖子 ID 为空。");
-                        return;
+                        AppendLog($"[Danbooru] 画师 ID {input} -> artist 标签 {artistTag}");
+                        await SetDanbooruPlannedTotalAsync(artistTag, counters, token);
+                        outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "artist"));
+                        Directory.CreateDirectory(outputDirectory);
+                        await DownloadDanbooruByTagsAsync(artistTag, outputDirectory, counters, token);
+                        break;
                     }
+                    case DatasetDownloadMode.Tag:
+                    {
+                        await SetDanbooruPlannedTotalAsync(input, counters, token);
+                        outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "tag"));
+                        Directory.CreateDirectory(outputDirectory);
+                        await DownloadDanbooruByTagsAsync(input, outputDirectory, counters, token);
+                        break;
+                    }
+                    case DatasetDownloadMode.PostId:
+                    {
+                        var ids = ParseIdentifiers(input);
+                        if (ids.Count == 0)
+                        {
+                            AppendLog("[Danbooru] 帖子 ID 为空。");
+                            return;
+                        }
 
-                    var outputDirectory = ResolveSourceOutputDirectory("Danbooru", "posts");
-                    Directory.CreateDirectory(outputDirectory);
-                    foreach (var id in ids)
-                    {
-                        token.ThrowIfCancellationRequested();
-                        await DownloadDanbooruByPostIdAsync(id, outputDirectory, token);
+                        counters.SetTotal(ids.Count);
+                        AppendLog($"[Danbooru] 已发现 {ids.Count} 张待处理图片。");
+                        outputDirectory = ResolveSourceOutputDirectory("Danbooru", "posts");
+                        Directory.CreateDirectory(outputDirectory);
+                        foreach (var id in ids)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            counters.Record(await DownloadDanbooruByPostIdAsync(id, outputDirectory, token));
+                        }
+                        break;
                     }
-                    break;
                 }
             }
-
-            AppendLog("[Danbooru] 任务完成。");
+            finally
+            {
+                SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", counters));
+                AppendLog("[Danbooru] 任务完成。");
+            }
         }
 
-        private async Task DownloadDanbooruByTagsAsync(string tags, string subDirectoryName, CancellationToken token)
+        private async Task SetDanbooruPlannedTotalAsync(string tags, SourceDownloadCounters counters, CancellationToken token)
         {
-            var outputDirectory = ResolveSourceOutputDirectory("Danbooru", subDirectoryName);
-            Directory.CreateDirectory(outputDirectory);
+            var total = await FetchDanbooruPostCountAsync(tags, token);
+            if (total.HasValue)
+            {
+                counters.SetTotal(total.Value);
+                AppendLog($"[Danbooru] 已发现 {total.Value} 个匹配帖子。");
+            }
+            else
+            {
+                AppendLog("[Danbooru] 无法获取匹配总数，将继续下载并显示已处理数量。");
+            }
+        }
 
+        private async Task<int?> FetchDanbooruPostCountAsync(string tags, CancellationToken token)
+        {
+            var request = new RestRequest($"/counts/posts.json?tags={Uri.EscapeDataString(tags)}", Method.Get);
+            var response = await _danbooruClient.ExecuteAsync(request, token);
+            if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+            {
+                return null;
+            }
+
+            try
+            {
+                var value = JToken.Parse(response.Content).SelectToken("counts.posts")?.Value<long?>();
+                if (!value.HasValue || value.Value < 0 || value.Value > int.MaxValue)
+                {
+                    return null;
+                }
+
+                return (int)value.Value;
+            }
+            catch (Newtonsoft.Json.JsonException)
+            {
+                return null;
+            }
+        }
+
+        private async Task DownloadDanbooruByTagsAsync(
+            string tags,
+            string outputDirectory,
+            SourceDownloadCounters counters,
+            CancellationToken token)
+        {
             int page = 1;
             var seenPostIds = new HashSet<int>();
             while (!token.IsCancellationRequested)
@@ -835,45 +914,45 @@ namespace CyanTools.ViewModel
                 foreach (var post in newPosts)
                 {
                     token.ThrowIfCancellationRequested();
-                    await DownloadDanbooruPostAsync(post, outputDirectory, token);
+                    counters.Record(await DownloadDanbooruPostAsync(post, outputDirectory, token));
                 }
 
                 page++;
             }
         }
 
-        private async Task DownloadDanbooruByPostIdAsync(string postId, string outputDirectory, CancellationToken token)
+        private async Task<DownloadOutcome> DownloadDanbooruByPostIdAsync(string postId, string outputDirectory, CancellationToken token)
         {
             var request = new RestRequest($"/posts/{Uri.EscapeDataString(postId)}.json", Method.Get);
             var response = await _danbooruClient.ExecuteAsync(request, token);
             if (!response.IsSuccessful)
             {
                 AppendLog($"[Danbooru] 获取帖子 {postId} 失败: {response.StatusCode} - {response.ErrorMessage}");
-                return;
+                return DownloadOutcome.None;
             }
 
             if (string.IsNullOrWhiteSpace(response.Content))
             {
                 AppendLog($"[Danbooru] 帖子 {postId} 响应为空。");
-                return;
+                return DownloadOutcome.None;
             }
 
             var post = ParseDanbooruSingle(response.Content);
             if (post == null)
             {
                 AppendLog($"[Danbooru] 解析帖子 {postId} 失败。");
-                return;
+                return DownloadOutcome.None;
             }
 
-            await DownloadDanbooruPostAsync(post, outputDirectory, token);
+            return await DownloadDanbooruPostAsync(post, outputDirectory, token);
         }
 
-        private async Task DownloadDanbooruPostAsync(BooruPostInfo post, string outputDirectory, CancellationToken token)
+        private async Task<DownloadOutcome> DownloadDanbooruPostAsync(BooruPostInfo post, string outputDirectory, CancellationToken token)
         {
             var fileUrl = NormalizeDanbooruFileUrl(post.FileUrl);
             if (string.IsNullOrWhiteSpace(fileUrl))
             {
-                return;
+                return DownloadOutcome.None;
             }
 
             var fileName = Path.GetFileName(new Uri(fileUrl).LocalPath);
@@ -892,7 +971,7 @@ namespace CyanTools.ViewModel
                 {
                     await SaveDanbooruTagsTxtAsync(post, txtPath, token);
                 }
-                return;
+                return DownloadOutcome.Skipped;
             }
 
             var request = new RestRequest(fileUrl, Method.Get);
@@ -914,7 +993,7 @@ namespace CyanTools.ViewModel
                         }
 
                         AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
-                        return;
+                        return DownloadOutcome.None;
                     }
 
                     await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
@@ -922,7 +1001,7 @@ namespace CyanTools.ViewModel
                     {
                         if (attempt >= ImageDownloadRetryCount)
                         {
-                            return;
+                            return DownloadOutcome.None;
                         }
 
                         continue;
@@ -930,7 +1009,7 @@ namespace CyanTools.ViewModel
 
                     await SaveDanbooruTagsTxtAsync(post, txtPath, token);
                     AppendLog($"[Danbooru] 已保存 {fileName}");
-                    return;
+                    return DownloadOutcome.Saved;
                 }
             }
             finally
@@ -940,6 +1019,8 @@ namespace CyanTools.ViewModel
                     await Task.Delay(DanbooruDownloadDelay, token);
                 }
             }
+
+            return DownloadOutcome.None;
         }
 
         private async Task SaveDanbooruTagsTxtAsync(BooruPostInfo post, string txtPath, CancellationToken token)
@@ -1090,19 +1171,72 @@ namespace CyanTools.ViewModel
             if (string.IsNullOrWhiteSpace(PixivRefreshToken))
             {
                 AppendLog("[Pixiv] 刷新令牌为空，已跳过。");
+                SetPixivDownloadSummary("Pixiv：未配置刷新令牌");
                 return;
             }
 
             var outputDirectory = ResolveSourceOutputDirectory("Pixiv", SanitizePathSegment(artistId, "unknown_artist"));
             Directory.CreateDirectory(outputDirectory);
             AppendLog($"[Pixiv] 输出目录: {outputDirectory}");
+            SetPixivDownloadSummary("Pixiv：正在获取下载清单…");
 
-            await RefreshPixivAccessTokenAsync(token);
-
-            var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var counters = new SourceDownloadCounters(progress => SetPixivDownloadSummary(BuildDownloadSummary("Pixiv", progress)));
             var existingPixivFiles = LoadExistingPixivImageKeys(outputDirectory);
-            int savedCount = 0;
-            int skippedCount = 0;
+
+            try
+            {
+                await RefreshPixivAccessTokenAsync(token);
+                var downloadPlan = await BuildPixivDownloadPlanAsync(artistId, token);
+                counters.SetTotal(downloadPlan.Count);
+                AppendLog($"[Pixiv] 已发现 {downloadPlan.Count} 张远端图片。");
+
+                foreach (var item in downloadPlan)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var targetPath = Path.Combine(outputDirectory, item.FileName);
+                    if (File.Exists(targetPath))
+                    {
+                        if (ShouldSkipExistingDownloadedFile(targetPath, "Pixiv", item.FileName))
+                        {
+                            counters.Record(DownloadOutcome.Skipped);
+                            existingPixivFiles.Add(item.FileKey);
+                            continue;
+                        }
+
+                        existingPixivFiles.Remove(item.FileKey);
+                    }
+
+                    if (existingPixivFiles.Contains(item.FileKey))
+                    {
+                        counters.Record(DownloadOutcome.Skipped);
+                        continue;
+                    }
+
+                    if (await DownloadPixivImageAsync(item.Url, targetPath, token))
+                    {
+                        counters.Record(DownloadOutcome.Saved);
+                        existingPixivFiles.Add(item.FileKey);
+                        AppendLog($"[Pixiv] 已保存 {item.FileName}");
+                    }
+                    else
+                    {
+                        counters.Record(DownloadOutcome.None);
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(PixivDownloadIntervalSeconds), token);
+                }
+            }
+            finally
+            {
+                AppendPixivSummary(counters.Saved, counters.Skipped);
+                SetPixivDownloadSummary(BuildDownloadSummary("Pixiv", counters));
+            }
+        }
+
+        private async Task<List<PixivDownloadItem>> BuildPixivDownloadPlanAsync(string artistId, CancellationToken token)
+        {
+            var plan = new List<PixivDownloadItem>();
+            var seenFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var contentType in PixivContentTypes)
             {
@@ -1119,38 +1253,10 @@ namespace CyanTools.ViewModel
 
                     foreach (var item in BuildPixivDownloadItems(response.Illusts))
                     {
-                        token.ThrowIfCancellationRequested();
-                        if (!seenFiles.Add(item.FileName))
+                        if (seenFileNames.Add(item.FileName))
                         {
-                            continue;
+                            plan.Add(item);
                         }
-
-                        var targetPath = Path.Combine(outputDirectory, item.FileName);
-                        if (File.Exists(targetPath))
-                        {
-                            if (ShouldSkipExistingDownloadedFile(targetPath, "Pixiv", item.FileName))
-                            {
-                                skippedCount++;
-                                existingPixivFiles.Add(item.FileKey);
-                                continue;
-                            }
-
-                            existingPixivFiles.Remove(item.FileKey);
-                        }
-                        else if (existingPixivFiles.Contains(item.FileKey))
-                        {
-                            skippedCount++;
-                            continue;
-                        }
-
-                        if (await DownloadPixivImageAsync(item.Url, targetPath, token))
-                        {
-                            savedCount++;
-                            existingPixivFiles.Add(item.FileKey);
-                            AppendLog($"[Pixiv] 已保存 {item.FileName}");
-                        }
-
-                        await Task.Delay(TimeSpan.FromSeconds(PixivDownloadIntervalSeconds), token);
                     }
 
                     nextUrl = response.NextUrl;
@@ -1161,7 +1267,8 @@ namespace CyanTools.ViewModel
                 }
             }
 
-            AppendPixivSummary(savedCount, skippedCount);
+            token.ThrowIfCancellationRequested();
+            return plan;
         }
 
         private void AppendPixivSummary(int savedCount, int skippedCount)
@@ -1471,30 +1578,34 @@ namespace CyanTools.ViewModel
             var outputDirectory = ResolveSourceOutputDirectory("Kemono", SanitizePathSegment(artistId, "unknown_artist"));
             Directory.CreateDirectory(outputDirectory);
             AppendLog($"[Kemono] 输出目录: {outputDirectory}");
+            SetKemonoDownloadSummary("Kemono：正在获取下载清单…");
 
-            int page = 0;
+            var counters = new SourceDownloadCounters(progress => SetKemonoDownloadSummary(BuildDownloadSummary("Kemono", progress)));
             int savedCount = 0;
             int skippedCount = 0;
             var postContentCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
-            while (!token.IsCancellationRequested)
+            try
             {
-                var posts = await FetchKemonoPostsAsync(artistId, selectedService, page, token);
-                if (posts.Count == 0)
-                {
-                    break;
-                }
+                var downloadPlan = await BuildKemonoDownloadPlanAsync(artistId, selectedService, token);
+                int imageTotal = downloadPlan.Count(asset => DownloadedImageValidator.HasSupportedImageExtension(asset.FileName));
+                counters.SetTotal(imageTotal);
+                AppendLog($"[Kemono] 已发现 {imageTotal} 张远端图片（另有 {downloadPlan.Count - imageTotal} 个非图片附件）。");
 
-                var downloads = BuildKemonoDownloads(posts, page, artistId).ToList();
-                foreach (var asset in downloads)
+                foreach (var asset in downloadPlan)
                 {
                     token.ThrowIfCancellationRequested();
                     var targetPath = Path.Combine(outputDirectory, asset.FileName);
+                    bool isImageAsset = DownloadedImageValidator.HasSupportedImageExtension(targetPath);
                     if (File.Exists(targetPath))
                     {
                         if (ShouldSkipExistingDownloadedFile(targetPath, "Kemono", asset.FileName))
                         {
                             skippedCount++;
+                            if (isImageAsset)
+                            {
+                                counters.Record(DownloadOutcome.Skipped);
+                            }
                             continue;
                         }
                     }
@@ -1502,18 +1613,48 @@ namespace CyanTools.ViewModel
                     if (await DownloadKemonoAssetAsync(asset, outputDirectory, token))
                     {
                         savedCount++;
+                        if (isImageAsset)
+                        {
+                            counters.Record(DownloadOutcome.Saved);
+                        }
                         var content = await ResolveKemonoPostContentAsync(asset, artistId, selectedService, postContentCache, token);
                         await SaveKemonoContentAsync(content, asset.FileName, outputDirectory, token);
                         AppendLog($"[Kemono] 已保存 {asset.FileName}");
                     }
+                    else if (isImageAsset)
+                    {
+                        counters.Record(DownloadOutcome.None);
+                    }
 
                     await Task.Delay(KemonoDownloadDelay, token);
                 }
+            }
+            finally
+            {
+                AppendLog($"[Kemono] 保存 {savedCount} 个文件，跳过 {skippedCount} 个已存在文件。");
+                SetKemonoDownloadSummary(BuildDownloadSummary("Kemono", counters));
+            }
+        }
 
+        private static async Task<List<KemonoAssetDownload>> BuildKemonoDownloadPlanAsync(string artistId, string service, CancellationToken token)
+        {
+            var plan = new List<KemonoAssetDownload>();
+            int page = 0;
+
+            while (!token.IsCancellationRequested)
+            {
+                var posts = await FetchKemonoPostsAsync(artistId, service, page, token);
+                if (posts.Count == 0)
+                {
+                    break;
+                }
+
+                plan.AddRange(BuildKemonoDownloads(posts, page, artistId));
                 page++;
             }
 
-            AppendLog($"[Kemono] 保存 {savedCount} 个文件，跳过 {skippedCount} 个已存在文件。");
+            token.ThrowIfCancellationRequested();
+            return plan;
         }
 
         private static async Task<List<KemonoPost>> FetchKemonoPostsAsync(string artistId, string service, int page, CancellationToken token)
@@ -1537,9 +1678,15 @@ namespace CyanTools.ViewModel
                 return new List<KemonoPost>();
             }
 
-            if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(payload))
+            if (!response.IsSuccessStatusCode)
             {
-                return new List<KemonoPost>();
+                var preview = payload.Length > 200 ? payload[..200] + "..." : payload;
+                throw new HttpRequestException($"Kemono API 返回 {response.StatusCode}: {preview}");
+            }
+
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                throw new InvalidOperationException("Kemono API 返回为空，无法完成下载清单统计。");
             }
 
             var tokenJson = JToken.Parse(payload);
@@ -1548,10 +1695,10 @@ namespace CyanTools.ViewModel
                 var error = tokenJson.Value<string>("error");
                 if (!string.IsNullOrWhiteSpace(error))
                 {
-                    return new List<KemonoPost>();
+                    throw new InvalidOperationException($"Kemono API 返回错误: {error}");
                 }
 
-                return new List<KemonoPost>();
+                throw new InvalidOperationException("Kemono API 返回了无法识别的对象，无法完成下载清单统计。");
             }
 
             var posts = tokenJson.ToObject<List<KemonoPost>>();
@@ -1884,6 +2031,93 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private void ResetDownloadSummaries()
+        {
+            SetDanbooruDownloadSummary(EnableDanbooru ? "Danbooru：等待下载" : "Danbooru：未选择");
+            SetPixivDownloadSummary(EnablePixiv && !IsTagOrPostMode ? "Pixiv：等待下载" : "Pixiv：未选择");
+            SetKemonoDownloadSummary(EnableKemono && !IsTagOrPostMode ? "Kemono：等待下载" : "Kemono：未选择");
+            SetOutputDirectoryImageTotalSummary("输出目录总计：等待下载");
+        }
+
+        private void SetDanbooruDownloadSummary(string value)
+        {
+            if (_danbooruDownloadSummary == value)
+            {
+                return;
+            }
+
+            _danbooruDownloadSummary = value;
+            OnPropertyChanged(nameof(DanbooruDownloadSummary));
+        }
+
+        private void SetPixivDownloadSummary(string value)
+        {
+            if (_pixivDownloadSummary == value)
+            {
+                return;
+            }
+
+            _pixivDownloadSummary = value;
+            OnPropertyChanged(nameof(PixivDownloadSummary));
+        }
+
+        private void SetKemonoDownloadSummary(string value)
+        {
+            if (_kemonoDownloadSummary == value)
+            {
+                return;
+            }
+
+            _kemonoDownloadSummary = value;
+            OnPropertyChanged(nameof(KemonoDownloadSummary));
+        }
+
+        private void SetOutputDirectoryImageTotalSummary(string value)
+        {
+            if (_outputDirectoryImageTotalSummary == value)
+            {
+                return;
+            }
+
+            _outputDirectoryImageTotalSummary = value;
+            OnPropertyChanged(nameof(OutputDirectoryImageTotalSummary));
+        }
+
+        private static string BuildDownloadSummary(string source, SourceDownloadCounters counters)
+        {
+            var progress = counters.Total.HasValue
+                ? $"已处理 {counters.Processed} / {counters.Total.Value} 张"
+                : $"总数未知，已处理 {counters.Processed} 张";
+            return $"{source}：{progress}，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张";
+        }
+
+        private static string BuildOutputDirectoryImageTotalSummary(string? outputDirectory)
+        {
+            return $"输出目录总计：{CountDownloadedImages(outputDirectory)} 张";
+        }
+
+        private static int CountDownloadedImages(string? outputDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(outputDirectory) || !Directory.Exists(outputDirectory))
+            {
+                return 0;
+            }
+
+            try
+            {
+                return Directory.EnumerateFiles(outputDirectory, "*", SearchOption.TopDirectoryOnly)
+                    .Count(DownloadedImageValidator.HasSupportedImageExtension);
+            }
+            catch (IOException)
+            {
+                return 0;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return 0;
+            }
+        }
+
         private void ClearLog()
         {
             LogText = string.Empty;
@@ -2117,6 +2351,50 @@ namespace CyanTools.ViewModel
 
         private sealed record PixivDownloadItem(string Url, string FileName, string FileKey);
         private sealed record KemonoAssetDownload(string Url, string FileName, string? Content, string? PostId);
+
+        private enum DownloadOutcome
+        {
+            None,
+            Saved,
+            Skipped
+        }
+
+        private sealed class SourceDownloadCounters
+        {
+            private readonly Action<SourceDownloadCounters>? _changed;
+
+            public SourceDownloadCounters(Action<SourceDownloadCounters>? changed = null)
+            {
+                _changed = changed;
+            }
+
+            public int? Total { get; private set; }
+            public int Processed { get; private set; }
+            public int Saved { get; private set; }
+            public int Skipped { get; private set; }
+
+            public void SetTotal(int total)
+            {
+                Total = Math.Max(0, total);
+                _changed?.Invoke(this);
+            }
+
+            public void Record(DownloadOutcome outcome)
+            {
+                Processed++;
+                switch (outcome)
+                {
+                    case DownloadOutcome.Saved:
+                        Saved++;
+                        break;
+                    case DownloadOutcome.Skipped:
+                        Skipped++;
+                        break;
+                }
+
+                _changed?.Invoke(this);
+            }
+        }
 
         private sealed class BooruPostInfo
         {

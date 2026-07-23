@@ -24,5 +24,6 @@
   <ItemGroup>
     <Compile Include="PathUiConventionsTests.cs" />
     <Compile Include="AgentToolCatalogTests.cs" />
+    <Compile Include="../Utils/InputStateStore.cs" Link="Utils/InputStateStore.cs" />
   </ItemGroup>
 </Project>

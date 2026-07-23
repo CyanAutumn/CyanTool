@@ -1,3 +1,4 @@
+using CyanTools.Utils;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -316,6 +317,44 @@ public sealed class PathUiConventionsTests
         }
     }
 
+    [Fact]
+    public void DatasetDownloaderView_PlacesStatisticsAndLogBelowOutputExecution()
+    {
+        string content = ReadRepoFile("DanbooruCrawlerView.xaml");
+
+        Assert.Contains("DanbooruDownloadSummary", content);
+        Assert.Contains("PixivDownloadSummary", content);
+        Assert.Contains("KemonoDownloadSummary", content);
+        Assert.Contains("OutputDirectoryImageTotalSummary", content);
+        Assert.Contains("<GroupBox Grid.Row=\"4\"", content);
+        Assert.Contains("Header=\"下载日志\"", content);
+        Assert.Contains("Text=\"{Binding LogText, Mode=OneWay}\"", content);
+        Assert.DoesNotContain("<GridSplitter", content);
+    }
+
+    [Fact]
+    public void DatasetDownloaderViewModel_ReportsPerSourceLiveTotalsAndOutputDirectoryTotal()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+
+        Assert.Contains("DanbooruDownloadSummary", content);
+        Assert.Contains("PixivDownloadSummary", content);
+        Assert.Contains("KemonoDownloadSummary", content);
+        Assert.Contains("OutputDirectoryImageTotalSummary", content);
+        Assert.Contains("BuildDownloadSummary", content);
+        Assert.Contains("BuildOutputDirectoryImageTotalSummary", content);
+        Assert.Contains("CountDownloadedImages", content);
+        Assert.Contains("FetchDanbooruPostCountAsync", content);
+        Assert.Contains("BuildPixivDownloadPlanAsync", content);
+        Assert.Contains("BuildKemonoDownloadPlanAsync", content);
+        Assert.Contains("已处理", content);
+        Assert.Contains("正在获取下载清单", content);
+        Assert.Contains("本次新增", content);
+        Assert.Contains("输出目录总计", content);
+        Assert.Contains("DownloadOutcome.Saved", content);
+        Assert.Contains("DownloadOutcome.Skipped", content);
+    }
+
     private static string ReadRepoFile(string relativePath)
     {
         string repositoryRoot = FindRepositoryRoot();
@@ -338,5 +377,84 @@ public sealed class PathUiConventionsTests
         }
 
         throw new DirectoryNotFoundException("Could not locate repository root.");
+    }
+}
+
+public sealed class InputStateStoreTests : IDisposable
+{
+    private readonly string _stateFilePath = Path.Combine(
+        Path.GetTempPath(),
+        "CyanToolsTests",
+        Guid.NewGuid().ToString("N"),
+        "input-state.json");
+
+    [Fact]
+    public void SaveAndRestore_RetainsOrdinaryInputsButNeverSensitiveOrRuntimeValues()
+    {
+        var store = new InputStateStore(_stateFilePath);
+        store.Save(new SampleInputs
+        {
+            SearchText = "cat_ears",
+            OutputDirectory = @"D:\datasets\cat_ears",
+            DownloadMode = SampleDownloadMode.Tag,
+            EnableSource = true,
+            RetryCount = 3,
+            ApiToken = "do-not-store",
+            StatusMessage = "completed",
+            IsRunning = true
+        });
+
+        var restored = new SampleInputs
+        {
+            ApiToken = "unchanged-secret",
+            StatusMessage = "waiting",
+            IsRunning = true
+        };
+
+        new InputStateStore(_stateFilePath).Restore(restored);
+
+        Assert.Equal("cat_ears", restored.SearchText);
+        Assert.Equal(@"D:\datasets\cat_ears", restored.OutputDirectory);
+        Assert.Equal(SampleDownloadMode.Tag, restored.DownloadMode);
+        Assert.True(restored.EnableSource);
+        Assert.Equal(3, restored.RetryCount);
+        Assert.Equal("unchanged-secret", restored.ApiToken);
+        Assert.Equal("waiting", restored.StatusMessage);
+        Assert.True(restored.IsRunning);
+        Assert.DoesNotContain("do-not-store", File.ReadAllText(_stateFilePath), StringComparison.Ordinal);
+    }
+
+    public void Dispose()
+    {
+        string? directory = Path.GetDirectoryName(_stateFilePath);
+        if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private enum SampleDownloadMode
+    {
+        Artist,
+        Tag
+    }
+
+    private sealed class SampleInputs
+    {
+        public string SearchText { get; set; } = string.Empty;
+
+        public string OutputDirectory { get; set; } = string.Empty;
+
+        public SampleDownloadMode DownloadMode { get; set; }
+
+        public bool EnableSource { get; set; }
+
+        public int RetryCount { get; set; }
+
+        public string ApiToken { get; set; } = string.Empty;
+
+        public string StatusMessage { get; set; } = string.Empty;
+
+        public bool IsRunning { get; set; }
     }
 }

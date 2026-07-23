@@ -61,6 +61,7 @@ namespace CyanTools.ViewModel
         public string Label { get; }
         public PipelineParameterEditorKind EditorKind { get; }
         public IReadOnlyList<PipelineNodeParameterOption> Options { get; }
+        public object? CurrentValue => _property.GetValue(_target);
         public ICommand? BrowseCommand { get; }
         public bool HasBrowseCommand => BrowseCommand != null;
 
