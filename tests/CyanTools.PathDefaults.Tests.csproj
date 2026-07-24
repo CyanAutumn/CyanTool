@@ -34,6 +34,7 @@
     <Compile Include="../Model/TrainingBridgeModels.cs" Link="Model/TrainingBridgeModels.cs" />
     <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
     <Compile Include="../Utils/TrainingBridgeProjectStore.cs" Link="Utils/TrainingBridgeProjectStore.cs" />
+    <Compile Include="../Utils/TrainingBackendRunner.cs" Link="Utils/TrainingBackendRunner.cs" />
     <Compile Include="../Utils/TrainingBridgeSystemMetricsService.cs" Link="Utils/TrainingBridgeSystemMetricsService.cs" />
     <Compile Include="../Utils/DesktopWidgetSettingsStore.cs" Link="Utils/DesktopWidgetSettingsStore.cs" />
     <Compile Include="../Model/LayeredLoraMergeModels.cs" Link="Model/LayeredLoraMergeModels.cs" />
@@ -62,6 +63,7 @@
     <Compile Include="../Utils/ToolOutputDirectoryDefaults.cs" Link="Utils/ToolOutputDirectoryDefaults.cs" />
     <Compile Include="../Framework/Pipeline/PipelineContext.cs" Link="Framework/Pipeline/PipelineContext.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineSnapshotProvider.cs" Link="Framework/Pipeline/IPipelineSnapshotProvider.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineInputPortProvider.cs" Link="Framework/Pipeline/IPipelineInputPortProvider.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineOutputPortProvider.cs" Link="Framework/Pipeline/IPipelineOutputPortProvider.cs" />
     <Compile Include="../Framework/Pipeline/PipelineNodeViewModelBase.cs" Link="Framework/Pipeline/PipelineNodeViewModelBase.cs" />
     <Compile Include="../Framework/Pipeline/PipelineRunner.cs" Link="Framework/Pipeline/PipelineRunner.cs" />

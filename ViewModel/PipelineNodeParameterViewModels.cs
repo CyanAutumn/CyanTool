@@ -205,6 +205,10 @@ namespace CyanTools.ViewModel
                 [
                     P("FolderPath", "输入文件夹", browseCommand: "SelectFolderCommand")
                 ],
+                [typeof(TrainingPipelineNode)] =
+                [
+                    P("ConfigurationFilePath", "选择配置文件", browseCommand: "SelectConfigurationFileCommand")
+                ],
                 [typeof(OutputFolderPickerPipelineNode)] =
                 [
                     P("OutputFolderPath", "输出文件夹", browseCommand: "SelectOutputFolderCommand")

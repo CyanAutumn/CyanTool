@@ -33,6 +33,9 @@ namespace CyanTools.Localization
             Add(translations, "登录获取", "Log In to Get", "ログインして取得");
             Add(translations, "下载间隔", "Download Interval", "ダウンロード間隔");
             Add(translations, "输出与执行", "Output and Run", "出力と実行");
+            Add(translations, "选择配置文件", "Choose Configuration File", "設定ファイルを選択");
+            Add(translations, "训练集输入路径", "Training Set Input Path", "学習セット入力パス");
+            Add(translations, "训练集输出路径", "Training Set Output Path", "学習セット出力パス");
             Add(translations, "可用占位符: {time} {id} {name}", "Available placeholders: {time} {id} {name}", "使用できるプレースホルダー: {time} {id} {name}");
             Add(translations, "Danbooru 正则手动获取", "Manual Danbooru Regex Capture", "Danbooru 正規表現の手動取得");
             Add(translations, "下载日志", "Download Log", "ダウンロードログ");

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CyanTools.Pipeline;
 using CyanTools.Utils;
+using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 namespace CyanTools.ViewModel
 {
@@ -259,6 +260,169 @@ namespace CyanTools.ViewModel
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 OutputFolderPath = dialog.FileName;
+            }
+        }
+    }
+
+    public sealed class TrainingPipelineNode : PipelineNodeViewModelBase,
+        IPipelineDirectoryNode,
+        IPipelineInputPortProvider,
+        IPipelineOutputPortProvider,
+        IPipelineSnapshotProvider
+    {
+        private string _configurationFilePath = string.Empty;
+
+        public TrainingPipelineNode()
+        {
+            SelectConfigurationFileCommand = new RelayCommand(SelectConfigurationFile);
+        }
+
+        public override string DisplayName => "训练";
+
+        public string ConfigurationFilePath
+        {
+            get => _configurationFilePath;
+            set => SetField(ref _configurationFilePath, value ?? string.Empty);
+        }
+
+        public ICommand SelectConfigurationFileCommand { get; }
+
+        public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
+
+        public string PipelineInputPath { get; set; } = string.Empty;
+
+        public string PipelineOutputPath { get; set; } = string.Empty;
+
+        public bool IsWorkflowMode { get; set; }
+
+        public bool HasInheritedInputPath { get; set; }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+
+            string configurationFilePath = GetExistingConfigurationFilePath();
+            string inputPath = GetExistingDirectoryPath(PipelineInputPath, "训练集输入路径");
+            string outputPath = GetOutputDirectoryPath(PipelineOutputPath);
+            Directory.CreateDirectory(outputPath);
+
+            context.AppendLog($"[{DisplayName}] 已选择配置文件: {configurationFilePath}");
+            context.AppendLog($"[{DisplayName}] 训练集输入路径: {inputPath}");
+            context.AppendLog($"[{DisplayName}] 训练集输出路径: {outputPath}");
+            return Task.CompletedTask;
+        }
+
+        public override PipelineNodeViewModelBase Clone()
+        {
+            return new TrainingPipelineNode
+            {
+                ConfigurationFilePath = ConfigurationFilePath
+            };
+        }
+
+        public IReadOnlyList<PipelineOutputPort> GetPipelineOutputPorts()
+        {
+            return [new PipelineOutputPort("root", "训练集输出路径")];
+        }
+
+        public string GetPipelineInputPortTitle() => "训练集输入路径";
+
+        public Dictionary<string, object?> CaptureSnapshot()
+        {
+            return new Dictionary<string, object?>
+            {
+                [nameof(ConfigurationFilePath)] = ConfigurationFilePath
+            };
+        }
+
+        public void ApplySnapshot(Dictionary<string, object?> snapshot)
+        {
+            if (snapshot != null && snapshot.TryGetValue(nameof(ConfigurationFilePath), out object? value))
+            {
+                ConfigurationFilePath = value?.ToString() ?? string.Empty;
+            }
+        }
+
+        private void SelectConfigurationFile()
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "选择训练配置文件",
+                Filter = "训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*",
+                CheckFileExists = true,
+                FileName = ConfigurationFilePath
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                ConfigurationFilePath = dialog.FileName;
+            }
+        }
+
+        private string GetExistingConfigurationFilePath()
+        {
+            if (string.IsNullOrWhiteSpace(ConfigurationFilePath))
+            {
+                throw new InvalidOperationException("请先选择配置文件。");
+            }
+
+            string path;
+            try
+            {
+                path = Path.GetFullPath(ConfigurationFilePath.Trim());
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+            {
+                throw new InvalidOperationException("配置文件路径无效。", exception);
+            }
+
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("未找到配置文件。", path);
+            }
+
+            return path;
+        }
+
+        private static string GetExistingDirectoryPath(string path, string label)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new InvalidOperationException($"请先设置有效的{label}。");
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(path.Trim());
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+            {
+                throw new InvalidOperationException($"{label}无效。", exception);
+            }
+
+            if (!Directory.Exists(fullPath))
+            {
+                throw new DirectoryNotFoundException($"未找到{label}：{fullPath}");
+            }
+
+            return fullPath;
+        }
+
+        private static string GetOutputDirectoryPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new InvalidOperationException("未设置训练集输出路径。");
+            }
+
+            try
+            {
+                return Path.GetFullPath(path.Trim());
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+            {
+                throw new InvalidOperationException("训练集输出路径无效。", exception);
             }
         }
     }

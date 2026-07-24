@@ -24,6 +24,10 @@
   <ItemGroup>
     <Compile Include="PathUiConventionsTests.cs" />
     <Compile Include="AgentToolCatalogTests.cs" />
+    <Compile Include="TrainingBackendRunnerTests.cs" />
     <Compile Include="../Utils/InputStateStore.cs" Link="Utils/InputStateStore.cs" />
+    <Compile Include="../Model/TrainingBridgeModels.cs" Link="Model/TrainingBridgeModels.cs" />
+    <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
+    <Compile Include="../Utils/TrainingBackendRunner.cs" Link="Utils/TrainingBackendRunner.cs" />
   </ItemGroup>
 </Project>
