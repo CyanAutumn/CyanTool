@@ -58,6 +58,11 @@ namespace CyanTools.Pipeline
             return this as IPipelineRuntimeOutputNode;
         }
 
+        public virtual IPipelineOutputPathSelectorNode? GetOutputPathSelectorNode()
+        {
+            return this as IPipelineOutputPathSelectorNode;
+        }
+
         public virtual void SetWorkflowEditorMode(bool isWorkflowMode)
         {
             var directoryNode = GetDirectoryAutomationNode();

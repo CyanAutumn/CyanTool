@@ -222,7 +222,6 @@ namespace CyanTools.Localization
             Add(translations, "本地代理端口", "Local Proxy Port", "ローカルプロキシポート");
             Add(translations, "中止当前任务", "Stop Current Task", "現在のタスクを停止");
             Add(translations, "支持 LoRA、LyCORIS、DoRA、LoHa、LoKr 与 Anima；优先复用 Python 3.10/3.11/3.12，无兼容版本时由 uv 准备 3.10。", "Supports LoRA, LyCORIS, DoRA, LoHa, LoKr, and Anima. Reuses Python 3.10/3.11/3.12 when available, otherwise uv prepares 3.10.", "LoRA、LyCORIS、DoRA、LoHa、LoKr、Anima に対応。Python 3.10/3.11/3.12 を優先し、互換版がない場合は uv が 3.10 を準備します。");
-            Add(translations, "训练桥", "Training Bridge", "学習ブリッジ");
             Add(translations, "在 Windows 与 WSL 训练后端之间导入、映射、预览和导出训练配置。", "Import, map, preview, and export training configurations between Windows and WSL training backends.", "Windows と WSL の学習バックエンド間で設定をインポート、マッピング、プレビュー、エクスポートします。");
             Add(translations, "草稿与转换目标", "Draft and Conversion Target", "下書きと変換先");
             Add(translations, "读取草稿", "Load Draft", "下書きを読み込む");

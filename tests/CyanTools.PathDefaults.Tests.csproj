@@ -66,6 +66,7 @@
     <Compile Include="../Framework/Pipeline/PipelineDirectoryBehavior.cs" Link="Framework/Pipeline/PipelineDirectoryBehavior.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineDirectoryNode.cs" Link="Framework/Pipeline/IPipelineDirectoryNode.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineRuntimeOutputNode.cs" Link="Framework/Pipeline/IPipelineRuntimeOutputNode.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineOutputPathSelectorNode.cs" Link="Framework/Pipeline/IPipelineOutputPathSelectorNode.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineRunnableViewModel.cs" Link="Framework/Pipeline/IPipelineRunnableViewModel.cs" />
     <Compile Include="../Framework/Pipeline/PipelineRuntimeOutputDirectoryValidator.cs" Link="Framework/Pipeline/PipelineRuntimeOutputDirectoryValidator.cs" />
     <Compile Include="../Framework/Pipeline/PipelineSnapshotHelper.cs" Link="Framework/Pipeline/PipelineSnapshotHelper.cs" />

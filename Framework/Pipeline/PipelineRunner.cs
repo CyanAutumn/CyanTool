@@ -10,10 +10,13 @@ namespace CyanTools.Pipeline
     {
         public async Task RunAsync(IEnumerable<PipelineNodeViewModelBase> nodes, PipelineContext context, CancellationToken token)
         {
+            var nodesToRun = nodes.ToList();
+            IReadOnlyDictionary<PipelineNodeViewModelBase, string> outputPathOverrides =
+                PipelineWorkflowPathPlanner.GetOutputPathOverrides(nodesToRun);
             string? inheritedInputPath = null;
             int nodeSequence = 0;
 
-            foreach (var node in nodes.ToList())
+            foreach (var node in nodesToRun)
             {
                 token.ThrowIfCancellationRequested();
                 nodeSequence++;
@@ -21,7 +24,12 @@ namespace CyanTools.Pipeline
                 IPipelineRuntimeOutputNode? runtimeOutputNode = node.GetRuntimeOutputNode();
                 runtimeOutputNode?.ResetRuntimeOutputPath();
 
-                PipelineWorkflowResolvedPaths resolvedPaths = PipelineWorkflowPathPlanner.ApplyNodePaths(node, inheritedInputPath, nodeSequence);
+                outputPathOverrides.TryGetValue(node, out string? outputPathOverride);
+                PipelineWorkflowResolvedPaths resolvedPaths = PipelineWorkflowPathPlanner.ApplyNodePaths(
+                    node,
+                    inheritedInputPath,
+                    nodeSequence,
+                    outputPathOverride);
                 context.UpdateEffectivePaths(resolvedPaths.EffectiveInputPath, resolvedPaths.EffectiveOutputPath, nodeSequence);
 
                 context.AppendLog($"开始执行: {node.DisplayName}");

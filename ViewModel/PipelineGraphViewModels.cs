@@ -18,12 +18,15 @@ namespace CyanTools.ViewModel
         {
             PipelineNode = pipelineNode ?? throw new ArgumentNullException(nameof(pipelineNode));
             Location = location;
-            EditableParameters = PipelineNodeParameterFactory.Create(PipelineNode);
+            EditableParameters = PipelineNodeParameterFactory.CreateWorkflowParameters(PipelineNode);
+            EditableActions = PipelineNodeParameterFactory.CreateWorkflowActions(PipelineNode);
 
             var directoryNode = PipelineNode.GetDirectoryAutomationNode();
             var runtimeOutputNode = PipelineNode.GetRuntimeOutputNode();
+            var outputPathSelectorNode = PipelineNode.GetOutputPathSelectorNode();
 
-            if (directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None)
+            if ((directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None) ||
+                outputPathSelectorNode != null)
             {
                 Input.Add(new PipelineCanvasConnectorViewModel(this, "输入", isInput: true));
             }
@@ -39,10 +42,12 @@ namespace CyanTools.ViewModel
 
         public PipelineNodeViewModelBase PipelineNode { get; }
         public ObservableCollection<PipelineNodeParameterViewModel> EditableParameters { get; }
+        public ObservableCollection<PipelineNodeActionViewModel> EditableActions { get; }
         public ObservableCollection<PipelineCanvasConnectorViewModel> Input { get; } = new();
         public ObservableCollection<PipelineCanvasConnectorViewModel> Output { get; } = new();
         public string DisplayName => PipelineNode.DisplayName;
         public bool HasEditableParameters => EditableParameters.Count > 0;
+        public bool HasEditableActions => EditableActions.Count > 0;
         public bool HasInput => Input.Count > 0;
         public bool HasOutput => Output.Count > 0;
 
@@ -68,6 +73,11 @@ namespace CyanTools.ViewModel
         {
             get
             {
+                if (PipelineNode.GetOutputPathSelectorNode() != null)
+                {
+                    return "重定向上一个节点输出";
+                }
+
                 var directoryNode = PipelineNode.GetDirectoryAutomationNode();
                 if (directoryNode == null || directoryNode.DirectoryBehavior == PipelineDirectoryBehavior.None)
                 {
@@ -130,7 +140,7 @@ namespace CyanTools.ViewModel
 
         private void OnPipelineNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            foreach (PipelineNodeParameterViewModel parameter in EditableParameters.Where(parameter => parameter.PropertyName == e.PropertyName))
+            foreach (PipelineNodeParameterViewModel parameter in EditableParameters)
             {
                 parameter.Refresh();
             }

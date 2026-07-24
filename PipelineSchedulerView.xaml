@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:nodify="https://miroiu.github.io/nodify"
@@ -17,10 +18,13 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBox Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                         IsReadOnly="{Binding IsReadOnly}"
+                         IsEnabled="{Binding IsEnabled}"
                          MinWidth="190"
                          VerticalContentAlignment="Center" />
                 <Button Grid.Column="1"
                         Command="{Binding BrowseCommand}"
+                        IsEnabled="{Binding IsBrowseEnabled}"
                         Margin="6,0,0,0"
                         ToolTip="选择路径">
                     <Button.Style>
@@ -38,8 +42,16 @@
             </Grid>
         </DataTemplate>
 
+        <DataTemplate x:Key="PipelinePasswordParameterEditorTemplate">
+            <PasswordBox utils:PasswordBoxHelper.BindPassword="True"
+                         utils:PasswordBoxHelper.BoundPassword="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding IsEnabled}"
+                         MinWidth="190" />
+        </DataTemplate>
+
         <DataTemplate x:Key="PipelineBooleanParameterEditorTemplate">
             <CheckBox IsChecked="{Binding BooleanValue, Mode=TwoWay}"
+                      IsEnabled="{Binding IsEnabled}"
                       HorizontalAlignment="Left"
                       VerticalAlignment="Center" />
         </DataTemplate>
@@ -47,6 +59,7 @@
         <DataTemplate x:Key="PipelineChoiceParameterEditorTemplate">
             <ComboBox ItemsSource="{Binding Options}"
                       SelectedItem="{Binding SelectedOption, Mode=TwoWay}"
+                      IsEnabled="{Binding IsEnabled}"
                       MinWidth="190">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
@@ -79,6 +92,10 @@
                                     <Setter Property="ContentTemplate" Value="{StaticResource PipelineBooleanParameterEditorTemplate}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding EditorKind}"
+                                             Value="{x:Static viewModel:PipelineParameterEditorKind.Password}">
+                                    <Setter Property="ContentTemplate" Value="{StaticResource PipelinePasswordParameterEditorTemplate}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EditorKind}"
                                              Value="{x:Static viewModel:PipelineParameterEditorKind.Choice}">
                                     <Setter Property="ContentTemplate" Value="{StaticResource PipelineChoiceParameterEditorTemplate}" />
                                 </DataTrigger>
@@ -87,6 +104,14 @@
                     </ContentControl.Style>
                 </ContentControl>
             </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PipelineActionButtonTemplate"
+                      DataType="{x:Type viewModel:PipelineNodeActionViewModel}">
+            <Button Content="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"
+                    Command="{Binding Command}"
+                    Style="{StaticResource CyanCommandButtonStyle}"
+                    Margin="0,3,8,4" />
         </DataTemplate>
 
         <DataTemplate x:Key="PipelineConnectionTemplate"
@@ -383,51 +408,69 @@
 
                             <nodify:Node.ContentTemplate>
                                 <DataTemplate DataType="{x:Type viewModel:PipelineCanvasNodeViewModel}">
-                                    <Grid>
-                                        <ScrollViewer MaxHeight="280"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      HorizontalScrollBarVisibility="Disabled">
-                                            <ScrollViewer.Style>
-                                                <Style TargetType="ScrollViewer">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </ScrollViewer.Style>
-                                            <Grid Margin="10,10,10,3">
-                                                <TextBlock Text="无需额外参数"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasEditableParameters}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                                <ItemsControl ItemsSource="{Binding EditableParameters}"
-                                                              ItemTemplate="{StaticResource PipelineParameterRowTemplate}">
-                                                    <ItemsControl.Style>
-                                                        <Style TargetType="ItemsControl">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasEditableParameters}" Value="False">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </ItemsControl.Style>
-                                                </ItemsControl>
-                                            </Grid>
-                                        </ScrollViewer>
+                                    <Grid Margin="10,10,10,3">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                                <StackPanel>
+                                                    <TextBlock Text="无需额外参数"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding HasEditableParameters}" Value="False" />
+                                                                            <Condition Binding="{Binding HasEditableActions}" Value="False" />
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <ItemsControl ItemsSource="{Binding EditableParameters}"
+                                                                  ItemTemplate="{StaticResource PipelineParameterRowTemplate}">
+                                                        <ItemsControl.Style>
+                                                            <Style TargetType="ItemsControl">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasEditableParameters}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ItemsControl.Style>
+                                                    </ItemsControl>
+                                                    <ItemsControl ItemsSource="{Binding EditableActions}"
+                                                                  ItemTemplate="{StaticResource PipelineActionButtonTemplate}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.Style>
+                                                            <Style TargetType="ItemsControl">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasEditableActions}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ItemsControl.Style>
+                                                    </ItemsControl>
+                                                </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </nodify:Node.ContentTemplate>

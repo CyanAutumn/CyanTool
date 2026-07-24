@@ -15,6 +15,7 @@ namespace CyanTools.ViewModel
     public enum PipelineParameterEditorKind
     {
         Text,
+        Password,
         Boolean,
         Choice
     }
@@ -35,6 +36,8 @@ namespace CyanTools.ViewModel
     {
         private readonly object _target;
         private readonly PropertyInfo _property;
+        private readonly bool _isReadOnlyWhenInputInherited;
+        private readonly string? _isEnabledPropertyName;
         private string _textValue = string.Empty;
 
         internal PipelineNodeParameterViewModel(
@@ -42,18 +45,25 @@ namespace CyanTools.ViewModel
             PropertyInfo property,
             string label,
             IReadOnlyList<PipelineNodeParameterOption> options,
-            ICommand? browseCommand)
+            ICommand? browseCommand,
+            bool isPassword,
+            bool isReadOnlyWhenInputInherited,
+            string? isEnabledPropertyName)
         {
             _target = target;
             _property = property;
+            _isReadOnlyWhenInputInherited = isReadOnlyWhenInputInherited;
+            _isEnabledPropertyName = isEnabledPropertyName;
             Label = label;
             Options = options;
             BrowseCommand = browseCommand;
-            EditorKind = options.Count > 0
-                ? PipelineParameterEditorKind.Choice
-                : GetUnderlyingType(property.PropertyType) == typeof(bool)
-                    ? PipelineParameterEditorKind.Boolean
-                    : PipelineParameterEditorKind.Text;
+            EditorKind = isPassword
+                ? PipelineParameterEditorKind.Password
+                : options.Count > 0
+                    ? PipelineParameterEditorKind.Choice
+                    : GetUnderlyingType(property.PropertyType) == typeof(bool)
+                        ? PipelineParameterEditorKind.Boolean
+                        : PipelineParameterEditorKind.Text;
             Refresh();
         }
 
@@ -64,6 +74,11 @@ namespace CyanTools.ViewModel
         public object? CurrentValue => _property.GetValue(_target);
         public ICommand? BrowseCommand { get; }
         public bool HasBrowseCommand => BrowseCommand != null;
+        public bool IsReadOnly => _isReadOnlyWhenInputInherited && IsInputInherited();
+        public bool IsBrowseEnabled => !IsReadOnly && IsEnabled;
+        public bool IsEnabled => string.IsNullOrWhiteSpace(_isEnabledPropertyName)
+            || _target.GetType().GetProperty(_isEnabledPropertyName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(_target) is not bool enabled
+            || enabled;
 
         public string TextValue
         {
@@ -122,6 +137,14 @@ namespace CyanTools.ViewModel
             OnPropertyChanged(nameof(TextValue));
             OnPropertyChanged(nameof(BooleanValue));
             OnPropertyChanged(nameof(SelectedOption));
+            OnPropertyChanged(nameof(IsReadOnly));
+            OnPropertyChanged(nameof(IsBrowseEnabled));
+            OnPropertyChanged(nameof(IsEnabled));
+        }
+
+        private bool IsInputInherited()
+        {
+            return _target.GetType().GetProperty("HasInheritedInputPath", BindingFlags.Public | BindingFlags.Instance)?.GetValue(_target) is true;
         }
 
         private void TrySetTextValue(string value)
@@ -157,6 +180,17 @@ namespace CyanTools.ViewModel
         }
     }
 
+    public sealed class PipelineNodeActionViewModel
+    {
+        internal PipelineNodeActionViewModel(string label, ICommand command)
+        {
+            Label = label;
+            Command = command;
+        }
+
+        public string Label { get; }
+        public ICommand Command { get; }
+    }
 
 
 
@@ -169,7 +203,11 @@ namespace CyanTools.ViewModel
             {
                 [typeof(FolderPickerPipelineNode)] =
                 [
-                    P("FolderPath", "路径", browseCommand: "SelectFolderCommand")
+                    P("FolderPath", "输入文件夹", browseCommand: "SelectFolderCommand")
+                ],
+                [typeof(OutputFolderPickerPipelineNode)] =
+                [
+                    P("OutputFolderPath", "输出文件夹", browseCommand: "SelectOutputFolderCommand")
                 ],
                 [typeof(ImageClusteringViewModel)] =
                 [
@@ -315,31 +353,101 @@ namespace CyanTools.ViewModel
                 ],
                 [typeof(DatasetDownloaderViewModel)] =
                 [
-                    P("SelectedMode", "下载模式"),
-                    P("EnableDanbooru", "启用 Danbooru"),
-                    P("EnablePixiv", "启用 Pixiv"),
-                    P("EnableKemono", "启用 Kemono"),
-                    P("InputText", "输入内容"),
-                    P("OutputDirectory", "输出路径", browseCommand: "BrowseOutputFolderCommand"),
-                    P("IncludeArtist", "包含画师标签"),
-                    P("IncludeCopyright", "包含版权标签"),
-                    P("IncludeCharacter", "包含角色标签"),
-                    P("IncludeGeneral", "包含通用标签"),
-                    P("IncludeMeta", "包含元标签"),
+                    P("SelectedMode", "下载方式"),
+                    P("EnableDanbooru", "Danbooru"),
+                    P("EnablePixiv", "Pixiv", isEnabledPropertyName: "CanSelectAllSources"),
+                    P("EnableKemono", "Kemono", isEnabledPropertyName: "CanSelectAllSources"),
+                    P("InputText", "ID / 标签"),
+                    P("IncludeArtist", "Artist"),
+                    P("IncludeCopyright", "Copyright"),
+                    P("IncludeCharacter", "Character"),
+                    P("IncludeGeneral", "General"),
+                    P("IncludeMeta", "Meta"),
+                    P("OutputDirectory", "输出目录", browseCommand: "BrowseOutputFolderCommand"),
                     P("DownloadIntervalSeconds", "请求间隔（秒）")
+                ]
+            };
+
+        private static readonly IReadOnlyDictionary<Type, IReadOnlyList<PipelineNodeParameterDefinition>> WorkflowOnlyDefinitions =
+            new Dictionary<Type, IReadOnlyList<PipelineNodeParameterDefinition>>
+            {
+                [typeof(TrainingOutputOrganizerViewModel)] =
+                [
+                    P("OverwriteExisting", "覆盖已存在文件")
+                ],
+                [typeof(DatasetDownloaderViewModel)] =
+                [
+                    P("DanbooruToken", "Danbooru 令牌", isEnabledPropertyName: "CanEditDanbooruSettings"),
+                    P("PixivRefreshToken", "Pixiv 令牌", isPassword: true),
+                    P("IncludeArtist", "Artist", isEnabledPropertyName: "CanEditDanbooruSettings"),
+                    P("IncludeCopyright", "Copyright", isEnabledPropertyName: "CanEditDanbooruSettings"),
+                    P("IncludeCharacter", "Character", isEnabledPropertyName: "CanEditDanbooruSettings"),
+                    P("IncludeGeneral", "General", isEnabledPropertyName: "CanEditDanbooruSettings"),
+                    P("IncludeMeta", "Meta", isEnabledPropertyName: "CanEditDanbooruSettings")
+                ]
+            };
+
+        private static readonly IReadOnlyDictionary<Type, IReadOnlyList<PipelineNodeActionDefinition>> WorkflowActionDefinitions =
+            new Dictionary<Type, IReadOnlyList<PipelineNodeActionDefinition>>
+            {
+                [typeof(DatasetDownloaderViewModel)] =
+                [
+                    A("登录获取", "GetPixivRefreshTokenCommand"),
+                    A("Danbooru 正则手动获取", "OpenDanbooruManualCollectorCommand")
                 ]
             };
 
         public static ObservableCollection<PipelineNodeParameterViewModel> Create(PipelineNodeViewModelBase node)
         {
+            return CreateParameters(node, includeWorkflowOnly: false);
+        }
+
+        public static ObservableCollection<PipelineNodeParameterViewModel> CreateWorkflowParameters(PipelineNodeViewModelBase node)
+        {
+            return CreateParameters(node, includeWorkflowOnly: true);
+        }
+
+        public static ObservableCollection<PipelineNodeActionViewModel> CreateWorkflowActions(PipelineNodeViewModelBase node)
+        {
             object target = ResolveTarget(node);
-            if (!Definitions.TryGetValue(target.GetType(), out IReadOnlyList<PipelineNodeParameterDefinition>? definitions))
+            if (!WorkflowActionDefinitions.TryGetValue(target.GetType(), out IReadOnlyList<PipelineNodeActionDefinition>? definitions))
             {
-                return new ObservableCollection<PipelineNodeParameterViewModel>();
+                return new ObservableCollection<PipelineNodeActionViewModel>();
+            }
+
+            var actions = new ObservableCollection<PipelineNodeActionViewModel>();
+            foreach (PipelineNodeActionDefinition definition in definitions)
+            {
+                ICommand? command = ResolveCommand(target, node, definition.CommandPropertyName);
+                if (command != null)
+                {
+                    actions.Add(new PipelineNodeActionViewModel(definition.Label, command));
+                }
+            }
+
+            return actions;
+        }
+
+        private static ObservableCollection<PipelineNodeParameterViewModel> CreateParameters(
+            PipelineNodeViewModelBase node,
+            bool includeWorkflowOnly)
+        {
+            object target = ResolveTarget(node);
+            var definitions = new List<PipelineNodeParameterDefinition>();
+            if (Definitions.TryGetValue(target.GetType(), out IReadOnlyList<PipelineNodeParameterDefinition>? agentDefinitions))
+            {
+                definitions.AddRange(agentDefinitions);
+            }
+
+            if (includeWorkflowOnly && WorkflowOnlyDefinitions.TryGetValue(target.GetType(), out IReadOnlyList<PipelineNodeParameterDefinition>? workflowDefinitions))
+            {
+                definitions.AddRange(workflowDefinitions);
             }
 
             var parameters = new ObservableCollection<PipelineNodeParameterViewModel>();
-            foreach (PipelineNodeParameterDefinition definition in definitions)
+            foreach (PipelineNodeParameterDefinition definition in definitions
+                         .GroupBy(definition => definition.PropertyName)
+                         .Select(group => group.Last()))
             {
                 PropertyInfo? property = target.GetType().GetProperty(definition.PropertyName, BindingFlags.Public | BindingFlags.Instance);
                 if (property == null || !property.CanRead || !property.CanWrite)
@@ -349,7 +457,15 @@ namespace CyanTools.ViewModel
 
                 IReadOnlyList<PipelineNodeParameterOption> options = CreateOptions(target, property, definition.OptionsPropertyName);
                 ICommand? browseCommand = ResolveCommand(target, node, definition.BrowseCommandPropertyName);
-                parameters.Add(new PipelineNodeParameterViewModel(target, property, definition.Label, options, browseCommand));
+                parameters.Add(new PipelineNodeParameterViewModel(
+                    target,
+                    property,
+                    definition.Label,
+                    options,
+                    browseCommand,
+                    definition.IsPassword,
+                    definition.IsReadOnlyWhenInputInherited,
+                    definition.IsEnabledPropertyName));
             }
 
             return parameters;
@@ -421,7 +537,7 @@ namespace CyanTools.ViewModel
             {
                 "ArtistId" => "画师 ID",
                 "Tag" => "标签",
-                "PostId" => "投稿 ID",
+                "PostId" => "帖子 ID",
                 "MoveFilesToTopLevel" => "移动子目录文件到顶层",
                 "DeleteEmptyDirectories" => "删除空文件夹",
                 "RetainDirectoriesByKeyword" => "按关键词保留文件夹",
@@ -449,15 +565,37 @@ namespace CyanTools.ViewModel
             string propertyName,
             string label,
             string? options = null,
-            string? browseCommand = null)
+            string? browseCommand = null,
+            bool isPassword = false,
+            bool isReadOnlyWhenInputInherited = false,
+            string? isEnabledPropertyName = null)
         {
-            return new PipelineNodeParameterDefinition(propertyName, label, options, browseCommand);
+            return new PipelineNodeParameterDefinition(
+                propertyName,
+                label,
+                options,
+                browseCommand,
+                isPassword,
+                isReadOnlyWhenInputInherited,
+                isEnabledPropertyName);
+        }
+
+        private static PipelineNodeActionDefinition A(string label, string commandPropertyName)
+        {
+            return new PipelineNodeActionDefinition(label, commandPropertyName);
         }
 
         private sealed record PipelineNodeParameterDefinition(
             string PropertyName,
             string Label,
             string? OptionsPropertyName,
-            string? BrowseCommandPropertyName);
+            string? BrowseCommandPropertyName,
+            bool IsPassword,
+            bool IsReadOnlyWhenInputInherited,
+            string? IsEnabledPropertyName);
+
+        private sealed record PipelineNodeActionDefinition(
+            string Label,
+            string CommandPropertyName);
     }
 }

@@ -20,7 +20,7 @@ namespace CyanTools.ViewModel
             SelectFolderCommand = new RelayCommand(SelectFolder);
         }
 
-        public override string DisplayName => "\u9009\u62E9\u6587\u4EF6\u5939";
+        public override string DisplayName => "\u9009\u62E9\u8F93\u5165\u6587\u4EF6\u5939";
 
         public string FolderPath
         {
@@ -95,7 +95,7 @@ namespace CyanTools.ViewModel
             using var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "\u9009\u62E9\u7BA1\u9053\u8D77\u59CB\u6587\u4EF6\u5939"
+                Title = "\u9009\u62E9\u7BA1\u9053\u8F93\u5165\u6587\u4EF6\u5939"
             };
 
             if (TryNormalizeExistingFolder(FolderPath, out string initialDirectory))
@@ -153,6 +153,112 @@ namespace CyanTools.ViewModel
             catch (UnauthorizedAccessException)
             {
                 return false;
+            }
+        }
+    }
+
+    public sealed class OutputFolderPickerPipelineNode : PipelineNodeViewModelBase, IPipelineOutputPathSelectorNode, IPipelineSnapshotProvider
+    {
+        private string _outputFolderPath = string.Empty;
+
+        public OutputFolderPickerPipelineNode()
+        {
+            SelectOutputFolderCommand = new RelayCommand(SelectOutputFolder);
+        }
+
+        public override string DisplayName => "\u9009\u62E9\u8F93\u51FA\u6587\u4EF6\u5939";
+
+        public string OutputFolderPath
+        {
+            get => _outputFolderPath;
+            set => SetField(ref _outputFolderPath, value ?? string.Empty);
+        }
+
+        public ICommand SelectOutputFolderCommand { get; }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!TryGetOutputFolderPath(out string outputFolderPath))
+            {
+                throw new InvalidOperationException("\u8BF7\u5148\u9009\u62E9\u6709\u6548\u7684\u8F93\u51FA\u6587\u4EF6\u5939\u3002");
+            }
+
+            context.AppendLog($"[{DisplayName}] \u4E0A\u4E00\u4E2A\u8282\u70B9\u7684\u8F93\u51FA\u5DF2\u8BBE\u4E3A: {outputFolderPath}");
+            return Task.CompletedTask;
+        }
+
+        public override PipelineNodeViewModelBase Clone()
+        {
+            return new OutputFolderPickerPipelineNode
+            {
+                OutputFolderPath = OutputFolderPath
+            };
+        }
+
+        public bool TryGetOutputFolderPath(out string path)
+        {
+            path = string.Empty;
+            if (string.IsNullOrWhiteSpace(OutputFolderPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                path = Path.GetFullPath(OutputFolderPath.Trim());
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        public Dictionary<string, object?> CaptureSnapshot()
+        {
+            return new Dictionary<string, object?>
+            {
+                ["OutputFolderPath"] = OutputFolderPath
+            };
+        }
+
+        public void ApplySnapshot(Dictionary<string, object?> snapshot)
+        {
+            if (snapshot.TryGetValue("OutputFolderPath", out object? value))
+            {
+                OutputFolderPath = value?.ToString() ?? string.Empty;
+            }
+        }
+
+        private void SelectOutputFolder()
+        {
+            using var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "\u9009\u62E9\u7BA1\u9053\u8F93\u51FA\u6587\u4EF6\u5939"
+            };
+
+            if (TryGetOutputFolderPath(out string initialDirectory) && Directory.Exists(initialDirectory))
+            {
+                dialog.InitialDirectory = initialDirectory;
+            }
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                OutputFolderPath = dialog.FileName;
             }
         }
     }

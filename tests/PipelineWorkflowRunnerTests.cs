@@ -44,6 +44,22 @@ public sealed class PipelineWorkflowRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_AppliesOutputFolderSelectorBeforeRunningThePrecedingNode()
+    {
+        var processor = new RecordingDirectoryNode("图片聚类", PipelineDirectoryBehavior.GeneratedOutput)
+        {
+            PipelineInputPath = Path.Combine("aaa", "bbb")
+        };
+        var outputSelector = new TestOutputFolderSelectorNode(Path.Combine("target", "final-output"));
+        var runner = new PipelineRunner();
+        var context = new PipelineContext(_ => { });
+
+        await runner.RunAsync(new PipelineNodeViewModelBase[] { processor, outputSelector }, context, CancellationToken.None);
+
+        Assert.Equal(Path.GetFullPath(Path.Combine("target", "final-output")), processor.SeenOutputPath);
+    }
+
+    [Fact]
     public async Task RunAsync_UsesRuntimeOutputPathFromWrappedInnerViewModelForNextInput()
     {
         var first = new RuntimeOutputSimpleNode("数据集下载器");
@@ -212,6 +228,28 @@ public sealed class PipelineWorkflowRunnerTests
             _nextPublishedPath = null;
             return Task.CompletedTask;
         }
+
+        public override PipelineNodeViewModelBase Clone() => throw new NotSupportedException();
+    }
+
+    private sealed class TestOutputFolderSelectorNode : PipelineNodeViewModelBase, IPipelineOutputPathSelectorNode
+    {
+        private readonly string _outputFolderPath;
+
+        public TestOutputFolderSelectorNode(string outputFolderPath)
+        {
+            _outputFolderPath = outputFolderPath;
+        }
+
+        public override string DisplayName => "选择输出文件夹";
+
+        public bool TryGetOutputFolderPath(out string path)
+        {
+            path = Path.GetFullPath(_outputFolderPath);
+            return true;
+        }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token) => Task.CompletedTask;
 
         public override PipelineNodeViewModelBase Clone() => throw new NotSupportedException();
     }

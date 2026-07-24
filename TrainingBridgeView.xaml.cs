@@ -4,7 +4,7 @@ using System.Windows.Controls;
 
 namespace CyanTools
 {
-    [ToolPage("训练桥", 157)]
+    [ToolPage("训练", 157)]
     public partial class TrainingBridgeView : UserControl
     {
         public TrainingBridgeView()

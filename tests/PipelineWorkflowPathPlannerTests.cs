@@ -100,6 +100,21 @@ public sealed class PipelineWorkflowPathPlannerTests
         Assert.True(second.HasInheritedInputPath);
     }
 
+    [Fact]
+    public void ApplyWorkflowPaths_RedirectsGeneratedOutputToFollowingOutputFolderSelector()
+    {
+        var processor = new TestDirectoryNode("图片聚类", PipelineDirectoryBehavior.GeneratedOutput)
+        {
+            PipelineInputPath = Path.Combine("aaa", "bbb")
+        };
+        var outputSelector = new TestOutputFolderSelectorNode(Path.Combine("target", "final-output"));
+
+        PipelineWorkflowPathPlanner.ApplyWorkflowPaths(new PipelineNodeViewModelBase[] { processor, outputSelector });
+
+        Assert.Equal(Path.GetFullPath(Path.Combine("aaa", "bbb")), processor.PipelineInputPath);
+        Assert.Equal(Path.GetFullPath(Path.Combine("target", "final-output")), processor.PipelineOutputPath);
+    }
+
     private sealed class TestDirectoryNode : PipelineNodeViewModelBase, IPipelineDirectoryNode
     {
         public TestDirectoryNode(string displayName, PipelineDirectoryBehavior directoryBehavior)
@@ -150,5 +165,27 @@ public sealed class PipelineWorkflowPathPlannerTests
             path = _runtimeOutputPath;
             return !string.IsNullOrWhiteSpace(path);
         }
+    }
+
+    private sealed class TestOutputFolderSelectorNode : PipelineNodeViewModelBase, IPipelineOutputPathSelectorNode
+    {
+        private readonly string _outputFolderPath;
+
+        public TestOutputFolderSelectorNode(string outputFolderPath)
+        {
+            _outputFolderPath = outputFolderPath;
+        }
+
+        public override string DisplayName => "选择输出文件夹";
+
+        public bool TryGetOutputFolderPath(out string path)
+        {
+            path = Path.GetFullPath(_outputFolderPath);
+            return true;
+        }
+
+        public override Task RunAsync(PipelineContext context, CancellationToken token) => Task.CompletedTask;
+
+        public override PipelineNodeViewModelBase Clone() => throw new NotSupportedException();
     }
 }

@@ -168,12 +168,13 @@ namespace CyanTools.ViewModel
             }
 
             SelectedAvailableNode = descriptor;
-            var previousTail = GetCanvasNodesInExecutionOrder().LastOrDefault(n => n.HasOutput);
+            var previousTail = GetCanvasNodesInExecutionOrder().LastOrDefault();
             var instance = descriptor.Factory();
             var canvasNode = CreateCanvasNode(instance, CanvasNodes.Count);
 
             CanvasNodes.Add(canvasNode);
-            if (previousTail != null)
+            if (previousTail?.HasOutput == true &&
+                (!IsOutputPathSelector(instance) || CanRedirectGeneratedOutput(previousTail.PipelineNode)))
             {
                 TryCreateConnection(previousTail.Output.FirstOrDefault(), canvasNode.Input.FirstOrDefault(), logFailures: false);
             }
@@ -325,6 +326,12 @@ namespace CyanTools.ViewModel
             if (!TryBuildExecutableCanvasOrder(out var canvasOrder, out var error))
             {
                 AppendLog(error ?? "节点图无效。");
+                return false;
+            }
+
+            if (!TryValidateOutputFolderSelectors(canvasOrder, out error))
+            {
+                AppendLog(error ?? "输出文件夹节点无效。");
                 return false;
             }
 
@@ -678,6 +685,13 @@ namespace CyanTools.ViewModel
             var normalizedOutput = output;
             var normalizedInput = input;
 
+            if (IsOutputPathSelector(input.Node.PipelineNode) &&
+                !CanRedirectGeneratedOutput(output.Node.PipelineNode))
+            {
+                error = "选择输出文件夹只能连接到会生成独立输出目录的节点。";
+                return false;
+            }
+
             if (CanvasConnections.Any(c => ReferenceEquals(c.Input, normalizedInput) && ReferenceEquals(c.Output, normalizedOutput)))
             {
                 error = "这条连线已经存在。";
@@ -751,6 +765,12 @@ namespace CyanTools.ViewModel
 
             if (CanvasNodes.Count == 1)
             {
+                if (IsOutputPathSelector(CanvasNodes[0].PipelineNode))
+                {
+                    error = "选择输出文件夹节点需要连接到上游节点的输出端口。";
+                    return false;
+                }
+
                 order.Add(CanvasNodes[0]);
                 return true;
             }
@@ -808,6 +828,45 @@ namespace CyanTools.ViewModel
             {
                 error = "节点图中存在断开的节点或循环。";
                 return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsOutputPathSelector(PipelineNodeViewModelBase node)
+        {
+            return node.GetOutputPathSelectorNode() != null;
+        }
+
+        private static bool CanRedirectGeneratedOutput(PipelineNodeViewModelBase node)
+        {
+            return node.GetDirectoryAutomationNode()?.DirectoryBehavior == PipelineDirectoryBehavior.GeneratedOutput;
+        }
+
+        private static bool TryValidateOutputFolderSelectors(
+            IReadOnlyList<PipelineCanvasNodeViewModel> order,
+            out string? error)
+        {
+            error = null;
+            for (var index = 0; index < order.Count; index++)
+            {
+                IPipelineOutputPathSelectorNode? selector = order[index].PipelineNode.GetOutputPathSelectorNode();
+                if (selector == null)
+                {
+                    continue;
+                }
+
+                if (index == 0 || !CanRedirectGeneratedOutput(order[index - 1].PipelineNode))
+                {
+                    error = "选择输出文件夹必须连接到会生成独立输出目录的上游节点。";
+                    return false;
+                }
+
+                if (!selector.TryGetOutputFolderPath(out _))
+                {
+                    error = "请先为选择输出文件夹节点设定有效的目标目录。";
+                    return false;
+                }
             }
 
             return true;

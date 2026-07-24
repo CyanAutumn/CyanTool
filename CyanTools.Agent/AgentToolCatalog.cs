@@ -30,7 +30,7 @@ public static class AgentToolCatalog
                 Dedicated("model_training_run", "运行模型训练", "启动已明确配置的模型训练进程。", AgentOperationRisk.ExternalService)),
             Page("layered_lora_merge", "LoRA分层融合", "训练", "按层或 Anima block 权重合并 safetensors LoRA/模型文件。",
                 Dedicated("lora_merge_layered", "分层融合 LoRA", "以明确的权重配置生成新的 safetensors 文件。", AgentOperationRisk.WritesOutput)),
-            Page("training_bridge", "训练桥", "训练", "在四种训练后端之间导入、编辑和导出配置。",
+            Page("training_bridge", "训练", "训练", "在四种训练后端之间导入、编辑和导出配置。",
                 Dedicated("training_bridge_convert_config", "转换训练配置", "导入并导出目标训练后端的配置包。", AgentOperationRisk.WritesOutput)),
             Page("lora_training", "LoRA训练", "训练", "生成并运行 LoRA 训练配置。",
                 Dedicated("lora_training_run", "运行 LoRA 训练", "启动已明确配置的 LoRA 训练进程。", AgentOperationRisk.ExternalService)),

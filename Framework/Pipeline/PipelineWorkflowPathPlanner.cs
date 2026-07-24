@@ -19,7 +19,11 @@ namespace CyanTools.Pipeline
             return SiblingDirectoryPathBuilder.Build(inputPath, $"{sequence:D2}-{nodeName.Trim()}");
         }
 
-        public static PipelineWorkflowResolvedPaths ApplyNodePaths(PipelineNodeViewModelBase node, string? inheritedInputPath, int sequence)
+        public static PipelineWorkflowResolvedPaths ApplyNodePaths(
+            PipelineNodeViewModelBase node,
+            string? inheritedInputPath,
+            int sequence,
+            string? outputPathOverride = null)
         {
             if (node == null)
             {
@@ -33,7 +37,12 @@ namespace CyanTools.Pipeline
             }
 
             string effectiveInputPath = ResolveEffectiveInputPath(directoryNode, inheritedInputPath);
-            string effectiveOutputPath = ResolveEffectiveOutputPath(directoryNode, node.DisplayName, effectiveInputPath, sequence);
+            string effectiveOutputPath = ResolveEffectiveOutputPath(
+                directoryNode,
+                node.DisplayName,
+                effectiveInputPath,
+                sequence,
+                outputPathOverride);
 
             directoryNode.PipelineInputPath = effectiveInputPath;
             directoryNode.PipelineOutputPath = effectiveOutputPath;
@@ -48,12 +57,20 @@ namespace CyanTools.Pipeline
                 throw new ArgumentNullException(nameof(nodes));
             }
 
+            var nodeList = nodes.ToList();
+            IReadOnlyDictionary<PipelineNodeViewModelBase, string> outputPathOverrides = GetOutputPathOverrides(nodeList);
+
             string? inheritedInputPath = null;
             int index = 0;
-            foreach (PipelineNodeViewModelBase node in nodes)
+            foreach (PipelineNodeViewModelBase node in nodeList)
             {
                 index++;
-                PipelineWorkflowResolvedPaths resolvedPaths = ApplyNodePaths(node, inheritedInputPath, index);
+                outputPathOverrides.TryGetValue(node, out string? outputPathOverride);
+                PipelineWorkflowResolvedPaths resolvedPaths = ApplyNodePaths(
+                    node,
+                    inheritedInputPath,
+                    index,
+                    outputPathOverride);
                 if (TryResolveRuntimeOutputPath(node, out string runtimeOutputPath))
                 {
                     inheritedInputPath = runtimeOutputPath;
@@ -69,6 +86,48 @@ namespace CyanTools.Pipeline
             }
         }
 
+        public static IReadOnlyDictionary<PipelineNodeViewModelBase, string> GetOutputPathOverrides(
+            IEnumerable<PipelineNodeViewModelBase> nodes)
+        {
+            if (nodes == null)
+            {
+                throw new ArgumentNullException(nameof(nodes));
+            }
+
+            var nodeList = nodes.ToList();
+            var overrides = new Dictionary<PipelineNodeViewModelBase, string>();
+            for (var index = 1; index < nodeList.Count; index++)
+            {
+                IPipelineOutputPathSelectorNode? selector = nodeList[index].GetOutputPathSelectorNode();
+                IPipelineDirectoryNode? precedingDirectoryNode = nodeList[index - 1].GetDirectoryAutomationNode();
+                if (selector == null ||
+                    precedingDirectoryNode?.DirectoryBehavior != PipelineDirectoryBehavior.GeneratedOutput ||
+                    !selector.TryGetOutputFolderPath(out string outputPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    overrides[nodeList[index - 1]] = NormalizePath(outputPath);
+                }
+                catch (ArgumentException)
+                {
+
+                }
+                catch (IOException)
+                {
+
+                }
+                catch (NotSupportedException)
+                {
+
+                }
+            }
+
+            return overrides;
+        }
+
         private static string ResolveEffectiveInputPath(IPipelineDirectoryNode node, string? inheritedInputPath)
         {
             node.HasInheritedInputPath = !string.IsNullOrWhiteSpace(inheritedInputPath);
@@ -80,8 +139,19 @@ namespace CyanTools.Pipeline
             return NormalizePath(source);
         }
 
-        private static string ResolveEffectiveOutputPath(IPipelineDirectoryNode node, string nodeName, string effectiveInputPath, int sequence)
+        private static string ResolveEffectiveOutputPath(
+            IPipelineDirectoryNode node,
+            string nodeName,
+            string effectiveInputPath,
+            int sequence,
+            string? outputPathOverride)
         {
+            if (node.DirectoryBehavior == PipelineDirectoryBehavior.GeneratedOutput &&
+                !string.IsNullOrWhiteSpace(outputPathOverride))
+            {
+                return NormalizePath(outputPathOverride);
+            }
+
             return node.DirectoryBehavior switch
             {
                 PipelineDirectoryBehavior.GeneratedOutput => BuildGeneratedOutputPath(effectiveInputPath, nodeName, sequence),

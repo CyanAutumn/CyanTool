@@ -374,6 +374,62 @@ public sealed class PathUiConventionsTests
         Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await KemonoHttpClient.GetAsync"), content);
     }
 
+    [Fact]
+    public void WorkflowParameterGrid_PreservesDatasetDownloaderControlsAndLabels()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "PipelineNodeParameterViewModels.cs"));
+        string canvas = ReadRepoFile(Path.Combine("ViewModel", "PipelineGraphViewModels.cs"));
+        string scheduler = ReadRepoFile("PipelineSchedulerView.xaml");
+
+        Assert.Contains("P(\"InputText\", \"ID / 标签\")", content);
+        Assert.Contains("P(\"OutputDirectory\", \"输出目录\"", content);
+        Assert.Contains("P(\"IncludeArtist\", \"Artist\")", content);
+        Assert.Contains("P(\"DanbooruToken\", \"Danbooru 令牌\"", content);
+        Assert.Contains("P(\"PixivRefreshToken\", \"Pixiv 令牌\", isPassword: true)", content);
+        Assert.Contains("A(\"登录获取\", \"GetPixivRefreshTokenCommand\")", content);
+        Assert.Contains("A(\"Danbooru 正则手动获取\", \"OpenDanbooruManualCollectorCommand\")", content);
+        Assert.Contains("CreateWorkflowParameters(PipelineNode)", canvas);
+        Assert.Contains("CreateWorkflowActions(PipelineNode)", canvas);
+        Assert.Contains("PipelinePasswordParameterEditorTemplate", scheduler);
+        Assert.Contains("PipelineActionButtonTemplate", scheduler);
+        Assert.DoesNotContain("P(\"InputText\", \"输入内容\")", content);
+    }
+
+    [Fact]
+    public void WorkflowOnlyParameters_ExcludeInputsRepresentedByNodeConnections()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "PipelineNodeParameterViewModels.cs"));
+        int workflowDefinitionsStart = content.IndexOf("WorkflowOnlyDefinitions", StringComparison.Ordinal);
+        int workflowActionsStart = content.IndexOf("WorkflowActionDefinitions", StringComparison.Ordinal);
+        string workflowDefinitions = content[workflowDefinitionsStart..workflowActionsStart];
+
+        Assert.DoesNotContain("InputPath", workflowDefinitions);
+        Assert.DoesNotContain("InputDirectory", workflowDefinitions);
+        Assert.DoesNotContain("InputFolder", workflowDefinitions);
+        Assert.DoesNotContain("FolderPath", workflowDefinitions);
+        Assert.DoesNotContain("VideoPath", workflowDefinitions);
+        Assert.DoesNotContain("SelectedFolderPath", workflowDefinitions);
+        Assert.Contains("P(\"DanbooruToken\", \"Danbooru 令牌\"", workflowDefinitions);
+        Assert.Contains("P(\"PixivRefreshToken\", \"Pixiv 令牌\", isPassword: true)", workflowDefinitions);
+    }
+
+    [Fact]
+    public void WorkflowFolderPickerNodes_UseExplicitInputAndOutputRoles()
+    {
+        string pipelineNodes = ReadRepoFile(Path.Combine("ViewModel", "PipelineNodes.cs"));
+        string catalog = ReadRepoFile(Path.Combine("Framework", "Pipeline", "PipelineCatalog.cs"));
+        string parameters = ReadRepoFile(Path.Combine("ViewModel", "PipelineNodeParameterViewModels.cs"));
+        string graph = ReadRepoFile(Path.Combine("ViewModel", "PipelineGraphViewModels.cs"));
+
+        Assert.Contains("\\u9009\\u62E9\\u8F93\\u5165\\u6587\\u4EF6\\u5939", pipelineNodes);
+        Assert.Contains("OutputFolderPickerPipelineNode", pipelineNodes);
+        Assert.Contains("IPipelineOutputPathSelectorNode", pipelineNodes);
+        Assert.Contains("OutputFolderPickerPipelineNode", catalog);
+        Assert.Contains("P(\"FolderPath\", \"输入文件夹\"", parameters);
+        Assert.Contains("P(\"OutputFolderPath\", \"输出文件夹\"", parameters);
+        Assert.Contains("GetOutputPathSelectorNode", graph);
+    }
+
     private static string ReadRepoFile(string relativePath)
     {
         string repositoryRoot = FindRepositoryRoot();

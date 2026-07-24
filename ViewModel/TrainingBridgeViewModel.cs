@@ -85,7 +85,7 @@ namespace CyanTools.ViewModel
 
             RefreshDrafts();
             ReplaceParameters(TrainingBridgeConfigService.CreateDefaultValues());
-            AppendLog("训练桥已就绪。");
+            AppendLog("训练已就绪。");
         }
 
         public ObservableCollection<TrainingBridgeBackendOption> BackendOptions { get; }
@@ -534,7 +534,7 @@ namespace CyanTools.ViewModel
             GeneratedFiles.Clear();
             SelectedGeneratedFile = null;
             HasUnsavedChanges = false;
-            StatusMessage = "已新建训练桥草稿。";
+            StatusMessage = "已新建训练草稿。";
             AppendLog(StatusMessage);
         }
 
@@ -572,7 +572,7 @@ namespace CyanTools.ViewModel
 
             MessageBoxResult result = MessageBox.Show(
                 $"确定删除草稿“{SelectedDraft.Name}”吗？",
-                "删除训练桥草稿",
+                "删除训练草稿",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
             if (result != MessageBoxResult.Yes)

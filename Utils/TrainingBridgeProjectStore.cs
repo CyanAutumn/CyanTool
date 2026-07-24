@@ -98,7 +98,7 @@ namespace CyanTools.Utils
         {
             if (!Guid.TryParse(projectId, out Guid parsed))
             {
-                throw new InvalidOperationException("训练桥项目 ID 无效。");
+                throw new InvalidOperationException("训练项目 ID 无效。");
             }
 
             return Path.Combine(_projectsDirectory, parsed.ToString("D") + ".json");
