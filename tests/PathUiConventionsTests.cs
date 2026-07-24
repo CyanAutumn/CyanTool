@@ -381,6 +381,32 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void WorkflowLog_IsCopyableContinuousText()
+    {
+        string view = ReadRepoFile("PipelineSchedulerView.xaml");
+        string viewModel = ReadRepoFile(Path.Combine("ViewModel", "PipelineSchedulerViewModel.cs"));
+
+        Assert.Contains("Text=\"{Binding LogText, Mode=OneWay}\"", view);
+        Assert.Contains("Style=\"{StaticResource CyanLogTextBoxStyle}\"", view);
+        Assert.DoesNotContain("ItemsSource=\"{Binding LogLines}\"", view);
+        Assert.Contains("public string LogText", viewModel);
+        Assert.Contains("Environment.NewLine", viewModel);
+        Assert.DoesNotContain("LogLines", viewModel);
+    }
+
+    [Fact]
+    public void Danbooru_UsesStablePostIdCursorAndReportsTheFinalSummary()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+
+        Assert.Contains("BuildDanbooruPostsRequestResource", content);
+        Assert.Contains("page=b{beforePostId.Value}", content);
+        Assert.Contains("当前页均已处理，继续检查更早的帖子", content);
+        Assert.Contains("已处理 {counters.Processed} 张，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张", content);
+        Assert.DoesNotContain("&page={page}", content);
+    }
+
+    [Fact]
     public void DatasetDownloader_IsAlwaysVisibleWhileHomeFiveClickPromptRemains()
     {
         string downloaderPage = ReadRepoFile("DanbooruCrawlerView.xaml.cs");

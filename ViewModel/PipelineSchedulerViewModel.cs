@@ -33,6 +33,7 @@ namespace CyanTools.ViewModel
         private bool _isRefreshingWorkflowPaths;
         private bool _isRebuildingPipelineNodes;
         private bool _isUpdatingSelection;
+        private string _logText = string.Empty;
 
         public PipelineSchedulerViewModel()
         {
@@ -43,7 +44,6 @@ namespace CyanTools.ViewModel
             CanvasNodes = new ObservableCollection<PipelineCanvasNodeViewModel>();
             CanvasConnections = new ObservableCollection<PipelineCanvasConnectionViewModel>();
             PendingConnection = new PipelineCanvasPendingConnectionViewModel();
-            LogLines = new ObservableCollection<string>();
             Workflows = new ObservableCollection<string>(WorkflowStorage.ListWorkflows());
 
             PipelineNodes.CollectionChanged += OnPipelineNodesCollectionChanged;
@@ -56,7 +56,7 @@ namespace CyanTools.ViewModel
             MoveDownCommand = new RelayCommand(MoveDown, () => CanMove(1));
             StartCommand = new RelayCommand(async () => await RunAsync(), () => CanvasNodes.Any() && !IsRunning);
             CancelCommand = new RelayCommand(CancelRun, () => IsRunning);
-            ClearLogCommand = new RelayCommand(() => LogLines.Clear(), () => !IsRunning);
+            ClearLogCommand = new RelayCommand(ClearLog, () => !IsRunning);
             SaveWorkflowCommand = new RelayCommand(SaveWorkflow, () => !IsRunning && !string.IsNullOrWhiteSpace(SelectedWorkflowName));
             RenameWorkflowCommand = new RelayCommand(RenameWorkflow, CanRenameWorkflow);
             DeleteWorkflowCommand = new RelayCommand(DeleteWorkflow, () => !IsRunning && !string.IsNullOrWhiteSpace(SelectedWorkflowName));
@@ -73,8 +73,13 @@ namespace CyanTools.ViewModel
         public ObservableCollection<PipelineCanvasNodeViewModel> CanvasNodes { get; }
         public ObservableCollection<PipelineCanvasConnectionViewModel> CanvasConnections { get; }
         public PipelineCanvasPendingConnectionViewModel PendingConnection { get; }
-        public ObservableCollection<string> LogLines { get; }
         public ObservableCollection<string> Workflows { get; }
+
+        public string LogText
+        {
+            get => _logText;
+            private set => SetField(ref _logText, value);
+        }
 
         public PipelineNodeDescriptor? SelectedAvailableNode
         {
@@ -299,7 +304,7 @@ namespace CyanTools.ViewModel
 
             IsRunning = true;
             _cts = new CancellationTokenSource();
-            LogLines.Clear();
+            ClearLog();
             RefreshWorkflowPaths();
             SetExecutingCanvasNode(null);
 
@@ -372,7 +377,7 @@ namespace CyanTools.ViewModel
 
         private void AppendLog(string message)
         {
-            void Append() => LogLines.Add($"{DateTime.Now:HH:mm:ss} {message}");
+            void Append() => LogText += $"{DateTime.Now:HH:mm:ss} {message}{Environment.NewLine}";
 
             if (Application.Current?.Dispatcher?.CheckAccess() == true)
             {
@@ -382,6 +387,11 @@ namespace CyanTools.ViewModel
             {
                 Application.Current?.Dispatcher?.Invoke(Append);
             }
+        }
+
+        private void ClearLog()
+        {
+            LogText = string.Empty;
         }
 
         private void SaveWorkflow()

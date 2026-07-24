@@ -815,7 +815,6 @@ namespace CyanTools.ViewModel
             AppendLog("[Danbooru] 任务开始。");
             SetDanbooruDownloadSummary("Danbooru：正在获取下载清单…");
             var counters = new SourceDownloadCounters(progress => SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", progress)));
-            string? outputDirectory = null;
 
             try
             {
@@ -832,7 +831,7 @@ namespace CyanTools.ViewModel
 
                         AppendLog($"[Danbooru] 画师 ID {input} -> artist 标签 {artistTag}");
                         await SetDanbooruPlannedTotalAsync(artistTag, counters, token);
-                        outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "artist"));
+                        var outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "artist"));
                         Directory.CreateDirectory(outputDirectory);
                         await DownloadDanbooruByTagsAsync(artistTag, outputDirectory, counters, token);
                         break;
@@ -840,7 +839,7 @@ namespace CyanTools.ViewModel
                     case DatasetDownloadMode.Tag:
                     {
                         await SetDanbooruPlannedTotalAsync(input, counters, token);
-                        outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "tag"));
+                        var outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "tag"));
                         Directory.CreateDirectory(outputDirectory);
                         await DownloadDanbooruByTagsAsync(input, outputDirectory, counters, token);
                         break;
@@ -856,7 +855,7 @@ namespace CyanTools.ViewModel
 
                         counters.SetTotal(ids.Count);
                         AppendLog($"[Danbooru] 已发现 {ids.Count} 张待处理图片。");
-                        outputDirectory = ResolveSourceOutputDirectory("Danbooru", "posts");
+                        var outputDirectory = ResolveSourceOutputDirectory("Danbooru", "posts");
                         Directory.CreateDirectory(outputDirectory);
                         foreach (var id in ids)
                         {
@@ -870,6 +869,7 @@ namespace CyanTools.ViewModel
             finally
             {
                 SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", counters));
+                AppendLog($"[Danbooru] 已处理 {counters.Processed} 张，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张。");
                 AppendLog("[Danbooru] 任务完成。");
             }
         }
@@ -920,11 +920,11 @@ namespace CyanTools.ViewModel
             SourceDownloadCounters counters,
             CancellationToken token)
         {
-            int page = 1;
+            int? beforePostId = null;
             var seenPostIds = new HashSet<int>();
             while (!token.IsCancellationRequested)
             {
-                var request = new RestRequest($"/posts.json?format=json&tags={Uri.EscapeDataString(tags)}&limit={DanbooruPageSize}&page={page}", Method.Get);
+                var request = new RestRequest(BuildDanbooruPostsRequestResource(tags, beforePostId), Method.Get);
                 await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
                 var response = await _danbooruClient.ExecuteAsync(request, token);
                 if (!response.IsSuccessful)
@@ -945,9 +945,16 @@ namespace CyanTools.ViewModel
                 }
 
                 var newPosts = posts.Where(p => p.PostId > 0 && seenPostIds.Add(p.PostId)).ToList();
+                var nextBeforePostId = posts.Where(p => p.PostId > 0).Select(p => p.PostId).DefaultIfEmpty().Min();
+                if (nextBeforePostId <= 0 || beforePostId.HasValue && nextBeforePostId >= beforePostId.Value)
+                {
+                    AppendLog("[Danbooru] 分页游标未继续向旧帖子推进，已停止以避免重复请求。");
+                    break;
+                }
+
                 if (newPosts.Count == 0)
                 {
-                    break;
+                    AppendLog("[Danbooru] 当前页均已处理，继续检查更早的帖子。");
                 }
 
                 foreach (var post in newPosts)
@@ -956,8 +963,20 @@ namespace CyanTools.ViewModel
                     counters.Record(await DownloadDanbooruPostAsync(post, outputDirectory, token));
                 }
 
-                page++;
+                beforePostId = nextBeforePostId;
+                if (posts.Count < DanbooruPageSize)
+                {
+                    break;
+                }
             }
+        }
+
+        private static string BuildDanbooruPostsRequestResource(string tags, int? beforePostId)
+        {
+            var resource = $"/posts.json?format=json&tags={Uri.EscapeDataString(tags)}&limit={DanbooruPageSize}";
+            return beforePostId.HasValue
+                ? $"{resource}&page=b{beforePostId.Value}"
+                : resource;
         }
 
         private async Task<DownloadOutcome> DownloadDanbooruByPostIdAsync(string postId, string outputDirectory, CancellationToken token)
