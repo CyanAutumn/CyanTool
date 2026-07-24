@@ -116,11 +116,11 @@
 
         <DataTemplate x:Key="PipelineConnectionTemplate"
                       DataType="{x:Type viewModel:PipelineCanvasConnectionViewModel}">
-            <nodify:CircuitConnection Source="{Binding Output.Anchor}"
-                                      Target="{Binding Input.Anchor}"
-                                      Direction="Forward"
-                                      Stroke="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                      StrokeThickness="3" />
+            <nodify:Connection Source="{Binding Output.Anchor}"
+                               Target="{Binding Input.Anchor}"
+                               Direction="Forward"
+                               Stroke="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                               StrokeThickness="3" />
         </DataTemplate>
 
         <DataTemplate x:Key="PendingConnectionTemplate"

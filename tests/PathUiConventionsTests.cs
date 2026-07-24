@@ -445,6 +445,15 @@ public sealed class PathUiConventionsTests
         Assert.Contains("GetSavedLocation", scheduler);
     }
 
+    [Fact]
+    public void PipelineScheduler_UsesBezierConnections()
+    {
+        string content = ReadRepoFile("PipelineSchedulerView.xaml");
+
+        Assert.Contains("<nodify:Connection Source=\"{Binding Output.Anchor}\"", content);
+        Assert.DoesNotContain("<nodify:CircuitConnection", content);
+    }
+
     private static string ReadRepoFile(string relativePath)
     {
         string repositoryRoot = FindRepositoryRoot();
