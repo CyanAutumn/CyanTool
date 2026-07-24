@@ -301,11 +301,12 @@ namespace CyanTools.ViewModel
             _cts = new CancellationTokenSource();
             LogLines.Clear();
             RefreshWorkflowPaths();
+            SetExecutingCanvasNode(null);
 
             var context = new PipelineContext(AppendLog);
             try
             {
-                await _runner.RunAsync(PipelineNodes, context, _cts.Token);
+                await _runner.RunAsync(PipelineNodes, context, _cts.Token, SetExecutingCanvasNode);
                 AppendLog("管道执行完成");
             }
             catch (OperationCanceledException)
@@ -318,10 +319,31 @@ namespace CyanTools.ViewModel
             }
             finally
             {
+                SetExecutingCanvasNode(null);
                 _cts?.Dispose();
                 _cts = null;
                 IsRunning = false;
             }
+        }
+
+        private void SetExecutingCanvasNode(PipelineNodeViewModelBase? activeNode)
+        {
+            void Update()
+            {
+                foreach (PipelineCanvasNodeViewModel canvasNode in CanvasNodes)
+                {
+                    canvasNode.IsExecuting = ReferenceEquals(canvasNode.PipelineNode, activeNode);
+                }
+            }
+
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.CheckAccess())
+            {
+                Update();
+                return;
+            }
+
+            dispatcher.Invoke(Update);
         }
 
         private bool TryPrepareGraphForRun()

@@ -455,6 +455,22 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void PipelineScheduler_HighlightsTheNodeCurrentlyExecuting()
+    {
+        string graph = ReadRepoFile(Path.Combine("ViewModel", "PipelineGraphViewModels.cs"));
+        string scheduler = ReadRepoFile(Path.Combine("ViewModel", "PipelineSchedulerViewModel.cs"));
+        string view = ReadRepoFile("PipelineSchedulerView.xaml");
+        string runner = ReadRepoFile(Path.Combine("Framework", "Pipeline", "PipelineRunner.cs"));
+
+        Assert.Contains("bool IsExecuting", graph);
+        Assert.Contains("SetExecutingCanvasNode", scheduler);
+        Assert.Contains("SetExecutingCanvasNode(null)", scheduler);
+        Assert.Contains("nodeStarted?.Invoke(node)", runner);
+        Assert.Contains("Binding=\"{Binding IsExecuting}\"", view);
+        Assert.Contains("<DropShadowEffect Color=\"#FF2497FF\"", view);
+    }
+
+    [Fact]
     public void SameSourceGrouping_ExposesNamedOutputPortsForItsActualFolders()
     {
         string viewModel = ReadRepoFile(Path.Combine("ViewModel", "SameSourceImageGroupingViewModel.cs"));

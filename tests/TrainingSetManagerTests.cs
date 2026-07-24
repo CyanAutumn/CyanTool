@@ -1,6 +1,7 @@
 using CyanTools.Model;
 using CyanTools.Utils;
 using Newtonsoft.Json;
+using System.Diagnostics;
 using Xunit;
 
 namespace CyanTools.PathDefaults.Tests;
@@ -214,6 +215,58 @@ public sealed class TrainingSetManagerTests : IDisposable
     }
 
     [Fact]
+    public void Real_git_lfs_repository_supports_history_checkout_prompt_restore_and_branching()
+    {
+        if (!CommandSucceeds("git", "--version") ||
+            !CommandSucceeds("git", "lfs", "version"))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(_root);
+        var git = new TrainingSetGitService();
+        var store = new TrainingSetProjectStore(git);
+        var project = store.InitializeProject(_root, "Integration dataset");
+        Assert.True(RunGit(_root, "config", "user.email", "cyantools-tests@example.invalid").IsSuccess);
+        Assert.True(RunGit(_root, "config", "user.name", "CyanTools Tests").IsSuccess);
+
+        var imagePath = Path.Combine(_root, "001.png");
+        var promptPath = Path.Combine(_root, "001.txt");
+        File.WriteAllBytes(imagePath, [137, 80, 78, 71, 13, 10, 26, 10]);
+        File.WriteAllText(promptPath, "tag_one");
+        var firstNode = new TrainingSetVersionNode
+        {
+            Title = "initial dataset",
+            NotePath = ".cyantools/notes/initial.md"
+        };
+        project.Nodes.Add(firstNode);
+        project.CurrentNodeId = firstNode.NodeId;
+        store.SaveProject(project);
+        Assert.True(git.Commit(_root, firstNode.Title).IsSuccess);
+        var firstCommit = git.GetHeadCommit(_root);
+
+        File.WriteAllText(promptPath, "tag_two");
+        var secondNode = new TrainingSetVersionNode
+        {
+            Title = "prompt update",
+            NotePath = ".cyantools/notes/prompt-update.md"
+        };
+        project.Nodes.Add(secondNode);
+        project.CurrentNodeId = secondNode.NodeId;
+        store.SaveProject(project);
+        Assert.True(git.Commit(_root, secondNode.Title).IsSuccess);
+
+        var history = git.GetHistory(_root);
+        Assert.Equal(["prompt update", "initial dataset"], history.Take(2).Select(item => item.Subject).ToArray());
+        Assert.Contains("001.png", RunGit(_root, "lfs", "ls-files").StandardOutput);
+
+        Assert.True(git.CheckoutCommit(_root, firstCommit).IsSuccess);
+        Assert.Equal("tag_one", File.ReadAllText(promptPath));
+        Assert.True(git.CreateBranchFromCommit(_root, "experiment/from-initial", firstCommit).IsSuccess);
+        Assert.Equal("experiment/from-initial", git.GetCurrentBranch(_root));
+    }
+
+    [Fact]
     public void Config_diff_only_returns_changed_json_values()
     {
         const string before = """
@@ -292,6 +345,16 @@ public sealed class TrainingSetManagerTests : IDisposable
     {
         if (Directory.Exists(_root))
         {
+            foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+            }
+            foreach (var directory in Directory
+                .EnumerateDirectories(_root, "*", SearchOption.AllDirectories)
+                .OrderByDescending(path => path.Length))
+            {
+                File.SetAttributes(directory, FileAttributes.Directory);
+            }
             Directory.Delete(_root, recursive: true);
         }
     }
@@ -316,4 +379,41 @@ public sealed class TrainingSetManagerTests : IDisposable
     }
 
     private sealed record RecordedGitCommand(string RepositoryPath, string[] Arguments);
+
+    private static bool CommandSucceeds(string fileName, params string[] arguments)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return false;
+            }
+
+            process.WaitForExit();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static TrainingSetGitCommandResult RunGit(string repositoryPath, params string[] arguments)
+    {
+        return new ProcessTrainingSetGitCommandRunner().Run(repositoryPath, arguments);
+    }
 }

@@ -14,6 +14,7 @@ namespace CyanTools.ViewModel
         private Point _location;
         private bool _isSelected;
         private bool _isExpanded = true;
+        private bool _isExecuting;
 
         public PipelineCanvasNodeViewModel(PipelineNodeViewModelBase pipelineNode, Point location)
         {
@@ -76,6 +77,15 @@ namespace CyanTools.ViewModel
         {
             get => _isExpanded;
             set => SetField(ref _isExpanded, value);
+        }
+
+
+
+
+        public bool IsExecuting
+        {
+            get => _isExecuting;
+            set => SetField(ref _isExecuting, value);
         }
 
         public string DirectoryBehaviorText

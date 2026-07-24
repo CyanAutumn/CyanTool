@@ -53,6 +53,7 @@ namespace CyanTools.Navigation
                 controlType == typeof(global::CyanTools.TrainingSetManagerView) ||
                 controlType == typeof(global::CyanTools.TrainingBridgeView) ||
                 controlType == typeof(global::CyanTools.LayeredLoraMergeView) ||
+                controlType == typeof(global::CyanTools.ModelMetadataView) ||
                 controlType == typeof(global::CyanTools.LoraTrainingView))
             {
                 return ToolPageCategory.Training;

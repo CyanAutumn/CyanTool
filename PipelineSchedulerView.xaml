@@ -142,6 +142,17 @@
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Panel.ZIndex" Value="2" />
                 </Trigger>
+                <DataTrigger Binding="{Binding IsExecuting}" Value="True">
+                    <Setter Property="Panel.ZIndex" Value="3" />
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#FF2497FF"
+                                              BlurRadius="24"
+                                              ShadowDepth="0"
+                                              Opacity="0.92" />
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 

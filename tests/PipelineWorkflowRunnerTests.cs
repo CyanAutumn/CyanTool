@@ -27,6 +27,25 @@ public sealed class PipelineWorkflowRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_ReportsTheNodeThatIsAboutToExecute()
+    {
+        var first = new RecordingDirectoryNode("图片聚类", PipelineDirectoryBehavior.GeneratedOutput)
+        {
+            PipelineInputPath = Path.Combine("aaa", "bbb")
+        };
+        var second = new RecordingDirectoryNode("图片超分", PipelineDirectoryBehavior.GeneratedOutput);
+        var startedNodes = new List<PipelineNodeViewModelBase>();
+
+        await new PipelineRunner().RunAsync(
+            new PipelineNodeViewModelBase[] { first, second },
+            new PipelineContext(_ => { }),
+            CancellationToken.None,
+            startedNodes.Add);
+
+        Assert.Equal(new PipelineNodeViewModelBase[] { first, second }, startedNodes);
+    }
+
+    [Fact]
     public async Task RunAsync_UsesRuntimeOutputPathFromCompletedNodeForNextInput()
     {
         var first = new RecordingRuntimeOutputNode("数据集下载器", Path.Combine("aaa", "dataset_root"));

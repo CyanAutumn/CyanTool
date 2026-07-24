@@ -8,7 +8,11 @@ namespace CyanTools.Pipeline
 {
     public sealed class PipelineRunner
     {
-        public async Task RunAsync(IEnumerable<PipelineNodeViewModelBase> nodes, PipelineContext context, CancellationToken token)
+        public async Task RunAsync(
+            IEnumerable<PipelineNodeViewModelBase> nodes,
+            PipelineContext context,
+            CancellationToken token,
+            Action<PipelineNodeViewModelBase>? nodeStarted = null)
         {
             var nodesToRun = nodes.ToList();
             IReadOnlyDictionary<PipelineNodeViewModelBase, string> outputPathOverrides =
@@ -32,6 +36,7 @@ namespace CyanTools.Pipeline
                     outputPathOverride);
                 context.UpdateEffectivePaths(resolvedPaths.EffectiveInputPath, resolvedPaths.EffectiveOutputPath, nodeSequence);
 
+                nodeStarted?.Invoke(node);
                 context.AppendLog($"开始执行: {node.DisplayName}");
                 node.AttachLogger(context.AppendLog);
 

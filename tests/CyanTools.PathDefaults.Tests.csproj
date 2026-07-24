@@ -41,6 +41,7 @@
     <Compile Include="../Utils/LayeredLoraPresetStore.cs" Link="Utils/LayeredLoraPresetStore.cs" />
     <Compile Include="../Utils/LoraLayerMapper.cs" Link="Utils/LoraLayerMapper.cs" />
     <Compile Include="../Utils/SafetensorsFile.cs" Link="Utils/SafetensorsFile.cs" />
+    <Compile Include="../Utils/SafetensorsMetadataService.cs" Link="Utils/SafetensorsMetadataService.cs" />
     <Compile Include="../Utils/LayeredLoraMerger.cs" Link="Utils/LayeredLoraMerger.cs" />
     <Compile Include="../Utils/AdaptiveClusterMerger.cs" Link="Utils/AdaptiveClusterMerger.cs" />
     <Compile Include="../Utils/StyleClusterPurityRefiner.cs" Link="Utils/StyleClusterPurityRefiner.cs" />

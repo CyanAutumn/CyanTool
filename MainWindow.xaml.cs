@@ -30,6 +30,7 @@ namespace CyanTools
             [typeof(ModelTrainingView)] = "管理训练脚本、TOML 输出和参数分组，生成配置后可直接启动训练。",
             [typeof(LoraTrainingView)] = "管理 LoRA 训练脚本、TOML 输出和参数分组，生成配置后可直接启动训练。",
             [typeof(LayeredLoraMergeView)] = "按 SDXL 25 层、Anima LoRA Block 或 Anima 大模型 Block 融合。",
+            [typeof(ModelMetadataView)] = "查看、编辑或清除 Safetensors 模型嵌入的源数据，并保持张量不变。",
             [typeof(ImageBucketingView)] = "根据图片宽高比和尺寸规则，将图片归入对应分辨率分组。",
             [typeof(ThreeStageView)] = "人物、半身、头部与眼部裁切参数集中配置。",
             [typeof(ResolutionFilterView)] = "按高度、宽度或分辨率阈值筛掉不符合要求的图片。",
@@ -315,6 +316,11 @@ namespace CyanTools
             if (controlType == typeof(LayeredLoraMergeView))
             {
                 return SymbolRegular.Layer24;
+            }
+
+            if (controlType == typeof(ModelMetadataView))
+            {
+                return SymbolRegular.DocumentText24;
             }
 
             if (controlType == typeof(XyzToolView))

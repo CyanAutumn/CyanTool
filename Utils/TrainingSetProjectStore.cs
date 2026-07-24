@@ -348,7 +348,7 @@ namespace CyanTools.Utils
                 Name = project.Name,
                 CoverPath = project.CoverPath,
                 NotePath = project.NotePath,
-                NoteMarkdown = project.NoteMarkdown,
+                NoteMarkdown = project.NoteMarkdown ?? string.Empty,
                 CreatedAt = project.CreatedAt,
                 UpdatedAt = DateTime.Now,
                 ConfigFiles = project.ConfigFiles
