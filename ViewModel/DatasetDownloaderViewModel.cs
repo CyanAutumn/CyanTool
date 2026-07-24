@@ -57,8 +57,6 @@ namespace CyanTools.ViewModel
         private static readonly string DanbooruTokenFilePath = Path.Combine(AppContext.BaseDirectory, "cookies.txt");
         private static readonly string PixivRefreshTokenDirectory = Path.Combine(AppContext.BaseDirectory, "Configs", "Crawler");
         private static readonly string PixivRefreshTokenFilePath = Path.Combine(PixivRefreshTokenDirectory, "pixiv_refresh_token.txt");
-        private static readonly TimeSpan DanbooruDownloadDelay = TimeSpan.FromSeconds(5);
-        private static readonly TimeSpan KemonoDownloadDelay = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan PixivAccessTokenRefreshLeadTime = TimeSpan.FromMinutes(5);
         private static readonly string[] PixivContentTypes = { "illust", "manga" };
 
@@ -109,6 +107,7 @@ namespace CyanTools.ViewModel
         private readonly RestClient _danbooruClient;
 
         private CancellationTokenSource? _cancellationTokenSource;
+        private readonly SemaphoreSlim _remoteRequestPacingLock = new(1, 1);
         private PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot? _activeRunOutputRootSnapshot;
         private Action<string>? _pipelineLogSink;
         private string? _pixivAccessToken;
@@ -123,7 +122,8 @@ namespace CyanTools.ViewModel
         private string _pixivDownloadSummary = "Pixiv：等待下载";
         private string _kemonoDownloadSummary = "Kemono：等待下载";
         private string _outputDirectoryImageTotalSummary = "输出目录总计：等待下载";
-        private int _pixivDownloadIntervalSeconds = DefaultPixivIntervalSeconds;
+        private int _downloadIntervalSeconds = DefaultPixivIntervalSeconds;
+        private DateTimeOffset _nextRemoteRequestUtc = DateTimeOffset.MinValue;
         private bool _enableDanbooru = true;
         private bool _enablePixiv = true;
         private bool _enableKemono = true;
@@ -372,15 +372,15 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public int PixivDownloadIntervalSeconds
+        public int DownloadIntervalSeconds
         {
-            get => _pixivDownloadIntervalSeconds;
+            get => _downloadIntervalSeconds;
             set
             {
                 var normalized = value < 0 ? 0 : value;
-                if (_pixivDownloadIntervalSeconds != normalized)
+                if (_downloadIntervalSeconds != normalized)
                 {
-                    _pixivDownloadIntervalSeconds = normalized;
+                    _downloadIntervalSeconds = normalized;
                     OnPropertyChanged();
                 }
             }
@@ -454,6 +454,30 @@ namespace CyanTools.ViewModel
             return !string.IsNullOrWhiteSpace(InputText)
                 && !string.IsNullOrWhiteSpace(OutputDirectory)
                 && (EnableDanbooru || EnablePixiv || EnableKemono);
+        }
+
+        private void ResetRemoteRequestPacing()
+        {
+            _nextRemoteRequestUtc = DateTimeOffset.MinValue;
+        }
+
+        private async Task WaitForNextRemoteRequestAsync(CancellationToken token)
+        {
+            await _remoteRequestPacingLock.WaitAsync(token);
+            try
+            {
+                var remaining = _nextRemoteRequestUtc - DateTimeOffset.UtcNow;
+                if (remaining > TimeSpan.Zero)
+                {
+                    await Task.Delay(remaining, token);
+                }
+
+                _nextRemoteRequestUtc = DateTimeOffset.UtcNow.AddSeconds(DownloadIntervalSeconds);
+            }
+            finally
+            {
+                _remoteRequestPacingLock.Release();
+            }
         }
 
         private async Task StartOrStopAsync()
@@ -583,7 +607,7 @@ namespace CyanTools.ViewModel
                 SelectedMode = DatasetDownloadMode.PostId;
                 EnableDanbooru = true;
                 InputText = string.Join(" ", collectorWindow.CollectedPostIds);
-                AppendLog($"[Danbooru] 手动获取完成，检测到 {collectorWindow.CollectedPostIds.Count} 个帖子 ID，开始按 Danbooru 间隔下载。");
+                AppendLog($"[Danbooru] 手动获取完成，检测到 {collectorWindow.CollectedPostIds.Count} 个帖子 ID，开始按请求间隔下载。");
 
                 await StartOrStopAsync();
             }
@@ -630,6 +654,7 @@ namespace CyanTools.ViewModel
                 ["redirect_uri"] = PixivRedirectUri
             });
 
+            await WaitForNextRemoteRequestAsync(token);
             using var response = await PixivAuthClient.SendAsync(request, token);
             var payload = await response.Content.ReadAsStringAsync(token);
             if (!response.IsSuccessStatusCode)
@@ -654,6 +679,7 @@ namespace CyanTools.ViewModel
         {
             var input = (InputText ?? string.Empty).Trim();
             ResetRuntimeOutputPath();
+            ResetRemoteRequestPacing();
 
             Action<string>? previousPipelineLogSink = _pipelineLogSink;
             PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot? previousRunOutputRootSnapshot = _activeRunOutputRootSnapshot;
@@ -854,6 +880,7 @@ namespace CyanTools.ViewModel
         private async Task<int?> FetchDanbooruPostCountAsync(string tags, CancellationToken token)
         {
             var request = new RestRequest($"/counts/posts.json?tags={Uri.EscapeDataString(tags)}", Method.Get);
+            await WaitForNextRemoteRequestAsync(token);
             var response = await _danbooruClient.ExecuteAsync(request, token);
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -887,6 +914,7 @@ namespace CyanTools.ViewModel
             while (!token.IsCancellationRequested)
             {
                 var request = new RestRequest($"/posts.json?format=json&tags={Uri.EscapeDataString(tags)}&limit={DanbooruPageSize}&page={page}", Method.Get);
+                await WaitForNextRemoteRequestAsync(token);
                 var response = await _danbooruClient.ExecuteAsync(request, token);
                 if (!response.IsSuccessful)
                 {
@@ -924,6 +952,7 @@ namespace CyanTools.ViewModel
         private async Task<DownloadOutcome> DownloadDanbooruByPostIdAsync(string postId, string outputDirectory, CancellationToken token)
         {
             var request = new RestRequest($"/posts/{Uri.EscapeDataString(postId)}.json", Method.Get);
+            await WaitForNextRemoteRequestAsync(token);
             var response = await _danbooruClient.ExecuteAsync(request, token);
             if (!response.IsSuccessful)
             {
@@ -980,44 +1009,35 @@ namespace CyanTools.ViewModel
                 request.AddHeader("Cookie", DanbooruToken);
             }
 
-            try
+            for (int attempt = 1; attempt <= ImageDownloadRetryCount; attempt++)
             {
-                for (int attempt = 1; attempt <= ImageDownloadRetryCount; attempt++)
+                await WaitForNextRemoteRequestAsync(token);
+                var response = await _danbooruClient.ExecuteAsync(request, token);
+                if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
                 {
-                    var response = await _danbooruClient.ExecuteAsync(request, token);
-                    if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
+                    if (attempt < ImageDownloadRetryCount)
                     {
-                        if (attempt < ImageDownloadRetryCount)
-                        {
-                            continue;
-                        }
-
-                        AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
-                        return DownloadOutcome.None;
-                    }
-
-                    await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
-                    if (!ValidateDownloadedFileOrDelete(imagePath, "Danbooru", fileName, attempt, ImageDownloadRetryCount))
-                    {
-                        if (attempt >= ImageDownloadRetryCount)
-                        {
-                            return DownloadOutcome.None;
-                        }
-
                         continue;
                     }
 
-                    await SaveDanbooruTagsTxtAsync(post, txtPath, token);
-                    AppendLog($"[Danbooru] 已保存 {fileName}");
-                    return DownloadOutcome.Saved;
+                    AppendLog($"[Danbooru] 下载失败: {response.StatusCode} - {response.ErrorMessage}");
+                    return DownloadOutcome.None;
                 }
-            }
-            finally
-            {
-                if (!token.IsCancellationRequested)
+
+                await File.WriteAllBytesAsync(imagePath, response.RawBytes, token);
+                if (!ValidateDownloadedFileOrDelete(imagePath, "Danbooru", fileName, attempt, ImageDownloadRetryCount))
                 {
-                    await Task.Delay(DanbooruDownloadDelay, token);
+                    if (attempt >= ImageDownloadRetryCount)
+                    {
+                        return DownloadOutcome.None;
+                    }
+
+                    continue;
                 }
+
+                await SaveDanbooruTagsTxtAsync(post, txtPath, token);
+                AppendLog($"[Danbooru] 已保存 {fileName}");
+                return DownloadOutcome.Saved;
             }
 
             return DownloadOutcome.None;
@@ -1145,6 +1165,7 @@ namespace CyanTools.ViewModel
             {
                 var pattern = $"*pixiv.net/users/{pixivUserId}*";
                 var request = new RestRequest($"/artists.json?search[url_matches]={Uri.EscapeDataString(pattern)}", Method.Get);
+                await WaitForNextRemoteRequestAsync(token);
                 var response = await _danbooruClient.ExecuteAsync(request, token);
                 if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
                 {
@@ -1223,7 +1244,6 @@ namespace CyanTools.ViewModel
                         counters.Record(DownloadOutcome.None);
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(PixivDownloadIntervalSeconds), token);
                 }
             }
             finally
@@ -1317,6 +1337,7 @@ namespace CyanTools.ViewModel
                 ["refresh_token"] = normalizedRefreshToken
             });
 
+            await WaitForNextRemoteRequestAsync(token);
             using var response = await PixivAuthClient.SendAsync(request, token);
             var payload = await response.Content.ReadAsStringAsync(token);
             if (!response.IsSuccessStatusCode)
@@ -1409,6 +1430,7 @@ namespace CyanTools.ViewModel
             request.Headers.TryAddWithoutValidation("App-OS", PixivAppOs);
             request.Headers.TryAddWithoutValidation("App-OS-Version", PixivAppOsVersion);
 
+            await WaitForNextRemoteRequestAsync(token);
             using var response = await PixivApiClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             var payload = await response.Content.ReadAsStringAsync(token);
             return (response.StatusCode, payload);
@@ -1524,6 +1546,7 @@ namespace CyanTools.ViewModel
                     request.Headers.Referrer = new Uri("https://app-api.pixiv.net/");
                     request.Headers.TryAddWithoutValidation("User-Agent", PixivUserAgent);
 
+                    await WaitForNextRemoteRequestAsync(token);
                     using var response = await PixivImageClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
                     if (!response.IsSuccessStatusCode)
                     {
@@ -1626,7 +1649,6 @@ namespace CyanTools.ViewModel
                         counters.Record(DownloadOutcome.None);
                     }
 
-                    await Task.Delay(KemonoDownloadDelay, token);
                 }
             }
             finally
@@ -1636,7 +1658,7 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private static async Task<List<KemonoAssetDownload>> BuildKemonoDownloadPlanAsync(string artistId, string service, CancellationToken token)
+        private async Task<List<KemonoAssetDownload>> BuildKemonoDownloadPlanAsync(string artistId, string service, CancellationToken token)
         {
             var plan = new List<KemonoAssetDownload>();
             int page = 0;
@@ -1657,12 +1679,13 @@ namespace CyanTools.ViewModel
             return plan;
         }
 
-        private static async Task<List<KemonoPost>> FetchKemonoPostsAsync(string artistId, string service, int page, CancellationToken token)
+        private async Task<List<KemonoPost>> FetchKemonoPostsAsync(string artistId, string service, int page, CancellationToken token)
         {
             int offset = page * KemonoPageSize;
             var requestUri = $"/api/v1/{service}/user/{artistId}/posts?o={offset}";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            await WaitForNextRemoteRequestAsync(token);
             using var response = await KemonoHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             var payload = await response.Content.ReadAsStringAsync(token);
 
@@ -1819,11 +1842,12 @@ namespace CyanTools.ViewModel
             return content;
         }
 
-        private static async Task<string?> FetchKemonoPostContentAsync(string artistId, string service, string postId, CancellationToken token)
+        private async Task<string?> FetchKemonoPostContentAsync(string artistId, string service, string postId, CancellationToken token)
         {
             var requestUri = $"/api/v1/{service}/user/{artistId}/post/{postId}";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            await WaitForNextRemoteRequestAsync(token);
             using var response = await KemonoHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if (!response.IsSuccessStatusCode)
             {
@@ -1863,6 +1887,7 @@ namespace CyanTools.ViewModel
             {
                 try
                 {
+                    await WaitForNextRemoteRequestAsync(token);
                     using var response = await KemonoHttpClient.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead, token);
                     response.EnsureSuccessStatusCode();
                     await using var input = await response.Content.ReadAsStreamAsync(token);
@@ -2149,7 +2174,10 @@ namespace CyanTools.ViewModel
                 }
 
                 OutputDirectory = string.IsNullOrWhiteSpace(settings.OutputDirectory) ? DefaultOutputDirectory : settings.OutputDirectory.Trim();
-                PixivDownloadIntervalSeconds = settings.PixivDownloadIntervalSeconds <= 0 ? DefaultPixivIntervalSeconds : settings.PixivDownloadIntervalSeconds;
+                var configuredInterval = settings.DownloadIntervalSeconds > 0
+                    ? settings.DownloadIntervalSeconds
+                    : settings.PixivDownloadIntervalSeconds;
+                DownloadIntervalSeconds = configuredInterval <= 0 ? DefaultPixivIntervalSeconds : configuredInterval;
                 IncludeArtist = settings.IncludeArtist;
                 IncludeCopyright = settings.IncludeCopyright;
                 IncludeCharacter = settings.IncludeCharacter;
@@ -2171,7 +2199,7 @@ namespace CyanTools.ViewModel
                 var settings = new DatasetDownloaderSettings
                 {
                     OutputDirectory = OutputDirectory,
-                    PixivDownloadIntervalSeconds = PixivDownloadIntervalSeconds,
+                    DownloadIntervalSeconds = DownloadIntervalSeconds,
                     IncludeArtist = IncludeArtist,
                     IncludeCopyright = IncludeCopyright,
                     IncludeCharacter = IncludeCharacter,
@@ -2410,7 +2438,8 @@ namespace CyanTools.ViewModel
         private sealed class DatasetDownloaderSettings
         {
             public string? OutputDirectory { get; set; }
-            public int PixivDownloadIntervalSeconds { get; set; } = DefaultPixivIntervalSeconds;
+            public int DownloadIntervalSeconds { get; set; }
+            public int PixivDownloadIntervalSeconds { get; set; }
             public bool IncludeArtist { get; set; }
             public bool IncludeCopyright { get; set; }
             public bool IncludeCharacter { get; set; } = true;

@@ -326,7 +326,7 @@ namespace CyanTools.ViewModel
                     P("IncludeCharacter", "包含角色标签"),
                     P("IncludeGeneral", "包含通用标签"),
                     P("IncludeMeta", "包含元标签"),
-                    P("PixivDownloadIntervalSeconds", "Pixiv 下载间隔（秒）")
+                    P("DownloadIntervalSeconds", "请求间隔（秒）")
                 ]
             };
 

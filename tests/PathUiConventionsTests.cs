@@ -326,6 +326,9 @@ public sealed class PathUiConventionsTests
         Assert.Contains("PixivDownloadSummary", content);
         Assert.Contains("KemonoDownloadSummary", content);
         Assert.Contains("OutputDirectoryImageTotalSummary", content);
+        Assert.Contains("DownloadIntervalSeconds", content);
+        Assert.Contains("图片、附件、分页和补充内容", content);
+        Assert.DoesNotContain("PixivDownloadIntervalSeconds", content);
         Assert.Contains("<GroupBox Grid.Row=\"4\"", content);
         Assert.Contains("Header=\"下载日志\"", content);
         Assert.Contains("Text=\"{Binding LogText, Mode=OneWay}\"", content);
@@ -347,12 +350,28 @@ public sealed class PathUiConventionsTests
         Assert.Contains("FetchDanbooruPostCountAsync", content);
         Assert.Contains("BuildPixivDownloadPlanAsync", content);
         Assert.Contains("BuildKemonoDownloadPlanAsync", content);
+        Assert.Contains("WaitForNextRemoteRequestAsync", content);
+        Assert.Contains("ResetRemoteRequestPacing", content);
+        Assert.Contains("DownloadIntervalSeconds", content);
+        Assert.DoesNotContain("DanbooruDownloadDelay", content);
+        Assert.DoesNotContain("KemonoDownloadDelay", content);
         Assert.Contains("已处理", content);
         Assert.Contains("正在获取下载清单", content);
         Assert.Contains("本次新增", content);
         Assert.Contains("输出目录总计", content);
         Assert.Contains("DownloadOutcome.Saved", content);
         Assert.Contains("DownloadOutcome.Skipped", content);
+    }
+
+    [Fact]
+    public void DatasetDownloader_PacesImageAndNonImageRemoteRequestsWithTheConfiguredInterval()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+
+        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+var response = await _danbooruClient.ExecuteAsync"), content);
+        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await PixivApiClient.SendAsync"), content);
+        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await KemonoHttpClient.SendAsync"), content);
+        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await KemonoHttpClient.GetAsync"), content);
     }
 
     private static string ReadRepoFile(string relativePath)
