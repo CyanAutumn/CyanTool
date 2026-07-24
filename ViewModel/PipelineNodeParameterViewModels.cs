@@ -290,6 +290,7 @@ namespace CyanTools.ViewModel
                 ],
                 [typeof(TaggingViewModel)] =
                 [
+                    P("SelectedTaggerSeriesId", "打标器系列"),
                     P("SelectedTaggerModel", "打标模型", "TaggerModels"),
                     P("SelectedExistingTxtConflictOption", "已有 TXT 处理", "ExistingTxtConflictOptions"),
                     P("GeneralThreshold", "通用标签阈值"),
@@ -304,7 +305,14 @@ namespace CyanTools.ViewModel
                     P("IncludeMeta", "包含元标签"),
                     P("IncludeQuality", "包含质量标签"),
                     P("IncludeRating", "包含分级标签"),
-                    P("IncludeModel", "包含模型标签")
+                    P("IncludeModel", "包含模型标签"),
+                    P("ToriiGateEndpoint", "ToriiGate 接口地址"),
+                    P("ToriiGateModelName", "ToriiGate 服务端模型名"),
+                    P("ToriiGateCaptionFormatId", "ToriiGate 描述格式"),
+                    P("ToriiGateMaxMegapixels", "ToriiGate 最大输入 MP"),
+                    P("ToriiGateMaxTokens", "ToriiGate 最大输出 token"),
+                    P("ToriiGateTemperature", "ToriiGate Temperature"),
+                    P("ToriiGateMaxParallelRequests", "ToriiGate 并发请求")
                 ],
                 [typeof(TrainingSet.TrainingSetBalancerViewModel)] = Array.Empty<PipelineNodeParameterDefinition>(),
                 [typeof(ImageRenameViewModel)] =
