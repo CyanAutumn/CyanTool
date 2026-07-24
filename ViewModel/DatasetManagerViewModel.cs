@@ -66,6 +66,7 @@ namespace CyanTools.ViewModel
         private int _untranslatedTagCount;
         private bool _isTranslatingAllTags;
         private bool _isSuggestionOpen = false;
+        private bool _isFolderPickerVisible = true;
         private static readonly char[] TagSeparators = { ',', '，', '\r', '\n' };
 
         
@@ -200,6 +201,14 @@ namespace CyanTools.ViewModel
             get => _isSuggestionOpen;
             set => SetField(ref _isSuggestionOpen, value);
         }
+
+        public bool IsFolderPickerVisible
+        {
+            get => _isFolderPickerVisible;
+            set => SetField(ref _isFolderPickerVisible, value);
+        }
+
+        public string CurrentFolderPath => _currentFolderPath;
 
         public string Category1Path
         {
@@ -357,7 +366,7 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void LoadFolder(string folderPath)
+        public void LoadFolder(string folderPath, IEnumerable<string>? excludedTopLevelDirectories = null)
         {
             if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             {
@@ -367,6 +376,7 @@ namespace CyanTools.ViewModel
             try
             {
                 _currentFolderPath = folderPath;
+                OnPropertyChanged(nameof(CurrentFolderPath));
                 _cachedEdits.Clear();
                 _cachedTextEdits.Clear();
                 CancelImageLoad();
@@ -382,13 +392,7 @@ namespace CyanTools.ViewModel
                 var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
                 var itemsByBaseName = new Dictionary<string, DatasetDataItem>(StringComparer.OrdinalIgnoreCase);
 
-                var enumerationOptions = new EnumerationOptions
-                {
-                    RecurseSubdirectories = true,
-                    IgnoreInaccessible = true
-                };
-
-                foreach (var file in Directory.EnumerateFiles(folderPath, "*", enumerationOptions))
+                foreach (var file in EnumerateDatasetFiles(folderPath, excludedTopLevelDirectories))
                 {
                     string extension = System.IO.Path.GetExtension(file);
                     string relativePath = System.IO.Path.GetRelativePath(folderPath, file)
@@ -453,6 +457,53 @@ namespace CyanTools.ViewModel
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show($"加载文件夹时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private static IEnumerable<string> EnumerateDatasetFiles(
+            string folderPath,
+            IEnumerable<string>? excludedTopLevelDirectories)
+        {
+            var excluded = new HashSet<string>(
+                excludedTopLevelDirectories ?? Array.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+            var pending = new Stack<string>();
+            pending.Push(folderPath);
+            while (pending.Count > 0)
+            {
+                var directory = pending.Pop();
+                IEnumerable<string> files;
+                IEnumerable<string> directories;
+                try
+                {
+                    files = Directory.EnumerateFiles(directory).ToArray();
+                    directories = Directory.EnumerateDirectories(directory).ToArray();
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                foreach (var file in files)
+                {
+                    yield return file;
+                }
+
+                foreach (var child in directories)
+                {
+                    var relative = System.IO.Path.GetRelativePath(folderPath, child);
+                    var firstSegment = relative.Split(
+                        new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar },
+                        StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    if (firstSegment == null || !excluded.Contains(firstSegment))
+                    {
+                        pending.Push(child);
+                    }
+                }
             }
         }
 

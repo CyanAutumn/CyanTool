@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using CyanTools.Model;
 
 namespace CyanTools.Utils
 {
@@ -92,7 +95,15 @@ namespace CyanTools.Utils
 
         public TrainingSetGitCommandResult CheckoutCommit(string repositoryPath, string commit)
         {
-            return Run(repositoryPath, "checkout", commit);
+            return Run(repositoryPath, "checkout", "--detach", commit);
+        }
+
+        public Task<TrainingSetGitCommandResult> CheckoutCommitAsync(
+            string repositoryPath,
+            string commit,
+            CancellationToken cancellationToken = default)
+        {
+            return RunAsync(repositoryPath, cancellationToken, "checkout", "--detach", commit);
         }
 
         public TrainingSetGitCommandResult CreateBranchFromCommit(string repositoryPath, string branch, string commit)
@@ -110,6 +121,45 @@ namespace CyanTools.Utils
         public TrainingSetGitCommandResult ShowFile(string repositoryPath, string commit, string path)
         {
             return Run(repositoryPath, "show", $"{commit}:{path.Replace('\\', '/')}");
+        }
+
+        public Task<TrainingSetGitCommandResult> ShowFileAsync(
+            string repositoryPath,
+            string commit,
+            string path,
+            CancellationToken cancellationToken = default)
+        {
+            return RunAsync(repositoryPath, cancellationToken, "show", $"{commit}:{path.Replace('\\', '/')}");
+        }
+
+        public IReadOnlyList<TrainingSetGitCommit> GetHistory(string repositoryPath, int maxCount = 500)
+        {
+            var result = Run(
+                repositoryPath,
+                "log",
+                "--all",
+                "--topo-order",
+                $"--max-count={Math.Max(1, maxCount)}",
+                "--date=iso-strict",
+                "--pretty=format:%H%x1f%P%x1f%D%x1f%an%x1f%aI%x1f%s%x1e");
+            return result.IsSuccess ? ParseHistory(result.StandardOutput) : Array.Empty<TrainingSetGitCommit>();
+        }
+
+        public async Task<IReadOnlyList<TrainingSetGitCommit>> GetHistoryAsync(
+            string repositoryPath,
+            int maxCount = 500,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await RunAsync(
+                repositoryPath,
+                cancellationToken,
+                "log",
+                "--all",
+                "--topo-order",
+                $"--max-count={Math.Max(1, maxCount)}",
+                "--date=iso-strict",
+                "--pretty=format:%H%x1f%P%x1f%D%x1f%an%x1f%aI%x1f%s%x1e").ConfigureAwait(false);
+            return result.IsSuccess ? ParseHistory(result.StandardOutput) : Array.Empty<TrainingSetGitCommit>();
         }
 
         public string GetHeadCommit(string repositoryPath)
@@ -146,6 +196,44 @@ namespace CyanTools.Utils
         {
             var result = await RunAsync(repositoryPath, cancellationToken, "status", "--short").ConfigureAwait(false);
             return result.IsSuccess ? result.StandardOutput.Trim() : result.StandardError.Trim();
+        }
+
+        public static IReadOnlyList<TrainingSetGitCommit> ParseHistory(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                return Array.Empty<TrainingSetGitCommit>();
+            }
+
+            var commits = new List<TrainingSetGitCommit>();
+            foreach (var rawRecord in output.Split('\x1e', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var record = rawRecord.Trim('\r', '\n');
+                var fields = record.Split('\x1f');
+                if (fields.Length < 6 || string.IsNullOrWhiteSpace(fields[0]))
+                {
+                    continue;
+                }
+
+                DateTimeOffset.TryParse(
+                    fields[4],
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind,
+                    out var authoredAt);
+                commits.Add(new TrainingSetGitCommit
+                {
+                    CommitHash = fields[0].Trim(),
+                    ParentHashes = fields[1]
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .ToList(),
+                    Decorations = fields[2].Trim(),
+                    Author = fields[3].Trim(),
+                    AuthoredAt = authoredAt,
+                    Subject = fields[5].Trim()
+                });
+            }
+
+            return commits;
         }
 
         private TrainingSetGitCommandResult Run(string repositoryPath, params string[] arguments)

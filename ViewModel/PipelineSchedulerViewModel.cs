@@ -387,7 +387,8 @@ namespace CyanTools.ViewModel
                 order.Select(node => new WorkflowNodeLayout(
                     node.PipelineNode,
                     node.Location.X,
-                    node.Location.Y)));
+                    node.Location.Y,
+                    node.PipelineNode.WorkflowOutputPortKey)));
             _loadedWorkflowName = SelectedWorkflowName.Trim();
             RefreshWorkflowList();
             AppendLog($"已保存工作流: {SelectedWorkflowName.Trim()}");
@@ -551,7 +552,9 @@ namespace CyanTools.ViewModel
                 CanvasNodes.Add(CreateCanvasNode(nodes[i].Node, i, GetSavedLocation(nodes[i])));
             }
 
-            RebuildLinearConnections(CanvasNodes.ToList());
+            RebuildLinearConnections(
+                CanvasNodes.ToList(),
+                nodes.Select(node => node.OutputPortKey).ToList());
             RebuildPipelineNodesFromCanvas();
         }
 
@@ -667,6 +670,7 @@ namespace CyanTools.ViewModel
                 Input = input,
                 Output = output
             });
+            output.Node.PipelineNode.WorkflowOutputPortKey = output.PortKey;
 
             RebuildPipelineNodesFromCanvas();
             return true;
@@ -707,9 +711,19 @@ namespace CyanTools.ViewModel
             var normalizedInput = input;
 
             if (IsOutputPathSelector(input.Node.PipelineNode) &&
-                !CanRedirectGeneratedOutput(output.Node.PipelineNode))
+                (!CanRedirectGeneratedOutput(output.Node.PipelineNode) || !output.IsRootOutput))
             {
-                error = "选择输出文件夹只能连接到会生成独立输出目录的节点。";
+                error = "选择输出文件夹只能连接到上游节点的总输出端口。";
+                return false;
+            }
+
+            PipelineCanvasNodeViewModel outputNode = output.Node;
+            PipelineCanvasConnectorViewModel selectedOutput = output;
+            if (CanvasConnections.Any(connection =>
+                    ReferenceEquals(connection.Output.Node, outputNode) &&
+                    !ReferenceEquals(connection.Output, selectedOutput)))
+            {
+                error = "一个节点在工作流中只能选择一个输出端口继续连接。";
                 return false;
             }
 
@@ -740,6 +754,12 @@ namespace CyanTools.ViewModel
             foreach (var connection in connections)
             {
                 CanvasConnections.Remove(connection);
+            }
+
+            if (!connector.IsInput &&
+                string.Equals(connector.Node.PipelineNode.WorkflowOutputPortKey, connector.PortKey, StringComparison.OrdinalIgnoreCase))
+            {
+                connector.Node.PipelineNode.WorkflowOutputPortKey = null;
             }
         }
 
@@ -877,9 +897,11 @@ namespace CyanTools.ViewModel
                     continue;
                 }
 
-                if (index == 0 || !CanRedirectGeneratedOutput(order[index - 1].PipelineNode))
+                if (index == 0 ||
+                    !CanRedirectGeneratedOutput(order[index - 1].PipelineNode) ||
+                    !string.Equals(order[index - 1].PipelineNode.WorkflowOutputPortKey, "root", StringComparison.OrdinalIgnoreCase))
                 {
-                    error = "选择输出文件夹必须连接到会生成独立输出目录的上游节点。";
+                    error = "选择输出文件夹必须连接到上游节点的总输出端口。";
                     return false;
                 }
 
@@ -906,12 +928,20 @@ namespace CyanTools.ViewModel
                 .ToList();
         }
 
-        private void RebuildLinearConnections(IReadOnlyList<PipelineCanvasNodeViewModel> order)
+        private void RebuildLinearConnections(
+            IReadOnlyList<PipelineCanvasNodeViewModel> order,
+            IReadOnlyList<string?>? outputPortKeys = null)
         {
             CanvasConnections.Clear();
+            foreach (var node in order)
+            {
+                node.PipelineNode.WorkflowOutputPortKey = null;
+            }
+
             for (var i = 0; i < order.Count - 1; i++)
             {
-                var output = order[i].Output.FirstOrDefault();
+                string? outputPortKey = outputPortKeys?.ElementAtOrDefault(i);
+                var output = GetOutputConnector(order[i], outputPortKey);
                 var input = order[i + 1].Input.FirstOrDefault();
                 if (output == null || input == null)
                 {
@@ -923,10 +953,29 @@ namespace CyanTools.ViewModel
                     Output = output,
                     Input = input
                 });
+                output.Node.PipelineNode.WorkflowOutputPortKey = output.PortKey;
             }
 
             UpdateConnectorStates();
             RebuildPipelineNodesFromCanvas();
+        }
+
+        private static PipelineCanvasConnectorViewModel? GetOutputConnector(
+            PipelineCanvasNodeViewModel node,
+            string? outputPortKey)
+        {
+            if (!string.IsNullOrWhiteSpace(outputPortKey))
+            {
+                PipelineCanvasConnectorViewModel? savedConnector = node.Output.FirstOrDefault(connector =>
+                    string.Equals(connector.PortKey, outputPortKey, StringComparison.OrdinalIgnoreCase));
+                if (savedConnector != null)
+                {
+                    return savedConnector;
+                }
+            }
+
+            return node.Output.FirstOrDefault(connector => connector.IsRootOutput)
+                   ?? node.Output.FirstOrDefault();
         }
 
         private static void ArrangeCanvasNodes(IReadOnlyList<PipelineCanvasNodeViewModel> order)

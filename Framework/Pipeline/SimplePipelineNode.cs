@@ -53,6 +53,11 @@ namespace CyanTools.Pipeline
             return Inner as IPipelineOutputPathSelectorNode;
         }
 
+        public override IPipelineOutputPortProvider? GetOutputPortProvider()
+        {
+            return Inner as IPipelineOutputPortProvider;
+        }
+
         private void OnInnerPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(e.PropertyName);

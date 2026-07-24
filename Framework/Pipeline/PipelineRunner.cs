@@ -39,11 +39,11 @@ namespace CyanTools.Pipeline
 
                 if (runtimeOutputNode != null && runtimeOutputNode.TryGetRuntimeOutputPath(out string runtimeOutputPath))
                 {
-                    inheritedInputPath = System.IO.Path.GetFullPath(runtimeOutputPath);
+                    inheritedInputPath = PipelineWorkflowPathPlanner.ResolveSelectedOutputPath(node, runtimeOutputPath);
                 }
                 else if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveOutputPath))
                 {
-                    inheritedInputPath = resolvedPaths.EffectiveOutputPath;
+                    inheritedInputPath = PipelineWorkflowPathPlanner.ResolveSelectedOutputPath(node, resolvedPaths.EffectiveOutputPath);
                 }
                 else if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveInputPath))
                 {

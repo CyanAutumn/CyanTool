@@ -10,6 +10,9 @@ namespace CyanTools.Model
         public string Name { get; set; } = "未命名训练集";
         public string RootPath { get; set; } = string.Empty;
         public string CoverPath { get; set; } = string.Empty;
+        public string NotePath { get; set; } = ".cyantools/project/README.md";
+        public string NoteMarkdown { get; set; } = string.Empty;
+        public List<TrainingSetConfigFile> ConfigFiles { get; set; } = new();
         public string CurrentNodeId { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
@@ -100,5 +103,47 @@ namespace CyanTools.Model
         public string HeadCommit { get; set; } = string.Empty;
         public string ShortStatus { get; set; } = string.Empty;
         public bool HasChanges => !string.IsNullOrWhiteSpace(ShortStatus);
+    }
+
+    public sealed class TrainingSetGitCommit
+    {
+        public string CommitHash { get; set; } = string.Empty;
+        public List<string> ParentHashes { get; set; } = new();
+        public string Decorations { get; set; } = string.Empty;
+        public string Author { get; set; } = string.Empty;
+        public DateTimeOffset AuthoredAt { get; set; }
+        public string Subject { get; set; } = string.Empty;
+
+        [JsonIgnore]
+        public string ShortHash => string.IsNullOrWhiteSpace(CommitHash)
+            ? string.Empty
+            : CommitHash.Length <= 7 ? CommitHash : CommitHash.Substring(0, 7);
+
+        [JsonIgnore]
+        public bool IsMerge => ParentHashes.Count > 1;
+
+        [JsonIgnore]
+        public string ReferenceDisplay
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Decorations))
+                {
+                    return string.Empty;
+                }
+
+                return Decorations
+                    .Replace("HEAD -> ", string.Empty, StringComparison.Ordinal)
+                    .Replace("tag: ", string.Empty, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    public sealed class TrainingSetStorageAllocation
+    {
+        public int GitFileCount { get; set; }
+        public long GitBytes { get; set; }
+        public int LfsFileCount { get; set; }
+        public long LfsBytes { get; set; }
     }
 }

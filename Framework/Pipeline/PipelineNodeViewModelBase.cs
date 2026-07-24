@@ -12,9 +12,19 @@ namespace CyanTools.Pipeline
     public abstract class PipelineNodeViewModelBase : INotifyPropertyChanged
     {
         private Action<string>? _pipelineLogger;
+        private string? _workflowOutputPortKey;
 
         public Guid NodeId { get; } = Guid.NewGuid();
         public abstract string DisplayName { get; }
+
+
+
+
+        public string? WorkflowOutputPortKey
+        {
+            get => _workflowOutputPortKey;
+            set => SetField(ref _workflowOutputPortKey, value);
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -61,6 +71,11 @@ namespace CyanTools.Pipeline
         public virtual IPipelineOutputPathSelectorNode? GetOutputPathSelectorNode()
         {
             return this as IPipelineOutputPathSelectorNode;
+        }
+
+        public virtual IPipelineOutputPortProvider? GetOutputPortProvider()
+        {
+            return this as IPipelineOutputPortProvider;
         }
 
         public virtual void SetWorkflowEditorMode(bool isWorkflowMode)

@@ -73,11 +73,11 @@ namespace CyanTools.Pipeline
                     outputPathOverride);
                 if (TryResolveRuntimeOutputPath(node, out string runtimeOutputPath))
                 {
-                    inheritedInputPath = runtimeOutputPath;
+                    inheritedInputPath = ResolveSelectedOutputPath(node, runtimeOutputPath);
                 }
                 else if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveOutputPath))
                 {
-                    inheritedInputPath = resolvedPaths.EffectiveOutputPath;
+                    inheritedInputPath = ResolveSelectedOutputPath(node, resolvedPaths.EffectiveOutputPath);
                 }
                 else if (!string.IsNullOrWhiteSpace(resolvedPaths.EffectiveInputPath))
                 {
@@ -126,6 +126,55 @@ namespace CyanTools.Pipeline
             }
 
             return overrides;
+        }
+
+        public static string ResolveSelectedOutputPath(PipelineNodeViewModelBase node, string? outputRoot)
+        {
+            if (node == null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            string normalizedRoot = NormalizePath(outputRoot);
+            if (string.IsNullOrWhiteSpace(normalizedRoot))
+            {
+                return normalizedRoot;
+            }
+
+            IPipelineOutputPortProvider? provider = node.GetOutputPortProvider();
+            if (provider == null || string.IsNullOrWhiteSpace(node.WorkflowOutputPortKey))
+            {
+                return normalizedRoot;
+            }
+
+            PipelineOutputPort? selectedPort = provider.GetPipelineOutputPorts()
+                .FirstOrDefault(port => string.Equals(port.Key, node.WorkflowOutputPortKey, StringComparison.OrdinalIgnoreCase));
+            if (selectedPort == null || selectedPort.IsRootOutput)
+            {
+                return normalizedRoot;
+            }
+
+            try
+            {
+                string selectedPath = NormalizePath(Path.Combine(normalizedRoot, selectedPort.RelativePath!));
+                string rootWithSeparator = normalizedRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                return selectedPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase)
+                    ? selectedPath
+                    : normalizedRoot;
+            }
+            catch (ArgumentException)
+            {
+                return normalizedRoot;
+            }
+            catch (IOException)
+            {
+                return normalizedRoot;
+            }
+            catch (NotSupportedException)
+            {
+                return normalizedRoot;
+            }
         }
 
         private static string ResolveEffectiveInputPath(IPipelineDirectoryNode node, string? inheritedInputPath)

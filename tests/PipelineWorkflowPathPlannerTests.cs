@@ -115,7 +115,24 @@ public sealed class PipelineWorkflowPathPlannerTests
         Assert.Equal(Path.GetFullPath(Path.Combine("target", "final-output")), processor.PipelineOutputPath);
     }
 
-    private sealed class TestDirectoryNode : PipelineNodeViewModelBase, IPipelineDirectoryNode
+    [Fact]
+    public void ApplyWorkflowPaths_UsesSelectedNamedOutputForNextNodeInput()
+    {
+        var grouping = new MultiOutputDirectoryNode("同源图片归类", PipelineDirectoryBehavior.GeneratedOutput)
+        {
+            PipelineInputPath = Path.Combine("aaa", "input"),
+            WorkflowOutputPortKey = "thumbnail"
+        };
+        var next = new TestDirectoryNode("图片超分", PipelineDirectoryBehavior.GeneratedOutput);
+
+        PipelineWorkflowPathPlanner.ApplyWorkflowPaths(new PipelineNodeViewModelBase[] { grouping, next });
+
+        string expectedRoot = Path.GetFullPath(Path.Combine("aaa", "01-同源图片归类"));
+        Assert.Equal(expectedRoot, grouping.PipelineOutputPath);
+        Assert.Equal(Path.Combine(expectedRoot, "缩略图"), next.PipelineInputPath);
+    }
+
+    private class TestDirectoryNode : PipelineNodeViewModelBase, IPipelineDirectoryNode
     {
         public TestDirectoryNode(string displayName, PipelineDirectoryBehavior directoryBehavior)
         {
@@ -138,6 +155,22 @@ public sealed class PipelineWorkflowPathPlannerTests
         public override Task RunAsync(PipelineContext context, CancellationToken token) => Task.CompletedTask;
 
         public override PipelineNodeViewModelBase Clone() => throw new NotSupportedException();
+    }
+
+    private sealed class MultiOutputDirectoryNode : TestDirectoryNode, IPipelineOutputPortProvider
+    {
+        private static readonly IReadOnlyList<PipelineOutputPort> OutputPorts =
+        [
+            new("root", "输出"),
+            new("thumbnail", "缩略图", "缩略图")
+        ];
+
+        public MultiOutputDirectoryNode(string displayName, PipelineDirectoryBehavior directoryBehavior)
+            : base(displayName, directoryBehavior)
+        {
+        }
+
+        public IReadOnlyList<PipelineOutputPort> GetPipelineOutputPorts() => OutputPorts;
     }
 
     private sealed class TestRuntimeOutputNode : PipelineNodeViewModelBase, IPipelineRuntimeOutputNode

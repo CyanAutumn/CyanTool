@@ -454,6 +454,28 @@ public sealed class PathUiConventionsTests
         Assert.DoesNotContain("<nodify:CircuitConnection", content);
     }
 
+    [Fact]
+    public void SameSourceGrouping_ExposesNamedOutputPortsForItsActualFolders()
+    {
+        string viewModel = ReadRepoFile(Path.Combine("ViewModel", "SameSourceImageGroupingViewModel.cs"));
+        string graph = ReadRepoFile(Path.Combine("ViewModel", "PipelineGraphViewModels.cs"));
+        string scheduler = ReadRepoFile(Path.Combine("ViewModel", "PipelineSchedulerViewModel.cs"));
+        string storage = ReadRepoFile(Path.Combine("Framework", "Pipeline", "WorkflowStorage.cs"));
+
+        Assert.Contains("IPipelineOutputPortProvider", viewModel);
+        Assert.Contains("new(\"root\", \"输出\")", viewModel);
+        Assert.Contains("new(\"original\", \"原图\", \"原图\")", viewModel);
+        Assert.Contains("new(\"thumbnail\", \"缩略图\", \"缩略图\")", viewModel);
+        Assert.Contains("new(\"duplicate\", \"副本\", \"副本\")", viewModel);
+        Assert.Contains("new(\"contained\", \"被包含\", \"被包含\")", viewModel);
+        Assert.Contains("new(\"difference\", \"差分\", \"差分\")", viewModel);
+        Assert.Contains("new(\"other\", \"其他\", \"其他\")", viewModel);
+        Assert.Contains("GetOutputPorts(PipelineNode)", graph);
+        Assert.Contains("WorkflowOutputPortKey", scheduler);
+        Assert.Contains("OutputPortKey", storage);
+        Assert.Contains("只能选择一个输出端口", scheduler);
+    }
+
     private static string ReadRepoFile(string relativePath)
     {
         string repositoryRoot = FindRepositoryRoot();

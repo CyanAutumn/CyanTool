@@ -20,12 +20,45 @@ namespace CyanTools.Utils
             "*.webp filter=lfs diff=lfs merge=lfs -text",
             "*.bmp filter=lfs diff=lfs merge=lfs -text",
             "*.gif filter=lfs diff=lfs merge=lfs -text",
+            "*.tif filter=lfs diff=lfs merge=lfs -text",
+            "*.tiff filter=lfs diff=lfs merge=lfs -text",
+            "*.avif filter=lfs diff=lfs merge=lfs -text",
+            "*.jxl filter=lfs diff=lfs merge=lfs -text",
             "*.safetensors filter=lfs diff=lfs merge=lfs -text",
             "*.ckpt filter=lfs diff=lfs merge=lfs -text",
             "*.pt filter=lfs diff=lfs merge=lfs -text",
             "*.pth filter=lfs diff=lfs merge=lfs -text",
             "*.bin filter=lfs diff=lfs merge=lfs -text",
+            "*.onnx filter=lfs diff=lfs merge=lfs -text",
+            "*.gguf filter=lfs diff=lfs merge=lfs -text",
+            "*.npy filter=lfs diff=lfs merge=lfs -text",
+            "*.npz filter=lfs diff=lfs merge=lfs -text",
+            "*.parquet filter=lfs diff=lfs merge=lfs -text",
+            "*.arrow filter=lfs diff=lfs merge=lfs -text",
+            "*.zip filter=lfs diff=lfs merge=lfs -text",
+            "*.7z filter=lfs diff=lfs merge=lfs -text",
+            "*.tar filter=lfs diff=lfs merge=lfs -text",
+            "*.gz filter=lfs diff=lfs merge=lfs -text",
+            "*.mp4 filter=lfs diff=lfs merge=lfs -text",
+            "*.mov filter=lfs diff=lfs merge=lfs -text",
+            "*.webm filter=lfs diff=lfs merge=lfs -text",
             "events.out.tfevents.* filter=lfs diff=lfs merge=lfs -text"
+        };
+
+        private static readonly HashSet<string> LfsExtensions = new(
+            LfsPatterns
+                .Where(pattern => pattern.StartsWith("*.", StringComparison.Ordinal))
+                .Select(pattern => "." + pattern.Substring(2, pattern.IndexOf(' ') - 2)),
+            StringComparer.OrdinalIgnoreCase);
+
+        public static readonly IReadOnlyList<string> DatasetBrowserExcludedDirectories = new[]
+        {
+            ".git",
+            ".cyantools",
+            "configs",
+            "models",
+            "samples",
+            "tensorboard"
         };
 
         private static readonly JsonSerializerSettings JsonSettings = new()
@@ -62,6 +95,7 @@ namespace CyanTools.Utils
                 Name = string.IsNullOrWhiteSpace(name) ? "未命名训练集" : name.Trim(),
                 RootPath = rootPath,
                 CoverPath = string.Empty,
+                NotePath = ".cyantools/project/README.md",
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -101,6 +135,13 @@ namespace CyanTools.Utils
             var managerPath = GetManagerPath(project.RootPath);
             File.WriteAllText(managerPath, JsonConvert.SerializeObject(project, JsonSettings));
 
+            if (!string.IsNullOrWhiteSpace(project.NotePath))
+            {
+                var projectNotePath = ResolveRelativePath(project.RootPath, project.NotePath);
+                Directory.CreateDirectory(Path.GetDirectoryName(projectNotePath) ?? project.RootPath);
+                File.WriteAllText(projectNotePath, project.NoteMarkdown ?? string.Empty);
+            }
+
             var nodeFolder = Path.Combine(project.RootPath, MetadataDirectoryName, "nodes");
             foreach (var node in project.Nodes)
             {
@@ -124,10 +165,53 @@ namespace CyanTools.Utils
             Directory.CreateDirectory(Path.Combine(rootPath, MetadataDirectoryName, "nodes"));
             Directory.CreateDirectory(Path.Combine(rootPath, MetadataDirectoryName, "notes"));
             Directory.CreateDirectory(Path.Combine(rootPath, MetadataDirectoryName, "covers"));
+            Directory.CreateDirectory(Path.Combine(rootPath, MetadataDirectoryName, "project"));
             Directory.CreateDirectory(Path.Combine(rootPath, "configs"));
             Directory.CreateDirectory(Path.Combine(rootPath, "samples"));
             Directory.CreateDirectory(Path.Combine(rootPath, "tensorboard"));
             Directory.CreateDirectory(Path.Combine(rootPath, "models"));
+        }
+
+        public static bool ShouldUseLfs(string path)
+        {
+            var fileName = Path.GetFileName(path);
+            return fileName.StartsWith("events.out.tfevents.", StringComparison.OrdinalIgnoreCase)
+                || LfsExtensions.Contains(Path.GetExtension(fileName));
+        }
+
+        public static TrainingSetStorageAllocation CalculateStorageAllocation(string rootPath)
+        {
+            var result = new TrainingSetStorageAllocation();
+            if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
+            {
+                return result;
+            }
+
+            foreach (var file in EnumerateRepositoryFiles(rootPath))
+            {
+                try
+                {
+                    var length = new FileInfo(file).Length;
+                    if (ShouldUseLfs(file))
+                    {
+                        result.LfsFileCount++;
+                        result.LfsBytes += length;
+                    }
+                    else
+                    {
+                        result.GitFileCount++;
+                        result.GitBytes += length;
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+
+            return result;
         }
 
         public static string GetManagerPath(string rootPath)
@@ -175,6 +259,44 @@ namespace CyanTools.Utils
             }
 
             File.WriteAllLines(path, existingLines);
+        }
+
+        private static IEnumerable<string> EnumerateRepositoryFiles(string rootPath)
+        {
+            var pending = new Stack<string>();
+            pending.Push(rootPath);
+            while (pending.Count > 0)
+            {
+                var directory = pending.Pop();
+                IEnumerable<string> files;
+                IEnumerable<string> directories;
+                try
+                {
+                    files = Directory.EnumerateFiles(directory).ToArray();
+                    directories = Directory.EnumerateDirectories(directory).ToArray();
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                foreach (var file in files)
+                {
+                    yield return file;
+                }
+
+                foreach (var child in directories)
+                {
+                    if (!string.Equals(Path.GetFileName(child), ".git", StringComparison.OrdinalIgnoreCase))
+                    {
+                        pending.Push(child);
+                    }
+                }
+            }
         }
 
         private static string SanitizeFileName(string value)

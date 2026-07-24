@@ -18,8 +18,15 @@ public sealed class TrainingSetManagerTests : IDisposable
             Name = "Style Study",
             RootPath = @"D:\datasets\style-study",
             CoverPath = ".cyantools/covers/project.png",
+            NotePath = ".cyantools/project/README.md",
+            NoteMarkdown = "# Style Study\n\n整个训练集的长期笔记。",
             CurrentNodeId = "node-b"
         };
+        project.ConfigFiles.Add(new TrainingSetConfigFile
+        {
+            RelativePath = "configs/project/dataset.toml",
+            DisplayName = "dataset.toml"
+        });
 
         project.Nodes.Add(new TrainingSetVersionNode
         {
@@ -74,6 +81,8 @@ public sealed class TrainingSetManagerTests : IDisposable
         Assert.NotNull(restored);
         Assert.Equal("project-1", restored!.ProjectId);
         Assert.Equal("node-b", restored.CurrentNodeId);
+        Assert.Contains("长期笔记", restored.NoteMarkdown);
+        Assert.Single(restored.ConfigFiles);
         Assert.Equal(2, restored.Nodes.Count);
         Assert.Single(restored.Edges);
         Assert.Equal("bbbbbbb", restored.Nodes[1].CommitShort);
@@ -98,6 +107,7 @@ public sealed class TrainingSetManagerTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "nodes")));
         Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "notes")));
         Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "covers")));
+        Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "project")));
         Assert.True(Directory.Exists(Path.Combine(_root, "configs")));
         Assert.True(Directory.Exists(Path.Combine(_root, "samples")));
         Assert.True(Directory.Exists(Path.Combine(_root, "tensorboard")));
@@ -106,6 +116,8 @@ public sealed class TrainingSetManagerTests : IDisposable
         var attributes = File.ReadAllText(Path.Combine(_root, ".gitattributes"));
         Assert.Contains("*.png filter=lfs diff=lfs merge=lfs -text", attributes);
         Assert.Contains("*.safetensors filter=lfs diff=lfs merge=lfs -text", attributes);
+        Assert.Contains("*.onnx filter=lfs diff=lfs merge=lfs -text", attributes);
+        Assert.Contains("*.parquet filter=lfs diff=lfs merge=lfs -text", attributes);
         Assert.Contains("events.out.tfevents.* filter=lfs diff=lfs merge=lfs -text", attributes);
         Assert.Contains(git.Commands, command => command.Arguments.SequenceEqual(["init"]));
         Assert.Contains(git.Commands, command => command.Arguments.SequenceEqual(["lfs", "install", "--local"]));
@@ -126,6 +138,49 @@ public sealed class TrainingSetManagerTests : IDisposable
                 "commit -m save node"
             ],
             git.Commands.Select(command => string.Join(" ", command.Arguments)).ToArray());
+    }
+
+    [Fact]
+    public async Task Git_service_checkout_uses_detached_commit_without_forcing_worktree()
+    {
+        var git = new RecordingTrainingSetGitCommandRunner();
+        var service = new TrainingSetGitService(git);
+
+        var result = await service.CheckoutCommitAsync(_root, "abc1234");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            ["checkout", "--detach", "abc1234"],
+            git.Commands.Single().Arguments);
+    }
+
+    [Fact]
+    public void Git_history_parser_returns_real_commit_topology_and_references()
+    {
+        const string output =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb cccccccccccccccccccccccccccccccccccccccc\u001fHEAD -> main, tag: v1\u001fAlice\u001f2026-07-24T10:20:30+08:00\u001fmerge dataset cleanup\u001e" +
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u001f\u001forigin/main\u001fBob\u001f2026-07-23T09:00:00+08:00\u001finitial dataset\u001e";
+
+        var commits = TrainingSetGitService.ParseHistory(output);
+
+        Assert.Equal(2, commits.Count);
+        Assert.True(commits[0].IsMerge);
+        Assert.Equal(["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccccccccccc"], commits[0].ParentHashes);
+        Assert.Equal("main, v1", commits[0].ReferenceDisplay);
+        Assert.Equal("aaaaaaa", commits[0].ShortHash);
+        Assert.Equal("initial dataset", commits[1].Subject);
+    }
+
+    [Fact]
+    public void Storage_policy_assigns_large_training_assets_to_lfs_and_text_metadata_to_git()
+    {
+        Assert.True(TrainingSetProjectStore.ShouldUseLfs("images/001.webp"));
+        Assert.True(TrainingSetProjectStore.ShouldUseLfs("models/final.safetensors"));
+        Assert.True(TrainingSetProjectStore.ShouldUseLfs("logs/events.out.tfevents.123"));
+        Assert.True(TrainingSetProjectStore.ShouldUseLfs("cache/features.parquet"));
+        Assert.False(TrainingSetProjectStore.ShouldUseLfs("images/001.txt"));
+        Assert.False(TrainingSetProjectStore.ShouldUseLfs(".cyantools/project/README.md"));
+        Assert.False(TrainingSetProjectStore.ShouldUseLfs("configs/train.toml"));
     }
 
     [Fact]

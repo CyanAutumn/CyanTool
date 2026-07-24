@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -14,6 +15,7 @@ using CyanTools.Model;
 using CyanTools.Utils;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using Newtonsoft.Json;
 
 namespace CyanTools.ViewModel
 {
@@ -22,19 +24,29 @@ namespace CyanTools.ViewModel
         private readonly TrainingSetProjectStore _store;
         private readonly TrainingSetGitService _git;
         private readonly DispatcherTimer _autoSaveTimer;
+        private readonly DispatcherTimer _toastTimer;
         private TrainingSetProject? _project;
         private TrainingSetVersionNode? _selectedNode;
+        private TrainingSetCommitNodeViewModel? _selectedCommit;
+        private TrainingSetCommitNodeViewModel? _compareSourceCommit;
+        private TrainingSetCommitNodeViewModel? _compareTargetCommit;
         private TrainingSetVersionNode? _compareSourceNode;
         private TrainingSetVersionNode? _compareTargetNode;
         private TrainingSetConfigFile? _compareSourceConfig;
         private TrainingSetConfigFile? _compareTargetConfig;
         private string _projectName = "新训练集";
         private string _projectRootPath = string.Empty;
-        private string _statusText = "请选择或创建训练集项目。";
         private string _gitStatusText = "Git 未连接";
+        private string _storageAllocationText = "尚未计算 Git / LFS 分配";
         private string _noteEditorText = string.Empty;
+        private string _projectNoteEditorText = string.Empty;
+        private string _newBranchName = string.Empty;
+        private string _toastMessage = string.Empty;
+        private bool _isToastVisible;
+        private bool _isToastError;
         private bool _isBusy;
         private bool _isLoading;
+        private bool _isDraftVersion;
 
         public TrainingSetManagerViewModel()
             : this(new TrainingSetProjectStore(), new TrainingSetGitService())
@@ -46,28 +58,33 @@ namespace CyanTools.ViewModel
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _git = git ?? throw new ArgumentNullException(nameof(git));
 
+            DatasetBrowser = new DatasetManagerViewModel
+            {
+                IsFolderPickerVisible = false
+            };
             HistoryNodes = new ObservableCollection<TrainingSetCommitNodeViewModel>();
             ConfigDiffRows = new ObservableCollection<TrainingSetConfigDiffRow>();
-            LogLines = new ObservableCollection<string>();
 
             CreateProjectCommand = new RelayCommand(_ => CreateProject(), _ => !IsBusy);
             OpenProjectCommand = new RelayCommand(_ => OpenProject(), _ => !IsBusy);
-            RefreshGitStatusCommand = new RelayCommand(_ => RefreshGitStatus(), _ => HasProject && !IsBusy);
-            CreateNodeCommand = new RelayCommand(_ => CreateNode(), _ => HasProject && !IsBusy);
-            SaveNodeCommand = new RelayCommand(async _ => await SaveNodeAsCommitAsync(), _ => HasProject && SelectedNode != null && !IsBusy);
-            CheckoutNodeCommand = new RelayCommand(_ => CheckoutSelectedNode(), _ => HasProject && !string.IsNullOrWhiteSpace(SelectedNode?.GitCommit) && !IsBusy);
-            CreateBranchFromNodeCommand = new RelayCommand(_ => CreateBranchFromSelectedNode(), _ => HasProject && !string.IsNullOrWhiteSpace(SelectedNode?.GitCommit) && !IsBusy);
-            ImportConfigCommand = new RelayCommand(_ => ImportConfig(), _ => HasProject && SelectedNode != null && !IsBusy);
-            CompareNodesCommand = new RelayCommand(_ => CompareNodes(), _ => HasProject && CompareSourceNode != null && CompareTargetNode != null && !IsBusy);
+            RefreshHistoryCommand = new RelayCommand(async _ => await RefreshRepositoryStateAsync(), _ => HasProject && !IsBusy);
+            CreateVersionCommand = new RelayCommand(_ => CreateVersion(), _ => HasProject && !IsBusy);
+            SaveVersionCommand = new RelayCommand(async _ => await SaveVersionAsCommitAsync(), _ => HasProject && SelectedNode != null && !IsBusy);
+            CreateBranchFromCommitCommand = new RelayCommand(_ => CreateBranchFromSelectedCommit(), _ => HasProject && SelectedCommit != null && !IsBusy);
+            ImportConfigCommand = new RelayCommand(_ => ImportVersionConfig(), _ => HasProject && SelectedNode != null && !IsBusy);
+            ImportProjectConfigCommand = new RelayCommand(_ => ImportProjectConfig(), _ => HasProject && !IsBusy);
+            CompareCommitsCommand = new RelayCommand(_ => CompareCommits(), _ => HasProject && CompareSourceCommit != null && CompareTargetCommit != null && !IsBusy);
             SelectProjectCoverCommand = new RelayCommand(_ => SelectProjectCover(), _ => HasProject && !IsBusy);
-            SelectNodeCoverCommand = new RelayCommand(_ => SelectNodeCover(), _ => HasProject && SelectedNode != null && !IsBusy);
+            SelectVersionCoverCommand = new RelayCommand(_ => SelectVersionCover(), _ => HasProject && SelectedNode != null && !IsBusy);
             AttachOutputImageCommand = new RelayCommand(_ => AttachFileArtifact(TrainingSetArtifactKind.OutputImage, "选择输出图片", "图片文件|*.png;*.jpg;*.jpeg;*.webp;*.bmp|所有文件|*.*", "samples"), _ => HasProject && SelectedNode != null && !IsBusy);
-            AttachModelCommand = new RelayCommand(_ => AttachFileArtifact(TrainingSetArtifactKind.Model, "选择训练成品模型", "模型文件|*.safetensors;*.ckpt;*.pt;*.pth;*.bin|所有文件|*.*", "models"), _ => HasProject && SelectedNode != null && !IsBusy);
+            AttachModelCommand = new RelayCommand(_ => AttachFileArtifact(TrainingSetArtifactKind.Model, "选择最终训练模型", "模型文件|*.safetensors;*.ckpt;*.pt;*.pth;*.bin;*.onnx|所有文件|*.*", "models"), _ => HasProject && SelectedNode != null && !IsBusy);
             AttachTensorBoardLogCommand = new RelayCommand(_ => AttachTensorBoardLog(), _ => HasProject && SelectedNode != null && !IsBusy);
-            InsertNoteHeadingCommand = new RelayCommand(_ => InsertIntoNote("\n## 新记录\n"), _ => SelectedNode != null);
-            InsertNoteTableCommand = new RelayCommand(_ => InsertIntoNote("\n| epoch | loss | sample | notes |\n| --- | --- | --- | --- |\n|  |  |  |  |\n"), _ => SelectedNode != null);
-            InsertNoteImageRecordCommand = new RelayCommand(_ => InsertIntoNote("\n| 输出图片 | 说明 |\n| --- | --- |\n| ![](samples/) |  |\n"), _ => SelectedNode != null);
-            InsertNoteChecklistCommand = new RelayCommand(_ => InsertIntoNote("\n- [ ] 数据清洗\n- [ ] 参数确认\n- [ ] 样张检查\n"), _ => SelectedNode != null);
+            InsertVersionNoteHeadingCommand = new RelayCommand(_ => InsertIntoVersionNote("\n## 训练记录\n"), _ => SelectedNode != null);
+            InsertVersionNoteTableCommand = new RelayCommand(_ => InsertIntoVersionNote("\n| epoch | loss | sample | notes |\n| --- | --- | --- | --- |\n|  |  |  |  |\n"), _ => SelectedNode != null);
+            InsertVersionNoteChecklistCommand = new RelayCommand(_ => InsertIntoVersionNote("\n- [ ] 数据确认\n- [ ] 参数确认\n- [ ] 样张检查\n"), _ => SelectedNode != null);
+            InsertProjectNoteHeadingCommand = new RelayCommand(_ => InsertIntoProjectNote("\n## 数据集记录\n"), _ => HasProject);
+            InsertProjectNoteTableCommand = new RelayCommand(_ => InsertIntoProjectNote("\n| 日期 | 变更 | 说明 |\n| --- | --- | --- |\n|  |  |  |\n"), _ => HasProject);
+            InsertProjectNoteChecklistCommand = new RelayCommand(_ => InsertIntoProjectNote("\n- [ ] 数据清洗\n- [ ] Prompt 复核\n- [ ] 版权与来源复核\n"), _ => HasProject);
             OpenProjectFolderCommand = new RelayCommand(_ => OpenProjectFolder(), _ => HasProject);
 
             _autoSaveTimer = new DispatcherTimer
@@ -79,15 +96,21 @@ namespace CyanTools.ViewModel
                 _autoSaveTimer.Stop();
                 AutoSave();
             };
+
+            _toastTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(4)
+            };
+            _toastTimer.Tick += (_, _) =>
+            {
+                _toastTimer.Stop();
+                IsToastVisible = false;
+            };
         }
 
+        public DatasetManagerViewModel DatasetBrowser { get; }
         public ObservableCollection<TrainingSetCommitNodeViewModel> HistoryNodes { get; }
         public ObservableCollection<TrainingSetConfigDiffRow> ConfigDiffRows { get; }
-        public ObservableCollection<string> LogLines { get; }
-
-        public IReadOnlyList<TrainingSetVersionNode> ProjectNodes => Project != null
-            ? Project.Nodes
-            : Array.Empty<TrainingSetVersionNode>();
 
         public TrainingSetProject? Project
         {
@@ -97,7 +120,7 @@ namespace CyanTools.ViewModel
                 if (SetField(ref _project, value))
                 {
                     OnPropertyChanged(nameof(HasProject));
-                    OnPropertyChanged(nameof(ProjectNodes));
+                    OnPropertyChanged(nameof(ProjectConfigFiles));
                 }
             }
         }
@@ -109,7 +132,7 @@ namespace CyanTools.ViewModel
             get => _projectName;
             set
             {
-                if (SetField(ref _projectName, value) && Project != null)
+                if (SetField(ref _projectName, value) && Project != null && !_isLoading)
                 {
                     Project.Name = value;
                     RequestAutoSave();
@@ -120,33 +143,17 @@ namespace CyanTools.ViewModel
         public string ProjectRootPath
         {
             get => _projectRootPath;
-            set => SetField(ref _projectRootPath, value);
+            private set => SetField(ref _projectRootPath, value);
         }
+
+        public IReadOnlyList<TrainingSetConfigFile> ProjectConfigFiles => Project != null
+            ? Project.ConfigFiles
+            : Array.Empty<TrainingSetConfigFile>();
 
         public TrainingSetVersionNode? SelectedNode
         {
             get => _selectedNode;
-            set
-            {
-                if (SetField(ref _selectedNode, value))
-                {
-                    _isLoading = true;
-                    NoteEditorText = value?.NoteMarkdown ?? string.Empty;
-                    _isLoading = false;
-                    OnPropertyChanged(nameof(SelectedNodeTitle));
-                    OnPropertyChanged(nameof(SelectedNodeDescription));
-                    if (Project != null && value != null)
-                    {
-                        Project.CurrentNodeId = value.NodeId;
-                        CompareTargetNode ??= value;
-                        RequestAutoSave();
-                    }
-
-                    RefreshCanvasSelection();
-                    OnPropertyChanged(nameof(SelectedNodeCoverImage));
-                    CommandManager.InvalidateRequerySuggested();
-                }
-            }
+            private set => SetSelectedNode(value, requestAutoSave: false);
         }
 
         public string SelectedNodeTitle
@@ -162,7 +169,6 @@ namespace CyanTools.ViewModel
                 SelectedNode.Title = value;
                 SelectedNode.UpdatedAt = DateTime.Now;
                 OnPropertyChanged();
-                RebuildGraph();
                 RequestAutoSave();
             }
         }
@@ -184,32 +190,92 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public TrainingSetVersionNode? CompareSourceNode
+        public TrainingSetCommitNodeViewModel? SelectedCommit
         {
-            get => _compareSourceNode;
+            get => _selectedCommit;
+            private set
+            {
+                if (SetField(ref _selectedCommit, value))
+                {
+                    OnPropertyChanged(nameof(CurrentSnapshotText));
+                    OnPropertyChanged(nameof(CanCreateBranch));
+                    RefreshHistorySelection();
+                    CommandManager.InvalidateRequerySuggested();
+                }
+            }
+        }
+
+        public bool CanCreateBranch => SelectedCommit != null;
+
+        public string CurrentSnapshotText
+        {
+            get
+            {
+                if (IsDraftVersion)
+                {
+                    return SelectedCommit == null
+                        ? "尚未提交的初始版本"
+                        : $"基于 {SelectedCommit.ShortHash} 的未提交版本";
+                }
+
+                return SelectedCommit == null
+                    ? "未选择 Git commit"
+                    : $"{SelectedCommit.ShortHash} · {SelectedCommit.Title}";
+            }
+        }
+
+        public bool IsDraftVersion
+        {
+            get => _isDraftVersion;
+            private set
+            {
+                if (SetField(ref _isDraftVersion, value))
+                {
+                    OnPropertyChanged(nameof(CurrentSnapshotText));
+                }
+            }
+        }
+
+        public TrainingSetCommitNodeViewModel? CompareSourceCommit
+        {
+            get => _compareSourceCommit;
             set
             {
-                if (SetField(ref _compareSourceNode, value))
+                if (SetField(ref _compareSourceCommit, value))
                 {
-                    CompareSourceConfig = value?.ConfigFiles.FirstOrDefault();
+                    CompareSourceNode = LoadNodeMetadataAtCommit(value?.Commit.CommitHash);
+                    CompareSourceConfig = CompareSourceNode?.ConfigFiles.FirstOrDefault();
                     OnPropertyChanged(nameof(CompareSourceConfigs));
                     CommandManager.InvalidateRequerySuggested();
                 }
             }
         }
 
-        public TrainingSetVersionNode? CompareTargetNode
+        public TrainingSetCommitNodeViewModel? CompareTargetCommit
         {
-            get => _compareTargetNode;
+            get => _compareTargetCommit;
             set
             {
-                if (SetField(ref _compareTargetNode, value))
+                if (SetField(ref _compareTargetCommit, value))
                 {
-                    CompareTargetConfig = value?.ConfigFiles.FirstOrDefault();
+                    CompareTargetNode = LoadNodeMetadataAtCommit(value?.Commit.CommitHash);
+                    CompareTargetConfig = CompareTargetNode?.ConfigFiles.FirstOrDefault();
                     OnPropertyChanged(nameof(CompareTargetConfigs));
                     CommandManager.InvalidateRequerySuggested();
                 }
             }
+        }
+
+        public TrainingSetVersionNode? CompareSourceNode
+        {
+            get => _compareSourceNode;
+            private set => SetField(ref _compareSourceNode, value);
+        }
+
+        public TrainingSetVersionNode? CompareTargetNode
+        {
+            get => _compareTargetNode;
+            private set => SetField(ref _compareTargetNode, value);
         }
 
         public IReadOnlyList<TrainingSetConfigFile> CompareSourceConfigs => CompareSourceNode != null
@@ -223,31 +289,13 @@ namespace CyanTools.ViewModel
         public TrainingSetConfigFile? CompareSourceConfig
         {
             get => _compareSourceConfig;
-            set
-            {
-                if (SetField(ref _compareSourceConfig, value))
-                {
-                    CommandManager.InvalidateRequerySuggested();
-                }
-            }
+            set => SetField(ref _compareSourceConfig, value);
         }
 
         public TrainingSetConfigFile? CompareTargetConfig
         {
             get => _compareTargetConfig;
-            set
-            {
-                if (SetField(ref _compareTargetConfig, value))
-                {
-                    CommandManager.InvalidateRequerySuggested();
-                }
-            }
-        }
-
-        public string StatusText
-        {
-            get => _statusText;
-            private set => SetField(ref _statusText, value);
+            set => SetField(ref _compareTargetConfig, value);
         }
 
         public string GitStatusText
@@ -255,6 +303,14 @@ namespace CyanTools.ViewModel
             get => _gitStatusText;
             private set => SetField(ref _gitStatusText, value);
         }
+
+        public string StorageAllocationText
+        {
+            get => _storageAllocationText;
+            private set => SetField(ref _storageAllocationText, value);
+        }
+
+        public string LfsPolicyText => "图片 / 模型 / TensorBoard / 大型数组与压缩包 → Git LFS；Prompt / Markdown / JSON / TOML / YAML → 普通 Git";
 
         public string NoteEditorText
         {
@@ -267,6 +323,43 @@ namespace CyanTools.ViewModel
                     RequestAutoSave();
                 }
             }
+        }
+
+        public string ProjectNoteEditorText
+        {
+            get => _projectNoteEditorText;
+            set
+            {
+                if (SetField(ref _projectNoteEditorText, value) && !_isLoading && Project != null)
+                {
+                    Project.NoteMarkdown = value;
+                    RequestAutoSave();
+                }
+            }
+        }
+
+        public string NewBranchName
+        {
+            get => _newBranchName;
+            set => SetField(ref _newBranchName, value);
+        }
+
+        public string ToastMessage
+        {
+            get => _toastMessage;
+            private set => SetField(ref _toastMessage, value);
+        }
+
+        public bool IsToastVisible
+        {
+            get => _isToastVisible;
+            private set => SetField(ref _isToastVisible, value);
+        }
+
+        public bool IsToastError
+        {
+            get => _isToastError;
+            private set => SetField(ref _isToastError, value);
         }
 
         public bool IsBusy
@@ -286,27 +379,82 @@ namespace CyanTools.ViewModel
 
         public ICommand CreateProjectCommand { get; }
         public ICommand OpenProjectCommand { get; }
-        public ICommand RefreshGitStatusCommand { get; }
-        public ICommand CreateNodeCommand { get; }
-        public ICommand SaveNodeCommand { get; }
-        public ICommand CheckoutNodeCommand { get; }
-        public ICommand CreateBranchFromNodeCommand { get; }
+        public ICommand RefreshHistoryCommand { get; }
+        public ICommand CreateVersionCommand { get; }
+        public ICommand SaveVersionCommand { get; }
+        public ICommand CreateBranchFromCommitCommand { get; }
         public ICommand ImportConfigCommand { get; }
-        public ICommand CompareNodesCommand { get; }
+        public ICommand ImportProjectConfigCommand { get; }
+        public ICommand CompareCommitsCommand { get; }
         public ICommand SelectProjectCoverCommand { get; }
-        public ICommand SelectNodeCoverCommand { get; }
+        public ICommand SelectVersionCoverCommand { get; }
         public ICommand AttachOutputImageCommand { get; }
         public ICommand AttachModelCommand { get; }
         public ICommand AttachTensorBoardLogCommand { get; }
-        public ICommand InsertNoteHeadingCommand { get; }
-        public ICommand InsertNoteTableCommand { get; }
-        public ICommand InsertNoteImageRecordCommand { get; }
-        public ICommand InsertNoteChecklistCommand { get; }
+        public ICommand InsertVersionNoteHeadingCommand { get; }
+        public ICommand InsertVersionNoteTableCommand { get; }
+        public ICommand InsertVersionNoteChecklistCommand { get; }
+        public ICommand InsertProjectNoteHeadingCommand { get; }
+        public ICommand InsertProjectNoteTableCommand { get; }
+        public ICommand InsertProjectNoteChecklistCommand { get; }
         public ICommand OpenProjectFolderCommand { get; }
 
-        public void SelectCommitNode(TrainingSetCommitNodeViewModel node)
+        public async Task SelectCommitAsync(TrainingSetCommitNodeViewModel commitNode)
         {
-            SelectedNode = node.Node;
+            if (Project == null || IsBusy)
+            {
+                return;
+            }
+
+            if (SelectedCommit != null &&
+                string.Equals(SelectedCommit.Commit.CommitHash, commitNode.Commit.CommitHash, StringComparison.OrdinalIgnoreCase) &&
+                !IsDraftVersion)
+            {
+                SelectedCommit = commitNode;
+                return;
+            }
+
+            var rootPath = Project.RootPath;
+            var status = await _git.GetShortStatusAsync(rootPath);
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var confirmation = MessageBox.Show(
+                    "当前工作区有未提交改动。切换 commit 可能失败，也可能覆盖当前正在查看的状态。\n\n请先提交或备份；确认继续切换吗？",
+                    "切换 Git commit",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning);
+                if (confirmation != MessageBoxResult.OK)
+                {
+                    return;
+                }
+            }
+
+            IsBusy = true;
+            ShowToast($"正在切换到 {commitNode.ShortHash}…");
+            try
+            {
+                var checkout = await _git.CheckoutCommitAsync(rootPath, commitNode.Commit.CommitHash);
+                if (!checkout.IsSuccess)
+                {
+                    ShowToast($"版本切换失败：{FirstUsefulLine(checkout.StandardError, checkout.StandardOutput)}", isError: true);
+                    return;
+                }
+
+                var project = LoadProjectSnapshotOrFallback(rootPath, commitNode.Commit);
+                ApplyProjectState(project, commitNode.Commit);
+                SelectedCommit = commitNode;
+                IsDraftVersion = false;
+                await RefreshGitStatusAsync();
+                ShowToast($"已切换到 {commitNode.ShortHash}，数据集快照已重新载入。");
+            }
+            catch (Exception ex)
+            {
+                ShowToast($"版本切换失败：{ex.Message}", isError: true);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
 
         private void CreateProject()
@@ -328,14 +476,17 @@ namespace CyanTools.ViewModel
                 var name = string.IsNullOrWhiteSpace(ProjectName)
                     ? Path.GetFileName(dialog.FileName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
                     : ProjectName;
-                LoadProjectState(_store.InitializeProject(dialog.FileName, name));
-                AppendLog("已初始化 Git/LFS 训练集项目。");
-                StatusText = "训练集项目已创建。";
-                RefreshGitStatus();
+                var project = _store.InitializeProject(dialog.FileName, name);
+                ApplyProjectState(project, null);
+                HistoryNodes.Clear();
+                SelectedCommit = null;
+                CreateVersion();
+                _ = RefreshRepositoryStateAsync();
+                ShowToast("已创建 Git/LFS 训练集，请放入图片和 prompt 后保存首个版本。");
             }
             catch (Exception ex)
             {
-                ShowError("创建训练集项目失败", ex);
+                ShowToast($"创建训练集失败：{ex.Message}", isError: true);
             }
             finally
             {
@@ -359,14 +510,14 @@ namespace CyanTools.ViewModel
             IsBusy = true;
             try
             {
-                LoadProjectState(_store.LoadProject(dialog.FileName));
-                AppendLog("已打开训练集项目。");
-                StatusText = "训练集项目已打开。";
-                RefreshGitStatus();
+                var project = _store.LoadProject(dialog.FileName);
+                ApplyProjectState(project, null);
+                _ = RefreshRepositoryStateAsync();
+                ShowToast("训练集已打开，正在读取 Git 历史。");
             }
             catch (Exception ex)
             {
-                ShowError("打开训练集项目失败", ex);
+                ShowToast($"打开训练集失败：{ex.Message}", isError: true);
             }
             finally
             {
@@ -374,20 +525,90 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void LoadProjectState(TrainingSetProject project)
+        private void ApplyProjectState(TrainingSetProject project, TrainingSetGitCommit? commit)
         {
-            Project = project;
-            ProjectName = project.Name;
-            ProjectRootPath = project.RootPath;
-            SelectedNode = project.Nodes.FirstOrDefault(node => node.NodeId == project.CurrentNodeId) ?? project.Nodes.FirstOrDefault();
-            CompareSourceNode = ProjectNodes.FirstOrDefault();
-            CompareTargetNode = SelectedNode ?? ProjectNodes.LastOrDefault();
-            RebuildGraph();
+            _isLoading = true;
+            try
+            {
+                Project = project;
+                ProjectName = project.Name;
+                ProjectRootPath = project.RootPath;
+                ProjectNoteEditorText = project.NoteMarkdown ?? string.Empty;
+                var selectedNode = project.Nodes.FirstOrDefault(node =>
+                    string.Equals(node.NodeId, project.CurrentNodeId, StringComparison.OrdinalIgnoreCase))
+                    ?? project.Nodes.LastOrDefault();
+                SetSelectedNode(selectedNode, requestAutoSave: false);
+                if (SelectedNode != null && commit != null && string.IsNullOrWhiteSpace(SelectedNode.Title))
+                {
+                    SelectedNode.Title = commit.Subject;
+                }
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+
+            DatasetBrowser.LoadFolder(project.RootPath, TrainingSetProjectStore.DatasetBrowserExcludedDirectories);
             OnPropertyChanged(nameof(ProjectCoverImage));
+            OnPropertyChanged(nameof(ProjectConfigFiles));
             CommandManager.InvalidateRequerySuggested();
         }
 
-        private void CreateNode()
+        private TrainingSetProject LoadProjectSnapshotOrFallback(string rootPath, TrainingSetGitCommit commit)
+        {
+            try
+            {
+                return _store.LoadProject(rootPath);
+            }
+            catch (FileNotFoundException)
+            {
+                var fallback = new TrainingSetProject
+                {
+                    ProjectId = Project?.ProjectId ?? Guid.NewGuid().ToString("N"),
+                    Name = Project?.Name ?? Path.GetFileName(rootPath),
+                    RootPath = rootPath,
+                    NotePath = ".cyantools/project/README.md"
+                };
+                var node = new TrainingSetVersionNode
+                {
+                    Title = commit.Subject,
+                    Branch = commit.ReferenceDisplay,
+                    Description = "此 commit 早于 CyanTools 版本元数据；仍可查看其中的数据集和 prompt。"
+                };
+                fallback.Nodes.Add(node);
+                fallback.CurrentNodeId = node.NodeId;
+                return fallback;
+            }
+        }
+
+        private void SetSelectedNode(TrainingSetVersionNode? node, bool requestAutoSave)
+        {
+            if (ReferenceEquals(_selectedNode, node))
+            {
+                return;
+            }
+
+            _selectedNode = node;
+            _isLoading = true;
+            NoteEditorText = node?.NoteMarkdown ?? string.Empty;
+            _isLoading = false;
+            OnPropertyChanged(nameof(SelectedNode));
+            OnPropertyChanged(nameof(SelectedNodeTitle));
+            OnPropertyChanged(nameof(SelectedNodeDescription));
+            OnPropertyChanged(nameof(SelectedNodeCoverImage));
+            if (Project != null && node != null)
+            {
+                Project.CurrentNodeId = node.NodeId;
+                if (requestAutoSave)
+                {
+                    RequestAutoSave();
+                }
+            }
+
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void CreateVersion()
         {
             if (Project == null)
             {
@@ -397,11 +618,9 @@ namespace CyanTools.ViewModel
             var parent = SelectedNode;
             var node = new TrainingSetVersionNode
             {
-                Title = Project.Nodes.Count == 0 ? "初始训练集" : $"节点 {Project.Nodes.Count + 1}",
+                Title = HistoryNodes.Count == 0 ? "初始训练集" : $"训练版本 {HistoryNodes.Count + 1}",
                 Branch = _git.GetCurrentBranch(Project.RootPath),
-                NotePath = $".cyantools/notes/{Guid.NewGuid():N}.md",
-                X = parent == null ? 60 : parent.X + 260,
-                Y = parent == null ? 80 : parent.Y + 70
+                NotePath = $".cyantools/notes/{Guid.NewGuid():N}.md"
             };
 
             Project.Nodes.Add(node);
@@ -414,14 +633,12 @@ namespace CyanTools.ViewModel
                 });
             }
 
-            SelectedNode = node;
-            CompareTargetNode = node;
-            RebuildGraph();
-            RequestAutoSave();
-            AppendLog($"已创建节点: {node.Title}");
+            SetSelectedNode(node, requestAutoSave: true);
+            IsDraftVersion = true;
+            ShowToast("已准备一个新版本；编辑数据集、配置和产物后点击“提交版本”。");
         }
 
-        private async Task SaveNodeAsCommitAsync()
+        private async Task SaveVersionAsCommitAsync()
         {
             if (Project == null || SelectedNode == null)
             {
@@ -429,36 +646,31 @@ namespace CyanTools.ViewModel
             }
 
             IsBusy = true;
+            _autoSaveTimer.Stop();
             try
             {
                 _store.SaveProject(Project);
-                var message = $"CyanTools node {SelectedNode.NodeId}: {SelectedNode.Title}";
-                StatusText = "正在保存节点：Git/LFS 正在后台扫描训练集文件，图片较多时可能需要几分钟。";
-                AppendLog("开始执行 git add -A / git commit。窗口不会再被 Git 操作冻结。");
+                var message = string.IsNullOrWhiteSpace(SelectedNode.Title)
+                    ? "保存训练集版本"
+                    : SelectedNode.Title.Trim();
+                ShowToast("正在计算文件变更并写入 Git/LFS…");
                 var commit = await _git.CommitAsync(Project.RootPath, message);
                 if (!commit.IsSuccess)
                 {
-                    AppendLog(string.IsNullOrWhiteSpace(commit.StandardError) ? commit.StandardOutput : commit.StandardError);
-                    StatusText = "Git 提交失败，可能没有文件改动。";
+                    ShowToast($"提交失败：{FirstUsefulLine(commit.StandardError, commit.StandardOutput)}", isError: true);
                     return;
                 }
 
-                SelectedNode.GitCommit = await _git.GetHeadCommitAsync(Project.RootPath);
-                SelectedNode.Branch = await _git.GetCurrentBranchAsync(Project.RootPath);
-                SelectedNode.UpdatedAt = DateTime.Now;
-                _store.SaveProject(Project);
-                RebuildGraph();
-                await RefreshGitStatusAsync();
-                AppendLog($"节点已保存为 Git 提交: {SelectedNode.CommitShort}");
-            }
-            catch (OperationCanceledException)
-            {
-                StatusText = "保存节点已取消。";
-                AppendLog("保存节点已取消。");
+                IsDraftVersion = false;
+                await RefreshRepositoryStateAsync();
+                var head = await _git.GetHeadCommitAsync(Project.RootPath);
+                SelectedCommit = HistoryNodes.FirstOrDefault(item =>
+                    string.Equals(item.Commit.CommitHash, head, StringComparison.OrdinalIgnoreCase));
+                ShowToast($"已创建 Git commit {SelectedCommit?.ShortHash ?? string.Empty}。");
             }
             catch (Exception ex)
             {
-                ShowError("保存节点失败", ex);
+                ShowToast($"提交版本失败：{ex.Message}", isError: true);
             }
             finally
             {
@@ -466,128 +678,234 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void CheckoutSelectedNode()
+        private void CreateBranchFromSelectedCommit()
         {
-            if (Project == null || SelectedNode == null || string.IsNullOrWhiteSpace(SelectedNode.GitCommit))
+            if (Project == null || SelectedCommit == null)
             {
                 return;
             }
 
-            var result = MessageBox.Show(
-                "回退会让 Git 工作区切换到该节点对应提交。请确认当前未保存改动已经提交或备份。",
-                "回退到节点",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Warning);
-            if (result != MessageBoxResult.OK)
+            var branch = string.IsNullOrWhiteSpace(NewBranchName)
+                ? $"experiment/{SanitizeBranchSegment(SelectedCommit.Title)}-{DateTime.Now:yyyyMMddHHmmss}"
+                : NewBranchName.Trim();
+            var result = _git.CreateBranchFromCommit(Project.RootPath, branch, SelectedCommit.Commit.CommitHash);
+            if (!result.IsSuccess)
             {
+                ShowToast($"创建分支失败：{FirstUsefulLine(result.StandardError, result.StandardOutput)}", isError: true);
                 return;
             }
 
-            var checkout = _git.CheckoutCommit(Project.RootPath, SelectedNode.GitCommit);
-            AppendLog(checkout.IsSuccess ? $"已回退到节点 {SelectedNode.Title}" : checkout.StandardError);
-            RefreshGitStatus();
+            NewBranchName = string.Empty;
+            IsDraftVersion = false;
+            _ = RefreshRepositoryStateAsync();
+            ShowToast($"已从 {SelectedCommit.ShortHash} 创建并切换到分支 {branch}。");
         }
 
-        private void CreateBranchFromSelectedNode()
+        private async Task RefreshRepositoryStateAsync()
         {
-            if (Project == null || SelectedNode == null || string.IsNullOrWhiteSpace(SelectedNode.GitCommit))
+            if (Project == null)
             {
                 return;
             }
 
-            var branch = $"experiment/{SanitizeBranchSegment(SelectedNode.Title)}-{DateTime.Now:yyyyMMddHHmmss}";
-            var result = _git.CreateBranchFromCommit(Project.RootPath, branch, SelectedNode.GitCommit);
-            AppendLog(result.IsSuccess ? $"已从节点创建分支: {branch}" : result.StandardError);
-            RefreshGitStatus();
+            var rootPath = Project.RootPath;
+            try
+            {
+                var selectedHash = SelectedCommit?.Commit.CommitHash;
+                var history = await _git.GetHistoryAsync(rootPath);
+                var head = await _git.GetHeadCommitAsync(rootPath);
+                HistoryNodes.Clear();
+                foreach (var commit in history)
+                {
+                    HistoryNodes.Add(new TrainingSetCommitNodeViewModel(commit, this)
+                    {
+                        IsHead = string.Equals(commit.CommitHash, head, StringComparison.OrdinalIgnoreCase)
+                    });
+                }
+
+                SelectedCommit = HistoryNodes.FirstOrDefault(item =>
+                    string.Equals(item.Commit.CommitHash, selectedHash, StringComparison.OrdinalIgnoreCase))
+                    ?? HistoryNodes.FirstOrDefault(item => item.IsHead);
+                CompareSourceCommit ??= HistoryNodes.Skip(1).FirstOrDefault() ?? HistoryNodes.FirstOrDefault();
+                CompareTargetCommit ??= HistoryNodes.FirstOrDefault();
+                await RefreshGitStatusAsync();
+                await RefreshStorageAllocationAsync(rootPath);
+            }
+            catch (Exception ex)
+            {
+                ShowToast($"刷新 Git 历史失败：{ex.Message}", isError: true);
+            }
         }
 
-        private void ImportConfig()
+        private async Task RefreshGitStatusAsync()
+        {
+            if (Project == null)
+            {
+                GitStatusText = "Git 未连接";
+                return;
+            }
+
+            var branch = await _git.GetCurrentBranchAsync(Project.RootPath);
+            var head = await _git.GetHeadCommitAsync(Project.RootPath);
+            var status = await _git.GetShortStatusAsync(Project.RootPath);
+            GitStatusText =
+                $"{(string.IsNullOrWhiteSpace(branch) ? "detached HEAD" : branch)} · " +
+                $"{ShortHash(head)} · " +
+                $"{(string.IsNullOrWhiteSpace(status) ? "工作区干净" : "有未提交改动")}";
+        }
+
+        private async Task RefreshStorageAllocationAsync(string rootPath)
+        {
+            var allocation = await Task.Run(() => TrainingSetProjectStore.CalculateStorageAllocation(rootPath));
+            StorageAllocationText =
+                $"普通 Git {allocation.GitFileCount} 个 / {FormatBytes(allocation.GitBytes)} · " +
+                $"Git LFS {allocation.LfsFileCount} 个 / {FormatBytes(allocation.LfsBytes)}";
+        }
+
+        private void RefreshHistorySelection()
+        {
+            foreach (var item in HistoryNodes)
+            {
+                item.IsSelected = SelectedCommit != null &&
+                    string.Equals(item.Commit.CommitHash, SelectedCommit.Commit.CommitHash, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private void ImportVersionConfig()
         {
             if (Project == null || SelectedNode == null)
             {
                 return;
             }
 
+            var files = PickConfigFiles("导入当前 commit 的训练配置");
+            foreach (var file in files)
+            {
+                var relative = CopyIntoRepository(file, "configs", SelectedNode.NodeId);
+                AddConfigIfMissing(SelectedNode.ConfigFiles, relative, file);
+            }
+
+            if (files.Length > 0)
+            {
+                RequestAutoSave();
+                OnPropertyChanged(nameof(SelectedNode));
+                ShowToast($"已导入 {files.Length} 个 commit 训练配置。");
+            }
+        }
+
+        private void ImportProjectConfig()
+        {
+            if (Project == null)
+            {
+                return;
+            }
+
+            var files = PickConfigFiles("导入训练集级配置");
+            foreach (var file in files)
+            {
+                var relative = CopyIntoRepository(file, "configs/project", string.Empty);
+                AddConfigIfMissing(Project.ConfigFiles, relative, file);
+            }
+
+            if (files.Length > 0)
+            {
+                RequestAutoSave();
+                OnPropertyChanged(nameof(ProjectConfigFiles));
+                ShowToast($"已导入 {files.Length} 个训练集级配置。");
+            }
+        }
+
+        private static string[] PickConfigFiles(string title)
+        {
             var dialog = new OpenFileDialog
             {
-                Title = "导入节点配置文件",
+                Title = title,
                 Filter = "配置文件|*.toml;*.json;*.yaml;*.yml;*.txt|所有文件|*.*",
                 Multiselect = true
             };
-
-            if (dialog.ShowDialog() != true)
-            {
-                return;
-            }
-
-            foreach (var file in dialog.FileNames)
-            {
-                var relative = CopyIntoRepository(file, "configs", SelectedNode.NodeId);
-                if (SelectedNode.ConfigFiles.All(item => !string.Equals(item.RelativePath, relative, StringComparison.OrdinalIgnoreCase)))
-                {
-                    SelectedNode.ConfigFiles.Add(new TrainingSetConfigFile
-                    {
-                        RelativePath = relative,
-                        DisplayName = Path.GetFileName(file)
-                    });
-                }
-            }
-
-            RequestAutoSave();
-            OnPropertyChanged(nameof(SelectedNode));
-            OnPropertyChanged(nameof(CompareSourceConfigs));
-            OnPropertyChanged(nameof(CompareTargetConfigs));
-            AppendLog($"已导入 {dialog.FileNames.Length} 个配置文件。");
+            return dialog.ShowDialog() == true ? dialog.FileNames : Array.Empty<string>();
         }
 
-        private void CompareNodes()
+        private static void AddConfigIfMissing(List<TrainingSetConfigFile> configs, string relative, string sourceFile)
+        {
+            if (configs.All(item => !string.Equals(item.RelativePath, relative, StringComparison.OrdinalIgnoreCase)))
+            {
+                configs.Add(new TrainingSetConfigFile
+                {
+                    RelativePath = relative,
+                    DisplayName = Path.GetFileName(sourceFile)
+                });
+            }
+        }
+
+        private void CompareCommits()
         {
             ConfigDiffRows.Clear();
-            if (Project == null || CompareSourceNode == null || CompareTargetNode == null)
+            if (Project == null || CompareSourceCommit == null || CompareTargetCommit == null)
             {
                 return;
             }
 
-            var sourceConfig = CompareSourceConfig ?? CompareSourceNode.ConfigFiles.FirstOrDefault();
+            var sourceConfig = CompareSourceConfig ?? CompareSourceNode?.ConfigFiles.FirstOrDefault();
             var targetConfig = CompareTargetConfig ??
-                CompareTargetNode.ConfigFiles.FirstOrDefault(config =>
+                CompareTargetNode?.ConfigFiles.FirstOrDefault(config =>
                     string.Equals(config.DisplayName, sourceConfig?.DisplayName, StringComparison.OrdinalIgnoreCase)) ??
-                CompareTargetNode.ConfigFiles.FirstOrDefault();
+                CompareTargetNode?.ConfigFiles.FirstOrDefault();
             if (sourceConfig == null || targetConfig == null)
             {
-                StatusText = "两个节点都需要至少一个配置文件才能比较。";
+                ShowToast("两个 commit 都需要训练配置才能比较。", isError: true);
                 return;
             }
 
-            var before = ReadConfigContent(CompareSourceNode, sourceConfig);
-            var after = ReadConfigContent(CompareTargetNode, targetConfig);
-            foreach (var row in TrainingSetConfigDiffService.Compare(sourceConfig.RelativePath, before, targetConfig.RelativePath, after))
+            var before = ReadConfigContent(CompareSourceCommit.Commit.CommitHash, sourceConfig);
+            var after = ReadConfigContent(CompareTargetCommit.Commit.CommitHash, targetConfig);
+            foreach (var row in TrainingSetConfigDiffService.Compare(
+                sourceConfig.RelativePath,
+                before,
+                targetConfig.RelativePath,
+                after))
             {
                 ConfigDiffRows.Add(row);
             }
 
-            StatusText = $"仅更改: {ConfigDiffRows.Count} 项";
-            AppendLog($"已比较 {CompareSourceNode.Title} -> {CompareTargetNode.Title}: {ConfigDiffRows.Count} 项差异。");
+            ShowToast($"配置对比完成：{ConfigDiffRows.Count} 项发生变化。");
         }
 
-        private string ReadConfigContent(TrainingSetVersionNode node, TrainingSetConfigFile config)
+        private TrainingSetVersionNode? LoadNodeMetadataAtCommit(string? commitHash)
+        {
+            if (Project == null || string.IsNullOrWhiteSpace(commitHash))
+            {
+                return null;
+            }
+
+            var show = _git.ShowFile(Project.RootPath, commitHash, ".cyantools/manager.json");
+            if (!show.IsSuccess)
+            {
+                return null;
+            }
+
+            try
+            {
+                var project = JsonConvert.DeserializeObject<TrainingSetProject>(show.StandardOutput);
+                return project?.Nodes.FirstOrDefault(node =>
+                    string.Equals(node.NodeId, project.CurrentNodeId, StringComparison.OrdinalIgnoreCase))
+                    ?? project?.Nodes.LastOrDefault();
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private string ReadConfigContent(string commitHash, TrainingSetConfigFile config)
         {
             if (Project == null)
             {
                 return string.Empty;
             }
 
-            if (!string.IsNullOrWhiteSpace(node.GitCommit))
-            {
-                var show = _git.ShowFile(Project.RootPath, node.GitCommit, config.RelativePath);
-                if (show.IsSuccess)
-                {
-                    return show.StandardOutput;
-                }
-            }
-
-            var path = TrainingSetProjectStore.ResolveRelativePath(Project.RootPath, config.RelativePath);
-            return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+            var show = _git.ShowFile(Project.RootPath, commitHash, config.RelativePath);
+            return show.IsSuccess ? show.StandardOutput : string.Empty;
         }
 
         private void SelectProjectCover()
@@ -597,7 +915,7 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            var relative = PickAndCopyImage(".cyantools/covers");
+            var relative = PickAndCopyImage(".cyantools/project");
             if (string.IsNullOrWhiteSpace(relative))
             {
                 return;
@@ -608,7 +926,7 @@ namespace CyanTools.ViewModel
             RequestAutoSave();
         }
 
-        private void SelectNodeCover()
+        private void SelectVersionCover()
         {
             if (SelectedNode == null)
             {
@@ -623,7 +941,6 @@ namespace CyanTools.ViewModel
 
             SelectedNode.CoverPath = relative;
             OnPropertyChanged(nameof(SelectedNodeCoverImage));
-            RebuildGraph();
             RequestAutoSave();
         }
 
@@ -635,10 +952,16 @@ namespace CyanTools.ViewModel
                 Filter = "图片文件|*.png;*.jpg;*.jpeg;*.webp;*.bmp|所有文件|*.*"
             };
 
-            return dialog.ShowDialog() == true ? CopyIntoRepository(dialog.FileName, targetFolder, string.Empty) : string.Empty;
+            return dialog.ShowDialog() == true
+                ? CopyIntoRepository(dialog.FileName, targetFolder, string.Empty)
+                : string.Empty;
         }
 
-        private void AttachFileArtifact(TrainingSetArtifactKind kind, string title, string filter, string targetRoot)
+        private void AttachFileArtifact(
+            TrainingSetArtifactKind kind,
+            string title,
+            string filter,
+            string targetRoot)
         {
             if (SelectedNode == null)
             {
@@ -671,7 +994,7 @@ namespace CyanTools.ViewModel
 
             RequestAutoSave();
             OnPropertyChanged(nameof(SelectedNode));
-            AppendLog($"已添加 {dialog.FileNames.Length} 个附件。");
+            ShowToast($"已添加 {dialog.FileNames.Length} 个训练产物。");
         }
 
         private void AttachTensorBoardLog()
@@ -692,25 +1015,28 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            var targetFolder = Path.Combine(Project.RootPath, "tensorboard", SelectedNode.NodeId, Path.GetFileName(dialog.FileName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
+            var sourceName = Path.GetFileName(dialog.FileName.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar));
+            var targetFolder = Path.Combine(Project.RootPath, "tensorboard", SelectedNode.NodeId, sourceName);
             CopyDirectory(dialog.FileName, targetFolder);
             var relative = TrainingSetProjectStore.ToRepositoryRelativePath(Project.RootPath, targetFolder);
             SelectedNode.TensorBoardLogs.Add(new TrainingSetTensorBoardLog
             {
                 RelativePath = relative,
-                DisplayName = Path.GetFileName(targetFolder),
+                DisplayName = sourceName,
                 IsStoredInRepository = true
             });
             SelectedNode.Artifacts.Add(new TrainingSetArtifact
             {
                 RelativePath = relative,
-                DisplayName = Path.GetFileName(targetFolder),
+                DisplayName = sourceName,
                 Kind = TrainingSetArtifactKind.TensorBoardLog,
                 IsStoredInRepository = true
             });
             RequestAutoSave();
             OnPropertyChanged(nameof(SelectedNode));
-            AppendLog("已保存 TensorBoard 日志目录。");
+            ShowToast("TensorBoard 日志已加入当前 commit 产物。");
         }
 
         private string CopyIntoRepository(string sourceFile, string targetRoot, string nodeId)
@@ -739,9 +1065,9 @@ namespace CyanTools.ViewModel
             var directory = Path.GetDirectoryName(path) ?? string.Empty;
             var name = Path.GetFileNameWithoutExtension(path);
             var extension = Path.GetExtension(path);
-            for (var i = 2; ; i++)
+            for (var index = 2; ; index++)
             {
-                var candidate = Path.Combine(directory, $"{name}-{i}{extension}");
+                var candidate = Path.Combine(directory, $"{name}-{index}{extension}");
                 if (!File.Exists(candidate) && !Directory.Exists(candidate))
                 {
                     return candidate;
@@ -754,90 +1080,25 @@ namespace CyanTools.ViewModel
             Directory.CreateDirectory(target);
             foreach (var directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
             {
-                Directory.CreateDirectory(directory.Replace(source, target));
+                Directory.CreateDirectory(directory.Replace(source, target, StringComparison.OrdinalIgnoreCase));
             }
 
             foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
             {
-                var targetFile = file.Replace(source, target);
+                var targetFile = file.Replace(source, target, StringComparison.OrdinalIgnoreCase);
                 Directory.CreateDirectory(Path.GetDirectoryName(targetFile) ?? target);
                 File.Copy(file, targetFile, overwrite: true);
             }
         }
 
-        private void InsertIntoNote(string text)
+        private void InsertIntoVersionNote(string text)
         {
             NoteEditorText += text;
         }
 
-        private void RefreshGitStatus()
+        private void InsertIntoProjectNote(string text)
         {
-            if (Project == null)
-            {
-                GitStatusText = "Git 未连接";
-                return;
-            }
-
-            var branch = _git.GetCurrentBranch(Project.RootPath);
-            var head = _git.GetHeadCommit(Project.RootPath);
-            var status = _git.GetShortStatus(Project.RootPath);
-            GitStatusText = $"分支: {(string.IsNullOrWhiteSpace(branch) ? "(detached)" : branch)} | HEAD: {(head.Length > 7 ? head.Substring(0, 7) : head)} | {(string.IsNullOrWhiteSpace(status) ? "工作区干净" : "有未提交改动")}";
-        }
-
-        private async Task RefreshGitStatusAsync()
-        {
-            if (Project == null)
-            {
-                GitStatusText = "Git 未连接";
-                return;
-            }
-
-            var branch = await _git.GetCurrentBranchAsync(Project.RootPath);
-            var head = await _git.GetHeadCommitAsync(Project.RootPath);
-            var status = await _git.GetShortStatusAsync(Project.RootPath);
-            GitStatusText = $"分支: {(string.IsNullOrWhiteSpace(branch) ? "(detached)" : branch)} | HEAD: {(head.Length > 7 ? head.Substring(0, 7) : head)} | {(string.IsNullOrWhiteSpace(status) ? "工作区干净" : "有未提交改动")}";
-        }
-
-        private void RebuildGraph()
-        {
-            HistoryNodes.Clear();
-            if (Project == null)
-            {
-                return;
-            }
-
-            var titleById = Project.Nodes.ToDictionary(
-                node => node.NodeId,
-                node => node.Title,
-                StringComparer.OrdinalIgnoreCase);
-            foreach (var node in Project.Nodes)
-            {
-                var parentTitles = Project.Edges
-                    .Where(edge => string.Equals(edge.TargetNodeId, node.NodeId, StringComparison.OrdinalIgnoreCase))
-                    .Select(edge => titleById.TryGetValue(edge.SourceNodeId, out var title) ? title : edge.SourceNodeId)
-                    .ToList();
-                HistoryNodes.Add(new TrainingSetCommitNodeViewModel(node, this)
-                    {
-                        ParentSummary = parentTitles.Count == 0
-                            ? "根提交 / 初始快照"
-                            : $"父提交: {string.Join(", ", parentTitles)}",
-                        IsCurrent = string.Equals(Project.CurrentNodeId, node.NodeId, StringComparison.OrdinalIgnoreCase)
-                    });
-            }
-
-            RefreshCanvasSelection();
-            OnPropertyChanged(nameof(ProjectNodes));
-        }
-
-        private void RefreshCanvasSelection()
-        {
-            foreach (var canvasNode in HistoryNodes)
-            {
-                canvasNode.IsSelected = SelectedNode != null &&
-                    string.Equals(canvasNode.Node.NodeId, SelectedNode.NodeId, StringComparison.OrdinalIgnoreCase);
-                canvasNode.IsCurrent = Project != null &&
-                    string.Equals(Project.CurrentNodeId, canvasNode.Node.NodeId, StringComparison.OrdinalIgnoreCase);
-            }
+            ProjectNoteEditorText += text;
         }
 
         private void RequestAutoSave()
@@ -861,12 +1122,11 @@ namespace CyanTools.ViewModel
             try
             {
                 _store.SaveProject(Project);
-                RefreshGitStatus();
-                StatusText = "节点元数据已实时保存。";
+                _ = RefreshGitStatusAsync();
             }
             catch (Exception ex)
             {
-                AppendLog($"自动保存失败: {ex.Message}");
+                ShowToast($"自动保存元数据失败：{ex.Message}", isError: true);
             }
         }
 
@@ -884,18 +1144,29 @@ namespace CyanTools.ViewModel
             });
         }
 
-        private void AppendLog(string message)
+        private void ShowToast(string message, bool isError = false)
         {
-            LogLines.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
-            while (LogLines.Count > 200)
-            {
-                LogLines.RemoveAt(LogLines.Count - 1);
-            }
+            ToastMessage = message;
+            IsToastError = isError;
+            IsToastVisible = true;
+            _toastTimer.Stop();
+            _toastTimer.Start();
         }
 
-        private static void ShowError(string title, Exception ex)
+        private static string FirstUsefulLine(params string[] values)
         {
-            MessageBox.Show($"{title}: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            foreach (var value in values)
+            {
+                var line = value?
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    return line.Trim();
+                }
+            }
+
+            return "Git 未返回详细信息。";
         }
 
         private static string SanitizeBranchSegment(string value)
@@ -904,7 +1175,31 @@ namespace CyanTools.ViewModel
                 .Select(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' ? ch : '-')
                 .ToArray())
                 .Trim('-');
-            return string.IsNullOrWhiteSpace(cleaned) ? "node" : cleaned.ToLowerInvariant();
+            return string.IsNullOrWhiteSpace(cleaned) ? "version" : cleaned.ToLowerInvariant();
+        }
+
+        private static string ShortHash(string hash)
+        {
+            if (string.IsNullOrWhiteSpace(hash))
+            {
+                return "无提交";
+            }
+
+            return hash.Length <= 7 ? hash : hash.Substring(0, 7);
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            string[] units = { "B", "KB", "MB", "GB", "TB" };
+            var value = (double)Math.Max(0, bytes);
+            var unit = 0;
+            while (value >= 1024 && unit < units.Length - 1)
+            {
+                value /= 1024;
+                unit++;
+            }
+
+            return $"{value:0.##} {units[unit]}";
         }
 
         public static BitmapImage? LoadBitmapForBinding(string rootPath, string? relativePath)
@@ -952,27 +1247,29 @@ namespace CyanTools.ViewModel
     public sealed class TrainingSetCommitNodeViewModel : INotifyPropertyChanged
     {
         private bool _isSelected;
-        private bool _isCurrent;
-        private string _parentSummary = string.Empty;
+        private bool _isHead;
 
-        public TrainingSetCommitNodeViewModel(TrainingSetVersionNode node, TrainingSetManagerViewModel owner)
+        public TrainingSetCommitNodeViewModel(TrainingSetGitCommit commit, TrainingSetManagerViewModel owner)
         {
-            Node = node ?? throw new ArgumentNullException(nameof(node));
+            Commit = commit ?? throw new ArgumentNullException(nameof(commit));
             Owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            SelectCommand = new RelayCommand(async _ => await Owner.SelectCommitAsync(this));
         }
 
-        public TrainingSetVersionNode Node { get; }
+        public TrainingSetGitCommit Commit { get; }
         public TrainingSetManagerViewModel Owner { get; }
-        public string Title => Node.Title;
-        public string CommitShort => string.IsNullOrWhiteSpace(Node.CommitShort) ? "未提交" : Node.CommitShort;
-        public string Branch => string.IsNullOrWhiteSpace(Node.Branch) ? "未记录分支" : Node.Branch;
-        public BitmapImage? CoverImage => TrainingSetManagerViewModel.LoadBitmapForBinding(Owner.ProjectRootPath, Node.CoverPath);
-
-        public string ParentSummary
+        public string Title => string.IsNullOrWhiteSpace(Commit.Subject) ? "(无提交说明)" : Commit.Subject;
+        public string ShortHash => Commit.ShortHash;
+        public string AuthorAndDate => $"{Commit.Author} · {Commit.AuthoredAt.ToLocalTime():yyyy-MM-dd HH:mm}";
+        public string References => Commit.ReferenceDisplay;
+        public string ParentSummary => Commit.ParentHashes.Count switch
         {
-            get => _parentSummary;
-            set => SetField(ref _parentSummary, value);
-        }
+            0 => "根提交",
+            1 => $"父级 {Short(Commit.ParentHashes[0])}",
+            _ => $"合并 {string.Join(" + ", Commit.ParentHashes.Select(Short))}"
+        };
+        public string GraphSymbol => IsHead ? "●" : Commit.IsMerge ? "◆" : "○";
+        public ICommand SelectCommand { get; }
 
         public bool IsSelected
         {
@@ -980,13 +1277,22 @@ namespace CyanTools.ViewModel
             set => SetField(ref _isSelected, value);
         }
 
-        public bool IsCurrent
+        public bool IsHead
         {
-            get => _isCurrent;
-            set => SetField(ref _isCurrent, value);
+            get => _isHead;
+            set
+            {
+                if (SetField(ref _isHead, value))
+                {
+                    OnPropertyChanged(nameof(GraphSymbol));
+                }
+            }
         }
 
-        public ICommand SelectCommand => new RelayCommand(_ => Owner.SelectCommitNode(this));
+        private static string Short(string hash)
+        {
+            return hash.Length <= 7 ? hash : hash.Substring(0, 7);
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

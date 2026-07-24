@@ -11,10 +11,20 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
-    public class SameSourceImageGroupingViewModel : PipelineNodeViewModelBase, IPipelineDirectoryNode
+    public class SameSourceImageGroupingViewModel : PipelineNodeViewModelBase, IPipelineDirectoryNode, IPipelineOutputPortProvider
     {
         public override string DisplayName => "同源图片归类";
         private const string DefaultOutputFolderName = "同源";
+        private static readonly IReadOnlyList<PipelineOutputPort> OutputPorts =
+        [
+            new("root", "输出"),
+            new("original", "原图", "原图"),
+            new("thumbnail", "缩略图", "缩略图"),
+            new("duplicate", "副本", "副本"),
+            new("contained", "被包含", "被包含"),
+            new("difference", "差分", "差分"),
+            new("other", "其他", "其他")
+        ];
 
         private string _inputPath = string.Empty;
         public string InputPath
@@ -107,6 +117,8 @@ namespace CyanTools.ViewModel
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.GeneratedOutput;
         public string PipelineInputPath { get => InputPath; set => InputPath = value ?? string.Empty; }
         public string PipelineOutputPath { get => OutputPath; set => OutputPath = value ?? string.Empty; }
+
+        public IReadOnlyList<PipelineOutputPort> GetPipelineOutputPorts() => OutputPorts;
 
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }

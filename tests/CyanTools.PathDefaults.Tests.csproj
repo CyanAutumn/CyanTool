@@ -61,6 +61,7 @@
     <Compile Include="../Utils/ToolOutputDirectoryDefaults.cs" Link="Utils/ToolOutputDirectoryDefaults.cs" />
     <Compile Include="../Framework/Pipeline/PipelineContext.cs" Link="Framework/Pipeline/PipelineContext.cs" />
     <Compile Include="../Framework/Pipeline/IPipelineSnapshotProvider.cs" Link="Framework/Pipeline/IPipelineSnapshotProvider.cs" />
+    <Compile Include="../Framework/Pipeline/IPipelineOutputPortProvider.cs" Link="Framework/Pipeline/IPipelineOutputPortProvider.cs" />
     <Compile Include="../Framework/Pipeline/PipelineNodeViewModelBase.cs" Link="Framework/Pipeline/PipelineNodeViewModelBase.cs" />
     <Compile Include="../Framework/Pipeline/PipelineRunner.cs" Link="Framework/Pipeline/PipelineRunner.cs" />
     <Compile Include="../Framework/Pipeline/PipelineDirectoryBehavior.cs" Link="Framework/Pipeline/PipelineDirectoryBehavior.cs" />

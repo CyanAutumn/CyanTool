@@ -13,6 +13,7 @@
         <viewModel:DatasetManagerViewModel/>
     </UserControl.DataContext>
     <UserControl.Resources>
+        <utils:BooleanToVisibilityConverter x:Key="DatasetBooleanToVisibilityConverter"/>
         <utils:BindingProxy x:Key="TagViewModelProxy" Data="{Binding}"/>
         <utils:ReferenceEqualsMultiConverter x:Key="ReferenceEqualsMultiConverter"/>
         <utils:ImagePathThumbnailConverter x:Key="ImagePathThumbnailConverter"/>
@@ -184,6 +185,7 @@
                 </Grid.ColumnDefinitions>
                 <Button Grid.Column="0"
                         Command="{Binding SelectFolderCommand}"
+                        Visibility="{Binding IsFolderPickerVisible, Converter={StaticResource DatasetBooleanToVisibilityConverter}}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         Margin="0,10,4,0">
                     <StackPanel Orientation="Horizontal"

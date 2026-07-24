@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -34,7 +35,15 @@ namespace CyanTools.ViewModel
             if ((directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None) ||
                 runtimeOutputNode != null)
             {
-                Output.Add(new PipelineCanvasConnectorViewModel(this, "输出", isInput: false));
+                foreach (PipelineOutputPort port in GetOutputPorts(PipelineNode))
+                {
+                    Output.Add(new PipelineCanvasConnectorViewModel(
+                        this,
+                        port.Title,
+                        isInput: false,
+                        port.Key,
+                        port.RelativePath));
+                }
             }
 
             PipelineNode.PropertyChanged += OnPipelineNodePropertyChanged;
@@ -148,6 +157,28 @@ namespace CyanTools.ViewModel
             RefreshPathPreview();
         }
 
+        private static IReadOnlyList<PipelineOutputPort> GetOutputPorts(PipelineNodeViewModelBase node)
+        {
+            IReadOnlyList<PipelineOutputPort>? configuredPorts = node.GetOutputPortProvider()?.GetPipelineOutputPorts();
+            if (configuredPorts == null || configuredPorts.Count == 0)
+            {
+                return [new PipelineOutputPort("root", "输出")];
+            }
+
+            var ports = configuredPorts
+                .Where(port => !string.IsNullOrWhiteSpace(port.Key) && !string.IsNullOrWhiteSpace(port.Title))
+                .GroupBy(port => port.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            if (!ports.Any(port => port.IsRootOutput))
+            {
+                ports.Insert(0, new PipelineOutputPort("root", "输出"));
+            }
+
+            return ports;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -173,16 +204,26 @@ namespace CyanTools.ViewModel
         private Point _anchor;
         private bool _isConnected;
 
-        public PipelineCanvasConnectorViewModel(PipelineCanvasNodeViewModel node, string title, bool isInput)
+        public PipelineCanvasConnectorViewModel(
+            PipelineCanvasNodeViewModel node,
+            string title,
+            bool isInput,
+            string? portKey = null,
+            string? relativePath = null)
         {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             Title = title ?? throw new ArgumentNullException(nameof(title));
             IsInput = isInput;
+            PortKey = portKey;
+            RelativePath = relativePath;
         }
 
         public PipelineCanvasNodeViewModel Node { get; }
         public string Title { get; }
         public bool IsInput { get; }
+        public string? PortKey { get; }
+        public string? RelativePath { get; }
+        public bool IsRootOutput => !IsInput && string.IsNullOrWhiteSpace(RelativePath);
 
         public Point Anchor
         {

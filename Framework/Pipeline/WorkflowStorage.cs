@@ -10,7 +10,8 @@ namespace CyanTools.Pipeline
     public sealed record WorkflowNodeLayout(
         PipelineNodeViewModelBase Node,
         double? LocationX = null,
-        double? LocationY = null);
+        double? LocationY = null,
+        string? OutputPortKey = null);
 
     public static class WorkflowStorage
     {
@@ -58,7 +59,8 @@ namespace CyanTools.Pipeline
                 NodeType = item.Node.GetType().FullName ?? string.Empty,
                 Snapshot = Capture(item.Node),
                 LocationX = item.LocationX,
-                LocationY = item.LocationY
+                LocationY = item.LocationY,
+                OutputPortKey = item.OutputPortKey ?? item.Node.WorkflowOutputPortKey
             }).ToList();
 
             var json = JsonConvert.SerializeObject(definitions, Formatting.Indented);
@@ -100,7 +102,8 @@ namespace CyanTools.Pipeline
 
                 var instance = descriptor.Factory();
                 Apply(instance, def.Snapshot);
-                nodes.Add(new WorkflowNodeLayout(instance, def.LocationX, def.LocationY));
+                instance.WorkflowOutputPortKey = def.OutputPortKey;
+                nodes.Add(new WorkflowNodeLayout(instance, def.LocationX, def.LocationY, def.OutputPortKey));
             }
 
             return nodes;
@@ -139,6 +142,7 @@ namespace CyanTools.Pipeline
             public Dictionary<string, object?> Snapshot { get; set; } = new();
             public double? LocationX { get; set; }
             public double? LocationY { get; set; }
+            public string? OutputPortKey { get; set; }
         }
     }
 }
