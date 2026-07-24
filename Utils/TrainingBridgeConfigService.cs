@@ -129,7 +129,17 @@ namespace CyanTools.Utils
                 }
             }
 
-            return ExpandAliases(CleanValues(values));
+            return NormalizeValues(values);
+        }
+
+
+
+
+        public static IReadOnlyDictionary<string, string> NormalizeValues(
+            IReadOnlyDictionary<string, string> sourceValues)
+        {
+            ArgumentNullException.ThrowIfNull(sourceValues);
+            return ExpandAliases(CleanValues(sourceValues));
         }
 
         public static IReadOnlyList<TrainingBridgeConfigFile> Export(
@@ -137,7 +147,7 @@ namespace CyanTools.Utils
             IReadOnlyDictionary<string, string> sourceValues)
         {
             EnsureSupportedBackend(targetBackendId);
-            var values = ExpandAliases(CleanValues(sourceValues));
+            var values = NormalizeValues(sourceValues);
             return targetBackendId switch
             {
                 DiffusionPipeBackendId => ExportDiffusionPipe(values),
