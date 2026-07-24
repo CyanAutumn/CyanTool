@@ -11,6 +11,9 @@ namespace CyanTools.Utils
     {
         public const string MetadataDirectoryName = ".cyantools";
         public const string ManagerFileName = "manager.json";
+        public const string GlobalProfileRelativePath = ".git/cyantools/project.json";
+        public const string GlobalProjectDirectoryRelativePath = ".git/cyantools/project";
+        public const string GlobalConfigDirectoryRelativePath = ".git/cyantools/configs";
 
         private static readonly IReadOnlyList<string> LfsPatterns = new[]
         {
@@ -95,7 +98,7 @@ namespace CyanTools.Utils
                 Name = string.IsNullOrWhiteSpace(name) ? "未命名训练集" : name.Trim(),
                 RootPath = rootPath,
                 CoverPath = string.Empty,
-                NotePath = ".cyantools/project/README.md",
+                NotePath = $"{GlobalProjectDirectoryRelativePath}/README.md",
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -115,6 +118,7 @@ namespace CyanTools.Utils
             var json = File.ReadAllText(managerPath);
             var project = JsonConvert.DeserializeObject<TrainingSetProject>(json) ?? new TrainingSetProject();
             project.RootPath = rootPath;
+            ApplyGlobalProfile(project);
             return project;
         }
 
@@ -132,6 +136,7 @@ namespace CyanTools.Utils
 
             EnsureLayout(project.RootPath);
             project.UpdatedAt = DateTime.Now;
+            PersistGlobalProfile(project);
             var managerPath = GetManagerPath(project.RootPath);
             File.WriteAllText(managerPath, JsonConvert.SerializeObject(project, JsonSettings));
 
@@ -170,6 +175,8 @@ namespace CyanTools.Utils
             Directory.CreateDirectory(Path.Combine(rootPath, "samples"));
             Directory.CreateDirectory(Path.Combine(rootPath, "tensorboard"));
             Directory.CreateDirectory(Path.Combine(rootPath, "models"));
+            Directory.CreateDirectory(ResolveRelativePath(rootPath, GlobalProjectDirectoryRelativePath));
+            Directory.CreateDirectory(ResolveRelativePath(rootPath, GlobalConfigDirectoryRelativePath));
         }
 
         public static bool ShouldUseLfs(string path)
@@ -259,6 +266,130 @@ namespace CyanTools.Utils
             }
 
             File.WriteAllLines(path, existingLines);
+        }
+
+        private static void ApplyGlobalProfile(TrainingSetProject project)
+        {
+            var profilePath = ResolveRelativePath(project.RootPath, GlobalProfileRelativePath);
+            if (!File.Exists(profilePath))
+            {
+                return;
+            }
+
+            try
+            {
+                var profile = JsonConvert.DeserializeObject<TrainingSetProjectProfile>(
+                    File.ReadAllText(profilePath));
+                if (profile == null)
+                {
+                    return;
+                }
+
+                project.ProjectId = string.IsNullOrWhiteSpace(profile.ProjectId)
+                    ? project.ProjectId
+                    : profile.ProjectId;
+                project.Name = profile.Name;
+                project.CoverPath = profile.CoverPath;
+                project.NotePath = profile.NotePath;
+                project.NoteMarkdown = profile.NoteMarkdown;
+                project.ConfigFiles = profile.ConfigFiles ?? new List<TrainingSetConfigFile>();
+                project.CreatedAt = profile.CreatedAt;
+
+                var notePath = ResolveRelativePath(project.RootPath, project.NotePath);
+                if (File.Exists(notePath))
+                {
+                    project.NoteMarkdown = File.ReadAllText(notePath);
+                }
+            }
+            catch (JsonException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        private static void PersistGlobalProfile(TrainingSetProject project)
+        {
+            project.NotePath = $"{GlobalProjectDirectoryRelativePath}/README.md";
+            project.CoverPath = MigrateGlobalFile(
+                project.RootPath,
+                project.CoverPath,
+                GlobalProjectDirectoryRelativePath);
+
+            var migratedConfigs = new List<TrainingSetConfigFile>();
+            foreach (var config in project.ConfigFiles)
+            {
+                var migratedPath = MigrateGlobalFile(
+                    project.RootPath,
+                    config.RelativePath,
+                    GlobalConfigDirectoryRelativePath);
+                if (!string.IsNullOrWhiteSpace(migratedPath))
+                {
+                    migratedConfigs.Add(new TrainingSetConfigFile
+                    {
+                        RelativePath = migratedPath,
+                        DisplayName = string.IsNullOrWhiteSpace(config.DisplayName)
+                            ? Path.GetFileName(migratedPath)
+                            : config.DisplayName,
+                        SnapshotPath = config.SnapshotPath
+                    });
+                }
+            }
+            project.ConfigFiles = migratedConfigs;
+
+            var notePath = ResolveRelativePath(project.RootPath, project.NotePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(notePath) ?? project.RootPath);
+            File.WriteAllText(notePath, project.NoteMarkdown ?? string.Empty);
+
+            var profile = new TrainingSetProjectProfile
+            {
+                ProjectId = project.ProjectId,
+                Name = project.Name,
+                CoverPath = project.CoverPath,
+                NotePath = project.NotePath,
+                NoteMarkdown = project.NoteMarkdown,
+                CreatedAt = project.CreatedAt,
+                UpdatedAt = DateTime.Now,
+                ConfigFiles = project.ConfigFiles
+            };
+            var profilePath = ResolveRelativePath(project.RootPath, GlobalProfileRelativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(profilePath) ?? project.RootPath);
+            File.WriteAllText(profilePath, JsonConvert.SerializeObject(profile, JsonSettings));
+        }
+
+        private static string MigrateGlobalFile(string rootPath, string relativePath, string targetDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                return string.Empty;
+            }
+
+            var normalizedTarget = targetDirectory.Replace('\\', '/').TrimEnd('/') + "/";
+            var normalizedPath = relativePath.Replace('\\', '/');
+            if (normalizedPath.StartsWith(normalizedTarget, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalizedPath;
+            }
+
+            var sourcePath = ResolveRelativePath(rootPath, relativePath);
+            if (!File.Exists(sourcePath))
+            {
+                return relativePath;
+            }
+
+            var targetFolder = ResolveRelativePath(rootPath, targetDirectory);
+            Directory.CreateDirectory(targetFolder);
+            var targetPath = Path.Combine(targetFolder, Path.GetFileName(sourcePath));
+            if (!string.Equals(
+                    Path.GetFullPath(sourcePath),
+                    Path.GetFullPath(targetPath),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                File.Copy(sourcePath, targetPath, overwrite: true);
+            }
+
+            return ToRepositoryRelativePath(rootPath, targetPath);
         }
 
         private static IEnumerable<string> EnumerateRepositoryFiles(string rootPath)

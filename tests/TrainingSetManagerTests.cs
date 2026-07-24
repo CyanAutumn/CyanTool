@@ -18,7 +18,7 @@ public sealed class TrainingSetManagerTests : IDisposable
             Name = "Style Study",
             RootPath = @"D:\datasets\style-study",
             CoverPath = ".cyantools/covers/project.png",
-            NotePath = ".cyantools/project/README.md",
+            NotePath = ".git/cyantools/project/README.md",
             NoteMarkdown = "# Style Study\n\n整个训练集的长期笔记。",
             CurrentNodeId = "node-b"
         };
@@ -108,6 +108,8 @@ public sealed class TrainingSetManagerTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "notes")));
         Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "covers")));
         Assert.True(Directory.Exists(Path.Combine(_root, ".cyantools", "project")));
+        Assert.True(Directory.Exists(Path.Combine(_root, ".git", "cyantools", "project")));
+        Assert.True(File.Exists(Path.Combine(_root, ".git", "cyantools", "project.json")));
         Assert.True(Directory.Exists(Path.Combine(_root, "configs")));
         Assert.True(Directory.Exists(Path.Combine(_root, "samples")));
         Assert.True(Directory.Exists(Path.Combine(_root, "tensorboard")));
@@ -181,6 +183,34 @@ public sealed class TrainingSetManagerTests : IDisposable
         Assert.False(TrainingSetProjectStore.ShouldUseLfs("images/001.txt"));
         Assert.False(TrainingSetProjectStore.ShouldUseLfs(".cyantools/project/README.md"));
         Assert.False(TrainingSetProjectStore.ShouldUseLfs("configs/train.toml"));
+    }
+
+    [Fact]
+    public void Project_profile_remains_global_when_versioned_manager_snapshot_is_older()
+    {
+        Directory.CreateDirectory(_root);
+        var store = new TrainingSetProjectStore(
+            new TrainingSetGitService(new RecordingTrainingSetGitCommandRunner()));
+        var project = store.InitializeProject(_root, "Current dataset");
+        project.NoteMarkdown = "# Current global note";
+        store.SaveProject(project);
+
+        var staleSnapshot = new TrainingSetProject
+        {
+            ProjectId = project.ProjectId,
+            Name = "Old commit name",
+            RootPath = _root,
+            NoteMarkdown = "# Old commit note"
+        };
+        File.WriteAllText(
+            TrainingSetProjectStore.GetManagerPath(_root),
+            JsonConvert.SerializeObject(staleSnapshot, Formatting.Indented));
+
+        var loaded = store.LoadProject(_root);
+
+        Assert.Equal("Current dataset", loaded.Name);
+        Assert.Equal("# Current global note", loaded.NoteMarkdown);
+        Assert.Equal(".git/cyantools/project/README.md", loaded.NotePath);
     }
 
     [Fact]

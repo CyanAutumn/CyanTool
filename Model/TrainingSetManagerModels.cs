@@ -20,6 +20,18 @@ namespace CyanTools.Model
         public List<TrainingSetVersionEdge> Edges { get; set; } = new();
     }
 
+    public sealed class TrainingSetProjectProfile
+    {
+        public string ProjectId { get; set; } = string.Empty;
+        public string Name { get; set; } = "未命名训练集";
+        public string CoverPath { get; set; } = string.Empty;
+        public string NotePath { get; set; } = ".git/cyantools/project/README.md";
+        public string NoteMarkdown { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public List<TrainingSetConfigFile> ConfigFiles { get; set; } = new();
+    }
+
     public sealed class TrainingSetVersionNode
     {
         public string NodeId { get; set; } = Guid.NewGuid().ToString("N");

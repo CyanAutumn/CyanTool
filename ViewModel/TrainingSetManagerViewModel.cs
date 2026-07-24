@@ -567,7 +567,7 @@ namespace CyanTools.ViewModel
                     ProjectId = Project?.ProjectId ?? Guid.NewGuid().ToString("N"),
                     Name = Project?.Name ?? Path.GetFileName(rootPath),
                     RootPath = rootPath,
-                    NotePath = ".cyantools/project/README.md"
+                    NotePath = $"{TrainingSetProjectStore.GlobalProjectDirectoryRelativePath}/README.md"
                 };
                 var node = new TrainingSetVersionNode
                 {
@@ -803,7 +803,10 @@ namespace CyanTools.ViewModel
             var files = PickConfigFiles("导入训练集级配置");
             foreach (var file in files)
             {
-                var relative = CopyIntoRepository(file, "configs/project", string.Empty);
+                var relative = CopyIntoRepository(
+                    file,
+                    TrainingSetProjectStore.GlobalConfigDirectoryRelativePath,
+                    string.Empty);
                 AddConfigIfMissing(Project.ConfigFiles, relative, file);
             }
 
@@ -915,7 +918,7 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            var relative = PickAndCopyImage(".cyantools/project");
+            var relative = PickAndCopyImage(TrainingSetProjectStore.GlobalProjectDirectoryRelativePath);
             if (string.IsNullOrWhiteSpace(relative))
             {
                 return;
