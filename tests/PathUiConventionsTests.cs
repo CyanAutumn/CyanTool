@@ -430,6 +430,21 @@ public sealed class PathUiConventionsTests
         Assert.Contains("GetOutputPathSelectorNode", graph);
     }
 
+    [Fact]
+    public void WorkflowStorage_PersistsAndRestoresCanvasNodeLocations()
+    {
+        string storage = ReadRepoFile(Path.Combine("Framework", "Pipeline", "WorkflowStorage.cs"));
+        string scheduler = ReadRepoFile(Path.Combine("ViewModel", "PipelineSchedulerViewModel.cs"));
+
+        Assert.Contains("WorkflowNodeLayout", storage);
+        Assert.Contains("LocationX", storage);
+        Assert.Contains("LocationY", storage);
+        Assert.Contains("LoadWithLayout", storage);
+        Assert.Contains("new WorkflowNodeLayout", scheduler);
+        Assert.Contains("LoadWithLayout(name, _downloadersUnlocked)", scheduler);
+        Assert.Contains("GetSavedLocation", scheduler);
+    }
+
     private static string ReadRepoFile(string relativePath)
     {
         string repositoryRoot = FindRepositoryRoot();

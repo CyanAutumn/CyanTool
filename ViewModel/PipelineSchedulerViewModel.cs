@@ -184,11 +184,14 @@ namespace CyanTools.ViewModel
             AppendLog($"已添加节点: {instance.DisplayName}");
         }
 
-        private PipelineCanvasNodeViewModel CreateCanvasNode(PipelineNodeViewModelBase pipelineNode, int index)
+        private PipelineCanvasNodeViewModel CreateCanvasNode(
+            PipelineNodeViewModelBase pipelineNode,
+            int index,
+            Point? savedLocation = null)
         {
             var row = index / 4;
             var column = index % 4;
-            var location = new Point(40 + column * NodeHorizontalSpacing, 40 + row * NodeVerticalSpacing);
+            var location = savedLocation ?? new Point(40 + column * NodeHorizontalSpacing, 40 + row * NodeVerticalSpacing);
             return new PipelineCanvasNodeViewModel(pipelineNode, location);
         }
 
@@ -379,7 +382,12 @@ namespace CyanTools.ViewModel
             }
 
             ReplacePipelineNodes(order.Select(n => n.PipelineNode));
-            WorkflowStorage.Save(SelectedWorkflowName.Trim(), PipelineNodes);
+            WorkflowStorage.Save(
+                SelectedWorkflowName.Trim(),
+                order.Select(node => new WorkflowNodeLayout(
+                    node.PipelineNode,
+                    node.Location.X,
+                    node.Location.Y)));
             _loadedWorkflowName = SelectedWorkflowName.Trim();
             RefreshWorkflowList();
             AppendLog($"已保存工作流: {SelectedWorkflowName.Trim()}");
@@ -519,8 +527,8 @@ namespace CyanTools.ViewModel
             _isLoadingWorkflow = true;
             try
             {
-                var nodes = WorkflowStorage.Load(name, _downloadersUnlocked);
-                LoadCanvasFromPipelineNodes(nodes);
+                var nodes = WorkflowStorage.LoadWithLayout(name, _downloadersUnlocked);
+                LoadCanvasFromWorkflowNodes(nodes);
                 _loadedWorkflowName = name;
             }
             finally
@@ -534,17 +542,30 @@ namespace CyanTools.ViewModel
             RaiseCommandStates();
         }
 
-        private void LoadCanvasFromPipelineNodes(IReadOnlyList<PipelineNodeViewModelBase> nodes)
+        private void LoadCanvasFromWorkflowNodes(IReadOnlyList<WorkflowNodeLayout> nodes)
         {
             ClearCanvas();
 
             for (var i = 0; i < nodes.Count; i++)
             {
-                CanvasNodes.Add(CreateCanvasNode(nodes[i], i));
+                CanvasNodes.Add(CreateCanvasNode(nodes[i].Node, i, GetSavedLocation(nodes[i])));
             }
 
             RebuildLinearConnections(CanvasNodes.ToList());
             RebuildPipelineNodesFromCanvas();
+        }
+
+        private static Point? GetSavedLocation(WorkflowNodeLayout node)
+        {
+            if (node.LocationX is not double x ||
+                node.LocationY is not double y ||
+                !double.IsFinite(x) ||
+                !double.IsFinite(y))
+            {
+                return null;
+            }
+
+            return new Point(x, y);
         }
 
         private void ClearCanvas()

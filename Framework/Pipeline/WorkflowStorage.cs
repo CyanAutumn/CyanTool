@@ -7,6 +7,11 @@ using Newtonsoft.Json;
 
 namespace CyanTools.Pipeline
 {
+    public sealed record WorkflowNodeLayout(
+        PipelineNodeViewModelBase Node,
+        double? LocationX = null,
+        double? LocationY = null);
+
     public static class WorkflowStorage
     {
         private const string FolderName = "Workflow";
@@ -35,6 +40,11 @@ namespace CyanTools.Pipeline
 
         public static void Save(string name, IEnumerable<PipelineNodeViewModelBase> nodes)
         {
+            Save(name, nodes.Select(node => new WorkflowNodeLayout(node)));
+        }
+
+        public static void Save(string name, IEnumerable<WorkflowNodeLayout> nodes)
+        {
             if (string.IsNullOrWhiteSpace(name))
             {
                 return;
@@ -43,10 +53,12 @@ namespace CyanTools.Pipeline
             var folder = EnsureFolder();
             var path = Path.Combine(folder, $"{name}.json");
 
-            var definitions = nodes.Select(node => new WorkflowNodeDefinition
+            var definitions = nodes.Select(item => new WorkflowNodeDefinition
             {
-                NodeType = node.GetType().FullName ?? string.Empty,
-                Snapshot = Capture(node)
+                NodeType = item.Node.GetType().FullName ?? string.Empty,
+                Snapshot = Capture(item.Node),
+                LocationX = item.LocationX,
+                LocationY = item.LocationY
             }).ToList();
 
             var json = JsonConvert.SerializeObject(definitions, Formatting.Indented);
@@ -55,17 +67,24 @@ namespace CyanTools.Pipeline
 
         public static List<PipelineNodeViewModelBase> Load(string name, bool downloadersUnlocked)
         {
+            return LoadWithLayout(name, downloadersUnlocked)
+                .Select(item => item.Node)
+                .ToList();
+        }
+
+        public static List<WorkflowNodeLayout> LoadWithLayout(string name, bool downloadersUnlocked)
+        {
             var folder = EnsureFolder();
             var path = Path.Combine(folder, $"{name}.json");
             if (!File.Exists(path))
             {
-                return new List<PipelineNodeViewModelBase>();
+                return new List<WorkflowNodeLayout>();
             }
 
             var json = File.ReadAllText(path);
             var definitions = JsonConvert.DeserializeObject<List<WorkflowNodeDefinition>>(json) ?? new List<WorkflowNodeDefinition>();
 
-            var nodes = new List<PipelineNodeViewModelBase>();
+            var nodes = new List<WorkflowNodeLayout>();
             foreach (var def in definitions)
             {
                 var descriptor = PipelineCatalog.GetAll().FirstOrDefault(d => d.NodeType.FullName == def.NodeType);
@@ -81,7 +100,7 @@ namespace CyanTools.Pipeline
 
                 var instance = descriptor.Factory();
                 Apply(instance, def.Snapshot);
-                nodes.Add(instance);
+                nodes.Add(new WorkflowNodeLayout(instance, def.LocationX, def.LocationY));
             }
 
             return nodes;
@@ -118,6 +137,8 @@ namespace CyanTools.Pipeline
         {
             public string NodeType { get; set; } = string.Empty;
             public Dictionary<string, object?> Snapshot { get; set; } = new();
+            public double? LocationX { get; set; }
+            public double? LocationY { get; set; }
         }
     }
 }
