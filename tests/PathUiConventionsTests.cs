@@ -381,6 +381,21 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void DatasetDownloader_IsAlwaysVisibleWhileHomeFiveClickPromptRemains()
+    {
+        string downloaderPage = ReadRepoFile("DanbooruCrawlerView.xaml.cs");
+        string catalog = ReadRepoFile(Path.Combine("Framework", "Pipeline", "PipelineCatalog.cs"));
+        string mainWindow = ReadRepoFile("MainWindow.xaml.cs");
+
+        Assert.Contains("[ToolPage(\"数据集下载器\", 290)]", downloaderPage);
+        Assert.DoesNotContain("[ToolPage(\"数据集下载器\", 290, true)]", downloaderPage);
+        Assert.Contains("typeof(DatasetDownloaderPipelineNode), () => new DatasetDownloaderPipelineNode())", catalog);
+        Assert.DoesNotContain("DatasetDownloaderPipelineNode(), requiresUnlock: true", catalog);
+        Assert.Contains("_secretImageClickCount < 5", mainWindow);
+        Assert.Contains("\"再敲咬你啊\"", mainWindow);
+    }
+
+    [Fact]
     public void WorkflowParameterGrid_PreservesDatasetDownloaderControlsAndLabels()
     {
         string content = ReadRepoFile(Path.Combine("ViewModel", "PipelineNodeParameterViewModels.cs"));
