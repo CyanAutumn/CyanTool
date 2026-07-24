@@ -287,6 +287,16 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void TrainingSetManagerView_ReadOnlyProjectPathBindingIsOneWay()
+    {
+        string content = ReadRepoFile("TrainingSetManagerView.xaml");
+
+        Assert.Contains(
+            "Text=\"{Binding ProjectRootPath, Mode=OneWay}\"",
+            content);
+    }
+
+    [Fact]
     public void SimplePipelineNode_ForwardsInnerPropertyChangedEvents()
     {
         string content = ReadRepoFile(Path.Combine("Framework", "Pipeline", "SimplePipelineNode.cs"));
