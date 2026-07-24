@@ -107,7 +107,9 @@ namespace CyanTools.ViewModel
         private readonly RestClient _danbooruClient;
 
         private CancellationTokenSource? _cancellationTokenSource;
-        private readonly SemaphoreSlim _remoteRequestPacingLock = new(1, 1);
+        private readonly RemoteRequestPacer _danbooruRequestPacer = new();
+        private readonly RemoteRequestPacer _pixivRequestPacer = new();
+        private readonly RemoteRequestPacer _kemonoRequestPacer = new();
         private PipelineRuntimeOutputDirectoryValidator.RunOutputRootSnapshot? _activeRunOutputRootSnapshot;
         private Action<string>? _pipelineLogSink;
         private string? _pixivAccessToken;
@@ -123,7 +125,6 @@ namespace CyanTools.ViewModel
         private string _kemonoDownloadSummary = "Kemono：等待下载";
         private string _outputDirectoryImageTotalSummary = "输出目录总计：等待下载";
         private int _downloadIntervalSeconds = DefaultPixivIntervalSeconds;
-        private DateTimeOffset _nextRemoteRequestUtc = DateTimeOffset.MinValue;
         private bool _enableDanbooru = true;
         private bool _enablePixiv = true;
         private bool _enableKemono = true;
@@ -458,26 +459,14 @@ namespace CyanTools.ViewModel
 
         private void ResetRemoteRequestPacing()
         {
-            _nextRemoteRequestUtc = DateTimeOffset.MinValue;
+            _danbooruRequestPacer.Reset();
+            _pixivRequestPacer.Reset();
+            _kemonoRequestPacer.Reset();
         }
 
-        private async Task WaitForNextRemoteRequestAsync(CancellationToken token)
+        private Task WaitForNextRemoteRequestAsync(RemoteRequestPacer pacer, CancellationToken token)
         {
-            await _remoteRequestPacingLock.WaitAsync(token);
-            try
-            {
-                var remaining = _nextRemoteRequestUtc - DateTimeOffset.UtcNow;
-                if (remaining > TimeSpan.Zero)
-                {
-                    await Task.Delay(remaining, token);
-                }
-
-                _nextRemoteRequestUtc = DateTimeOffset.UtcNow.AddSeconds(DownloadIntervalSeconds);
-            }
-            finally
-            {
-                _remoteRequestPacingLock.Release();
-            }
+            return pacer.WaitAsync(DownloadIntervalSeconds, token);
         }
 
         private async Task StartOrStopAsync()
@@ -654,7 +643,7 @@ namespace CyanTools.ViewModel
                 ["redirect_uri"] = PixivRedirectUri
             });
 
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_pixivRequestPacer, token);
             using var response = await PixivAuthClient.SendAsync(request, token);
             var payload = await response.Content.ReadAsStringAsync(token);
             if (!response.IsSuccessStatusCode)
@@ -700,7 +689,7 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                await PrepareSessionOutputSegmentsAsync(input, token);
+                PrepareSessionOutputSegments(input);
 
                 string resolvedOutputRoot = ResolveCurrentRunOutputRoot();
                 pipelineLog?.Invoke($"解析后的输出路径: {resolvedOutputRoot}");
@@ -761,10 +750,10 @@ namespace CyanTools.ViewModel
             return EnableDanbooru || (EnablePixiv && !IsTagOrPostMode) || (EnableKemono && !IsTagOrPostMode);
         }
 
-        private async Task PrepareSessionOutputSegmentsAsync(string input, CancellationToken token)
+        private void PrepareSessionOutputSegments(string input)
         {
             _sessionOutputIdSegment = SanitizePathSegment(input, "unknown");
-            _sessionOutputArtistSegment = await ResolveArtistSegmentForOutputAsync(input, token);
+            _sessionOutputArtistSegment = SanitizePathSegment(input, "unknown_artist");
         }
 
         private async Task RunSelectedTasksAsync(string input, CancellationToken token)
@@ -772,31 +761,53 @@ namespace CyanTools.ViewModel
             var tasks = new List<Task>();
             if (EnableDanbooru)
             {
-                tasks.Add(RunDanbooruAsync(input, token));
+                tasks.Add(RunSourceIndependentlyAsync(
+                    "Danbooru",
+                    () => RunDanbooruAsync(input, token),
+                    SetDanbooruDownloadSummary,
+                    token));
             }
 
             if (EnablePixiv && !IsTagOrPostMode)
             {
-                tasks.Add(RunPixivAsync(input, token));
+                tasks.Add(RunSourceIndependentlyAsync(
+                    "Pixiv",
+                    () => RunPixivAsync(input, token),
+                    SetPixivDownloadSummary,
+                    token));
             }
 
             if (EnableKemono && !IsTagOrPostMode)
             {
-                tasks.Add(RunKemonoAsync(input, token));
+                tasks.Add(RunSourceIndependentlyAsync(
+                    "Kemono",
+                    () => RunKemonoAsync(input, token),
+                    SetKemonoDownloadSummary,
+                    token));
             }
 
             await Task.WhenAll(tasks);
         }
 
-        private async Task<string> ResolveArtistSegmentForOutputAsync(string input, CancellationToken token)
+        private async Task RunSourceIndependentlyAsync(
+            string source,
+            Func<Task> runSource,
+            Action<string> setSummary,
+            CancellationToken token)
         {
-            if (SelectedMode != DatasetDownloadMode.ArtistId)
+            try
             {
-                return "unknown_artist";
+                await runSource();
             }
-
-            var artistName = await ResolveDanbooruArtistTagByPixivUserIdAsync(input, token);
-            return SanitizePathSegment(artistName ?? string.Empty, "unknown_artist");
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[{source}] 任务失败: {ex.Message}");
+                setSummary($"{source}：任务失败（{ex.Message}）");
+            }
         }
 
         private async Task RunDanbooruAsync(string input, CancellationToken token)
@@ -880,7 +891,7 @@ namespace CyanTools.ViewModel
         private async Task<int?> FetchDanbooruPostCountAsync(string tags, CancellationToken token)
         {
             var request = new RestRequest($"/counts/posts.json?tags={Uri.EscapeDataString(tags)}", Method.Get);
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
             var response = await _danbooruClient.ExecuteAsync(request, token);
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -914,7 +925,7 @@ namespace CyanTools.ViewModel
             while (!token.IsCancellationRequested)
             {
                 var request = new RestRequest($"/posts.json?format=json&tags={Uri.EscapeDataString(tags)}&limit={DanbooruPageSize}&page={page}", Method.Get);
-                await WaitForNextRemoteRequestAsync(token);
+                await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
                 var response = await _danbooruClient.ExecuteAsync(request, token);
                 if (!response.IsSuccessful)
                 {
@@ -952,7 +963,7 @@ namespace CyanTools.ViewModel
         private async Task<DownloadOutcome> DownloadDanbooruByPostIdAsync(string postId, string outputDirectory, CancellationToken token)
         {
             var request = new RestRequest($"/posts/{Uri.EscapeDataString(postId)}.json", Method.Get);
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
             var response = await _danbooruClient.ExecuteAsync(request, token);
             if (!response.IsSuccessful)
             {
@@ -1011,7 +1022,7 @@ namespace CyanTools.ViewModel
 
             for (int attempt = 1; attempt <= ImageDownloadRetryCount; attempt++)
             {
-                await WaitForNextRemoteRequestAsync(token);
+                await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
                 var response = await _danbooruClient.ExecuteAsync(request, token);
                 if (!response.IsSuccessful || response.RawBytes == null || response.RawBytes.Length == 0)
                 {
@@ -1165,7 +1176,7 @@ namespace CyanTools.ViewModel
             {
                 var pattern = $"*pixiv.net/users/{pixivUserId}*";
                 var request = new RestRequest($"/artists.json?search[url_matches]={Uri.EscapeDataString(pattern)}", Method.Get);
-                await WaitForNextRemoteRequestAsync(token);
+                await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
                 var response = await _danbooruClient.ExecuteAsync(request, token);
                 if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
                 {
@@ -1337,7 +1348,7 @@ namespace CyanTools.ViewModel
                 ["refresh_token"] = normalizedRefreshToken
             });
 
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_pixivRequestPacer, token);
             using var response = await PixivAuthClient.SendAsync(request, token);
             var payload = await response.Content.ReadAsStringAsync(token);
             if (!response.IsSuccessStatusCode)
@@ -1430,7 +1441,7 @@ namespace CyanTools.ViewModel
             request.Headers.TryAddWithoutValidation("App-OS", PixivAppOs);
             request.Headers.TryAddWithoutValidation("App-OS-Version", PixivAppOsVersion);
 
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_pixivRequestPacer, token);
             using var response = await PixivApiClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             var payload = await response.Content.ReadAsStringAsync(token);
             return (response.StatusCode, payload);
@@ -1546,7 +1557,7 @@ namespace CyanTools.ViewModel
                     request.Headers.Referrer = new Uri("https://app-api.pixiv.net/");
                     request.Headers.TryAddWithoutValidation("User-Agent", PixivUserAgent);
 
-                    await WaitForNextRemoteRequestAsync(token);
+                    await WaitForNextRemoteRequestAsync(_pixivRequestPacer, token);
                     using var response = await PixivImageClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
                     if (!response.IsSuccessStatusCode)
                     {
@@ -1685,7 +1696,7 @@ namespace CyanTools.ViewModel
             var requestUri = $"/api/v1/{service}/user/{artistId}/posts?o={offset}";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_kemonoRequestPacer, token);
             using var response = await KemonoHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             var payload = await response.Content.ReadAsStringAsync(token);
 
@@ -1847,7 +1858,7 @@ namespace CyanTools.ViewModel
             var requestUri = $"/api/v1/{service}/user/{artistId}/post/{postId}";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-            await WaitForNextRemoteRequestAsync(token);
+            await WaitForNextRemoteRequestAsync(_kemonoRequestPacer, token);
             using var response = await KemonoHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if (!response.IsSuccessStatusCode)
             {
@@ -1887,7 +1898,7 @@ namespace CyanTools.ViewModel
             {
                 try
                 {
-                    await WaitForNextRemoteRequestAsync(token);
+                    await WaitForNextRemoteRequestAsync(_kemonoRequestPacer, token);
                     using var response = await KemonoHttpClient.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead, token);
                     response.EnsureSuccessStatusCode();
                     await using var input = await response.Content.ReadAsStreamAsync(token);
@@ -2379,6 +2390,36 @@ namespace CyanTools.ViewModel
 
         private sealed record PixivDownloadItem(string Url, string FileName, string FileKey);
         private sealed record KemonoAssetDownload(string Url, string FileName, string? Content, string? PostId);
+
+        private sealed class RemoteRequestPacer
+        {
+            private readonly SemaphoreSlim _lock = new(1, 1);
+            private DateTimeOffset _nextRequestUtc = DateTimeOffset.MinValue;
+
+            public void Reset()
+            {
+                _nextRequestUtc = DateTimeOffset.MinValue;
+            }
+
+            public async Task WaitAsync(int intervalSeconds, CancellationToken token)
+            {
+                await _lock.WaitAsync(token);
+                try
+                {
+                    var remaining = _nextRequestUtc - DateTimeOffset.UtcNow;
+                    if (remaining > TimeSpan.Zero)
+                    {
+                        await Task.Delay(remaining, token);
+                    }
+
+                    _nextRequestUtc = DateTimeOffset.UtcNow.AddSeconds(Math.Max(0, intervalSeconds));
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            }
+        }
 
         private enum DownloadOutcome
         {

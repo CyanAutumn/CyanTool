@@ -364,14 +364,20 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
-    public void DatasetDownloader_PacesImageAndNonImageRemoteRequestsWithTheConfiguredInterval()
+    public void DatasetDownloader_RunsSourcesInParallelWithIndependentRequestPacing()
     {
         string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
 
-        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+var response = await _danbooruClient.ExecuteAsync"), content);
-        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await PixivApiClient.SendAsync"), content);
-        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await KemonoHttpClient.SendAsync"), content);
-        Assert.Matches(new Regex("await WaitForNextRemoteRequestAsync\\(token\\);\\s+using var response = await KemonoHttpClient.GetAsync"), content);
+        Assert.Contains("Task.WhenAll(tasks)", content);
+        Assert.Contains("RunSourceIndependentlyAsync", content);
+        Assert.Contains("_danbooruRequestPacer", content);
+        Assert.Contains("_pixivRequestPacer", content);
+        Assert.Contains("_kemonoRequestPacer", content);
+        Assert.Contains("WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token)", content);
+        Assert.Contains("WaitForNextRemoteRequestAsync(_pixivRequestPacer, token)", content);
+        Assert.Contains("WaitForNextRemoteRequestAsync(_kemonoRequestPacer, token)", content);
+        Assert.DoesNotContain("_remoteRequestPacingLock", content);
+        Assert.DoesNotContain("_nextRemoteRequestUtc", content);
     }
 
     [Fact]
