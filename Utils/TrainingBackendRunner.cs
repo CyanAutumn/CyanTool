@@ -27,10 +27,7 @@ namespace CyanTools.Utils
 
         public TrainingBackendRunner(string? managedRoot = null, string? runsRoot = null)
         {
-            _managedRoot = managedRoot ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "CyanTools",
-                "training-backends");
+            _managedRoot = managedRoot ?? TrainingBackendBindingStore.GetDefaultManagedRoot();
             _runsRoot = runsRoot ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "CyanTools",

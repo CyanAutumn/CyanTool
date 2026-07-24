@@ -33,6 +33,7 @@
     <Compile Include="../Utils/TrainingSetConfigDiffService.cs" Link="Utils/TrainingSetConfigDiffService.cs" />
     <Compile Include="../Model/TrainingBridgeModels.cs" Link="Model/TrainingBridgeModels.cs" />
     <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
+    <Compile Include="../Utils/TrainingBackendBindingStore.cs" Link="Utils/TrainingBackendBindingStore.cs" />
     <Compile Include="../Utils/TrainingBridgeProjectStore.cs" Link="Utils/TrainingBridgeProjectStore.cs" />
     <Compile Include="../Utils/TrainingBackendRunner.cs" Link="Utils/TrainingBackendRunner.cs" />
     <Compile Include="../Utils/TrainingBridgeSystemMetricsService.cs" Link="Utils/TrainingBridgeSystemMetricsService.cs" />

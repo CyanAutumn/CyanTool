@@ -201,15 +201,58 @@ public sealed class TrainingBridgeTests
                 Values = new Dictionary<string, string> { ["learning_rate"] = "0.0002" }
             };
 
-            store.Save(draft);
-            var loaded = Assert.Single(store.ListAll());
+        store.Save(draft);
+        var loaded = Assert.Single(store.ListAll());
 
-            Assert.Equal(draft.Id, loaded.Id);
-            Assert.Equal("bridge-test", loaded.Name);
-            Assert.Equal("0.0002", loaded.Values["learning_rate"]);
+        Assert.Equal(draft.Id, loaded.Id);
+        Assert.Equal("bridge-test", loaded.Name);
+        Assert.Equal("0.0002", loaded.Values["learning_rate"]);
 
             store.Delete(draft.Id);
             Assert.Empty(store.ListAll());
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void ProjectStore_FindsDraftByConfigurationFileName()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "cyantools-training-bridge-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new TrainingBridgeProjectStore(root);
+            var draft = new TrainingBridgeProjectDraft
+            {
+                Name = "anima-1024",
+                ProjectName = "Anima 1024 训练",
+                Values = new Dictionary<string, string> { ["learning_rate"] = "0.0002" }
+            };
+
+            store.Save(draft);
+            TrainingBridgeProjectDraft loaded = Assert.IsType<TrainingBridgeProjectDraft>(store.FindByName(" ANIMA-1024 "));
+
+            Assert.Equal(draft.Id, loaded.Id);
+            Assert.Equal("Anima 1024 训练", loaded.ProjectName);
+
+            var replacement = new TrainingBridgeProjectDraft
+            {
+                Id = loaded.Id,
+                Name = "anima-1024",
+                ProjectName = "Anima 1024 修订",
+                Values = new Dictionary<string, string> { ["learning_rate"] = "0.0001" }
+            };
+            store.Save(replacement);
+
+            TrainingBridgeProjectDraft updated = Assert.Single(store.ListAll());
+            Assert.Equal(loaded.Id, updated.Id);
+            Assert.Equal("Anima 1024 修订", updated.ProjectName);
+            Assert.Equal("0.0001", updated.Values["learning_rate"]);
         }
         finally
         {
@@ -234,6 +277,15 @@ public sealed class TrainingBridgeTests
     {
         string xaml = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "TrainingBridgeView.xaml"));
 
+        Assert.Contains("Header=\"配置文件\"", xaml);
+        Assert.Contains("ItemsSource=\"{Binding BackendBindings}\"", xaml);
+        Assert.Contains("SelectedItem=\"{Binding SelectedTrainerBinding}\"", xaml);
+        Assert.Contains("Text=\"配置文件名称\"", xaml);
+        Assert.Contains("IsEditable=\"True\"", xaml);
+        Assert.Contains("Text=\"{Binding DraftFileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", xaml);
+        Assert.Contains("Text=\"保存配置文件\"", xaml);
+        Assert.DoesNotContain("NewProjectCommand", xaml);
+        Assert.Contains("Text=\"导出到训练器\"", xaml);
         Assert.Contains("<WrapPanel Orientation=\"Horizontal\"/>", xaml);
         Assert.Contains("Binding DisplayLabel", xaml);
         Assert.DoesNotContain("<DataGrid", xaml);
@@ -243,12 +295,10 @@ public sealed class TrainingBridgeTests
         Assert.Contains("Text=\"{Binding CpuText}\"", xaml);
         Assert.Contains("Text=\"{Binding RamText}\"", xaml);
         Assert.Contains("Value=\"{Binding DiskLoadPercent}\"", xaml);
-        Assert.Contains("Header=\"Epoch 预览图\"", xaml);
-        Assert.Contains("ItemsSource=\"{Binding CoreParameters}\"", xaml);
-        Assert.Contains("Text=\"{Binding PreviewPositivePrompt", xaml);
-        Assert.Contains("SelectedItem=\"{Binding PreviewSampler", xaml);
-        Assert.Contains("Text=\"{Binding PreviewWidth", xaml);
-        Assert.Contains("Text=\"{Binding PreviewHeight", xaml);
+        Assert.Contains("ItemsSource=\"{Binding VisibleParameters}\"", xaml);
+        Assert.DoesNotContain("Header=\"Epoch 预览图\"", xaml);
+        Assert.DoesNotContain("Binding PreviewPositivePrompt", xaml);
+        Assert.DoesNotContain("Binding PreviewSampler", xaml);
     }
 
     [Fact]

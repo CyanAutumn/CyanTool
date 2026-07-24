@@ -11,8 +11,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Model;
 using CyanTools.Utils;
 using Microsoft.Win32;
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace CyanTools.ViewModel
 {
@@ -21,6 +23,7 @@ namespace CyanTools.ViewModel
         private const int MaxLogLines = 300;
         private const string CudnnWindowsDownloadUrl = "https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/";
         private readonly TrainingBackendDeployer _trainingBackendDeployer = new();
+        private readonly TrainingBackendBindingStore _trainingBackendBindingStore = new();
         private readonly Dictionary<string, TrainingBackendStatus> _trainingBackendStatuses = new(StringComparer.OrdinalIgnoreCase);
         private CancellationTokenSource? _trainingDeploymentCancellation;
         private bool _isBusy;
@@ -37,6 +40,13 @@ namespace CyanTools.ViewModel
         private TrainingBackendMirrorOption _selectedWslMirror = null!;
         private TrainingBackendMirrorOption _selectedWslSdScriptsMirror = null!;
         private TrainingBackendMirrorOption _selectedDiffusionPipeMirror = null!;
+        private TrainingBackendBinding? _selectedTrainingBackendBinding;
+        private TrainingBridgeBackendOption _selectedBindingBackend = null!;
+        private string _bindingName = string.Empty;
+        private string _bindingTrainerPath = string.Empty;
+        private string _bindingConfigurationDirectory = string.Empty;
+        private string _bindingWslDistribution = "Ubuntu";
+        private string _bindingCondaEnvironment = string.Empty;
 
         public OptionsViewModel()
         {
@@ -51,6 +61,15 @@ namespace CyanTools.ViewModel
             _selectedWslMirror = TrainingBackendMirrorOptions[0];
             _selectedWslSdScriptsMirror = TrainingBackendMirrorOptions[0];
             _selectedDiffusionPipeMirror = TrainingBackendMirrorOptions[0];
+            TrainingBackendBindings = new ObservableCollection<TrainingBackendBinding>();
+            BindingBackendOptions = new ObservableCollection<TrainingBridgeBackendOption>
+            {
+                new(TrainingBridgeConfigService.SdScriptsBackendId, "sd-scripts / Windows"),
+                new(TrainingBridgeConfigService.AnimaFastLoraBackendId, "Anima Fast LoRA / Windows"),
+                new(TrainingBridgeConfigService.WslSdScriptsBackendId, "wsl-sd-scripts / WSL2"),
+                new(TrainingBridgeConfigService.DiffusionPipeBackendId, "diffusion-pipe / WSL2")
+            };
+            _selectedBindingBackend = BindingBackendOptions[0];
 
             CheckCudaCommand = new RelayCommand(async _ => await CheckOrInstallCudaAsync(), _ => !IsBusy);
             InstallCudaToolkitCommand = new RelayCommand(_ => TryLaunchWingetCudaInstall(), _ => !IsBusy);
@@ -69,7 +88,13 @@ namespace CyanTools.ViewModel
             InstallUbuntuCommand = new RelayCommand(async _ => await InstallUbuntuAsync(), _ => !IsBusy);
             DeleteUbuntuCommand = new RelayCommand(async _ => await RunTrainingBackendActionAsync("wsl", TrainingBackendAction.DeleteUbuntu), _ => !IsBusy);
             CancelTrainingDeploymentCommand = new RelayCommand(_ => CancelTrainingDeployment(), _ => IsBusy && _trainingDeploymentCancellation != null);
+            NewTrainingBackendBindingCommand = new RelayCommand(NewTrainingBackendBinding, () => !IsBusy);
+            SaveTrainingBackendBindingCommand = new RelayCommand(SaveTrainingBackendBinding, () => !IsBusy && !IsManagedBindingSelected);
+            DeleteTrainingBackendBindingCommand = new RelayCommand(DeleteTrainingBackendBinding, () => !IsBusy && SelectedTrainingBackendBinding is { IsManaged: false });
+            SelectBindingTrainerPathCommand = new RelayCommand(() => SelectBindingDirectory(isConfigurationDirectory: false), () => !IsBusy && !IsManagedBindingSelected);
+            SelectBindingConfigurationDirectoryCommand = new RelayCommand(() => SelectBindingDirectory(isConfigurationDirectory: true), () => !IsBusy && !IsManagedBindingSelected);
 
+            ReloadTrainingBackendBindings();
             RefreshNvidiaAppStatus();
             _trainingBackendDeployer.RestoreTasksAndLogs(new Progress<string>(AddLog));
             _ = InitializeTrainingDeploymentAsync();
@@ -78,6 +103,62 @@ namespace CyanTools.ViewModel
         public ObservableCollection<string> LogLines { get; }
         public string LogText => string.Join(Environment.NewLine, LogLines);
         public ObservableCollection<TrainingBackendMirrorOption> TrainingBackendMirrorOptions { get; }
+        public ObservableCollection<TrainingBackendBinding> TrainingBackendBindings { get; }
+        public ObservableCollection<TrainingBridgeBackendOption> BindingBackendOptions { get; }
+
+        public TrainingBackendBinding? SelectedTrainingBackendBinding
+        {
+            get => _selectedTrainingBackendBinding;
+            set
+            {
+                if (SetField(ref _selectedTrainingBackendBinding, value))
+                {
+                    LoadTrainingBackendBindingEditor(value);
+                    OnPropertyChanged(nameof(IsManagedBindingSelected));
+                    OnPropertyChanged(nameof(CanEditTrainingBackendBinding));
+                    RaiseCommandStates();
+                }
+            }
+        }
+
+        public TrainingBridgeBackendOption SelectedBindingBackend
+        {
+            get => _selectedBindingBackend;
+            set => SetField(ref _selectedBindingBackend, value);
+        }
+
+        public string BindingName
+        {
+            get => _bindingName;
+            set => SetField(ref _bindingName, value);
+        }
+
+        public string BindingTrainerPath
+        {
+            get => _bindingTrainerPath;
+            set => SetField(ref _bindingTrainerPath, value);
+        }
+
+        public string BindingConfigurationDirectory
+        {
+            get => _bindingConfigurationDirectory;
+            set => SetField(ref _bindingConfigurationDirectory, value);
+        }
+
+        public string BindingWslDistribution
+        {
+            get => _bindingWslDistribution;
+            set => SetField(ref _bindingWslDistribution, value);
+        }
+
+        public string BindingCondaEnvironment
+        {
+            get => _bindingCondaEnvironment;
+            set => SetField(ref _bindingCondaEnvironment, value);
+        }
+
+        public bool IsManagedBindingSelected => SelectedTrainingBackendBinding?.IsManaged == true;
+        public bool CanEditTrainingBackendBinding => !IsManagedBindingSelected;
 
         public bool IsBusy
         {
@@ -186,6 +267,11 @@ namespace CyanTools.ViewModel
         public ICommand InstallUbuntuCommand { get; }
         public ICommand DeleteUbuntuCommand { get; }
         public ICommand CancelTrainingDeploymentCommand { get; }
+        public ICommand NewTrainingBackendBindingCommand { get; }
+        public ICommand SaveTrainingBackendBindingCommand { get; }
+        public ICommand DeleteTrainingBackendBindingCommand { get; }
+        public ICommand SelectBindingTrainerPathCommand { get; }
+        public ICommand SelectBindingConfigurationDirectoryCommand { get; }
 
         public async Task InstallCudnnPackageAsync(string packagePath)
         {
@@ -935,6 +1021,127 @@ namespace CyanTools.ViewModel
                 succeeded == backendIds.Length ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
+        private void ReloadTrainingBackendBindings(string? selectedBindingId = null)
+        {
+            selectedBindingId ??= SelectedTrainingBackendBinding?.Id;
+            TrainingBackendBindings.Clear();
+            foreach (TrainingBackendBinding binding in _trainingBackendBindingStore.ListAll())
+            {
+                TrainingBackendBindings.Add(binding);
+            }
+
+            SelectedTrainingBackendBinding = TrainingBackendBindings.FirstOrDefault(binding =>
+                string.Equals(binding.Id, selectedBindingId, StringComparison.OrdinalIgnoreCase))
+                ?? TrainingBackendBindings.FirstOrDefault();
+        }
+
+        private void NewTrainingBackendBinding()
+        {
+            SelectedTrainingBackendBinding = null;
+            BindingName = string.Empty;
+            SelectedBindingBackend = BindingBackendOptions[0];
+            BindingTrainerPath = string.Empty;
+            BindingConfigurationDirectory = string.Empty;
+            BindingWslDistribution = "Ubuntu";
+            BindingCondaEnvironment = string.Empty;
+            OnPropertyChanged(nameof(IsManagedBindingSelected));
+            OnPropertyChanged(nameof(CanEditTrainingBackendBinding));
+            RaiseCommandStates();
+        }
+
+        private void LoadTrainingBackendBindingEditor(TrainingBackendBinding? binding)
+        {
+            if (binding == null)
+            {
+                return;
+            }
+
+            BindingName = binding.Name;
+            SelectedBindingBackend = BindingBackendOptions.FirstOrDefault(option =>
+                string.Equals(option.Id, binding.BackendId, StringComparison.OrdinalIgnoreCase))
+                ?? BindingBackendOptions[0];
+            BindingTrainerPath = binding.TrainerPath;
+            BindingConfigurationDirectory = binding.ConfigurationDirectory;
+            BindingWslDistribution = binding.WslDistribution;
+            BindingCondaEnvironment = binding.CondaEnvironment;
+        }
+
+        private void SaveTrainingBackendBinding()
+        {
+            try
+            {
+                if (IsManagedBindingSelected)
+                {
+                    throw new InvalidOperationException("CyanTools 自动安装的训练器会自动绑定，无需手动保存。请新建一个已有训练器绑定。");
+                }
+
+                string bindingId = SelectedTrainingBackendBinding?.Id ?? Guid.NewGuid().ToString("D");
+                var binding = new TrainingBackendBinding
+                {
+                    Id = bindingId,
+                    Name = BindingName,
+                    BackendId = SelectedBindingBackend?.Id ?? TrainingBridgeConfigService.SdScriptsBackendId,
+                    TrainerPath = BindingTrainerPath,
+                    ConfigurationDirectory = BindingConfigurationDirectory,
+                    WslDistribution = BindingWslDistribution,
+                    CondaEnvironment = BindingCondaEnvironment,
+                    IsManaged = false
+                };
+                _trainingBackendBindingStore.SaveCustom(binding);
+                ReloadTrainingBackendBindings(binding.Id);
+                AddLog($"已保存训练器绑定：{binding.Name}。");
+            }
+            catch (Exception exception)
+            {
+                AddLog($"保存训练器绑定失败：{exception.Message}");
+                MessageBox.Show(exception.Message, "训练器绑定", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void DeleteTrainingBackendBinding()
+        {
+            TrainingBackendBinding? binding = SelectedTrainingBackendBinding;
+            if (binding == null || binding.IsManaged)
+            {
+                return;
+            }
+
+            if (MessageBox.Show(
+                    $"确定删除训练器绑定“{binding.Name}”吗？不会删除训练器文件。",
+                    "删除训练器绑定",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            _trainingBackendBindingStore.DeleteCustom(binding.Id);
+            ReloadTrainingBackendBindings();
+            AddLog($"已删除训练器绑定：{binding.Name}。");
+        }
+
+        private void SelectBindingDirectory(bool isConfigurationDirectory)
+        {
+            using var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = isConfigurationDirectory ? "选择配置文件目录" : "选择训练器根目录"
+            };
+            if (dialog.ShowDialog() != CommonFileDialogResult.Ok)
+            {
+                return;
+            }
+
+            if (isConfigurationDirectory)
+            {
+                BindingConfigurationDirectory = dialog.FileName;
+            }
+            else
+            {
+                BindingTrainerPath = dialog.FileName;
+            }
+        }
+
         private bool ConfirmTrainingBackendAction(string backendId, TrainingBackendAction action)
         {
             if (action == TrainingBackendAction.DeleteUbuntu)
@@ -1083,6 +1290,11 @@ namespace CyanTools.ViewModel
             (InstallUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (DeleteUbuntuCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (CancelTrainingDeploymentCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (NewTrainingBackendBindingCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (SaveTrainingBackendBindingCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeleteTrainingBackendBindingCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (SelectBindingTrainerPathCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (SelectBindingConfigurationDirectoryCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
         private void AddLog(string message)
