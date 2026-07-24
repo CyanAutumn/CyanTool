@@ -290,6 +290,7 @@ namespace CyanTools.ViewModel
                 if (_danbooruToken != value)
                 {
                     _danbooruToken = value ?? string.Empty;
+                    DatasetDownloaderCredentialState.PublishDanbooruToken(_danbooruToken);
                     OnPropertyChanged();
                 }
             }
@@ -368,6 +369,7 @@ namespace CyanTools.ViewModel
                 if (_pixivRefreshToken != value)
                 {
                     _pixivRefreshToken = value ?? string.Empty;
+                    DatasetDownloaderCredentialState.PublishPixivRefreshToken(_pixivRefreshToken);
                     OnPropertyChanged();
                 }
             }
@@ -517,11 +519,25 @@ namespace CyanTools.ViewModel
 
         public Task RunFromPipelineAsync(PipelineContext context, CancellationToken token)
         {
+            RefreshCredentialsFromSharedControl();
             return ExecuteDownloadAsync(
                 token,
                 message => context.AppendLog($"[数据集下载器] {message}"),
                 rethrowErrors: true,
                 validateWorkflowOutput: true);
+        }
+
+        private void RefreshCredentialsFromSharedControl()
+        {
+            if (DatasetDownloaderCredentialState.TryGetDanbooruToken(out string danbooruToken))
+            {
+                DanbooruToken = danbooruToken;
+            }
+
+            if (DatasetDownloaderCredentialState.TryGetPixivRefreshToken(out string pixivRefreshToken))
+            {
+                PixivRefreshToken = pixivRefreshToken;
+            }
         }
 
         private async Task FetchPixivRefreshTokenAsync()
@@ -2253,6 +2269,12 @@ namespace CyanTools.ViewModel
         {
             try
             {
+                if (DatasetDownloaderCredentialState.TryGetDanbooruToken(out string sharedToken))
+                {
+                    DanbooruToken = sharedToken;
+                    return;
+                }
+
                 if (File.Exists(DanbooruTokenFilePath))
                 {
                     DanbooruToken = File.ReadAllText(DanbooruTokenFilePath);
@@ -2280,6 +2302,12 @@ namespace CyanTools.ViewModel
         {
             try
             {
+                if (DatasetDownloaderCredentialState.TryGetPixivRefreshToken(out string sharedToken))
+                {
+                    PixivRefreshToken = sharedToken;
+                    return;
+                }
+
                 if (File.Exists(PixivRefreshTokenFilePath))
                 {
                     PixivRefreshToken = File.ReadAllText(PixivRefreshTokenFilePath).Trim();

@@ -87,6 +87,9 @@ namespace CyanTools.Utils
                     {
                         logAction?.Invoke(
                             $"上采样: 跳过，源图 {sourceInfo.Width}x{sourceInfo.Height}（面积 {sourceArea}） > 目标 {options.UpsampleTargetWidth}x{options.UpsampleTargetHeight}（面积 {upsampleTargetArea}）: {fileName}");
+                        CopyOriginalFile(inputFile, outputFile);
+                        CopyCompanionText(inputFile, options.OutputFolder);
+                        logAction?.Invoke($"已原样复制: {fileName}");
                         return;
                     }
                 }
@@ -98,6 +101,9 @@ namespace CyanTools.Utils
                     {
                         logAction?.Invoke(
                             $"下采样: 跳过，源图 {sourceInfo.Width}x{sourceInfo.Height}（面积 {sourceArea}） < 目标 {options.DownsampleTargetWidth}x{options.DownsampleTargetHeight}（面积 {downsampleTargetArea}）: {fileName}");
+                        CopyOriginalFile(inputFile, outputFile);
+                        CopyCompanionText(inputFile, options.OutputFolder);
+                        logAction?.Invoke($"已原样复制: {fileName}");
                         return;
                     }
                 }

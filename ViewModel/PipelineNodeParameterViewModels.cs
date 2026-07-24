@@ -374,28 +374,11 @@ namespace CyanTools.ViewModel
                 [typeof(TrainingOutputOrganizerViewModel)] =
                 [
                     P("OverwriteExisting", "覆盖已存在文件")
-                ],
-                [typeof(DatasetDownloaderViewModel)] =
-                [
-                    P("DanbooruToken", "Danbooru 令牌", isEnabledPropertyName: "CanEditDanbooruSettings"),
-                    P("PixivRefreshToken", "Pixiv 令牌", isPassword: true),
-                    P("IncludeArtist", "Artist", isEnabledPropertyName: "CanEditDanbooruSettings"),
-                    P("IncludeCopyright", "Copyright", isEnabledPropertyName: "CanEditDanbooruSettings"),
-                    P("IncludeCharacter", "Character", isEnabledPropertyName: "CanEditDanbooruSettings"),
-                    P("IncludeGeneral", "General", isEnabledPropertyName: "CanEditDanbooruSettings"),
-                    P("IncludeMeta", "Meta", isEnabledPropertyName: "CanEditDanbooruSettings")
                 ]
             };
 
         private static readonly IReadOnlyDictionary<Type, IReadOnlyList<PipelineNodeActionDefinition>> WorkflowActionDefinitions =
-            new Dictionary<Type, IReadOnlyList<PipelineNodeActionDefinition>>
-            {
-                [typeof(DatasetDownloaderViewModel)] =
-                [
-                    A("登录获取", "GetPixivRefreshTokenCommand"),
-                    A("Danbooru 正则手动获取", "OpenDanbooruManualCollectorCommand")
-                ]
-            };
+            new Dictionary<Type, IReadOnlyList<PipelineNodeActionDefinition>>();
 
         public static ObservableCollection<PipelineNodeParameterViewModel> Create(PipelineNodeViewModelBase node)
         {

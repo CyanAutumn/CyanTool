@@ -85,6 +85,24 @@ namespace CyanTools.Pipeline
 
             var json = File.ReadAllText(path);
             var definitions = JsonConvert.DeserializeObject<List<WorkflowNodeDefinition>>(json) ?? new List<WorkflowNodeDefinition>();
+            bool removedSensitiveValues = false;
+
+            foreach (WorkflowNodeDefinition definition in definitions)
+            {
+                definition.Snapshot ??= new Dictionary<string, object?>();
+                Dictionary<string, object?> safeSnapshot =
+                    PipelineSnapshotHelper.RemoveSensitiveProperties(definition.Snapshot);
+                if (safeSnapshot.Count != definition.Snapshot.Count)
+                {
+                    definition.Snapshot = safeSnapshot;
+                    removedSensitiveValues = true;
+                }
+            }
+
+            if (removedSensitiveValues)
+            {
+                TryRewriteSanitizedWorkflow(path, definitions);
+            }
 
             var nodes = new List<WorkflowNodeLayout>();
             foreach (var def in definitions)
@@ -111,12 +129,17 @@ namespace CyanTools.Pipeline
 
         private static Dictionary<string, object?> Capture(PipelineNodeViewModelBase node)
         {
+            Dictionary<string, object?> snapshot;
             if (node is IPipelineSnapshotProvider provider)
             {
-                return provider.CaptureSnapshot();
+                snapshot = provider.CaptureSnapshot();
+            }
+            else
+            {
+                snapshot = PipelineSnapshotHelper.CaptureSimpleProperties(node);
             }
 
-            return PipelineSnapshotHelper.CaptureSimpleProperties(node);
+            return PipelineSnapshotHelper.RemoveSensitiveProperties(snapshot);
         }
 
         private static void Apply(PipelineNodeViewModelBase node, Dictionary<string, object?> snapshot)
@@ -126,13 +149,31 @@ namespace CyanTools.Pipeline
                 return;
             }
 
+            Dictionary<string, object?> safeSnapshot =
+                PipelineSnapshotHelper.RemoveSensitiveProperties(snapshot);
             if (node is IPipelineSnapshotProvider provider)
             {
-                provider.ApplySnapshot(snapshot);
+                provider.ApplySnapshot(safeSnapshot);
             }
             else
             {
-                PipelineSnapshotHelper.ApplySimpleProperties(node, snapshot);
+                PipelineSnapshotHelper.ApplySimpleProperties(node, safeSnapshot);
+            }
+        }
+
+        private static void TryRewriteSanitizedWorkflow(
+            string path,
+            IReadOnlyCollection<WorkflowNodeDefinition> definitions)
+        {
+            try
+            {
+                string json = JsonConvert.SerializeObject(definitions, Formatting.Indented);
+                File.WriteAllText(path, json);
+            }
+            catch
+            {
+
+
             }
         }
 
