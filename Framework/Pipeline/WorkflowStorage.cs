@@ -17,17 +17,18 @@ namespace CyanTools.Pipeline
     {
         private const string FolderName = "Workflow";
 
-        public static string EnsureFolder()
+        public static string EnsureFolder(string? workflowFolder = null)
         {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var folder = Path.Combine(baseDir, "Configs", FolderName);
+            string folder = string.IsNullOrWhiteSpace(workflowFolder)
+                ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Configs", FolderName)
+                : Path.GetFullPath(workflowFolder.Trim());
             Directory.CreateDirectory(folder);
             return folder;
         }
 
-        public static IReadOnlyList<string> ListWorkflows()
+        public static IReadOnlyList<string> ListWorkflows(string? workflowFolder = null)
         {
-            var folder = EnsureFolder();
+            var folder = EnsureFolder(workflowFolder);
             if (!Directory.Exists(folder))
             {
                 return Array.Empty<string>();
@@ -39,20 +40,26 @@ namespace CyanTools.Pipeline
                 .ToList();
         }
 
-        public static void Save(string name, IEnumerable<PipelineNodeViewModelBase> nodes)
+        public static void Save(
+            string name,
+            IEnumerable<PipelineNodeViewModelBase> nodes,
+            string? workflowFolder = null)
         {
-            Save(name, nodes.Select(node => new WorkflowNodeLayout(node)));
+            Save(name, nodes.Select(node => new WorkflowNodeLayout(node)), workflowFolder);
         }
 
-        public static void Save(string name, IEnumerable<WorkflowNodeLayout> nodes)
+        public static void Save(
+            string name,
+            IEnumerable<WorkflowNodeLayout> nodes,
+            string? workflowFolder = null)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
                 return;
             }
 
-            var folder = EnsureFolder();
-            var path = Path.Combine(folder, $"{name}.json");
+            var folder = EnsureFolder(workflowFolder);
+            var path = GetWorkflowPath(folder, name);
 
             var definitions = nodes.Select(item => new WorkflowNodeDefinition
             {
@@ -67,17 +74,23 @@ namespace CyanTools.Pipeline
             File.WriteAllText(path, json);
         }
 
-        public static List<PipelineNodeViewModelBase> Load(string name, bool downloadersUnlocked)
+        public static List<PipelineNodeViewModelBase> Load(
+            string name,
+            bool downloadersUnlocked,
+            string? workflowFolder = null)
         {
-            return LoadWithLayout(name, downloadersUnlocked)
+            return LoadWithLayout(name, downloadersUnlocked, workflowFolder)
                 .Select(item => item.Node)
                 .ToList();
         }
 
-        public static List<WorkflowNodeLayout> LoadWithLayout(string name, bool downloadersUnlocked)
+        public static List<WorkflowNodeLayout> LoadWithLayout(
+            string name,
+            bool downloadersUnlocked,
+            string? workflowFolder = null)
         {
-            var folder = EnsureFolder();
-            var path = Path.Combine(folder, $"{name}.json");
+            var folder = EnsureFolder(workflowFolder);
+            var path = GetWorkflowPath(folder, name);
             if (!File.Exists(path))
             {
                 return new List<WorkflowNodeLayout>();
@@ -125,6 +138,19 @@ namespace CyanTools.Pipeline
             }
 
             return nodes;
+        }
+
+        private static string GetWorkflowPath(string folder, string name)
+        {
+            string normalizedName = name?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(normalizedName) ||
+                !string.Equals(Path.GetFileName(normalizedName), normalizedName, StringComparison.Ordinal) ||
+                normalizedName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                throw new ArgumentException("工作流名称无效。", nameof(name));
+            }
+
+            return Path.Combine(folder, $"{normalizedName}.json");
         }
 
         private static Dictionary<string, object?> Capture(PipelineNodeViewModelBase node)

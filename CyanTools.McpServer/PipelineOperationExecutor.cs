@@ -16,6 +16,20 @@ public sealed record PipelineOperationResult(
     string? OutputDirectory,
     IReadOnlyList<string> Logs);
 
+public sealed record PipelineParameterOptionDescription(string? Value, string Label);
+
+public sealed record PipelineParameterDescription(
+    string Name,
+    string Label,
+    string Type,
+    object? DefaultValue,
+    IReadOnlyList<PipelineParameterOptionDescription> AllowedValues,
+    string Description);
+
+public sealed record PipelineParameterSetDescription(
+    IReadOnlyList<AgentParameterDefinition>? CommonParameters,
+    IReadOnlyList<PipelineParameterDescription> Parameters);
+
 
 
 
@@ -24,29 +38,30 @@ public sealed class PipelineOperationExecutor
 {
     private const int MaximumReturnedLogLines = 200;
 
-    public static object DescribeParameters(AgentOperationDefinition operation)
+    public static PipelineParameterSetDescription DescribeParameters(AgentOperationDefinition operation)
     {
         PipelineNodeViewModelBase node = CreateNode(operation);
-        var parameters = PipelineNodeParameterFactory.Create(node)
-            .Select(parameter => new
-            {
-                name = parameter.PropertyName,
-                label = parameter.Label,
-                type = GetParameterType(parameter),
-                default_value = GetParameterDefaultValue(parameter),
-                allowed_values = parameter.Options.Select(option => new
-                {
-                    value = Convert.ToString(option.Value, CultureInfo.InvariantCulture),
-                    label = option.DisplayName
-                }),
-                description = "仅提交此字段；未知、只读、进度和凭据字段会被拒绝。"
-            });
+        return new PipelineParameterSetDescription(
+            operation.Parameters,
+            DescribeNodeParameters(node));
+    }
 
-        return new
-        {
-            common_parameters = operation.Parameters,
-            parameters
-        };
+    public static IReadOnlyList<PipelineParameterDescription> DescribeNodeParameters(
+        PipelineNodeViewModelBase node)
+    {
+        return PipelineNodeParameterFactory.Create(node)
+            .Select(parameter => new PipelineParameterDescription(
+                    parameter.PropertyName,
+                    parameter.Label,
+                    GetParameterType(parameter),
+                    GetParameterDefaultValue(parameter),
+                    parameter.Options
+                        .Select(option => new PipelineParameterOptionDescription(
+                            Convert.ToString(option.Value, CultureInfo.InvariantCulture),
+                            option.DisplayName))
+                        .ToArray(),
+                    "仅提交此字段；未知、只读、进度和凭据字段会被拒绝。"))
+            .ToArray();
     }
 
     public async Task<PipelineOperationResult> ExecuteAsync(
@@ -58,9 +73,12 @@ public sealed class PipelineOperationExecutor
         CancellationToken cancellationToken)
     {
         AgentOperationDefinition operation = AgentToolCatalog.GetOperation(operationId);
-        if (!operation.IsHeadlessExecutable)
+        if (operation.ExecutionKind != AgentExecutionKind.PipelineNode)
         {
-            throw new InvalidOperationException($"{operationId} still requires a dedicated headless adapter and cannot be executed through MCP.");
+            string guidance = operation.ExecutionKind == AgentExecutionKind.Workflow
+                ? "Use cyantools_list_workflows, cyantools_describe_workflow, and cyantools_run_workflow."
+                : $"{operationId} still requires a dedicated headless adapter and cannot be executed through MCP.";
+            throw new InvalidOperationException(guidance);
         }
 
         if (operation.Risk == AgentOperationRisk.Destructive && !confirmDestructive)
@@ -137,7 +155,7 @@ public sealed class PipelineOperationExecutor
         }
     }
 
-    private static void ApplyParameters(PipelineNodeViewModelBase node, string? parametersJson)
+    internal static void ApplyParameters(PipelineNodeViewModelBase node, string? parametersJson)
     {
         if (string.IsNullOrWhiteSpace(parametersJson))
         {
@@ -168,7 +186,7 @@ public sealed class PipelineOperationExecutor
         }
     }
 
-    private static object ResolveParameterTarget(PipelineNodeViewModelBase node)
+    internal static object ResolveParameterTarget(PipelineNodeViewModelBase node)
     {
         PropertyInfo? inner = node.GetType().GetProperty("Inner", BindingFlags.Public | BindingFlags.Instance);
         return inner?.GetValue(node) ?? node;
@@ -293,6 +311,99 @@ internal static class AllowedPathGuard
         }
 
         return normalizedPath;
+    }
+
+    public static void ValidateNodePaths(PipelineNodeViewModelBase node, PipelineContext context)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var validatedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        ValidateKnownPath(context.CurrentInputPath, "workflow_input", requireExistingDirectory: true, validatedPaths);
+        ValidateKnownPath(context.CurrentOutputPath, "workflow_output", requireExistingDirectory: false, validatedPaths);
+
+        if (node.GetOutputPathSelectorNode() is IPipelineOutputPathSelectorNode selector &&
+            selector.TryGetOutputFolderPath(out string selectedOutput))
+        {
+            ValidateKnownPath(selectedOutput, "workflow_output_selector", requireExistingDirectory: false, validatedPaths);
+        }
+
+        if (node.GetRuntimeOutputNode() is IPipelineRuntimeOutputNode runtimeOutput &&
+            runtimeOutput.TryGetRuntimeOutputPath(out string runtimePath))
+        {
+            ValidateKnownPath(runtimePath, "workflow_runtime_output", requireExistingDirectory: false, validatedPaths);
+        }
+
+        ValidatePathProperties(node, validatedPaths);
+        object parameterTarget = PipelineOperationExecutor.ResolveParameterTarget(node);
+        if (!ReferenceEquals(parameterTarget, node))
+        {
+            ValidatePathProperties(parameterTarget, validatedPaths);
+        }
+    }
+
+    private static void ValidatePathProperties(object target, ISet<string> validatedPaths)
+    {
+        foreach (PropertyInfo property in target.GetType()
+                     .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                     .Where(property => property.CanRead && property.CanWrite)
+                     .Where(property => property.PropertyType == typeof(string))
+                     .Where(property => IsPathPropertyName(property.Name)))
+        {
+            string? value;
+            try
+            {
+                value = property.GetValue(target) as string;
+            }
+            catch
+            {
+                continue;
+            }
+
+            ValidateKnownPath(
+                value,
+                $"workflow_{target.GetType().Name}_{property.Name}",
+                requireExistingDirectory: false,
+                validatedPaths);
+        }
+    }
+
+    private static void ValidateKnownPath(
+        string? path,
+        string argumentName,
+        bool requireExistingDirectory,
+        ISet<string> validatedPaths)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        string normalized = Path.GetFullPath(path.Trim());
+        if (!validatedPaths.Add(normalized))
+        {
+            return;
+        }
+
+        if (requireExistingDirectory)
+        {
+            RequireDirectory(normalized, argumentName);
+        }
+        else
+        {
+            RequirePathWithinAllowedRoot(normalized, argumentName);
+        }
+    }
+
+    private static bool IsPathPropertyName(string propertyName)
+    {
+        string normalized = propertyName
+            .Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .ToLowerInvariant();
+        return normalized.Contains("path", StringComparison.Ordinal) ||
+               normalized.Contains("directory", StringComparison.Ordinal) ||
+               normalized.Contains("folder", StringComparison.Ordinal);
     }
 
     private static IReadOnlyList<string> GetAllowedRoots() =>

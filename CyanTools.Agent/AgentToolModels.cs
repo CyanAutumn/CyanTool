@@ -19,6 +19,7 @@ public enum AgentOperationRisk
 public enum AgentExecutionKind
 {
     PipelineNode,
+    Workflow,
     DedicatedAdapter
 }
 
@@ -37,7 +38,8 @@ public sealed record AgentOperationDefinition(
     string? PipelineNodeType = null,
     IReadOnlyList<AgentParameterDefinition>? Parameters = null)
 {
-    public bool IsHeadlessExecutable => ExecutionKind == AgentExecutionKind.PipelineNode;
+    public bool IsHeadlessExecutable =>
+        ExecutionKind is AgentExecutionKind.PipelineNode or AgentExecutionKind.Workflow;
 }
 
 public sealed record AgentPageDefinition(
