@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -22,6 +23,8 @@ namespace CyanTools.ViewModel
         public string TagsUrl { get; set; }
         public int InputSize { get; set; }
         public string InputFormat { get; set; } = "NHWC";
+        public string SeriesId { get; set; } = TaggerSeriesCatalog.OnnxMultiLabelSeriesId;
+        public TaggerBackendKind BackendKind { get; set; } = TaggerBackendKind.OnnxMultiLabel;
     }
 
     public class ExistingTxtConflictOption
@@ -52,8 +55,16 @@ namespace CyanTools.ViewModel
         private ExistingTxtConflictOption _selectedExistingTxtConflictOption;
         private bool _isWorkflowMode;
         private bool _hasInheritedInputPath;
-
-        private readonly TaggingProcessor _taggingProcessor;
+        private TaggerSeriesDefinition _selectedTaggerSeries;
+        private string _toriiGateEndpoint = TaggerSeriesCatalog.ToriiGateDefaultEndpoint;
+        private string _toriiGateModelName = TaggerSeriesCatalog.ToriiGateDefaultModelName;
+        private string _toriiGateApiToken = string.Empty;
+        private string _toriiGateCaptionFormatId = "short";
+        private double _toriiGateMaxMegapixels = 1.0;
+        private int _toriiGateMaxTokens = 1024;
+        private double _toriiGateTemperature = 0.5;
+        private int _toriiGateMaxParallelRequests = 1;
+        private readonly List<TaggerModel> _allTaggerModels = new();
         private const int MaxLogLines = 1000;
 
         public string InputDirectory { get => _inputDirectory; set => SetField(ref _inputDirectory, value); }
@@ -63,9 +74,36 @@ namespace CyanTools.ViewModel
         public double ProgressValue { get => _progressValue; set => SetField(ref _progressValue, value); }
 
         public ObservableCollection<string> LogLines { get; }
+        public ObservableCollection<TaggerSeriesDefinition> TaggerSeries { get; }
         public ObservableCollection<TaggerModel> TaggerModels { get; }
         public ObservableCollection<ExistingTxtConflictOption> ExistingTxtConflictOptions { get; }
         public TaggerModel SelectedTaggerModel { get => _selectedTaggerModel; set => SetField(ref _selectedTaggerModel, value); }
+        public string SelectedTaggerSeriesId
+        {
+            get => SelectedTaggerSeries?.Id ?? string.Empty;
+            set
+            {
+                var series = TaggerSeries.FirstOrDefault(item => string.Equals(item.Id, value, StringComparison.OrdinalIgnoreCase))
+                             ?? TaggerSeriesCatalog.GetSeries(value);
+                SelectedTaggerSeries = series;
+            }
+        }
+        public TaggerSeriesDefinition SelectedTaggerSeries
+        {
+            get => _selectedTaggerSeries;
+            private set
+            {
+                if (!SetField(ref _selectedTaggerSeries, value))
+                {
+                    return;
+                }
+
+                RefreshTaggerModels();
+                OnPropertyChanged(nameof(SelectedTaggerSeriesId));
+                OnPropertyChanged(nameof(IsOnnxTaggerSeries));
+                OnPropertyChanged(nameof(IsToriiGateTaggerSeries));
+            }
+        }
         public ExistingTxtConflictOption SelectedExistingTxtConflictOption { get => _selectedExistingTxtConflictOption; set => SetField(ref _selectedExistingTxtConflictOption, value); }
         public string PriorityTags { get => _priorityTags; set => SetField(ref _priorityTags, value); }
         public string CustomTags { get => _customTags; set => SetField(ref _customTags, value); }
@@ -80,6 +118,17 @@ namespace CyanTools.ViewModel
         public bool PreferGpu { get => _preferGpu; set => SetField(ref _preferGpu, value); }
         public bool IsWorkflowMode { get => _isWorkflowMode; set => SetField(ref _isWorkflowMode, value); }
         public bool HasInheritedInputPath { get => _hasInheritedInputPath; set => SetField(ref _hasInheritedInputPath, value); }
+        public bool IsOnnxTaggerSeries => SelectedTaggerSeries?.BackendKind == TaggerBackendKind.OnnxMultiLabel;
+        public bool IsToriiGateTaggerSeries => SelectedTaggerSeries?.BackendKind == TaggerBackendKind.OpenAiCompatibleVisionCaption;
+        public string ToriiGateEndpoint { get => _toriiGateEndpoint; set => SetField(ref _toriiGateEndpoint, value); }
+        public string ToriiGateModelName { get => _toriiGateModelName; set => SetField(ref _toriiGateModelName, value); }
+        public string ToriiGateApiToken { get => _toriiGateApiToken; set => SetField(ref _toriiGateApiToken, value); }
+        public ObservableCollection<ToriiGateCaptionFormatDefinition> ToriiGateCaptionFormats { get; }
+        public string ToriiGateCaptionFormatId { get => _toriiGateCaptionFormatId; set => SetField(ref _toriiGateCaptionFormatId, value); }
+        public double ToriiGateMaxMegapixels { get => _toriiGateMaxMegapixels; set => SetField(ref _toriiGateMaxMegapixels, value); }
+        public int ToriiGateMaxTokens { get => _toriiGateMaxTokens; set => SetField(ref _toriiGateMaxTokens, value); }
+        public double ToriiGateTemperature { get => _toriiGateTemperature; set => SetField(ref _toriiGateTemperature, value); }
+        public int ToriiGateMaxParallelRequests { get => _toriiGateMaxParallelRequests; set => SetField(ref _toriiGateMaxParallelRequests, value); }
         public PipelineDirectoryBehavior DirectoryBehavior => PipelineDirectoryBehavior.InPlace;
         public string PipelineInputPath { get => InputDirectory ?? string.Empty; set => InputDirectory = value ?? string.Empty; }
         public string PipelineOutputPath { get => InputDirectory ?? string.Empty; set => InputDirectory = value ?? string.Empty; }
@@ -91,9 +140,11 @@ namespace CyanTools.ViewModel
 
         public TaggingViewModel()
         {
-            _taggingProcessor = new TaggingProcessor();
             LogLines = new ObservableCollection<string>();
-            TaggerModels = new ObservableCollection<TaggerModel>
+            TaggerSeries = new ObservableCollection<TaggerSeriesDefinition>(TaggerSeriesCatalog.BuiltInSeries);
+            ToriiGateCaptionFormats = new ObservableCollection<ToriiGateCaptionFormatDefinition>(TaggerSeriesCatalog.ToriiGateCaptionFormats);
+            TaggerModels = new ObservableCollection<TaggerModel>();
+            _allTaggerModels.AddRange(new[]
             {
                 new TaggerModel { DisplayName = "wd-v1-4-swinv2-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
                 new TaggerModel { DisplayName = "wd-v1-4-convnext-tagger-v2", ModelUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
@@ -107,9 +158,15 @@ namespace CyanTools.ViewModel
                 new TaggerModel { DisplayName = "wd-eva02-large-tagger-v3", ModelUrl = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
                 new TaggerModel { DisplayName = "idolsankaku-swinv2-tagger-v1", ModelUrl = "https://huggingface.co/deepghs/idolsankaku-swinv2-tagger-v1/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/deepghs/idolsankaku-swinv2-tagger-v1/resolve/main/selected_tags.csv", InputSize = 448, InputFormat = "NHWC" },
                 new TaggerModel { DisplayName = "idolsankaku-eva02-large-tagger-v1", ModelUrl = "https://huggingface.co/deepghs/idolsankaku-eva02-large-tagger-v1/resolve/main/model.onnx", TagsUrl = "https://huggingface.co/deepghs/idolsankaku-eva02-large-tagger-v1/resolve/main/selected_tags.csv", InputSize = 480, InputFormat = "NHWC" },
-                new TaggerModel { DisplayName = "cl_tagger_1_02", ModelUrl = "https://huggingface.co/cella110n/cl_tagger/resolve/main/cl_tagger_1_02/model.onnx", TagsUrl = "https://huggingface.co/cella110n/cl_tagger/raw/main/cl_tagger_1_02/tag_mapping.json", InputSize = 448, InputFormat = "NCHW" }
-            };
-            SelectedTaggerModel = TaggerModels.FirstOrDefault();
+                new TaggerModel { DisplayName = "cl_tagger_1_02", ModelUrl = "https://huggingface.co/cella110n/cl_tagger/resolve/main/cl_tagger_1_02/model.onnx", TagsUrl = "https://huggingface.co/cella110n/cl_tagger/raw/main/cl_tagger_1_02/tag_mapping.json", InputSize = 448, InputFormat = "NCHW" },
+                new TaggerModel
+                {
+                    DisplayName = "ToriiGate-0.5",
+                    SeriesId = TaggerSeriesCatalog.ToriiGateSeriesId,
+                    BackendKind = TaggerBackendKind.OpenAiCompatibleVisionCaption
+                }
+            });
+            SelectedTaggerSeries = TaggerSeriesCatalog.GetSeries(TaggerSeriesCatalog.OnnxMultiLabelSeriesId);
             ExistingTxtConflictOptions = new ObservableCollection<ExistingTxtConflictOption>
             {
                 new ExistingTxtConflictOption { DisplayName = "跳过", Mode = ExistingTxtHandlingMode.Skip },
@@ -123,6 +180,25 @@ namespace CyanTools.ViewModel
             StartTaggingCommand = new RelayCommand(async _ => await StartProcessing(), _ => IsIdle && !string.IsNullOrWhiteSpace(InputDirectory));
             ClearLogCommand = new RelayCommand(_ => LogLines.Clear(), _ => IsIdle);
             AddTaggerCommand = new RelayCommand(_ => AddTagger(), _ => IsIdle);
+        }
+
+        private void RefreshTaggerModels()
+        {
+            string selectedName = SelectedTaggerModel?.DisplayName ?? string.Empty;
+            string selectedSeriesId = SelectedTaggerSeries?.Id ?? TaggerSeriesCatalog.OnnxMultiLabelSeriesId;
+            var models = _allTaggerModels
+                .Where(model => string.Equals(model.SeriesId, selectedSeriesId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            TaggerModels.Clear();
+            foreach (var model in models)
+            {
+                TaggerModels.Add(model);
+            }
+
+            SelectedTaggerModel = TaggerModels.FirstOrDefault(model =>
+                                      string.Equals(model.DisplayName, selectedName, StringComparison.OrdinalIgnoreCase))
+                                  ?? TaggerModels.FirstOrDefault();
         }
 
         private void AddLog(string message)
@@ -174,7 +250,9 @@ namespace CyanTools.ViewModel
             if (window.ShowDialog() == true && window.ResultModel != null)
             {
                 var newModel = window.ResultModel;
-                var existing = TaggerModels.FirstOrDefault(model =>
+                newModel.SeriesId = TaggerSeriesCatalog.OnnxMultiLabelSeriesId;
+                newModel.BackendKind = TaggerBackendKind.OnnxMultiLabel;
+                var existing = _allTaggerModels.FirstOrDefault(model =>
                     string.Equals(model.DisplayName, newModel.DisplayName, StringComparison.OrdinalIgnoreCase));
 
                 if (existing != null)
@@ -190,10 +268,12 @@ namespace CyanTools.ViewModel
                         return;
                     }
 
-                    TaggerModels.Remove(existing);
+                    _allTaggerModels.Remove(existing);
                 }
 
-                TaggerModels.Add(newModel);
+                _allTaggerModels.Add(newModel);
+                SelectedTaggerSeries = TaggerSeriesCatalog.GetSeries(TaggerSeriesCatalog.OnnxMultiLabelSeriesId);
+                RefreshTaggerModels();
                 SelectedTaggerModel = newModel;
             }
         }
@@ -266,31 +346,34 @@ namespace CyanTools.ViewModel
             return normalized;
         }
 
-        private async Task StartProcessing()
+        public TaggerSeriesExecutionOptions BuildSeriesExecutionOptions()
         {
-            IsIdle = false;
-            (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            LogLines.Clear();
-            ProgressValue = 0;
-
-            var progress = new Progress<string>(update =>
+            if (SelectedTaggerSeries?.BackendKind == TaggerBackendKind.OpenAiCompatibleVisionCaption)
             {
-                AddLog(update);
-                if (update.StartsWith("Processed"))
+                return new TaggerSeriesExecutionOptions
                 {
-                    try
+                    BackendKind = TaggerBackendKind.OpenAiCompatibleVisionCaption,
+                    ToriiGateOptions = new ToriiGateTaggingOptions
                     {
-                        var parts = update.Split('[', '/', ']');
-                        if (parts.Length > 2)
-                        {
-                            double current = double.Parse(parts[1]);
-                            double total = double.Parse(parts[2]);
-                            ProgressValue = (current / total) * 100;
-                        }
+                        InputDirectory = InputDirectory ?? string.Empty,
+                        Endpoint = ToriiGateEndpoint,
+                        ModelName = ToriiGateModelName,
+                        ApiToken = ToriiGateApiToken,
+                        CaptionFormat = TaggerSeriesCatalog.GetToriiGateCaptionFormat(ToriiGateCaptionFormatId),
+                        MaxMegapixels = ToriiGateMaxMegapixels,
+                        MaxTokens = ToriiGateMaxTokens,
+                        Temperature = ToriiGateTemperature,
+                        MaxParallelRequests = ToriiGateMaxParallelRequests,
+                        CustomTags = ParseCustomTags(),
+                        ExistingTxtHandlingMode = SelectedExistingTxtConflictOption?.Mode ?? ExistingTxtHandlingMode.Overwrite
                     }
-                    catch {                             }
-                }
-            });
+                };
+            }
+
+            if (SelectedTaggerModel == null)
+            {
+                throw new InvalidOperationException("未选择打标模型。");
+            }
 
             var categoryOptions = new TagCategoryOptions
             {
@@ -304,27 +387,42 @@ namespace CyanTools.ViewModel
                 IncludeModel = IncludeModel
             };
 
+            return new TaggerSeriesExecutionOptions
+            {
+                BackendKind = TaggerBackendKind.OnnxMultiLabel,
+                OnnxOptions = new TaggingPipelineExecutionOptions
+                {
+                    InputDirectory = InputDirectory ?? string.Empty,
+                    ModelUrl = SelectedTaggerModel.ModelUrl,
+                    TagsUrl = SelectedTaggerModel.TagsUrl,
+                    DisplayName = SelectedTaggerModel.DisplayName,
+                    PreferGpu = PreferGpu,
+                    GeneralThreshold = GeneralThreshold,
+                    CharacterThreshold = CharacterThreshold,
+                    InputSize = SelectedTaggerModel.InputSize,
+                    InputFormat = SelectedTaggerModel.InputFormat,
+                    CategoryOptions = categoryOptions,
+                    PriorityTags = ParsePriorityTags(),
+                    CustomTags = ParseCustomTags(),
+                    ExistingTxtHandlingMode = SelectedExistingTxtConflictOption?.Mode ?? ExistingTxtHandlingMode.Overwrite
+                }
+            };
+        }
+
+        private async Task StartProcessing()
+        {
+            IsIdle = false;
+            (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            LogLines.Clear();
+            ProgressValue = 0;
+
             try
             {
-                var priorityTags = ParsePriorityTags();
-                var customTags = ParseCustomTags();
-
-                await Task.Run(async () =>
-                {
-                    await _taggingProcessor.InitializeAsync(SelectedTaggerModel.ModelUrl, SelectedTaggerModel.TagsUrl, SelectedTaggerModel.DisplayName, PreferGpu, progress);
-                    await _taggingProcessor.ProcessDirectoryAsync(
-                        InputDirectory,
-                        GeneralThreshold,
-                        CharacterThreshold,
-                        SelectedTaggerModel.InputSize,
-                        SelectedTaggerModel.InputFormat,
-                        categoryOptions,
-                        priorityTags,
-                        customTags,
-                        SelectedExistingTxtConflictOption?.Mode ?? ExistingTxtHandlingMode.Overwrite,
-                        progress);
-                });
-                AddLog("Tagging complete.");
+                await TaggerSeriesExecutor.ExecuteAsync(
+                    BuildSeriesExecutionOptions(),
+                    AddLog,
+                    value => ProgressValue = value,
+                    CancellationToken.None);
             }
             catch (Exception ex)
             {

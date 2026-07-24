@@ -428,39 +428,8 @@ namespace CyanTools.ViewModel
 
         public override Task RunAsync(PipelineContext context, CancellationToken token)
         {
-            if (Inner.SelectedTaggerModel == null)
-            {
-                throw new InvalidOperationException("未选择打标模型。");
-            }
-
-            return TaggingPipelineExecutor.ExecuteAsync(
-                new TaggingPipelineProcessorAdapter(new TaggingProcessor()),
-                new TaggingPipelineExecutionOptions
-                {
-                    InputDirectory = Inner.InputDirectory ?? string.Empty,
-                    ModelUrl = Inner.SelectedTaggerModel.ModelUrl,
-                    TagsUrl = Inner.SelectedTaggerModel.TagsUrl,
-                    DisplayName = Inner.SelectedTaggerModel.DisplayName,
-                    PreferGpu = Inner.PreferGpu,
-                    GeneralThreshold = Inner.GeneralThreshold,
-                    CharacterThreshold = Inner.CharacterThreshold,
-                    InputSize = Inner.SelectedTaggerModel.InputSize,
-                    InputFormat = Inner.SelectedTaggerModel.InputFormat,
-                    CategoryOptions = new TagCategoryOptions
-                    {
-                        IncludeGeneral = Inner.IncludeGeneral,
-                        IncludeArtist = Inner.IncludeArtist,
-                        IncludeCopyright = Inner.IncludeCopyright,
-                        IncludeCharacter = Inner.IncludeCharacter,
-                        IncludeMeta = Inner.IncludeMeta,
-                        IncludeQuality = Inner.IncludeQuality,
-                        IncludeRating = Inner.IncludeRating,
-                        IncludeModel = Inner.IncludeModel
-                    },
-                    PriorityTags = TaggingTextParser.ParseTagList(Inner.PriorityTags),
-                    CustomTags = TaggingTextParser.ParseTagList(Inner.CustomTags),
-                    ExistingTxtHandlingMode = Inner.SelectedExistingTxtConflictOption?.Mode ?? ExistingTxtHandlingMode.Overwrite
-                },
+            return TaggerSeriesExecutor.ExecuteAsync(
+                Inner.BuildSeriesExecutionOptions(),
                 message => context.AppendLog($"[{DisplayName}] {message}"),
                 _ => { },
                 token);

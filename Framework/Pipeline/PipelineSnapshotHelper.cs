@@ -7,12 +7,27 @@ namespace CyanTools.Pipeline
 {
     public static class PipelineSnapshotHelper
     {
+        private static readonly string[] SensitiveNameFragments =
+        {
+            "password",
+            "passwd",
+            "secret",
+            "token",
+            "api_key",
+            "apikey",
+            "cookie",
+            "credential",
+            "authorization",
+            "bearer"
+        };
+
         public static Dictionary<string, object?> CaptureSimpleProperties(object target)
         {
             var dict = new Dictionary<string, object?>();
             var props = target.GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && p.CanWrite && IsSimpleType(p.PropertyType));
+                .Where(p => p.CanRead && p.CanWrite && IsSimpleType(p.PropertyType))
+                .Where(p => IsSafePropertyName(p.Name));
 
             foreach (var prop in props)
             {
@@ -27,6 +42,7 @@ namespace CyanTools.Pipeline
             var props = target.GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanWrite && p.CanRead && IsSimpleType(p.PropertyType))
+                .Where(p => IsSafePropertyName(p.Name))
                 .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
 
             foreach (var kvp in snapshot)
@@ -83,6 +99,15 @@ namespace CyanTools.Pipeline
                    || underlying == typeof(int)
                    || underlying == typeof(long)
                    || underlying == typeof(bool);
+        }
+
+        private static bool IsSafePropertyName(string propertyName)
+        {
+            string normalized = propertyName.Replace("_", string.Empty, StringComparison.Ordinal)
+                .Replace("-", string.Empty, StringComparison.Ordinal)
+                .ToLowerInvariant();
+            return !SensitiveNameFragments.Any(fragment =>
+                normalized.Contains(fragment.Replace("_", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal));
         }
     }
 }
