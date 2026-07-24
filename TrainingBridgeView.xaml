@@ -36,6 +36,22 @@
                      MinHeight="64"/>
         </DataTemplate>
 
+        <DataTemplate x:Key="TrainingBridgeBucketsEditorTemplate">
+            <StackPanel>
+                <Button Command="{Binding DataContext.CalculateSizeBucketsCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                        Content="根据数据集图片计算分桶"
+                        Style="{StaticResource CyanCommandButtonStyle}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,6"
+                        ToolTip="扫描训练集根目录及子目录内的图片，按训练分辨率和 16 像素对齐自动填写 size_buckets。"/>
+                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         MinHeight="64"/>
+            </StackPanel>
+        </DataTemplate>
+
         <Style x:Key="TrainingBridgeParameterListItemStyle" TargetType="{x:Type ListBoxItem}">
             <Setter Property="Margin" Value="4"/>
             <Setter Property="Padding" Value="2"/>
@@ -270,6 +286,10 @@
                                                         <DataTrigger Binding="{Binding EditorKind}" Value="textarea">
                                                             <Setter Property="ContentTemplate"
                                                                     Value="{StaticResource TrainingBridgeTextareaEditorTemplate}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Key}" Value="size_buckets">
+                                                            <Setter Property="ContentTemplate"
+                                                                    Value="{StaticResource TrainingBridgeBucketsEditorTemplate}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>

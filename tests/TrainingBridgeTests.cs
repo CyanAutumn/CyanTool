@@ -6,6 +6,33 @@ using Xunit;
 public sealed class TrainingBridgeTests
 {
     [Fact]
+    public void BucketCalculator_GeneratesDistinct16PixelBucketsAtTrainingResolution()
+    {
+        IReadOnlyList<TrainingBridgeBucketSize> buckets = TrainingBridgeBucketCalculator.Calculate(
+        [
+            new TrainingBridgeBucketSize(720, 1456),
+            new TrainingBridgeBucketSize(768, 1360),
+            new TrainingBridgeBucketSize(1024, 1024),
+            new TrainingBridgeBucketSize(1456, 720),
+            new TrainingBridgeBucketSize(1024, 1024)
+        ],
+        resolution: 1024);
+
+        Assert.Equal(
+        [
+            new TrainingBridgeBucketSize(720, 1456),
+            new TrainingBridgeBucketSize(768, 1360),
+            new TrainingBridgeBucketSize(1024, 1024),
+            new TrainingBridgeBucketSize(1456, 720)
+        ],
+        buckets);
+
+        Assert.Equal(
+            "[\n    [720, 1456, 1],\n    [768, 1360, 1],\n    [1024, 1024, 1],\n    [1456, 720, 1],\n]",
+            TrainingBridgeBucketCalculator.FormatTomlArray(buckets));
+    }
+
+    [Fact]
     public void SystemMonitorWidget_FormatsElapsedAndTotalTimeWithDays()
     {
         Assert.Equal(
@@ -95,6 +122,129 @@ public sealed class TrainingBridgeTests
         Assert.Equal("4.5", values["preview_cfg"]);
         Assert.Equal("123", values["preview_seed"]);
         Assert.Equal("false", values["preview_offload_pipeline_for_vae"]);
+    }
+
+    [Fact]
+    public void ImportAndExport_DiffusionPipeCompleteAnimaConfig_PreservesAllConfigurationFields()
+    {
+        var files = new[]
+        {
+            new TrainingBridgeConfigFile("anima_anime_1024.toml", """
+                output_dir = '/mnt/c/Users/Admin/Desktop/models/Lora'
+                dataset = 'configs/anima_anime_dataset_1024.toml'
+                epochs = 100
+                micro_batch_size_per_gpu = 3
+                pipeline_stages = 1
+                gradient_accumulation_steps = 1
+                gradient_clipping = 1.0
+                warmup_steps = 0
+                lr_scheduler = 'constant'
+                eval_every_n_epochs = 1
+                eval_before_first_step = false
+                eval_micro_batch_size_per_gpu = 1
+                eval_gradient_accumulation_steps = 1
+                save_every_n_epochs = 1
+                checkpoint_every_n_minutes = 15
+                activation_checkpointing = true
+                partition_method = 'parameters'
+                save_dtype = 'bfloat16'
+                caching_batch_size = 1
+                steps_per_print = 1
+                blocks_to_swap = 0
+
+                [model]
+                type = 'anima'
+                transformer_path = '/mnt/c/Users/Admin/Downloads/anima_base.safetensors'
+                vae_path = '/mnt/c/Users/Admin/Downloads/vae.safetensors'
+                llm_path = '/mnt/c/Users/Admin/Downloads/llm.safetensors'
+                dtype = 'bfloat16'
+                transformer_dtype = 'float8'
+                timestep_sample_method = 'logit_normal'
+                llm_adapter_lr = 0
+                max_sequence_length = 256
+
+                [adapter]
+                type = 'lora'
+                rank = 32
+                dtype = 'bfloat16'
+
+                [optimizer]
+                type = 'Prodigy'
+                lr = 1
+                betas = [0.9, 0.99]
+                weight_decay = 0.01
+
+                [monitoring]
+                enable_wandb = false
+                """),
+            new TrainingBridgeConfigFile("anima_anime_dataset_1024.toml", """
+                size_buckets = [
+                    [720, 1456, 1],
+                    [1024, 1024, 1],
+                ]
+                cache_shuffle_num = 1
+                cache_shuffle_delimiter = ", "
+                skip_empty_caption = true
+
+                [[directory]]
+                path = '/mnt/c/Users/Admin/Downloads/dataset'
+                num_repeats = 3
+                """)
+        };
+
+        IReadOnlyDictionary<string, string> values = TrainingBridgeConfigService.Import(
+            TrainingBridgeConfigService.DiffusionPipeBackendId,
+            files);
+
+        string[] requiredKeys =
+        [
+            "dataset", "pipeline_stages", "gradient_clipping", "warmup_steps", "lr_scheduler",
+            "eval_before_first_step", "eval_micro_batch_size_per_gpu", "eval_gradient_accumulation_steps",
+            "checkpoint_every_n_minutes", "activation_checkpointing", "partition_method", "save_dtype",
+            "caching_batch_size", "steps_per_print", "model.type", "model.dtype",
+            "model.transformer_dtype", "model.timestep_sample_method", "model.llm_adapter_lr",
+            "adapter.type", "adapter.dtype", "optimizer.betas", "optimizer.weight_decay",
+            "monitoring.enable_wandb", "size_buckets", "cache_shuffle_num",
+            "cache_shuffle_delimiter", "skip_empty_caption", "dataset_path", "num_repeats"
+        ];
+        Assert.All(requiredKeys, key => Assert.True(values.ContainsKey(key), $"缺少参数：{key}"));
+        Assert.Equal("configs/anima_anime_dataset_1024.toml", values["dataset"]);
+        Assert.Equal(", ", values["cache_shuffle_delimiter"]);
+        Assert.Contains("[720, 1456, 1]", values["size_buckets"]);
+        Assert.Contains("[1024, 1024, 1]", values["size_buckets"]);
+
+        var exported = TrainingBridgeConfigService.Export(
+                TrainingBridgeConfigService.DiffusionPipeBackendId,
+                values)
+            .ToDictionary(file => file.FileName, StringComparer.Ordinal);
+        string training = exported["anima_train.toml"].Content;
+        string dataset = exported["anima_anime_dataset_1024.toml"].Content;
+
+        string[] expectedTrainingLines =
+        [
+            "dataset = \"configs/anima_anime_dataset_1024.toml\"",
+            "epochs = 100", "micro_batch_size_per_gpu = 3", "pipeline_stages = 1",
+            "gradient_accumulation_steps = 1", "gradient_clipping = 1", "warmup_steps = 0",
+            "lr_scheduler = \"constant\"", "eval_before_first_step = false",
+            "eval_every_n_epochs = 1",
+            "eval_micro_batch_size_per_gpu = 1", "eval_gradient_accumulation_steps = 1",
+            "save_every_n_epochs = 1",
+            "checkpoint_every_n_minutes = 15", "activation_checkpointing = true",
+            "partition_method = \"parameters\"", "save_dtype = \"bfloat16\"",
+            "caching_batch_size = 1", "steps_per_print = 1", "blocks_to_swap = 0",
+            "type = \"anima\"", "transformer_path = \"/mnt/c/Users/Admin/Downloads/anima_base.safetensors\"",
+            "vae_path = \"/mnt/c/Users/Admin/Downloads/vae.safetensors\"",
+            "llm_path = \"/mnt/c/Users/Admin/Downloads/llm.safetensors\"", "dtype = \"bfloat16\"",
+            "transformer_dtype = \"float8\"", "timestep_sample_method = \"logit_normal\"",
+            "llm_adapter_lr = 0", "max_sequence_length = 256", "type = \"lora\"", "rank = 32",
+            "lr = 1", "betas = [0.9, 0.99]", "weight_decay = 0.01", "enable_wandb = false"
+        ];
+        Assert.All(expectedTrainingLines, line => Assert.Contains(line, training));
+        Assert.Contains("[720, 1456, 1]", dataset);
+        Assert.Contains("[1024, 1024, 1]", dataset);
+        Assert.Contains("cache_shuffle_num = 1", dataset);
+        Assert.Contains("cache_shuffle_delimiter = \", \"", dataset);
+        Assert.Contains("skip_empty_caption = true", dataset);
     }
 
     [Fact]
@@ -296,6 +446,9 @@ public sealed class TrainingBridgeTests
         Assert.Contains("Text=\"{Binding RamText}\"", xaml);
         Assert.Contains("Value=\"{Binding DiskLoadPercent}\"", xaml);
         Assert.Contains("ItemsSource=\"{Binding VisibleParameters}\"", xaml);
+        Assert.Contains("CalculateSizeBucketsCommand", xaml);
+        Assert.Contains("根据数据集图片计算分桶", xaml);
+        Assert.Contains("Binding Key\" Value=\"size_buckets\"", xaml);
         Assert.DoesNotContain("Header=\"Epoch 预览图\"", xaml);
         Assert.DoesNotContain("Binding PreviewPositivePrompt", xaml);
         Assert.DoesNotContain("Binding PreviewSampler", xaml);

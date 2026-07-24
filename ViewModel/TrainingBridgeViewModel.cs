@@ -87,6 +87,7 @@ namespace CyanTools.ViewModel
             AddParameterCommand = new RelayCommand(AddParameter, () => !IsBusy);
             RemoveParameterCommand = new RelayCommand(RemoveSelectedParameter, () => !IsBusy && SelectedParameter != null);
             FillDefaultsCommand = new RelayCommand(FillMissingDefaults, () => !IsBusy);
+            CalculateSizeBucketsCommand = new RelayCommand(async () => await CalculateSizeBucketsAsync(), () => !IsBusy);
             CopyPreviewCommand = new RelayCommand(CopySelectedPreview, () => SelectedGeneratedFile != null);
 
             ReloadBackendBindings();
@@ -113,6 +114,7 @@ namespace CyanTools.ViewModel
         public ICommand AddParameterCommand { get; }
         public ICommand RemoveParameterCommand { get; }
         public ICommand FillDefaultsCommand { get; }
+        public ICommand CalculateSizeBucketsCommand { get; }
         public ICommand CopyPreviewCommand { get; }
 
         public string DraftFileName
@@ -812,6 +814,56 @@ namespace CyanTools.ViewModel
             AppendLog(StatusMessage);
         }
 
+        private async Task CalculateSizeBucketsAsync()
+        {
+            string datasetPath = TrainingBridgeConfigService.RuntimePathToWindows(GetParameterValue("dataset_path"));
+            if (string.IsNullOrWhiteSpace(datasetPath) || !Directory.Exists(datasetPath))
+            {
+                ShowError("计算分桶失败", new DirectoryNotFoundException("请先填写一个可访问的训练集根目录。"));
+                return;
+            }
+
+            int resolution = GetPositiveIntParameter(
+                "resolution",
+                GetPositiveIntParameter("dataset_resolution", 1024));
+
+            IsBusy = true;
+            try
+            {
+                TrainingBridgeBucketCalculation calculation = await Task.Run(
+                    () => TrainingBridgeBucketCalculator.CalculateFromDirectory(datasetPath, resolution));
+                if (calculation.ImageCount == 0 || calculation.Buckets.Count == 0)
+                {
+                    throw new InvalidOperationException("训练集路径中未找到可识别的图片文件。");
+                }
+
+                TrainingBridgeParameterViewModel? bucketsParameter = Parameters.LastOrDefault(parameter =>
+                    string.Equals(parameter.Key.Trim(), "size_buckets", StringComparison.Ordinal));
+                if (bucketsParameter is null)
+                {
+                    bucketsParameter = CreateParameter("size_buckets", string.Empty);
+                    Parameters.Add(bucketsParameter);
+                    OnPropertyChanged(nameof(ParameterCountText));
+                    OnPropertyChanged(nameof(VisibleParameters));
+                }
+
+                bucketsParameter.Value = TrainingBridgeBucketCalculator.FormatTomlArray(calculation.Buckets);
+                string ignored = calculation.SkippedFileCount == 0
+                    ? string.Empty
+                    : $"，忽略 {calculation.SkippedFileCount} 个无法识别的文件";
+                StatusMessage = $"已按 {resolution} 分辨率从 {calculation.ImageCount} 张图片计算 {calculation.Buckets.Count} 个分桶{ignored}。";
+                AppendLog(StatusMessage);
+            }
+            catch (Exception exception)
+            {
+                ShowError("计算分桶失败", exception);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
         private void CopySelectedPreview()
         {
             if (SelectedGeneratedFile == null)
@@ -1013,14 +1065,22 @@ namespace CyanTools.ViewModel
             return values;
         }
 
+        private string GetParameterValue(string key)
+            => Parameters.LastOrDefault(parameter => string.Equals(parameter.Key.Trim(), key, StringComparison.Ordinal))?.Value
+                ?? string.Empty;
+
+        private int GetPositiveIntParameter(string key, int fallback)
+            => int.TryParse(GetParameterValue(key), out int value) && value > 0 ? value : fallback;
+
         private static int ParameterOrder(string key)
         {
             string[] preferred =
             [
-                "model_family", "dataset_path", "output_dir", "pretrained_model_path", "transformer_path",
-                "qwen3_path", "llm_path", "vae_path", "dataset_resolution", "resolution",
-                "dataset_repeats", "num_repeats", "caption_extension", "keep_tokens", "enable_bucket",
-                "shuffle_caption", "output_name", "save_model_as", "learning_rate", "optimizer_type",
+                "model_family", "dataset_path", "dataset_resolution", "resolution", "size_buckets",
+                "cache_shuffle_num", "cache_shuffle_delimiter", "skip_empty_caption", "dataset_repeats",
+                "num_repeats", "caption_extension", "keep_tokens", "enable_bucket", "shuffle_caption",
+                "output_dir", "pretrained_model_path", "transformer_path", "qwen3_path", "llm_path", "vae_path",
+                "output_name", "save_model_as", "learning_rate", "optimizer_type",
                 "lr_scheduler", "train_batch_size", "micro_batch_size_per_gpu", "max_train_epochs", "epochs",
                 "gradient_accumulation_steps", "save_every_n_epochs", "network_dim", "rank", "network_alpha",
                 "network_module"
@@ -1108,11 +1168,15 @@ namespace CyanTools.ViewModel
                 ["learning_rate"] = new("学习率", "number", "优化器的基础学习率。"),
                 ["optimizer_type"] = new("优化器", "select", "训练使用的优化器。", ["AdamW8bit", "AdamW", "Prodigy", "Adafactor"]),
                 ["lr_scheduler"] = new("学习率调度器", "select", "学习率随训练进度的变化规则。", ["constant", "constant_with_warmup", "cosine", "cosine_with_restarts"]),
+                ["dataset"] = new("数据集配置引用", "text", "diffusion-pipe 主配置中指向数据集 TOML 的相对路径。"),
                 ["train_batch_size"] = new("Batch Size", "number", "sd-scripts 单次迭代处理的样本数。"),
                 ["micro_batch_size_per_gpu"] = new("单卡 micro batch", "number", "diffusion-pipe 每张 GPU 的微批量。"),
                 ["max_train_epochs"] = new("最大 Epoch", "number", "sd-scripts 训练轮数。"),
                 ["epochs"] = new("训练轮数", "number", "diffusion-pipe 训练轮数。"),
+                ["pipeline_stages"] = new("Pipeline stages", "number", "diffusion-pipe 管线阶段数。"),
                 ["gradient_accumulation_steps"] = new("梯度累积步数", "number", "增大等效 batch 而不额外占用同等显存。"),
+                ["gradient_clipping"] = new("梯度裁剪", "number", "diffusion-pipe 梯度裁剪阈值。"),
+                ["warmup_steps"] = new("Warmup 步数", "number", "学习率预热步数。"),
                 ["save_every_n_epochs"] = new("每 N Epoch 保存", "number", "按 Epoch 保存训练检查点。"),
                 ["save_every_n_steps"] = new("每 N Step 保存", "number", "按 Step 保存训练检查点。"),
                 ["network_dim"] = new("LoRA 维度", "number", "sd-scripts LoRA rank。"),
@@ -1125,6 +1189,29 @@ namespace CyanTools.ViewModel
                 ["blocks_to_swap"] = new("Block swap 数量", "number", "diffusion-pipe 在 CPU/GPU 间换入换出的 block 数。"),
                 ["max_sequence_length"] = new("最大文本长度", "number", "Anima 文本编码的 token 上限。"),
                 ["eval_every_n_epochs"] = new("每 N Epoch 评估", "number", "diffusion-pipe 评估间隔。"),
+                ["eval_before_first_step"] = new("首步前评估", "boolean", "训练开始前先执行一次评估。"),
+                ["eval_micro_batch_size_per_gpu"] = new("评估单卡 micro batch", "number", "评估阶段每张 GPU 的微批量。"),
+                ["eval_gradient_accumulation_steps"] = new("评估梯度累积步数", "number", "评估阶段的梯度累积步数。"),
+                ["checkpoint_every_n_minutes"] = new("每 N 分钟保存检查点", "number", "按时间间隔保存检查点。"),
+                ["activation_checkpointing"] = new("激活检查点", "boolean", "以额外计算换取更低训练显存。"),
+                ["partition_method"] = new("参数分片方式", "text", "diffusion-pipe 参数分片策略。"),
+                ["save_dtype"] = new("检查点保存精度", "text", "保存 checkpoint 时使用的数据类型。"),
+                ["caching_batch_size"] = new("缓存 Batch Size", "number", "数据缓存阶段的 batch 大小。"),
+                ["steps_per_print"] = new("每 N Step 输出日志", "number", "训练进度日志输出间隔。"),
+                ["model.type"] = new("模型类型", "text", "[model] 区段的 type。"),
+                ["model.dtype"] = new("模型精度", "text", "[model] 区段的 dtype。"),
+                ["model.transformer_dtype"] = new("Transformer 精度", "text", "[model] 区段的 transformer_dtype。"),
+                ["model.timestep_sample_method"] = new("时间步采样方法", "text", "[model] 区段的 timestep_sample_method。"),
+                ["model.llm_adapter_lr"] = new("LLM Adapter 学习率", "number", "[model] 区段的 llm_adapter_lr。"),
+                ["adapter.type"] = new("Adapter 类型", "text", "[adapter] 区段的 type。"),
+                ["adapter.dtype"] = new("Adapter 精度", "text", "[adapter] 区段的 dtype。"),
+                ["optimizer.betas"] = new("Optimizer Betas", "text", "[optimizer] 区段的 betas TOML 数组，例如 [0.9, 0.99]。"),
+                ["optimizer.weight_decay"] = new("权重衰减", "number", "[optimizer] 区段的 weight_decay。"),
+                ["monitoring.enable_wandb"] = new("启用 Weights & Biases", "boolean", "[monitoring] 区段的 enable_wandb。"),
+                ["size_buckets"] = new("尺寸桶列表", "textarea", "可直接编辑 TOML 数组；也可根据训练集图片自动生成 16 像素对齐的尺寸桶。"),
+                ["cache_shuffle_num"] = new("缓存打乱数量", "number", "数据集缓存的 shuffle 数量。"),
+                ["cache_shuffle_delimiter"] = new("缓存打乱分隔符", "text", "数据集缓存 caption 的分隔符。"),
+                ["skip_empty_caption"] = new("跳过空 Caption", "boolean", "跳过没有标签文本的训练样本。"),
                 ["preview_enabled"] = new("启用 Epoch 预览图", "boolean", "在训练 Epoch 结束后生成固定条件的对比图。"),
                 ["preview_every_n_epochs"] = new("每 N 个 Epoch 预览", "number", "预览图生成间隔。"),
                 ["preview_positive_prompt"] = new("预览图正向 Prompt", "textarea", "固定 Prompt 便于比较不同 Epoch 的训练变化。"),
