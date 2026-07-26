@@ -27,7 +27,7 @@ namespace CyanTools.Pipeline
             var props = target.GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead && p.CanWrite && IsSimpleType(p.PropertyType))
-                .Where(p => IsSafePropertyName(p.Name));
+                .Where(p => !IsSensitivePropertyName(p.Name));
 
             foreach (var prop in props)
             {
@@ -42,7 +42,7 @@ namespace CyanTools.Pipeline
             var props = target.GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanWrite && p.CanRead && IsSimpleType(p.PropertyType))
-                .Where(p => IsSafePropertyName(p.Name))
+                .Where(p => !IsSensitivePropertyName(p.Name))
                 .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
 
             foreach (var kvp in snapshot)
@@ -62,6 +62,32 @@ namespace CyanTools.Pipeline
 
                 }
             }
+        }
+
+        public static Dictionary<string, object?> RemoveSensitiveProperties(
+            IReadOnlyDictionary<string, object?> snapshot)
+        {
+            return snapshot
+                .Where(pair => !IsSensitivePropertyName(pair.Key))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        }
+
+        public static bool IsSensitivePropertyName(string propertyName)
+        {
+            if (string.IsNullOrWhiteSpace(propertyName))
+            {
+                return false;
+            }
+
+            string normalized = propertyName
+                .Replace("-", string.Empty, StringComparison.Ordinal)
+                .Replace("_", string.Empty, StringComparison.Ordinal)
+                .ToLowerInvariant();
+
+            return SensitiveNameFragments.Any(fragment =>
+                normalized.Contains(
+                    fragment.Replace("_", string.Empty, StringComparison.Ordinal),
+                    StringComparison.Ordinal));
         }
 
         private static object? ConvertToType(object? value, Type targetType)
@@ -99,15 +125,6 @@ namespace CyanTools.Pipeline
                    || underlying == typeof(int)
                    || underlying == typeof(long)
                    || underlying == typeof(bool);
-        }
-
-        private static bool IsSafePropertyName(string propertyName)
-        {
-            string normalized = propertyName.Replace("_", string.Empty, StringComparison.Ordinal)
-                .Replace("-", string.Empty, StringComparison.Ordinal)
-                .ToLowerInvariant();
-            return !SensitiveNameFragments.Any(fragment =>
-                normalized.Contains(fragment.Replace("_", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal));
         }
     }
 }

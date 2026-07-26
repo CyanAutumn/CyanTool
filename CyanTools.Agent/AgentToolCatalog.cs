@@ -12,8 +12,8 @@ public static class AgentToolCatalog
     private static readonly IReadOnlyList<AgentPageDefinition> Pages =
         new ReadOnlyCollection<AgentPageDefinition>(
         [
-            Page("workflow", "工作流", "训练", "创建、检查并执行由多个工具步骤组成的本地工作流。",
-                Dedicated("workflow_manage", "管理工作流", "读取、保存或调整工作流定义。", AgentOperationRisk.WritesOutput)),
+            Page("workflow", "工作流", "训练", "检查并执行由多个工具步骤组成的本地工作流。",
+                Workflow("workflow_run_saved", "执行已保存工作流", "列出工作流、读取首节点参数，并用首节点参数覆盖执行整条工作流。")),
             Page("llm", "LLM工具", "训练", "用兼容的视觉语言模型批量分析图片并生成文本结果。",
                 Dedicated("llm_analyze_images", "分析图片", "将图片和提示词提交给已配置的模型服务。", AgentOperationRisk.ExternalService)),
             Page("image_super_resolution", "图片超分", "数据集处理", "使用 Real-ESRGAN 或 Waifu2x 放大目录中的图像。",
@@ -116,4 +116,14 @@ public static class AgentToolCatalog
         string description,
         AgentOperationRisk risk) =>
         new(id, displayName, description, risk, AgentExecutionKind.DedicatedAdapter);
+
+    private static AgentOperationDefinition Workflow(
+        string id,
+        string displayName,
+        string description) =>
+        new(id, displayName, description, AgentOperationRisk.WritesOutput, AgentExecutionKind.Workflow, Parameters:
+        [
+            new("workflow_name", "来自 cyantools_list_workflows 的已保存工作流名称。", true, "string"),
+            new("first_node_parameters", "只覆盖首节点的安全参数；未提交字段及后续节点保持工作流保存值。", false, "object")
+        ]);
 }
