@@ -885,7 +885,7 @@ namespace CyanTools.ViewModel
             finally
             {
                 SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", counters));
-                AppendLog($"[Danbooru] 已处理 {counters.Processed} 张，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张。");
+                AppendLog($"[Danbooru] {BuildDownloadSummary("Danbooru", counters)}。");
                 AppendLog("[Danbooru] 任务完成。");
             }
         }
@@ -1024,10 +1024,20 @@ namespace CyanTools.ViewModel
 
         private async Task<DownloadOutcome> DownloadDanbooruPostAsync(BooruPostInfo post, string outputDirectory, CancellationToken token)
         {
+            if (post.IsBanned)
+            {
+                return DownloadOutcome.Banned;
+            }
+
+            if (post.IsDeleted)
+            {
+                return DownloadOutcome.Deleted;
+            }
+
             var fileUrl = NormalizeDanbooruFileUrl(post.FileUrl);
             if (string.IsNullOrWhiteSpace(fileUrl))
             {
-                return DownloadOutcome.None;
+                return DownloadOutcome.Unavailable;
             }
 
             var fileName = Path.GetFileName(new Uri(fileUrl).LocalPath);
@@ -1155,6 +1165,8 @@ namespace CyanTools.ViewModel
             {
                 PostId = post.id,
                 FileUrl = GetBestDanbooruFileUrl(post),
+                IsBanned = post.is_banned,
+                IsDeleted = post.is_deleted,
                 ArtistTags = post.tag_string_artist,
                 CopyrightTags = post.tag_string_copyright,
                 CharacterTags = post.tag_string_character,
@@ -2159,7 +2171,26 @@ namespace CyanTools.ViewModel
             var progress = counters.Total.HasValue
                 ? $"已处理 {counters.Processed} / {counters.Total.Value} 张"
                 : $"总数未知，已处理 {counters.Processed} 张";
-            return $"{source}：{progress}，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张";
+            var unavailableParts = new List<string>();
+            if (counters.Banned > 0)
+            {
+                unavailableParts.Add($"已屏蔽 {counters.Banned} 张");
+            }
+
+            if (counters.Deleted > 0)
+            {
+                unavailableParts.Add($"已删除 {counters.Deleted} 张");
+            }
+
+            if (counters.Unavailable > 0)
+            {
+                unavailableParts.Add($"无公开原图链接 {counters.Unavailable} 张");
+            }
+
+            var unavailable = unavailableParts.Count == 0
+                ? string.Empty
+                : $"，{string.Join("，", unavailableParts)}";
+            return $"{source}：{progress}，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张{unavailable}";
         }
 
         private static string BuildOutputDirectoryImageTotalSummary(string? outputDirectory)
@@ -2472,7 +2503,10 @@ namespace CyanTools.ViewModel
         {
             None,
             Saved,
-            Skipped
+            Skipped,
+            Banned,
+            Deleted,
+            Unavailable
         }
 
         private sealed class SourceDownloadCounters
@@ -2488,6 +2522,9 @@ namespace CyanTools.ViewModel
             public int Processed { get; private set; }
             public int Saved { get; private set; }
             public int Skipped { get; private set; }
+            public int Banned { get; private set; }
+            public int Deleted { get; private set; }
+            public int Unavailable { get; private set; }
 
             public void SetTotal(int total)
             {
@@ -2506,6 +2543,15 @@ namespace CyanTools.ViewModel
                     case DownloadOutcome.Skipped:
                         Skipped++;
                         break;
+                    case DownloadOutcome.Banned:
+                        Banned++;
+                        break;
+                    case DownloadOutcome.Deleted:
+                        Deleted++;
+                        break;
+                    case DownloadOutcome.Unavailable:
+                        Unavailable++;
+                        break;
                 }
 
                 _changed?.Invoke(this);
@@ -2516,6 +2562,8 @@ namespace CyanTools.ViewModel
         {
             public int PostId { get; init; }
             public string? FileUrl { get; init; }
+            public bool IsBanned { get; init; }
+            public bool IsDeleted { get; init; }
             public string? ArtistTags { get; init; }
             public string? CopyrightTags { get; init; }
             public string? CharacterTags { get; init; }
