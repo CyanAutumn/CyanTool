@@ -4,10 +4,15 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:utils="clr-namespace:CyanTools.Utils"
              xmlns:viewModel="clr-namespace:CyanTools.ViewModel"
              mc:Ignorable="d"
              d:DesignHeight="620"
              d:DesignWidth="980">
+    <UserControl.Resources>
+        <utils:BooleanToInverseBooleanConverter x:Key="BooleanToInverseBooleanConverter" />
+    </UserControl.Resources>
+
     <UserControl.DataContext>
         <viewModel:ModelMetadataViewModel />
     </UserControl.DataContext>

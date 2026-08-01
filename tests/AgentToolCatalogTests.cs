@@ -41,4 +41,15 @@ public sealed class AgentToolCatalogTests
         Assert.Equal(AgentOperationRisk.Destructive, resolutionFilter.Risk);
         Assert.Equal(AgentOperationRisk.Destructive, rename.Risk);
     }
+
+    [Fact]
+    public void SavedWorkflowOperationUsesTheHeadlessWorkflowAdapter()
+    {
+        AgentOperationDefinition operation = AgentToolCatalog.GetOperation("workflow_run_saved");
+
+        Assert.Equal(AgentExecutionKind.Workflow, operation.ExecutionKind);
+        Assert.True(operation.IsHeadlessExecutable);
+        Assert.Contains(operation.Parameters!, parameter => parameter.Name == "workflow_name" && parameter.Required);
+        Assert.Contains(operation.Parameters!, parameter => parameter.Name == "first_node_parameters");
+    }
 }

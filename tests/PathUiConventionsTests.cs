@@ -399,6 +399,9 @@ public sealed class PathUiConventionsTests
         Assert.Contains("Text=\"{Binding LogText, Mode=OneWay}\"", view);
         Assert.Contains("Style=\"{StaticResource CyanLogTextBoxStyle}\"", view);
         Assert.DoesNotContain("ItemsSource=\"{Binding LogLines}\"", view);
+        Assert.Contains("<Grid Height=\"220\"", view);
+        Assert.DoesNotContain("<Border Height=\"145\"", view);
+        Assert.DoesNotContain("工作流执行输出", view);
         Assert.Contains("public string LogText", viewModel);
         Assert.Contains("Environment.NewLine", viewModel);
         Assert.DoesNotContain("LogLines", viewModel);
@@ -412,7 +415,13 @@ public sealed class PathUiConventionsTests
         Assert.Contains("BuildDanbooruPostsRequestResource", content);
         Assert.Contains("page=b{beforePostId.Value}", content);
         Assert.Contains("当前页均已处理，继续检查更早的帖子", content);
-        Assert.Contains("已处理 {counters.Processed} 张，本次新增 {counters.Saved} 张，跳过 {counters.Skipped} 张", content);
+        Assert.Contains("IsBanned = post.is_banned", content);
+        Assert.Contains("IsDeleted = post.is_deleted", content);
+        Assert.Contains("DownloadOutcome.Banned", content);
+        Assert.Contains("DownloadOutcome.Deleted", content);
+        Assert.Contains("DownloadOutcome.Unavailable", content);
+        Assert.Contains("已屏蔽 {counters.Banned} 张", content);
+        Assert.Contains("无公开原图链接 {counters.Unavailable} 张", content);
         Assert.DoesNotContain("&page={page}", content);
     }
 
@@ -441,10 +450,10 @@ public sealed class PathUiConventionsTests
         Assert.Contains("P(\"InputText\", \"ID / 标签\")", content);
         Assert.Contains("P(\"OutputDirectory\", \"输出目录\"", content);
         Assert.Contains("P(\"IncludeArtist\", \"Artist\")", content);
-        Assert.Contains("P(\"DanbooruToken\", \"Danbooru 令牌\"", content);
-        Assert.Contains("P(\"PixivRefreshToken\", \"Pixiv 令牌\", isPassword: true)", content);
-        Assert.Contains("A(\"登录获取\", \"GetPixivRefreshTokenCommand\")", content);
-        Assert.Contains("A(\"Danbooru 正则手动获取\", \"OpenDanbooruManualCollectorCommand\")", content);
+        Assert.DoesNotContain("P(\"DanbooruToken\", \"Danbooru 令牌\"", content);
+        Assert.DoesNotContain("P(\"PixivRefreshToken\", \"Pixiv 令牌\"", content);
+        Assert.DoesNotContain("A(\"登录获取\", \"GetPixivRefreshTokenCommand\")", content);
+        Assert.DoesNotContain("A(\"Danbooru 正则手动获取\", \"OpenDanbooruManualCollectorCommand\")", content);
         Assert.Contains("CreateWorkflowParameters(PipelineNode)", canvas);
         Assert.Contains("CreateWorkflowActions(PipelineNode)", canvas);
         Assert.Contains("PipelinePasswordParameterEditorTemplate", scheduler);
@@ -466,8 +475,8 @@ public sealed class PathUiConventionsTests
         Assert.DoesNotContain("FolderPath", workflowDefinitions);
         Assert.DoesNotContain("VideoPath", workflowDefinitions);
         Assert.DoesNotContain("SelectedFolderPath", workflowDefinitions);
-        Assert.Contains("P(\"DanbooruToken\", \"Danbooru 令牌\"", workflowDefinitions);
-        Assert.Contains("P(\"PixivRefreshToken\", \"Pixiv 令牌\", isPassword: true)", workflowDefinitions);
+        Assert.DoesNotContain("DanbooruToken", workflowDefinitions);
+        Assert.DoesNotContain("PixivRefreshToken", workflowDefinitions);
     }
 
     [Fact]

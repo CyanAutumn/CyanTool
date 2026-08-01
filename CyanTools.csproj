@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -18,6 +18,8 @@
     <FileVersion>1.0.0.15</FileVersion>
   </PropertyGroup>
 
+  
+
   <ItemGroup>
     <Folder Include="ViewModel" />
     <Folder Include="Model" />
@@ -25,7 +27,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    
+    
+    
     <PackageReference Include="Autoupdater.NET.Official" Version="1.9.2" />
+    
+    
+    
     <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.15.0" />
     <PackageReference Include="Nodify" Version="7.3.0" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
@@ -52,7 +60,7 @@
     <Content Include="realesrgan-ncnn-vulkan-20220424-windows\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="waifu2x-caffe\**">
+        <Content Include="waifu2x-caffe\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Models\**">

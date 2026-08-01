@@ -53,10 +53,7 @@ namespace CyanTools.Utils
             "save_every_n_epochs", "save_every_n_steps", "eval_every_n_epochs",
             "blocks_to_swap", "max_sequence_length", "lr_warmup_steps", "keep_tokens",
             "preview_every_n_epochs", "preview_width", "preview_height", "preview_steps",
-            "preview_cfg", "preview_seed", "pipeline_stages", "gradient_clipping",
-            "warmup_steps", "eval_micro_batch_size_per_gpu", "eval_gradient_accumulation_steps",
-            "checkpoint_every_n_minutes", "caching_batch_size", "steps_per_print",
-            "model.llm_adapter_lr", "optimizer.weight_decay", "cache_shuffle_num"
+            "preview_cfg", "preview_seed"
         };
 
         private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal)
@@ -66,11 +63,6 @@ namespace CyanTools.Utils
             "ae_path", "gemma2_path", "text_encoder_path", "byt5_path", "llm_path",
             "vae_path", "network_weights", "conditioning_data_dir", "config_path",
             "resume_from_checkpoint"
-        };
-
-        private static readonly HashSet<string> WhitespaceSignificantKeys = new(StringComparer.Ordinal)
-        {
-            "cache_shuffle_delimiter"
         };
 
         private static readonly Dictionary<string, string> CliFlagMap = new(StringComparer.Ordinal)
@@ -137,107 +129,7 @@ namespace CyanTools.Utils
                 }
             }
 
-            return NormalizeValues(values);
-        }
-
-
-
-
-
-        public static string? DetectSourceBackend(IEnumerable<TrainingBridgeConfigFile> files)
-        {
-            TrainingBridgeConfigFile[] selectedFiles = files?.ToArray() ?? Array.Empty<TrainingBridgeConfigFile>();
-            if (selectedFiles.Length == 0)
-            {
-                return null;
-            }
-
-            if (HasFileName(selectedFiles, "anima_train.toml") ||
-                HasPathHint(selectedFiles, "diffusion-pipe") ||
-                HasDiffusionPipeTomlSignature(selectedFiles))
-            {
-                return DiffusionPipeBackendId;
-            }
-
-            if (HasFileName(selectedFiles, "anima-fast-lora.args.txt") ||
-                HasPathHint(selectedFiles, "anima-fast-lora") ||
-                HasContentHint(selectedFiles, "external/anima_lora") ||
-                HasContentHint(selectedFiles, @"external\anima_lora"))
-            {
-                return AnimaFastLoraBackendId;
-            }
-
-            if (HasFileName(selectedFiles, "wsl-sd-scripts.args.txt") ||
-                HasPathHint(selectedFiles, "wsl-sd-scripts"))
-            {
-                return WslSdScriptsBackendId;
-            }
-
-            if (HasFileName(selectedFiles, "sd-scripts.args.txt"))
-            {
-                return SdScriptsBackendId;
-            }
-
-            if (HasPathHint(selectedFiles, "sd-scripts"))
-            {
-                return HasWslPathHint(selectedFiles)
-                    ? WslSdScriptsBackendId
-                    : SdScriptsBackendId;
-            }
-
-            return null;
-        }
-
-
-
-
-        public static IReadOnlyDictionary<string, string> NormalizeValues(
-            IReadOnlyDictionary<string, string> sourceValues)
-        {
-            ArgumentNullException.ThrowIfNull(sourceValues);
-            return ExpandAliases(CleanValues(sourceValues));
-        }
-
-        private static bool HasFileName(IEnumerable<TrainingBridgeConfigFile> files, string expectedFileName)
-            => files.Any(file => string.Equals(
-                Path.GetFileName(file.FileName),
-                expectedFileName,
-                StringComparison.OrdinalIgnoreCase));
-
-        private static bool HasPathHint(IEnumerable<TrainingBridgeConfigFile> files, string hint)
-            => files.Any(file => !string.IsNullOrWhiteSpace(file.SourcePath) &&
-                file.SourcePath.IndexOf(hint, StringComparison.OrdinalIgnoreCase) >= 0);
-
-        private static bool HasContentHint(IEnumerable<TrainingBridgeConfigFile> files, string hint)
-            => files.Any(file => file.Content.IndexOf(hint, StringComparison.OrdinalIgnoreCase) >= 0);
-
-        private static bool HasWslPathHint(IEnumerable<TrainingBridgeConfigFile> files)
-            => files.Any(file =>
-            {
-                string text = (file.SourcePath ?? string.Empty) + "\n" + file.Content;
-                return text.IndexOf("/mnt/", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    text.IndexOf("\\\\wsl", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    text.IndexOf("wsl.localhost", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    text.IndexOf("~/sd-scripts", StringComparison.OrdinalIgnoreCase) >= 0;
-            });
-
-        private static bool HasDiffusionPipeTomlSignature(IEnumerable<TrainingBridgeConfigFile> files)
-        {
-            foreach (TrainingBridgeConfigFile file in files.Where(file =>
-                         string.Equals(Path.GetExtension(file.FileName), ".toml", StringComparison.OrdinalIgnoreCase)))
-            {
-                string content = file.Content;
-                if ((content.IndexOf("[[directory]]", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                     content.IndexOf("size_buckets", StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (content.IndexOf("[model]", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                     content.IndexOf("transformer_path", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                     content.IndexOf("llm_path", StringComparison.OrdinalIgnoreCase) >= 0))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return ExpandAliases(CleanValues(values));
         }
 
         public static IReadOnlyList<TrainingBridgeConfigFile> Export(
@@ -271,6 +163,10 @@ namespace CyanTools.Utils
             };
         }
 
+        public static IReadOnlyDictionary<string, string> NormalizeValues(
+            IReadOnlyDictionary<string, string> sourceValues)
+            => ExpandAliases(CleanValues(sourceValues));
+
         public static IReadOnlyDictionary<string, string> CreateDefaultValues()
         {
             return new Dictionary<string, string>(StringComparer.Ordinal)
@@ -301,33 +197,6 @@ namespace CyanTools.Utils
                 ["network_module"] = "networks.lora_anima",
                 ["gradient_checkpointing"] = "true",
                 ["cache_latents"] = "true",
-                ["dataset"] = "anima_dataset.toml",
-                ["pipeline_stages"] = "1",
-                ["gradient_clipping"] = "1.0",
-                ["warmup_steps"] = "0",
-                ["eval_before_first_step"] = "false",
-                ["eval_micro_batch_size_per_gpu"] = "1",
-                ["eval_gradient_accumulation_steps"] = "1",
-                ["checkpoint_every_n_minutes"] = "15",
-                ["activation_checkpointing"] = "true",
-                ["partition_method"] = "parameters",
-                ["save_dtype"] = "bfloat16",
-                ["caching_batch_size"] = "1",
-                ["steps_per_print"] = "1",
-                ["model.type"] = "anima",
-                ["model.dtype"] = "bfloat16",
-                ["model.transformer_dtype"] = "float8",
-                ["model.timestep_sample_method"] = "logit_normal",
-                ["model.llm_adapter_lr"] = "0",
-                ["adapter.type"] = "lora",
-                ["adapter.dtype"] = "bfloat16",
-                ["optimizer.betas"] = "[0.9, 0.99]",
-                ["optimizer.weight_decay"] = "0.01",
-                ["monitoring.enable_wandb"] = "false",
-                ["size_buckets"] = "[[1024, 1024, 1]]",
-                ["cache_shuffle_num"] = "1",
-                ["cache_shuffle_delimiter"] = ", ",
-                ["skip_empty_caption"] = "true",
                 ["preview_enabled"] = "true",
                 ["preview_every_n_epochs"] = "1",
                 ["preview_positive_prompt"] = "a golden retriever running through a grassy field",
@@ -444,28 +313,14 @@ namespace CyanTools.Utils
         private static Dictionary<string, string> ImportDiffusionPipeToml(MiniTomlDocument document)
         {
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
+            CopyScalar(document, values, string.Empty, "output_dir");
             foreach (string key in new[]
                      {
-                         "output_dir", "dataset", "epochs", "micro_batch_size_per_gpu",
-                         "pipeline_stages", "gradient_accumulation_steps", "gradient_clipping",
-                         "warmup_steps", "lr_scheduler", "eval_every_n_epochs",
-                         "eval_before_first_step", "eval_micro_batch_size_per_gpu",
-                         "eval_gradient_accumulation_steps", "save_every_n_epochs",
-                         "checkpoint_every_n_minutes", "activation_checkpointing",
-                         "partition_method", "save_dtype", "caching_batch_size", "steps_per_print",
-                         "blocks_to_swap", "cache_shuffle_num", "cache_shuffle_delimiter",
-                         "skip_empty_caption"
+                         "epochs", "micro_batch_size_per_gpu", "gradient_accumulation_steps",
+                         "eval_every_n_epochs", "save_every_n_epochs", "blocks_to_swap"
                      })
             {
                 CopyScalar(document, values, string.Empty, key);
-            }
-
-            foreach (string key in new[]
-                     {
-                         "type", "dtype", "transformer_dtype", "timestep_sample_method", "llm_adapter_lr"
-                     })
-            {
-                CopyScalar(document, values, "model", key, "model." + key);
             }
 
             foreach ((string source, string target) in new[]
@@ -486,10 +341,6 @@ namespace CyanTools.Utils
             {
                 values["rank"] = rank;
             }
-            foreach (string key in new[] { "type", "dtype" })
-            {
-                CopyScalar(document, values, "adapter", key, "adapter." + key);
-            }
             if (document.TryGetScalar("optimizer", "lr", out string learningRate))
             {
                 values["learning_rate"] = learningRate;
@@ -498,11 +349,6 @@ namespace CyanTools.Utils
             {
                 values["optimizer_type"] = optimizerType;
             }
-            foreach (string key in new[] { "betas", "weight_decay" })
-            {
-                CopyScalar(document, values, "optimizer", key, "optimizer." + key);
-            }
-            CopyScalar(document, values, "monitoring", "enable_wandb", "monitoring.enable_wandb");
 
             foreach (string key in new[]
                      {
@@ -519,7 +365,6 @@ namespace CyanTools.Utils
 
             if (document.TryGetScalar(string.Empty, "size_buckets", out string buckets))
             {
-                values["size_buckets"] = buckets;
                 Match resolution = Regex.Match(buckets, @"-?\d+");
                 if (resolution.Success)
                 {
@@ -585,13 +430,11 @@ namespace CyanTools.Utils
             MiniTomlDocument document,
             IDictionary<string, string> values,
             string section,
-            string key,
-            string? targetKey = null)
+            string key)
         {
             if (document.TryGetScalar(section, key, out string value))
             {
-                string destinationKey = targetKey ?? key;
-                values[destinationKey] = PathKeys.Contains(destinationKey) ? RuntimePathToWindows(value) : value;
+                values[key] = PathKeys.Contains(key) ? RuntimePathToWindows(value) : value;
             }
         }
 
@@ -661,17 +504,16 @@ namespace CyanTools.Utils
             string vaePath = WindowsPathToWsl(GetText(values, "vae_path"));
             string llmPath = WindowsPathToWsl(GetText(values, "llm_path"));
             int resolution = GetInt(values, "resolution", 1024);
-            string datasetReference = GetText(values, "dataset", "anima_dataset.toml");
-            string datasetFileName = GetTomlFileName(datasetReference);
-            string sizeBuckets = GetTomlArray(values, "size_buckets", $"[[{resolution}, {resolution}, 1]]");
 
             string datasetText = string.Join("\n",
             [
-                $"size_buckets = {sizeBuckets}",
+                "size_buckets = [",
+                $"    [{resolution}, {resolution}, 1],",
+                "]",
                 string.Empty,
-                $"cache_shuffle_num = {GetInt(values, "cache_shuffle_num", 1)}",
-                $"cache_shuffle_delimiter = {TomlString(GetText(values, "cache_shuffle_delimiter", ", "))}",
-                $"skip_empty_caption = {TomlBool(GetBool(values, "skip_empty_caption", true))}",
+                "cache_shuffle_num = 1",
+                "cache_shuffle_delimiter = \", \",",
+                "skip_empty_caption = true",
                 string.Empty,
                 "[[directory]]",
                 $"path = {TomlString(datasetPath)}",
@@ -682,28 +524,28 @@ namespace CyanTools.Utils
             string trainingText = string.Join("\n",
             [
                 $"output_dir = {TomlString(outputDirectory)}",
-                $"dataset = {TomlString(datasetReference)}",
+                "dataset = \"anima_dataset.toml\"",
                 string.Empty,
                 $"epochs = {GetInt(values, "epochs", 50)}",
                 $"micro_batch_size_per_gpu = {GetInt(values, "micro_batch_size_per_gpu", 1)}",
-                $"pipeline_stages = {GetInt(values, "pipeline_stages", 1)}",
+                "pipeline_stages = 1",
                 $"gradient_accumulation_steps = {GetInt(values, "gradient_accumulation_steps", 1)}",
-                $"gradient_clipping = {GetDouble(values, "gradient_clipping", 1).ToString("G17", CultureInfo.InvariantCulture)}",
-                $"warmup_steps = {GetInt(values, "warmup_steps", 0)}",
-                $"lr_scheduler = {TomlString(GetText(values, "lr_scheduler", "constant"))}",
+                "gradient_clipping = 1.0",
+                "warmup_steps = 0",
+                "lr_scheduler = 'constant'",
                 string.Empty,
                 $"eval_every_n_epochs = {GetInt(values, "eval_every_n_epochs", 5)}",
-                $"eval_before_first_step = {TomlBool(GetBool(values, "eval_before_first_step", false))}",
-                $"eval_micro_batch_size_per_gpu = {GetInt(values, "eval_micro_batch_size_per_gpu", 1)}",
-                $"eval_gradient_accumulation_steps = {GetInt(values, "eval_gradient_accumulation_steps", 1)}",
+                "eval_before_first_step = false",
+                "eval_micro_batch_size_per_gpu = 1",
+                "eval_gradient_accumulation_steps = 1",
                 string.Empty,
                 $"save_every_n_epochs = {GetInt(values, "save_every_n_epochs", 1)}",
-                $"checkpoint_every_n_minutes = {GetInt(values, "checkpoint_every_n_minutes", 15)}",
-                $"activation_checkpointing = {TomlBool(GetBool(values, "activation_checkpointing", true))}",
-                $"partition_method = {TomlString(GetText(values, "partition_method", "parameters"))}",
-                $"save_dtype = {TomlString(GetText(values, "save_dtype", "bfloat16"))}",
-                $"caching_batch_size = {GetInt(values, "caching_batch_size", 1)}",
-                $"steps_per_print = {GetInt(values, "steps_per_print", 1)}",
+                "checkpoint_every_n_minutes = 15",
+                "activation_checkpointing = true",
+                "partition_method = 'parameters'",
+                "save_dtype = 'bfloat16'",
+                "caching_batch_size = 1",
+                "steps_per_print = 1",
                 $"blocks_to_swap = {GetInt(values, "blocks_to_swap", 0)}",
                 string.Empty,
                 "[preview]",
@@ -721,36 +563,36 @@ namespace CyanTools.Utils
                 $"offload_pipeline_for_vae = {TomlBool(GetBool(values, "preview_offload_pipeline_for_vae", true))}",
                 string.Empty,
                 "[model]",
-                $"type = {TomlString(GetText(values, "model.type", "anima"))}",
+                "type = 'anima'",
                 $"transformer_path = {TomlString(transformerPath)}",
                 $"vae_path = {TomlString(vaePath)}",
                 $"llm_path = {TomlString(llmPath)}",
-                $"dtype = {TomlString(GetText(values, "model.dtype", "bfloat16"))}",
-                $"transformer_dtype = {TomlString(GetText(values, "model.transformer_dtype", "float8"))}",
-                $"timestep_sample_method = {TomlString(GetText(values, "model.timestep_sample_method", "logit_normal"))}",
-                $"llm_adapter_lr = {GetDouble(values, "model.llm_adapter_lr", 0).ToString("G17", CultureInfo.InvariantCulture)}",
+                "dtype = 'bfloat16'",
+                "transformer_dtype = 'float8'",
+                "timestep_sample_method = 'logit_normal'",
+                "llm_adapter_lr = 0",
                 $"max_sequence_length = {GetInt(values, "max_sequence_length", 256)}",
                 string.Empty,
                 "[adapter]",
-                $"type = {TomlString(GetText(values, "adapter.type", "lora"))}",
+                "type = 'lora'",
                 $"rank = {GetInt(values, "rank", 16)}",
-                $"dtype = {TomlString(GetText(values, "adapter.dtype", "bfloat16"))}",
+                "dtype = 'bfloat16'",
                 string.Empty,
                 "[optimizer]",
-                $"type = {TomlString(GetText(values, "optimizer_type", "Prodigy"))}",
+                "type = 'Prodigy'",
                 $"lr = {GetDouble(values, "learning_rate", 1).ToString("G17", CultureInfo.InvariantCulture)}",
-                $"betas = {GetTomlArray(values, "optimizer.betas", "[0.9, 0.99]")}",
-                $"weight_decay = {GetDouble(values, "optimizer.weight_decay", 0.01).ToString("G17", CultureInfo.InvariantCulture)}",
+                "betas = [0.9, 0.99]",
+                "weight_decay = 0.01",
                 string.Empty,
                 "[monitoring]",
-                $"enable_wandb = {TomlBool(GetBool(values, "monitoring.enable_wandb", false))}",
+                "enable_wandb = false",
                 string.Empty
             ]);
 
             return
             [
                 new TrainingBridgeConfigFile("anima_train.toml", trainingText),
-                new TrainingBridgeConfigFile(datasetFileName, datasetText)
+                new TrainingBridgeConfigFile("anima_dataset.toml", datasetText)
             ];
         }
 
@@ -980,9 +822,7 @@ namespace CyanTools.Utils
 
                 string value = PathKeys.Contains(key)
                     ? CleanPathText(pair.Value)
-                    : WhitespaceSignificantKeys.Contains(key)
-                        ? pair.Value ?? string.Empty
-                        : pair.Value?.Trim() ?? string.Empty;
+                    : pair.Value?.Trim() ?? string.Empty;
                 if (NumericKeys.Contains(key) &&
                     double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number))
                 {
@@ -1045,12 +885,9 @@ namespace CyanTools.Utils
             string key,
             string defaultValue = "")
         {
-            if (!values.TryGetValue(key, out string? value) || string.IsNullOrWhiteSpace(value))
-            {
-                return defaultValue;
-            }
-
-            return WhitespaceSignificantKeys.Contains(key) ? value : value.Trim();
+            return values.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value)
+                ? value.Trim()
+                : defaultValue;
         }
 
         private static int GetInt(IReadOnlyDictionary<string, string> values, string key, int defaultValue)
@@ -1084,27 +921,6 @@ namespace CyanTools.Utils
         private static string TomlBool(bool value) => value ? "true" : "false";
 
         private static string TomlString(string value) => JsonSerializer.Serialize(value);
-
-        private static string GetTomlArray(
-            IReadOnlyDictionary<string, string> values,
-            string key,
-            string defaultValue)
-        {
-            string value = GetText(values, key, defaultValue);
-            return value.StartsWith("[", StringComparison.Ordinal) && value.EndsWith("]", StringComparison.Ordinal)
-                ? value
-                : defaultValue;
-        }
-
-        private static string GetTomlFileName(string datasetReference)
-        {
-            string normalized = datasetReference.Replace('\\', '/').Trim();
-            int separatorIndex = normalized.LastIndexOf('/');
-            string fileName = separatorIndex >= 0 ? normalized[(separatorIndex + 1)..] : normalized;
-            return fileName.EndsWith(".toml", StringComparison.OrdinalIgnoreCase)
-                ? fileName
-                : "anima_dataset.toml";
-        }
 
         private static void EnsureSupportedBackend(string backendId)
         {

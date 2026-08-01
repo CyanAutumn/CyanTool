@@ -42,23 +42,11 @@ namespace CyanTools.Utils
                 .ToArray();
         }
 
-        public TrainingBridgeProjectDraft? FindByName(string? name)
-        {
-            string normalizedName = name?.Trim() ?? string.Empty;
-            if (normalizedName.Length == 0)
-            {
-                return null;
-            }
-
-            return ListAll().FirstOrDefault(project =>
-                string.Equals(project.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
-        }
-
         public TrainingBridgeProjectDraft Save(TrainingBridgeProjectDraft project)
         {
             if (string.IsNullOrWhiteSpace(project.Name))
             {
-                throw new InvalidOperationException("请填写配置文件名称。");
+                throw new InvalidOperationException("请填写项目名称。");
             }
 
             if (!Guid.TryParse(project.Id, out _))
@@ -67,7 +55,6 @@ namespace CyanTools.Utils
             }
 
             project.Name = project.Name.Trim();
-            project.ProjectName = project.ProjectName?.Trim() ?? string.Empty;
             project.UpdatedAtUtc = DateTime.UtcNow;
             project.Values = new Dictionary<string, string>(project.Values, StringComparer.Ordinal);
             Directory.CreateDirectory(_projectsDirectory);
@@ -99,7 +86,6 @@ namespace CyanTools.Utils
                 }
 
                 project.Values = new Dictionary<string, string>(project.Values ?? new(), StringComparer.Ordinal);
-                project.ProjectName ??= string.Empty;
                 return project;
             }
             catch

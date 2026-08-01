@@ -6,33 +6,6 @@ using Xunit;
 public sealed class TrainingBridgeTests
 {
     [Fact]
-    public void BucketCalculator_GeneratesDistinct16PixelBucketsAtTrainingResolution()
-    {
-        IReadOnlyList<TrainingBridgeBucketSize> buckets = TrainingBridgeBucketCalculator.Calculate(
-        [
-            new TrainingBridgeBucketSize(720, 1456),
-            new TrainingBridgeBucketSize(768, 1360),
-            new TrainingBridgeBucketSize(1024, 1024),
-            new TrainingBridgeBucketSize(1456, 720),
-            new TrainingBridgeBucketSize(1024, 1024)
-        ],
-        resolution: 1024);
-
-        Assert.Equal(
-        [
-            new TrainingBridgeBucketSize(720, 1456),
-            new TrainingBridgeBucketSize(768, 1360),
-            new TrainingBridgeBucketSize(1024, 1024),
-            new TrainingBridgeBucketSize(1456, 720)
-        ],
-        buckets);
-
-        Assert.Equal(
-            "[\n    [720, 1456, 1],\n    [768, 1360, 1],\n    [1024, 1024, 1],\n    [1456, 720, 1],\n]",
-            TrainingBridgeBucketCalculator.FormatTomlArray(buckets));
-    }
-
-    [Fact]
     public void SystemMonitorWidget_FormatsElapsedAndTotalTimeWithDays()
     {
         Assert.Equal(
@@ -125,129 +98,6 @@ public sealed class TrainingBridgeTests
     }
 
     [Fact]
-    public void ImportAndExport_DiffusionPipeCompleteAnimaConfig_PreservesAllConfigurationFields()
-    {
-        var files = new[]
-        {
-            new TrainingBridgeConfigFile("anima_anime_1024.toml", """
-                output_dir = '/mnt/c/Users/Admin/Desktop/models/Lora'
-                dataset = 'configs/anima_anime_dataset_1024.toml'
-                epochs = 100
-                micro_batch_size_per_gpu = 3
-                pipeline_stages = 1
-                gradient_accumulation_steps = 1
-                gradient_clipping = 1.0
-                warmup_steps = 0
-                lr_scheduler = 'constant'
-                eval_every_n_epochs = 1
-                eval_before_first_step = false
-                eval_micro_batch_size_per_gpu = 1
-                eval_gradient_accumulation_steps = 1
-                save_every_n_epochs = 1
-                checkpoint_every_n_minutes = 15
-                activation_checkpointing = true
-                partition_method = 'parameters'
-                save_dtype = 'bfloat16'
-                caching_batch_size = 1
-                steps_per_print = 1
-                blocks_to_swap = 0
-
-                [model]
-                type = 'anima'
-                transformer_path = '/mnt/c/Users/Admin/Downloads/anima_base.safetensors'
-                vae_path = '/mnt/c/Users/Admin/Downloads/vae.safetensors'
-                llm_path = '/mnt/c/Users/Admin/Downloads/llm.safetensors'
-                dtype = 'bfloat16'
-                transformer_dtype = 'float8'
-                timestep_sample_method = 'logit_normal'
-                llm_adapter_lr = 0
-                max_sequence_length = 256
-
-                [adapter]
-                type = 'lora'
-                rank = 32
-                dtype = 'bfloat16'
-
-                [optimizer]
-                type = 'Prodigy'
-                lr = 1
-                betas = [0.9, 0.99]
-                weight_decay = 0.01
-
-                [monitoring]
-                enable_wandb = false
-                """),
-            new TrainingBridgeConfigFile("anima_anime_dataset_1024.toml", """
-                size_buckets = [
-                    [720, 1456, 1],
-                    [1024, 1024, 1],
-                ]
-                cache_shuffle_num = 1
-                cache_shuffle_delimiter = ", "
-                skip_empty_caption = true
-
-                [[directory]]
-                path = '/mnt/c/Users/Admin/Downloads/dataset'
-                num_repeats = 3
-                """)
-        };
-
-        IReadOnlyDictionary<string, string> values = TrainingBridgeConfigService.Import(
-            TrainingBridgeConfigService.DiffusionPipeBackendId,
-            files);
-
-        string[] requiredKeys =
-        [
-            "dataset", "pipeline_stages", "gradient_clipping", "warmup_steps", "lr_scheduler",
-            "eval_before_first_step", "eval_micro_batch_size_per_gpu", "eval_gradient_accumulation_steps",
-            "checkpoint_every_n_minutes", "activation_checkpointing", "partition_method", "save_dtype",
-            "caching_batch_size", "steps_per_print", "model.type", "model.dtype",
-            "model.transformer_dtype", "model.timestep_sample_method", "model.llm_adapter_lr",
-            "adapter.type", "adapter.dtype", "optimizer.betas", "optimizer.weight_decay",
-            "monitoring.enable_wandb", "size_buckets", "cache_shuffle_num",
-            "cache_shuffle_delimiter", "skip_empty_caption", "dataset_path", "num_repeats"
-        ];
-        Assert.All(requiredKeys, key => Assert.True(values.ContainsKey(key), $"缺少参数：{key}"));
-        Assert.Equal("configs/anima_anime_dataset_1024.toml", values["dataset"]);
-        Assert.Equal(", ", values["cache_shuffle_delimiter"]);
-        Assert.Contains("[720, 1456, 1]", values["size_buckets"]);
-        Assert.Contains("[1024, 1024, 1]", values["size_buckets"]);
-
-        var exported = TrainingBridgeConfigService.Export(
-                TrainingBridgeConfigService.DiffusionPipeBackendId,
-                values)
-            .ToDictionary(file => file.FileName, StringComparer.Ordinal);
-        string training = exported["anima_train.toml"].Content;
-        string dataset = exported["anima_anime_dataset_1024.toml"].Content;
-
-        string[] expectedTrainingLines =
-        [
-            "dataset = \"configs/anima_anime_dataset_1024.toml\"",
-            "epochs = 100", "micro_batch_size_per_gpu = 3", "pipeline_stages = 1",
-            "gradient_accumulation_steps = 1", "gradient_clipping = 1", "warmup_steps = 0",
-            "lr_scheduler = \"constant\"", "eval_before_first_step = false",
-            "eval_every_n_epochs = 1",
-            "eval_micro_batch_size_per_gpu = 1", "eval_gradient_accumulation_steps = 1",
-            "save_every_n_epochs = 1",
-            "checkpoint_every_n_minutes = 15", "activation_checkpointing = true",
-            "partition_method = \"parameters\"", "save_dtype = \"bfloat16\"",
-            "caching_batch_size = 1", "steps_per_print = 1", "blocks_to_swap = 0",
-            "type = \"anima\"", "transformer_path = \"/mnt/c/Users/Admin/Downloads/anima_base.safetensors\"",
-            "vae_path = \"/mnt/c/Users/Admin/Downloads/vae.safetensors\"",
-            "llm_path = \"/mnt/c/Users/Admin/Downloads/llm.safetensors\"", "dtype = \"bfloat16\"",
-            "transformer_dtype = \"float8\"", "timestep_sample_method = \"logit_normal\"",
-            "llm_adapter_lr = 0", "max_sequence_length = 256", "type = \"lora\"", "rank = 32",
-            "lr = 1", "betas = [0.9, 0.99]", "weight_decay = 0.01", "enable_wandb = false"
-        ];
-        Assert.All(expectedTrainingLines, line => Assert.Contains(line, training));
-        Assert.Contains("[720, 1456, 1]", dataset);
-        Assert.Contains("[1024, 1024, 1]", dataset);
-        Assert.Contains("cache_shuffle_num = 1", dataset);
-        Assert.Contains("cache_shuffle_delimiter = \", \"", dataset);
-        Assert.Contains("skip_empty_caption = true", dataset);
-    }
-
-    [Fact]
     public void Export_DiffusionPipeBundle_WritesTwoTomlFilesWithWslPaths()
     {
         var values = new Dictionary<string, string>
@@ -305,6 +155,47 @@ public sealed class TrainingBridgeTests
     }
 
     [Fact]
+    public void TrainingRunner_PreparesAnimaBundleAndUsesGeneratedFilesForDiffusionPipe()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "cyantools-training-run-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var runner = new TrainingBackendRunner(
+                managedRoot: Path.Combine(root, "backends"),
+                runsRoot: Path.Combine(root, "runs"));
+            var values = new Dictionary<string, string>
+            {
+                ["dataset_path"] = "D:/datasets/anime",
+                ["output_dir"] = "D:/outputs/anime",
+                ["transformer_path"] = "D:/models/anima.safetensors",
+                ["llm_path"] = "D:/models/qwen3",
+                ["vae_path"] = "D:/models/vae.safetensors"
+            };
+
+            TrainingBackendLaunchPlan plan = runner.Prepare(
+                "anima-test",
+                TrainingBridgeConfigService.DiffusionPipeBackendId,
+                values);
+
+            Assert.Equal("wsl.exe", plan.FileName);
+            Assert.Equal(2, plan.GeneratedFiles.Count);
+            string trainConfig = File.ReadAllText(Path.Combine(plan.RunDirectory, "anima_train.toml"));
+            string expectedDatasetPath = TrainingBridgeConfigService.WindowsPathToWsl(
+                Path.Combine(plan.RunDirectory, "anima_dataset.toml"));
+            Assert.Contains($"dataset = \"{expectedDatasetPath}\"", trainConfig);
+            Assert.Contains("deepspeed --num_gpus=1 train.py --deepspeed --config", plan.Arguments.Last());
+            Assert.True(File.Exists(Path.Combine(plan.RunDirectory, "anima_dataset.toml")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ExportAndImport_WslSdScriptsSdxl_DoesNotAddAnimaArguments()
     {
         var values = new Dictionary<string, string>
@@ -351,58 +242,15 @@ public sealed class TrainingBridgeTests
                 Values = new Dictionary<string, string> { ["learning_rate"] = "0.0002" }
             };
 
-        store.Save(draft);
-        var loaded = Assert.Single(store.ListAll());
+            store.Save(draft);
+            var loaded = Assert.Single(store.ListAll());
 
-        Assert.Equal(draft.Id, loaded.Id);
-        Assert.Equal("bridge-test", loaded.Name);
-        Assert.Equal("0.0002", loaded.Values["learning_rate"]);
+            Assert.Equal(draft.Id, loaded.Id);
+            Assert.Equal("bridge-test", loaded.Name);
+            Assert.Equal("0.0002", loaded.Values["learning_rate"]);
 
             store.Delete(draft.Id);
             Assert.Empty(store.ListAll());
-        }
-        finally
-        {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
-    public void ProjectStore_FindsDraftByConfigurationFileName()
-    {
-        string root = Path.Combine(Path.GetTempPath(), "cyantools-training-bridge-tests", Guid.NewGuid().ToString("N"));
-        try
-        {
-            var store = new TrainingBridgeProjectStore(root);
-            var draft = new TrainingBridgeProjectDraft
-            {
-                Name = "anima-1024",
-                ProjectName = "Anima 1024 训练",
-                Values = new Dictionary<string, string> { ["learning_rate"] = "0.0002" }
-            };
-
-            store.Save(draft);
-            TrainingBridgeProjectDraft loaded = Assert.IsType<TrainingBridgeProjectDraft>(store.FindByName(" ANIMA-1024 "));
-
-            Assert.Equal(draft.Id, loaded.Id);
-            Assert.Equal("Anima 1024 训练", loaded.ProjectName);
-
-            var replacement = new TrainingBridgeProjectDraft
-            {
-                Id = loaded.Id,
-                Name = "anima-1024",
-                ProjectName = "Anima 1024 修订",
-                Values = new Dictionary<string, string> { ["learning_rate"] = "0.0001" }
-            };
-            store.Save(replacement);
-
-            TrainingBridgeProjectDraft updated = Assert.Single(store.ListAll());
-            Assert.Equal(loaded.Id, updated.Id);
-            Assert.Equal("Anima 1024 修订", updated.ProjectName);
-            Assert.Equal("0.0001", updated.Values["learning_rate"]);
         }
         finally
         {
@@ -423,19 +271,26 @@ public sealed class TrainingBridgeTests
     }
 
     [Fact]
+    public void View_UsesEditableConfigurationSelectorAndDirectTrainingStart()
+    {
+        string xaml = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "TrainingBridgeView.xaml"));
+        string scheduler = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "PipelineSchedulerView.xaml"));
+
+        Assert.Contains("Header=\"配置文件与训练器\"", xaml);
+        Assert.Contains("IsEditable=\"True\"", xaml);
+        Assert.Contains("Text=\"{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}\"", xaml);
+        Assert.Contains("Command=\"{Binding StartTrainingCommand}\"", xaml);
+        Assert.DoesNotContain("NewProjectCommand", xaml);
+        Assert.DoesNotContain("Binding Notes", xaml);
+        Assert.DoesNotContain("RenameWorkflowCommand", scheduler);
+        Assert.DoesNotContain("Text=\"重命名\"", scheduler);
+    }
+
+    [Fact]
     public void View_UsesParameterCardsAndSystemMonitor()
     {
         string xaml = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "TrainingBridgeView.xaml"));
 
-        Assert.Contains("Header=\"配置文件\"", xaml);
-        Assert.Contains("ItemsSource=\"{Binding BackendBindings}\"", xaml);
-        Assert.Contains("SelectedItem=\"{Binding SelectedTrainerBinding}\"", xaml);
-        Assert.Contains("Text=\"配置文件名称\"", xaml);
-        Assert.Contains("IsEditable=\"True\"", xaml);
-        Assert.Contains("Text=\"{Binding DraftFileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", xaml);
-        Assert.Contains("Text=\"保存配置文件\"", xaml);
-        Assert.DoesNotContain("NewProjectCommand", xaml);
-        Assert.Contains("Text=\"导出到训练器\"", xaml);
         Assert.Contains("<WrapPanel Orientation=\"Horizontal\"/>", xaml);
         Assert.Contains("Binding DisplayLabel", xaml);
         Assert.DoesNotContain("<DataGrid", xaml);
@@ -445,13 +300,12 @@ public sealed class TrainingBridgeTests
         Assert.Contains("Text=\"{Binding CpuText}\"", xaml);
         Assert.Contains("Text=\"{Binding RamText}\"", xaml);
         Assert.Contains("Value=\"{Binding DiskLoadPercent}\"", xaml);
-        Assert.Contains("ItemsSource=\"{Binding VisibleParameters}\"", xaml);
-        Assert.Contains("CalculateSizeBucketsCommand", xaml);
-        Assert.Contains("根据数据集图片计算分桶", xaml);
-        Assert.Contains("Binding Key\" Value=\"size_buckets\"", xaml);
-        Assert.DoesNotContain("Header=\"Epoch 预览图\"", xaml);
-        Assert.DoesNotContain("Binding PreviewPositivePrompt", xaml);
-        Assert.DoesNotContain("Binding PreviewSampler", xaml);
+        Assert.Contains("Header=\"Epoch 预览图\"", xaml);
+        Assert.Contains("ItemsSource=\"{Binding CoreParameters}\"", xaml);
+        Assert.Contains("Text=\"{Binding PreviewPositivePrompt", xaml);
+        Assert.Contains("SelectedItem=\"{Binding PreviewSampler", xaml);
+        Assert.Contains("Text=\"{Binding PreviewWidth", xaml);
+        Assert.Contains("Text=\"{Binding PreviewHeight", xaml);
     }
 
     [Fact]

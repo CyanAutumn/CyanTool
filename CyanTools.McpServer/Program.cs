@@ -34,6 +34,7 @@ internal static class Program
 
         builder.Logging.ClearProviders();
         builder.Services.AddSingleton<PipelineOperationExecutor>();
+        builder.Services.AddSingleton(_ => new WorkflowOperationExecutor());
         builder.Services.AddMcpServer()
             .WithStdioServerTransport()
             .WithTools<CyanToolsMcpTools>();

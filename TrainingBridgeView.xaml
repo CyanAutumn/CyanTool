@@ -36,22 +36,6 @@
                      MinHeight="64"/>
         </DataTemplate>
 
-        <DataTemplate x:Key="TrainingBridgeBucketsEditorTemplate">
-            <StackPanel>
-                <Button Command="{Binding DataContext.CalculateSizeBucketsCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
-                        Content="根据数据集图片计算分桶"
-                        Style="{StaticResource CyanCommandButtonStyle}"
-                        HorizontalAlignment="Left"
-                        Margin="0,0,0,6"
-                        ToolTip="扫描训练集根目录及子目录内的图片，按训练分辨率和 16 像素对齐自动填写 size_buckets。"/>
-                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         MinHeight="64"/>
-            </StackPanel>
-        </DataTemplate>
-
         <Style x:Key="TrainingBridgeParameterListItemStyle" TargetType="{x:Type ListBoxItem}">
             <Setter Property="Margin" Value="4"/>
             <Setter Property="Padding" Value="2"/>
@@ -101,7 +85,7 @@
         </Grid.RowDefinitions>
 
         <GroupBox Grid.Row="0"
-                  Header="配置文件"
+                  Header="配置文件与训练器"
                   Style="{StaticResource CyanGroupBoxStyle}"
                   Margin="0,0,0,12">
             <Grid>
@@ -110,50 +94,52 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.2*"/>
-                    <ColumnDefinition Width="1.35*"/>
-                    <ColumnDefinition Width="2.2*"/>
+                    <ColumnDefinition Width="1.45*"/>
+                    <ColumnDefinition Width="1.1*"/>
+                    <ColumnDefinition Width="1.1*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Margin="0,0,10,0">
-                    <TextBlock Text="配置文件名称" Style="{StaticResource CyanFormLabelStyle}"/>
+                    <TextBlock Text="配置文件" Style="{StaticResource CyanFormLabelStyle}"/>
                     <ComboBox ItemsSource="{Binding Drafts}"
                               SelectedItem="{Binding SelectedDraft}"
                               DisplayMemberPath="Name"
                               IsEditable="True"
-                              Text="{Binding DraftFileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              ToolTip="输入名称后保存：同名配置文件会覆盖，不存在则创建。"
+                              IsTextSearchEnabled="False"
+                              Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
                               MinHeight="34"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                    <TextBlock Text="项目名称" Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
-                             MinHeight="34"/>
+                    <TextBlock Text="导入训练器" Style="{StaticResource CyanFormLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding BackendOptions}"
+                              SelectedItem="{Binding SelectedSourceBackend}"
+                              DisplayMemberPath="Label"
+                              MinHeight="34"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Margin="0,0,10,0">
                     <TextBlock Text="训练器" Style="{StaticResource CyanFormLabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding BackendBindings}"
-                              SelectedItem="{Binding SelectedTrainerBinding}"
-                              DisplayMemberPath="DisplayName"
+                    <ComboBox ItemsSource="{Binding BackendOptions}"
+                              SelectedItem="{Binding SelectedTargetBackend}"
+                              DisplayMemberPath="Label"
                               MinHeight="34"/>
                 </StackPanel>
 
                 <WrapPanel Grid.Column="3" VerticalAlignment="Bottom">
                     <Button Command="{Binding ImportConfigCommand}"
-                            Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                            Style="{StaticResource CyanCommandButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="ArrowUpload24" Margin="0,0,6,0"/>
-                            <TextBlock Text="导入配置"/>
+                            <TextBlock Text="导入"/>
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding SaveProjectCommand}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Save24" Margin="0,0,6,0"/>
-                            <TextBlock Text="保存配置文件"/>
+                            <TextBlock Text="保存"/>
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding DeleteProjectCommand}"
@@ -163,25 +149,22 @@
                             <TextBlock Text="删除"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding StartTrainingCommand}"
+                            Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="PlayCircle24" Margin="0,0,6,0"/>
+                            <TextBlock Text="开始训练"/>
+                        </StackPanel>
+                    </Button>
                 </WrapPanel>
 
-                <Grid Grid.Row="1" Grid.ColumnSpan="4" Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
-                             MinHeight="36"
-                             Padding="10,7"
-                             ToolTip="项目备注"/>
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding StatusMessage, Converter={StaticResource LocalizedTextConverter}}"
-                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
-                               VerticalAlignment="Center"
-                               TextWrapping="Wrap"
-                               MaxWidth="520"
-                               Margin="14,0,0,0"/>
-                </Grid>
+                <TextBlock Grid.Row="1"
+                           Grid.ColumnSpan="4"
+                           Text="{Binding StatusMessage, Converter={StaticResource LocalizedTextConverter}}"
+                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,10,0,0"/>
             </Grid>
         </GroupBox>
 
@@ -198,6 +181,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid Margin="0,0,0,8">
@@ -215,6 +199,13 @@
                             </Border>
                         </StackPanel>
                         <WrapPanel Grid.Column="1">
+                            <Button Command="{Binding ImportConfigCommand}"
+                                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ArrowUpload24" Margin="0,0,6,0"/>
+                                    <TextBlock Text="导入配置"/>
+                                </StackPanel>
+                            </Button>
                             <Button Command="{Binding FillDefaultsCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Content="补齐常用参数"/>
@@ -228,7 +219,7 @@
                     </Grid>
 
                     <ListBox Grid.Row="1"
-                             ItemsSource="{Binding VisibleParameters}"
+                             ItemsSource="{Binding CoreParameters}"
                              SelectedItem="{Binding SelectedParameter}"
                              ItemContainerStyle="{StaticResource TrainingBridgeParameterListItemStyle}"
                              Background="Transparent"
@@ -287,10 +278,6 @@
                                                             <Setter Property="ContentTemplate"
                                                                     Value="{StaticResource TrainingBridgeTextareaEditorTemplate}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Key}" Value="size_buckets">
-                                                            <Setter Property="ContentTemplate"
-                                                                    Value="{StaticResource TrainingBridgeBucketsEditorTemplate}"/>
-                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </ContentControl.Style>
@@ -309,6 +296,110 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
+                    <GroupBox Grid.Row="2"
+                              Header="Epoch 预览图"
+                              Margin="0,10,0,0"
+                              MaxHeight="350">
+                        <GroupBox.Style>
+                            <Style TargetType="{x:Type GroupBox}"
+                                   BasedOn="{StaticResource CyanGroupBoxStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDiffusionPipeTarget}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </GroupBox.Style>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="复用当前 Anima 模型，在 Epoch 结束后生成固定条件预览图。"
+                                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                               VerticalAlignment="Center"
+                                               TextWrapping="Wrap"/>
+                                    <CheckBox Grid.Column="1"
+                                              Content="启用"
+                                              IsChecked="{Binding PreviewEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Margin="12,0,12,0"
+                                              VerticalAlignment="Center"/>
+                                    <CheckBox Grid.Column="2"
+                                              Content="VAE 解码时下放训练模型"
+                                              ToolTip="增加预览阶段的显存余量；解码后会恢复训练模型。"
+                                              IsChecked="{Binding PreviewOffloadPipelineForVae, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,5,8">
+                                        <TextBlock Text="正向 Prompt" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewPositivePrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="58"
+                                                 VerticalScrollBarVisibility="Auto"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="5,0,0,8">
+                                        <TextBlock Text="负向 Prompt" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewNegativePrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="58"
+                                                 VerticalScrollBarVisibility="Auto"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <UniformGrid Columns="4">
+                                    <StackPanel Margin="0,0,5,7">
+                                        <TextBlock Text="每 N 个 Epoch" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewEveryNEpochs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0,5,7">
+                                        <TextBlock Text="采样器" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <ComboBox ItemsSource="{Binding PreviewSamplerOptions}"
+                                                  SelectedItem="{Binding PreviewSampler, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0,5,7">
+                                        <TextBlock Text="调度器" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <ComboBox ItemsSource="{Binding PreviewSchedulerOptions}"
+                                                  SelectedItem="{Binding PreviewScheduler, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0,0,7">
+                                        <TextBlock Text="采样步数" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewSteps, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,5,0">
+                                        <TextBlock Text="宽度" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="最低 64，生成时按 16 对齐。"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0,5,0">
+                                        <TextBlock Text="高度" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewHeight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="最低 64，生成时按 16 对齐。"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0,5,0">
+                                        <TextBlock Text="CFG" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewCfg, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0,0,0">
+                                        <TextBlock Text="Seed" Style="{StaticResource CyanFormLabelStyle}"/>
+                                        <TextBox Text="{Binding PreviewSeed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </GroupBox>
                 </Grid>
             </GroupBox>
 
@@ -481,7 +572,7 @@
                 </GroupBox>
 
                 <GroupBox Grid.Row="1"
-                          Header="导出配置包"
+                          Header="训练配置"
                           Style="{StaticResource CyanGroupBoxStyle}">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -495,13 +586,6 @@
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="Eye24" Margin="0,0,6,0"/>
                                     <TextBlock Text="生成预览"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ExportConfigCommand}"
-                                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="FolderArrowRight24" Margin="0,0,6,0"/>
-                                    <TextBlock Text="导出到训练器"/>
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding CopyPreviewCommand}"

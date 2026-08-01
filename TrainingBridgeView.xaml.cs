@@ -19,7 +19,6 @@ namespace CyanTools
         {
             if (DataContext is TrainingBridgeViewModel viewModel)
             {
-                viewModel.ReloadBackendBindings();
                 viewModel.StartMonitoring();
                 viewModel.StartObservingSystemMonitorWidget();
             }

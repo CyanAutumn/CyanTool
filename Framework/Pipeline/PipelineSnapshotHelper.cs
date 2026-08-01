@@ -37,6 +37,23 @@ namespace CyanTools.Pipeline
             return dict;
         }
 
+        public static Dictionary<string, object?> RemoveSensitiveProperties(
+            IReadOnlyDictionary<string, object?> snapshot)
+        {
+            ArgumentNullException.ThrowIfNull(snapshot);
+
+            var sanitized = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var (key, value) in snapshot)
+            {
+                if (IsSafePropertyName(key))
+                {
+                    sanitized[key] = value;
+                }
+            }
+
+            return sanitized;
+        }
+
         public static void ApplySimpleProperties(object target, Dictionary<string, object?> snapshot)
         {
             var props = target.GetType()
