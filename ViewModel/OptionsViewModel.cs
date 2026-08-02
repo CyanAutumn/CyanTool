@@ -48,7 +48,7 @@ namespace CyanTools.ViewModel
         private string _bindingConfigurationDirectory = string.Empty;
         private string _bindingWslDistribution = "Ubuntu";
         private string _bindingCondaEnvironment = string.Empty;
-        private string _pathBindingStatus = "可检测并打开绑定目录；不会自动安装、启动或删除外部程序。";
+        private string _pathBindingStatus = "可检测并打开绑定目录；路径保存后可在“跑图工程”页启动。";
 
         public OptionsViewModel()
         {
@@ -188,7 +188,7 @@ namespace CyanTools.ViewModel
         public string BindingCapabilityText
             => RuntimePathBindingBackendIds.SupportsTraining(SelectedBindingBackend?.Id)
                 ? "训练类型绑定由“训练”页面用于配置导入、导出和启动。"
-                : "ComfyUI / Webui Forge Neo 当前仅提供路径持久化、检测和目录定位；CyanTools 尚未提供推理部署或启动功能。";
+                : "ComfyUI / Webui Forge Neo 的绑定会由“跑图工程”页用于启动、运行日志和模型目录管理。";
 
         public string PathBindingStatus
         {
@@ -1282,20 +1282,24 @@ namespace CyanTools.ViewModel
                 case RuntimePathBindingBackendIds.ComfyUiWindows:
                     BindingTrainerPath = Path.Combine(userProfile, "ComfyUI");
                     BindingConfigurationDirectory = Path.Combine(BindingTrainerPath, "user", "default", "workflows");
+                    BindingCondaEnvironment = string.Empty;
                     break;
                 case RuntimePathBindingBackendIds.ComfyUiWsl:
                     BindingTrainerPath = "~/ComfyUI";
                     BindingConfigurationDirectory = "~/ComfyUI/user/default/workflows";
                     BindingWslDistribution = string.IsNullOrWhiteSpace(BindingWslDistribution) ? "Ubuntu" : BindingWslDistribution;
+                    BindingCondaEnvironment = "comfyui-cu130";
                     break;
                 case RuntimePathBindingBackendIds.ForgeNeoWindows:
                     BindingTrainerPath = Path.Combine(userProfile, "sd-webui-forge-neo");
                     BindingConfigurationDirectory = BindingTrainerPath;
+                    BindingCondaEnvironment = string.Empty;
                     break;
                 case RuntimePathBindingBackendIds.ForgeNeoWsl:
                     BindingTrainerPath = "~/sd-webui-forge-neo";
                     BindingConfigurationDirectory = BindingTrainerPath;
                     BindingWslDistribution = string.IsNullOrWhiteSpace(BindingWslDistribution) ? "Ubuntu" : BindingWslDistribution;
+                    BindingCondaEnvironment = "forge-neo-cu128";
                     break;
                 default:
                     BindingTrainerPath = string.Empty;

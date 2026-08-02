@@ -250,7 +250,7 @@ namespace CyanTools.Localization
             Add(translations, "打开", "Open", "開く");
             Add(translations, "检测绑定路径", "Check Binding Paths", "バインディングパスを確認");
             Add(translations, "训练类型绑定由“训练”页面用于配置导入、导出和启动。", "Training bindings are used by the Training page for configuration import, export, and launch.", "学習バインディングは「学習」ページで設定のインポート、エクスポート、起動に使用されます。");
-            Add(translations, "ComfyUI / Webui Forge Neo 当前仅提供路径持久化、检测和目录定位；CyanTools 尚未提供推理部署或启动功能。", "ComfyUI / Webui Forge Neo bindings currently provide path persistence, checks, and folder location only; CyanTools does not yet provide inference deployment or launch.", "ComfyUI / Webui Forge Neo のバインディングは現在、パスの保存、確認、フォルダー表示のみを提供します。CyanTools は推論環境の展開や起動にはまだ対応していません。");
+            Add(translations, "ComfyUI / Webui Forge Neo 的绑定会由“跑图工程”页用于启动、运行日志和模型目录管理。", "ComfyUI / Webui Forge Neo bindings are used by Image Generation Projects for launching, live logs, and model-folder management.", "ComfyUI / Webui Forge Neo のバインディングは、画像生成プロジェクトの起動、ライブログ、モデルフォルダ管理に使用されます。");
             Add(translations, "训练器", "Trainer", "トレーナー");
             Add(translations, "导出到训练器", "Export to Trainer", "トレーナーへエクスポート");
             Add(translations, "新建", "New", "新規");
@@ -607,6 +607,18 @@ namespace CyanTools.Localization
             Add(translations, "训练输出整理", "Training Output Organizer", "学習出力整理");
             Add(translations, "图片重命名", "Image Rename", "画像リネーム");
             Add(translations, "数据集下载器", "Dataset Downloader", "データセットダウンローダー");
+            Add(translations, "跑图工程", "Image Generation Projects", "画像生成プロジェクト");
+            Add(translations, "启动 ComfyUI 与 Webui Forge Neo，查看实时日志并快捷管理模型目录。", "Launch ComfyUI and Webui Forge Neo, view live logs, and quickly manage model folders.", "ComfyUI と Webui Forge Neo を起動し、ライブログとモデルフォルダを管理します。");
+            Add(translations, "运行环境路径绑定", "Runtime Path Binding", "実行環境パスの関連付け");
+            Add(translations, "刷新绑定", "Refresh Bindings", "関連付けを更新");
+            Add(translations, "启动", "Start", "起動");
+            Add(translations, "停止", "Stop", "停止");
+            Add(translations, "根目录", "Root Folder", "ルートフォルダ");
+            Add(translations, "模型目录", "Model Folders", "モデルフォルダ");
+            Add(translations, "打开根目录", "Open Root", "ルートを開く");
+            Add(translations, "输出日志", "Output Log", "出力ログ");
+            Add(translations, "清空日志", "Clear Log", "ログをクリア");
+            Add(translations, "实时合并显示标准输出与错误输出。", "Shows standard output and error output together in real time.", "標準出力と標準エラーをリアルタイムで一緒に表示します。");
         }
 
         private static void Add(

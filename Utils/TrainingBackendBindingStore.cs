@@ -156,6 +156,7 @@ namespace CyanTools.Utils
                     TrainerPath = "~/ComfyUI",
                     ConfigurationDirectory = "~/ComfyUI/user/default/workflows",
                     WslDistribution = distribution,
+                    CondaEnvironment = "comfyui-cu130",
                     IsManaged = true
                 },
                 new TrainingBackendBinding
@@ -175,6 +176,7 @@ namespace CyanTools.Utils
                     TrainerPath = "~/sd-webui-forge-neo",
                     ConfigurationDirectory = "~/sd-webui-forge-neo",
                     WslDistribution = distribution,
+                    CondaEnvironment = "forge-neo-cu128",
                     IsManaged = true
                 }
             ];
