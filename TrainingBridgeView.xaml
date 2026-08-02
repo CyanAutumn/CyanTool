@@ -113,17 +113,19 @@
 
                 <StackPanel Grid.Column="1" Margin="0,0,10,0">
                     <TextBlock Text="导入训练器" Style="{StaticResource CyanFormLabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding BackendOptions}"
-                              SelectedItem="{Binding SelectedSourceBackend}"
-                              DisplayMemberPath="Label"
+                    <ComboBox ItemsSource="{Binding BackendBindings}"
+                              SelectedItem="{Binding SelectedSourceBinding}"
+                              DisplayMemberPath="DisplayName"
+                              ToolTip="{Binding SelectedSourceBinding.LocationSummary}"
                               MinHeight="34"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Margin="0,0,10,0">
                     <TextBlock Text="训练器" Style="{StaticResource CyanFormLabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding BackendOptions}"
-                              SelectedItem="{Binding SelectedTargetBackend}"
-                              DisplayMemberPath="Label"
+                    <ComboBox ItemsSource="{Binding BackendBindings}"
+                              SelectedItem="{Binding SelectedTargetBinding}"
+                              DisplayMemberPath="DisplayName"
+                              ToolTip="{Binding SelectedTargetBinding.LocationSummary}"
                               MinHeight="34"/>
                 </StackPanel>
 
@@ -586,6 +588,13 @@
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="Eye24" Margin="0,0,6,0"/>
                                     <TextBlock Text="生成预览"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ExportConfigCommand}"
+                                    Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="FolderArrowRight24" Margin="0,0,6,0"/>
+                                    <TextBlock Text="导出到训练器"/>
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding CopyPreviewCommand}"

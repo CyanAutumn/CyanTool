@@ -132,6 +132,97 @@ namespace CyanTools.Utils
             return ExpandAliases(CleanValues(values));
         }
 
+        public static string? DetectSourceBackend(IEnumerable<TrainingBridgeConfigFile> files)
+        {
+            TrainingBridgeConfigFile[] selectedFiles = files?.ToArray()
+                ?? Array.Empty<TrainingBridgeConfigFile>();
+            if (selectedFiles.Length == 0)
+            {
+                return null;
+            }
+
+            if (HasFileName(selectedFiles, "anima_train.toml") ||
+                HasPathHint(selectedFiles, "diffusion-pipe") ||
+                HasDiffusionPipeTomlSignature(selectedFiles))
+            {
+                return DiffusionPipeBackendId;
+            }
+            if (HasFileName(selectedFiles, "anima-fast-lora.args.txt") ||
+                HasPathHint(selectedFiles, "anima-fast-lora") ||
+                HasContentHint(selectedFiles, "external/anima_lora") ||
+                HasContentHint(selectedFiles, @"external\anima_lora"))
+            {
+                return AnimaFastLoraBackendId;
+            }
+            if (HasFileName(selectedFiles, "wsl-sd-scripts.args.txt") ||
+                HasPathHint(selectedFiles, "wsl-sd-scripts"))
+            {
+                return WslSdScriptsBackendId;
+            }
+            if (HasFileName(selectedFiles, "sd-scripts.args.txt"))
+            {
+                return SdScriptsBackendId;
+            }
+            if (HasPathHint(selectedFiles, "sd-scripts"))
+            {
+                return HasWslPathHint(selectedFiles)
+                    ? WslSdScriptsBackendId
+                    : SdScriptsBackendId;
+            }
+            return null;
+        }
+
+        private static bool HasFileName(
+            IEnumerable<TrainingBridgeConfigFile> files,
+            string expectedFileName)
+            => files.Any(file => string.Equals(
+                Path.GetFileName(file.FileName),
+                expectedFileName,
+                StringComparison.OrdinalIgnoreCase));
+
+        private static bool HasPathHint(
+            IEnumerable<TrainingBridgeConfigFile> files,
+            string hint)
+            => files.Any(file => !string.IsNullOrWhiteSpace(file.SourcePath) &&
+                file.SourcePath.IndexOf(hint, StringComparison.OrdinalIgnoreCase) >= 0);
+
+        private static bool HasContentHint(
+            IEnumerable<TrainingBridgeConfigFile> files,
+            string hint)
+            => files.Any(file => file.Content.IndexOf(hint, StringComparison.OrdinalIgnoreCase) >= 0);
+
+        private static bool HasWslPathHint(IEnumerable<TrainingBridgeConfigFile> files)
+            => files.Any(file =>
+            {
+                string text = (file.SourcePath ?? string.Empty) + "\n" + file.Content;
+                return text.IndexOf("/mnt/", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.IndexOf("\\\\wsl", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.IndexOf("wsl.localhost", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.IndexOf("~/sd-scripts", StringComparison.OrdinalIgnoreCase) >= 0;
+            });
+
+        private static bool HasDiffusionPipeTomlSignature(
+            IEnumerable<TrainingBridgeConfigFile> files)
+        {
+            foreach (TrainingBridgeConfigFile file in files.Where(file =>
+                         string.Equals(
+                             Path.GetExtension(file.FileName),
+                             ".toml",
+                             StringComparison.OrdinalIgnoreCase)))
+            {
+                string content = file.Content;
+                if ((content.IndexOf("[[directory]]", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                     content.IndexOf("size_buckets", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (content.IndexOf("[model]", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                     content.IndexOf("transformer_path", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                     content.IndexOf("llm_path", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public static IReadOnlyList<TrainingBridgeConfigFile> Export(
             string targetBackendId,
             IReadOnlyDictionary<string, string> sourceValues)

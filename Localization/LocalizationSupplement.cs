@@ -229,6 +229,10 @@ namespace CyanTools.Localization
             Add(translations, "配置文件", "Configuration Files", "設定ファイル");
             Add(translations, "配置文件名称", "Configuration File Name", "設定ファイル名");
             Add(translations, "训练器绑定", "Trainer Bindings", "トレーナーバインディング");
+            Add(translations, "运行环境路径绑定", "Runtime Path Bindings", "実行環境パスのバインディング");
+            Add(translations, "统一管理四个训练后端以及 ComfyUI、Webui Forge Neo 的 Windows / WSL2 路径。内置兼容路径只读且不代表已经安装；自定义绑定可新增、编辑和删除。", "Manage Windows and WSL2 paths for four training backends, ComfyUI, and Webui Forge Neo. Built-in compatibility paths are read-only and do not mean the software is installed; custom bindings can be added, edited, and removed.", "4 種類の学習バックエンド、ComfyUI、Webui Forge Neo の Windows / WSL2 パスを管理します。組み込み互換パスは読み取り専用で、インストール済みであることを示しません。カスタムバインディングは追加、編集、削除できます。");
+            Add(translations, "已绑定运行环境", "Bound Runtime", "関連付け済み実行環境");
+            Add(translations, "运行环境类型", "Runtime Type", "実行環境の種類");
             Add(translations, "CyanTools 安装的四个训练器会自动绑定到已知位置；也可添加已有训练器的根目录与配置文件目录。", "The four trainers installed by CyanTools are bound to their known locations automatically. You can also add an existing trainer's root and configuration directories.", "CyanTools がインストールした 4 種類のトレーナーは既知の場所に自動で関連付けられます。既存トレーナーのルートと設定フォルダーも追加できます。");
             Add(translations, "已绑定训练器", "Bound Trainer", "関連付け済みトレーナー");
             Add(translations, "新建绑定", "New Binding", "バインディングを新規作成");
@@ -239,8 +243,14 @@ namespace CyanTools.Localization
             Add(translations, "WSL 发行版（仅 WSL）", "WSL Distribution (WSL only)", "WSL ディストリビューション（WSL のみ）");
             Add(translations, "Conda 环境（仅 WSL）", "Conda Environment (WSL only)", "Conda 環境（WSL のみ）");
             Add(translations, "训练器根目录", "Trainer Root Directory", "トレーナーのルートフォルダー");
+            Add(translations, "程序根目录", "Application Root Directory", "アプリケーションのルートフォルダー");
             Add(translations, "配置文件目录", "Configuration Directory", "設定ファイルフォルダー");
+            Add(translations, "工作流目录", "Workflow Directory", "ワークフローフォルダー");
             Add(translations, "选择目录", "Choose Directory", "フォルダーを選択");
+            Add(translations, "打开", "Open", "開く");
+            Add(translations, "检测绑定路径", "Check Binding Paths", "バインディングパスを確認");
+            Add(translations, "训练类型绑定由“训练”页面用于配置导入、导出和启动。", "Training bindings are used by the Training page for configuration import, export, and launch.", "学習バインディングは「学習」ページで設定のインポート、エクスポート、起動に使用されます。");
+            Add(translations, "ComfyUI / Webui Forge Neo 当前仅提供路径持久化、检测和目录定位；CyanTools 尚未提供推理部署或启动功能。", "ComfyUI / Webui Forge Neo bindings currently provide path persistence, checks, and folder location only; CyanTools does not yet provide inference deployment or launch.", "ComfyUI / Webui Forge Neo のバインディングは現在、パスの保存、確認、フォルダー表示のみを提供します。CyanTools は推論環境の展開や起動にはまだ対応していません。");
             Add(translations, "训练器", "Trainer", "トレーナー");
             Add(translations, "导出到训练器", "Export to Trainer", "トレーナーへエクスポート");
             Add(translations, "新建", "New", "新規");

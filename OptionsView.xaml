@@ -203,11 +203,13 @@
             </GroupBox>
 
             <GroupBox Grid.Row="3"
-                      Header="训练器绑定"
+                      Header="运行环境路径绑定"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -222,15 +224,16 @@
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.ColumnSpan="4"
-                               Text="CyanTools 安装的四个训练器会自动绑定到已知位置；也可添加已有训练器的根目录与配置文件目录。"
+                               Text="统一管理四个训练后端以及 ComfyUI、Webui Forge Neo 的 Windows / WSL2 路径。内置兼容路径只读且不代表已经安装；自定义绑定可新增、编辑和删除。"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                TextWrapping="Wrap"/>
 
                     <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,10,0,0">
-                        <TextBlock Text="已绑定训练器" Style="{StaticResource CyanFormLabelStyle}"/>
+                        <TextBlock Text="已绑定运行环境" Style="{StaticResource CyanFormLabelStyle}"/>
                         <ComboBox ItemsSource="{Binding TrainingBackendBindings}"
                                   SelectedItem="{Binding SelectedTrainingBackendBinding}"
                                   DisplayMemberPath="DisplayName"
+                                  ToolTip="{Binding SelectedTrainingBackendBinding.LocationSummary}"
                                   MinHeight="32"
                                   MinWidth="390"/>
                     </StackPanel>
@@ -251,11 +254,16 @@
                         <TextBox Text="{Binding BindingName, UpdateSourceTrigger=PropertyChanged}" MinHeight="32"/>
                     </StackPanel>
                     <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,10,10,0" IsEnabled="{Binding CanEditTrainingBackendBinding}">
-                        <TextBlock Text="训练器类型" Style="{StaticResource CyanFormLabelStyle}"/>
+                        <TextBlock Text="运行环境类型" Style="{StaticResource CyanFormLabelStyle}"/>
                         <ComboBox ItemsSource="{Binding BindingBackendOptions}"
                                   SelectedItem="{Binding SelectedBindingBackend}"
-                                  DisplayMemberPath="Label"
-                                  MinHeight="32"/>
+                                  MinHeight="32">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,10,10,0" IsEnabled="{Binding CanEditTrainingBackendBinding}">
                         <TextBlock Text="WSL 发行版（仅 WSL）" Style="{StaticResource CyanFormLabelStyle}"/>
@@ -266,27 +274,50 @@
                         <TextBox Text="{Binding BindingCondaEnvironment, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" Width="170"/>
                     </StackPanel>
 
-                    <TextBlock Grid.Row="3" Text="训练器根目录" Style="{StaticResource CyanFormLabelStyle}" Margin="0,10,0,0"/>
+                    <TextBlock Grid.Row="3" Text="{Binding BindingRootDirectoryLabel, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanFormLabelStyle}" Margin="0,10,0,0"/>
                     <TextBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
                              Text="{Binding BindingTrainerPath, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding CanEditTrainingBackendBinding}"
                              MinHeight="32" Margin="0,10,10,0"/>
-                    <Button Grid.Row="3" Grid.Column="3"
-                            Command="{Binding SelectBindingTrainerPathCommand}"
-                            Style="{StaticResource CyanCommandButtonStyle}"
-                            Margin="0,10,0,0"
-                            Content="选择目录"/>
+                    <WrapPanel Grid.Row="3" Grid.Column="3" Margin="0,10,0,0">
+                        <Button Command="{Binding SelectBindingTrainerPathCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Content="选择目录"/>
+                        <Button Command="{Binding OpenBindingTrainerPathCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Content="打开"/>
+                    </WrapPanel>
 
-                    <TextBlock Grid.Row="4" Text="配置文件目录" Style="{StaticResource CyanFormLabelStyle}" Margin="0,10,0,0"/>
+                    <TextBlock Grid.Row="4" Text="{Binding BindingConfigurationDirectoryLabel, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanFormLabelStyle}" Margin="0,10,0,0"/>
                     <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
                              Text="{Binding BindingConfigurationDirectory, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding CanEditTrainingBackendBinding}"
                              MinHeight="32" Margin="0,10,10,0"/>
-                    <Button Grid.Row="4" Grid.Column="3"
-                            Command="{Binding SelectBindingConfigurationDirectoryCommand}"
-                            Style="{StaticResource CyanCommandButtonStyle}"
-                            Margin="0,10,0,0"
-                            Content="选择目录"/>
+                    <WrapPanel Grid.Row="4" Grid.Column="3" Margin="0,10,0,0">
+                        <Button Command="{Binding SelectBindingConfigurationDirectoryCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Content="选择目录"/>
+                        <Button Command="{Binding OpenBindingConfigurationDirectoryCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Content="打开"/>
+                    </WrapPanel>
+
+                    <TextBlock Grid.Row="5" Grid.ColumnSpan="4"
+                               Text="{Binding BindingCapabilityText, Converter={StaticResource LocalizedTextConverter}}"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0"/>
+                    <DockPanel Grid.Row="6" Grid.ColumnSpan="4" Margin="0,10,0,0">
+                        <Button DockPanel.Dock="Right"
+                                Command="{Binding CheckPathBindingCommand}"
+                                Style="{StaticResource CyanCommandButtonStyle}"
+                                Content="检测绑定路径"/>
+                        <TextBlock Text="{Binding PathBindingStatus}"
+                                   Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"/>
+                    </DockPanel>
                 </Grid>
             </GroupBox>
 

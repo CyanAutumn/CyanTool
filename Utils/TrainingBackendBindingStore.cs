@@ -48,7 +48,7 @@ namespace CyanTools.Utils
             ArgumentNullException.ThrowIfNull(binding);
             if (binding.IsManaged)
             {
-                throw new InvalidOperationException("CyanTools 自动绑定的训练器不能覆盖；请新建一个已有训练器绑定。");
+                throw new InvalidOperationException("CyanTools 托管的路径绑定不能覆盖；请新建一个自定义路径绑定。");
             }
 
             Validate(binding);
@@ -90,6 +90,12 @@ namespace CyanTools.Utils
         {
             string windowsSdScripts = Path.Combine(_managedRoot, "repos", "sd-scripts");
             string animaFastLora = Path.Combine(_managedRoot, "repos", "anima-fast-lora", "external", "anima_lora");
+            string compatibleInferenceRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "AnimaTrainer",
+                "repos");
+            string comfyUiWindows = Path.Combine(compatibleInferenceRoot, "comfyui-windows");
+            string forgeNeoWindows = Path.Combine(compatibleInferenceRoot, "forge-neo-windows");
             const string distribution = "Ubuntu";
             return
             [
@@ -117,7 +123,7 @@ namespace CyanTools.Utils
                     Name = "CyanTools · wsl-sd-scripts",
                     BackendId = TrainingBridgeConfigService.WslSdScriptsBackendId,
                     TrainerPath = "~/sd-scripts",
-                    ConfigurationDirectory = @"\\wsl.localhost\Ubuntu\root\sd-scripts\configs",
+                    ConfigurationDirectory = "~/sd-scripts/configs",
                     WslDistribution = distribution,
                     CondaEnvironment = "wsl-sd-scripts-cu128",
                     IsManaged = true
@@ -128,9 +134,47 @@ namespace CyanTools.Utils
                     Name = "CyanTools · diffusion-pipe",
                     BackendId = TrainingBridgeConfigService.DiffusionPipeBackendId,
                     TrainerPath = "~/diffusion-pipe",
-                    ConfigurationDirectory = @"\\wsl.localhost\Ubuntu\root\diffusion-pipe\configs",
+                    ConfigurationDirectory = "~/diffusion-pipe/configs",
                     WslDistribution = distribution,
                     CondaEnvironment = "diffusion-pipe-cu128",
+                    IsManaged = true
+                },
+                new TrainingBackendBinding
+                {
+                    Id = "managed-comfyui-windows",
+                    Name = "兼容默认路径 · ComfyUI Windows",
+                    BackendId = RuntimePathBindingBackendIds.ComfyUiWindows,
+                    TrainerPath = comfyUiWindows,
+                    ConfigurationDirectory = Path.Combine(comfyUiWindows, "user", "default", "workflows"),
+                    IsManaged = true
+                },
+                new TrainingBackendBinding
+                {
+                    Id = "managed-comfyui-wsl",
+                    Name = "兼容默认路径 · ComfyUI WSL2",
+                    BackendId = RuntimePathBindingBackendIds.ComfyUiWsl,
+                    TrainerPath = "~/ComfyUI",
+                    ConfigurationDirectory = "~/ComfyUI/user/default/workflows",
+                    WslDistribution = distribution,
+                    IsManaged = true
+                },
+                new TrainingBackendBinding
+                {
+                    Id = "managed-forge-neo-windows",
+                    Name = "兼容默认路径 · Webui Forge Neo Windows",
+                    BackendId = RuntimePathBindingBackendIds.ForgeNeoWindows,
+                    TrainerPath = forgeNeoWindows,
+                    ConfigurationDirectory = forgeNeoWindows,
+                    IsManaged = true
+                },
+                new TrainingBackendBinding
+                {
+                    Id = "managed-forge-neo-wsl",
+                    Name = "兼容默认路径 · Webui Forge Neo WSL2",
+                    BackendId = RuntimePathBindingBackendIds.ForgeNeoWsl,
+                    TrainerPath = "~/sd-webui-forge-neo",
+                    ConfigurationDirectory = "~/sd-webui-forge-neo",
+                    WslDistribution = distribution,
                     IsManaged = true
                 }
             ];
@@ -180,15 +224,15 @@ namespace CyanTools.Utils
         {
             if (string.IsNullOrWhiteSpace(binding.Name))
             {
-                throw new InvalidOperationException("请填写训练器绑定名称。");
+                throw new InvalidOperationException("请填写路径绑定名称。");
             }
             if (!IsSupportedBackend(binding.BackendId))
             {
-                throw new InvalidOperationException("请选择支持的训练器类型。");
+                throw new InvalidOperationException("请选择支持的运行环境类型。");
             }
             if (string.IsNullOrWhiteSpace(binding.TrainerPath))
             {
-                throw new InvalidOperationException("请填写训练器根目录。");
+                throw new InvalidOperationException("请填写程序或训练器根目录。");
             }
             if (string.IsNullOrWhiteSpace(binding.ConfigurationDirectory))
             {
@@ -220,7 +264,11 @@ namespace CyanTools.Utils
             => backendId is TrainingBridgeConfigService.SdScriptsBackendId
                 or TrainingBridgeConfigService.WslSdScriptsBackendId
                 or TrainingBridgeConfigService.AnimaFastLoraBackendId
-                or TrainingBridgeConfigService.DiffusionPipeBackendId;
+                or TrainingBridgeConfigService.DiffusionPipeBackendId
+                or RuntimePathBindingBackendIds.ComfyUiWindows
+                or RuntimePathBindingBackendIds.ComfyUiWsl
+                or RuntimePathBindingBackendIds.ForgeNeoWindows
+                or RuntimePathBindingBackendIds.ForgeNeoWsl;
 
         private static TrainingBackendBinding Clone(TrainingBackendBinding binding)
             => new()
