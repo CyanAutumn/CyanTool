@@ -9,6 +9,44 @@ namespace CyanTools.Tests;
 
 public sealed class InferenceFrontendLaunchPlannerTests
 {
+    [Theory]
+    [InlineData(RuntimePathBindingBackendIds.ComfyUiWindows, "main.py")]
+    [InlineData(RuntimePathBindingBackendIds.ComfyUiWsl, "main.py")]
+    [InlineData(RuntimePathBindingBackendIds.ForgeNeoWindows, "launch.py")]
+    [InlineData(RuntimePathBindingBackendIds.ForgeNeoWsl, "launch.py")]
+    public void InstallationDetector_ReportsMissingBrokenAndAvailableStates(
+        string backendId,
+        string entryName)
+    {
+        const string root = "X:/frontend";
+        var binding = new TrainingBackendBinding
+        {
+            BackendId = backendId,
+            TrainerPath = root
+        };
+
+        InferenceBackendInstallationStatus missing = InferenceBackendInstallationDetector.Inspect(
+            binding,
+            (_, _) => root,
+            _ => false,
+            _ => false);
+        InferenceBackendInstallationStatus broken = InferenceBackendInstallationDetector.Inspect(
+            binding,
+            (_, _) => root,
+            _ => true,
+            _ => false);
+        InferenceBackendInstallationStatus available = InferenceBackendInstallationDetector.Inspect(
+            binding,
+            (_, _) => root,
+            _ => true,
+            path => string.Equals(path, Path.Combine(root, entryName), StringComparison.Ordinal));
+
+        Assert.Equal("未安装", missing.InstallState);
+        Assert.Equal("安装异常", broken.InstallState);
+        Assert.Contains(entryName, broken.Summary, StringComparison.Ordinal);
+        Assert.Equal("已安装", available.InstallState);
+    }
+
     [Fact]
     public void InferenceProjectsPage_IsRegisteredAsAnIndependentToolPage()
     {
@@ -17,7 +55,7 @@ public sealed class InferenceFrontendLaunchPlannerTests
         string registry = File.ReadAllText(Path.Combine(root, "Framework", "Navigation", "ToolPageRegistry.cs"));
         string shell = File.ReadAllText(Path.Combine(root, "MainWindow.xaml.cs"));
 
-        Assert.Contains("[ToolPage(\"跑图工程\", 890)]", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("[ToolPage(\"跑图管理\", 890)]", codeBehind, StringComparison.Ordinal);
         Assert.Contains("typeof(global::CyanTools.InferenceProjectsView)", registry, StringComparison.Ordinal);
         Assert.Contains("[typeof(InferenceProjectsView)]", shell, StringComparison.Ordinal);
     }
@@ -33,6 +71,32 @@ public sealed class InferenceFrontendLaunchPlannerTests
         Assert.Contains("CommandParameter=\"Checkpoint\"", xaml, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Lora\"", xaml, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Vae\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CommandParameter=\"Nodes\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"节点文件夹\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Binding=\"{Binding IsComfyUiSelected}\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(RuntimePathBindingBackendIds.ComfyUiWindows)]
+    [InlineData(RuntimePathBindingBackendIds.ComfyUiWsl)]
+    public void GetRelativeFolder_ComfyUiNodes_UsesCustomNodes(string backendId)
+    {
+        string actual = InferenceFrontendLaunchPlanner.GetRelativeFolder(
+            backendId,
+            InferenceFrontendFolder.Nodes);
+
+        Assert.Equal("custom_nodes", actual);
+    }
+
+    [Theory]
+    [InlineData(RuntimePathBindingBackendIds.ForgeNeoWindows)]
+    [InlineData(RuntimePathBindingBackendIds.ForgeNeoWsl)]
+    public void GetRelativeFolder_ForgeNodes_IsRejected(string backendId)
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            InferenceFrontendLaunchPlanner.GetRelativeFolder(backendId, InferenceFrontendFolder.Nodes));
+
+        Assert.Contains("ComfyUI", exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]

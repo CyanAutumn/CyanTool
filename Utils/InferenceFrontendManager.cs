@@ -15,7 +15,8 @@ namespace CyanTools.Utils
         Root,
         Checkpoint,
         Lora,
-        Vae
+        Vae,
+        Nodes
     }
 
     public sealed record InferenceFrontendLaunchPlan(
@@ -43,7 +44,7 @@ namespace CyanTools.Utils
         {
             if (!RuntimePathBindingBackendIds.IsInferenceFrontend(backendId))
             {
-                throw new InvalidOperationException($"运行环境 {backendId} 不是跑图工程。");
+                throw new InvalidOperationException($"运行环境 {backendId} 不是跑图管理后端。");
             }
 
             return (backendId, folder) switch
@@ -55,9 +56,12 @@ namespace CyanTools.Utils
                     InferenceFrontendFolder.Lora) => Path.Combine("models", "loras"),
                 (RuntimePathBindingBackendIds.ComfyUiWindows or RuntimePathBindingBackendIds.ComfyUiWsl,
                     InferenceFrontendFolder.Vae) => Path.Combine("models", "vae"),
+                (RuntimePathBindingBackendIds.ComfyUiWindows or RuntimePathBindingBackendIds.ComfyUiWsl,
+                    InferenceFrontendFolder.Nodes) => "custom_nodes",
                 (_, InferenceFrontendFolder.Checkpoint) => Path.Combine("models", "Stable-diffusion"),
                 (_, InferenceFrontendFolder.Lora) => Path.Combine("models", "Lora"),
                 (_, InferenceFrontendFolder.Vae) => Path.Combine("models", "VAE"),
+                (_, InferenceFrontendFolder.Nodes) => throw new InvalidOperationException("节点文件夹只适用于 ComfyUI。"),
                 _ => throw new ArgumentOutOfRangeException(nameof(folder))
             };
         }
@@ -88,7 +92,7 @@ namespace CyanTools.Utils
             }
             if (string.IsNullOrWhiteSpace(binding.TrainerPath))
             {
-                throw new InvalidOperationException("跑图工程根目录为空。");
+                throw new InvalidOperationException("跑图管理根目录为空。");
             }
 
             return binding.IsWsl
@@ -228,7 +232,7 @@ namespace CyanTools.Utils
                 resolver);
             if (!Directory.Exists(resolvedRoot))
             {
-                throw new DirectoryNotFoundException($"跑图工程根目录不存在：{resolvedRoot}");
+                throw new DirectoryNotFoundException($"跑图管理根目录不存在：{resolvedRoot}");
             }
 
             string entryScript = Path.Combine(
@@ -238,7 +242,7 @@ namespace CyanTools.Utils
                     : "launch.py");
             if (!File.Exists(entryScript))
             {
-                throw new FileNotFoundException("跑图工程缺少启动入口。", entryScript);
+                throw new FileNotFoundException("跑图管理后端缺少启动入口。", entryScript);
             }
 
             InferenceFrontendLaunchPlan plan = InferenceFrontendLaunchPlanner.Create(binding);

@@ -24,7 +24,7 @@ namespace CyanTools.ViewModel
         private readonly Queue<string> _logLines = new();
         private TrainingBackendBinding? _selectedProject;
         private string _logText = string.Empty;
-        private string _statusText = "选择跑图工程后可启动或打开模型目录。";
+        private string _statusText = "选择运行环境后可启动或打开资源目录。";
         private bool _isBusy;
         private bool _disposed;
 
@@ -52,7 +52,7 @@ namespace CyanTools.ViewModel
             ClearLogCommand = new RelayCommand(ClearLog);
 
             ReloadProjects();
-            AppendLog("跑图工程管理已就绪；路径来自“选项 → 运行环境路径绑定”。");
+            AppendLog("跑图管理已就绪；路径来自“选项 → 运行环境路径绑定”。");
         }
 
         public ObservableCollection<TrainingBackendBinding> Projects { get; }
@@ -96,6 +96,9 @@ namespace CyanTools.ViewModel
         public bool IsRunning => SelectedProject != null && _manager.IsRunning(SelectedProject.Id);
         public bool CanStart => SelectedProject != null && !IsBusy && !IsRunning;
         public bool CanStop => SelectedProject != null && !IsBusy && IsRunning;
+        public bool IsComfyUiSelected
+            => SelectedProject?.BackendId is RuntimePathBindingBackendIds.ComfyUiWindows
+                or RuntimePathBindingBackendIds.ComfyUiWsl;
         public string SelectedRootPath => SelectedProject?.TrainerPath ?? string.Empty;
         public string SelectedRuntimeText
             => SelectedProject == null
@@ -123,7 +126,7 @@ namespace CyanTools.ViewModel
             SelectedProject = Projects.FirstOrDefault(binding =>
                                   string.Equals(binding.Id, selectedId, StringComparison.OrdinalIgnoreCase))
                               ?? Projects.FirstOrDefault();
-            AppendLog($"已加载 {Projects.Count} 个跑图工程路径绑定。");
+            AppendLog($"已加载 {Projects.Count} 个跑图管理路径绑定。");
         }
 
         private async Task StartSelectedAsync()
@@ -196,14 +199,15 @@ namespace CyanTools.ViewModel
                     _wslPathResolver);
                 if (!Directory.Exists(root))
                 {
-                    throw new DirectoryNotFoundException($"跑图工程根目录不存在：{root}");
+                    throw new DirectoryNotFoundException($"跑图管理根目录不存在：{root}");
                 }
 
                 string directory = InferenceFrontendLaunchPlanner.ResolveFolder(binding, folder, _wslPathResolver);
                 if (folder != InferenceFrontendFolder.Root && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
-                    AppendLog($"[{binding.Name}] 已创建模型目录：{directory}");
+                    string folderLabel = folder == InferenceFrontendFolder.Nodes ? "节点文件夹" : "资源目录";
+                    AppendLog($"[{binding.Name}] 已创建{folderLabel}：{directory}");
                 }
 
                 Process.Start(new ProcessStartInfo
@@ -238,12 +242,13 @@ namespace CyanTools.ViewModel
             OnPropertyChanged(nameof(IsRunning));
             OnPropertyChanged(nameof(CanStart));
             OnPropertyChanged(nameof(CanStop));
+            OnPropertyChanged(nameof(IsComfyUiSelected));
             OnPropertyChanged(nameof(SelectedRootPath));
             OnPropertyChanged(nameof(SelectedRuntimeText));
             if (!keepFailureMessage || !StatusText.Contains("失败", StringComparison.Ordinal))
             {
                 StatusText = SelectedProject == null
-                    ? "没有可用的跑图工程绑定。"
+                    ? "没有可用的跑图管理绑定。"
                     : IsRunning
                         ? $"{SelectedProject.Name} 运行中。"
                         : $"{SelectedProject.Name} 未运行。";

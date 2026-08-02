@@ -60,5 +60,33 @@ namespace CyanTools
                 textBox.ScrollToEnd();
             }
         }
+
+        private void BackendStatusButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string backendId })
+            {
+                return;
+            }
+
+            FrameworkElement? target = backendId switch
+            {
+                "sd-scripts" => SdScriptsDeploymentSection,
+                "anima-fast-lora" => AnimaFastLoraDeploymentSection,
+                "wsl-sd-scripts" => WslSdScriptsDeploymentSection,
+                "diffusion-pipe" => DiffusionPipeDeploymentSection,
+                "comfyui-windows" => ComfyUiWindowsDeploymentSection,
+                "comfyui-wsl" => ComfyUiWslDeploymentSection,
+                "forge-neo-windows" => ForgeNeoWindowsDeploymentSection,
+                "forge-neo-wsl" => ForgeNeoWslDeploymentSection,
+                _ => null
+            };
+            if (target == null)
+            {
+                return;
+            }
+
+            target.BringIntoView();
+            target.Focus();
+        }
     }
 }

@@ -15,7 +15,7 @@
         </Grid.RowDefinitions>
 
         <GroupBox Grid.Row="0"
-                  Header="跑图工程"
+                  Header="跑图管理"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <Grid>
@@ -98,7 +98,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="快捷打开当前工程的常用资源目录；模型子目录不存在时会自动创建。"
+                <TextBlock Text="快捷打开当前运行环境的常用资源目录；子目录不存在时会自动创建。"
                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                            TextWrapping="Wrap"
                            VerticalAlignment="Center"/>
@@ -119,6 +119,21 @@
                             CommandParameter="Vae"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="VAE"/>
+                    <Button Command="{Binding OpenFolderCommand}"
+                            CommandParameter="Nodes"
+                            Content="节点文件夹">
+                        <Button.Style>
+                            <Style TargetType="Button"
+                                   BasedOn="{StaticResource CyanCommandButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsComfyUiSelected}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </WrapPanel>
             </Grid>
         </GroupBox>

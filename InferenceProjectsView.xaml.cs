@@ -6,7 +6,7 @@ using System.Windows.Controls;
 
 namespace CyanTools
 {
-    [ToolPage("跑图工程", 890)]
+    [ToolPage("跑图管理", 890)]
     public partial class InferenceProjectsView : UserControl
     {
         private readonly InferenceProjectsViewModel _viewModel;

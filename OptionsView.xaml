@@ -17,10 +17,58 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="320"/>
             </Grid.RowDefinitions>
 
             <GroupBox Grid.Row="0"
+                      Header="系统检查"
+                      Margin="0,0,0,12"
+                      Style="{StaticResource CyanGroupBoxStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="训练后端与跑图后端安装状态；点击任意状态可定位到对应部署位置。"
+                               Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                               TextWrapping="Wrap"/>
+                    <UniformGrid Grid.Row="1" Columns="2" Margin="0,10,0,0">
+                        <Button Tag="sd-scripts" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding SdScriptsInstallState}"/><TextBlock Text="sd-scripts（Windows）"/></DockPanel>
+                        </Button>
+                        <Button Tag="wsl-sd-scripts" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding WslSdScriptsInstallState}"/><TextBlock Text="sd-scripts（WSL）"/></DockPanel>
+                        </Button>
+                        <Button Tag="anima-fast-lora" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding AnimaFastLoraInstallState}"/><TextBlock Text="Anima Fast LoRA（Windows）"/></DockPanel>
+                        </Button>
+                        <Button Tag="diffusion-pipe" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding DiffusionPipeInstallState}"/><TextBlock Text="diffusion-pipe（WSL）"/></DockPanel>
+                        </Button>
+                        <Button Tag="comfyui-windows" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ComfyUiWindowsInstallState}"/><TextBlock Text="ComfyUI（Windows）"/></DockPanel>
+                        </Button>
+                        <Button Tag="comfyui-wsl" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ComfyUiWslInstallState}"/><TextBlock Text="ComfyUI（WSL）"/></DockPanel>
+                        </Button>
+                        <Button Tag="forge-neo-windows" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ForgeNeoWindowsInstallState}"/><TextBlock Text="Webui Forge Neo（Windows）"/></DockPanel>
+                        </Button>
+                        <Button Tag="forge-neo-wsl" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ForgeNeoWslInstallState}"/><TextBlock Text="Webui Forge Neo（WSL）"/></DockPanel>
+                        </Button>
+                    </UniformGrid>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Row="1"
                       Header="CUDA / cuDNN"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -126,7 +174,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="1"
+            <GroupBox Grid.Row="2"
                       Header="NVIDIA 驱动应用"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -160,7 +208,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="2"
+            <GroupBox Grid.Row="3"
                       Header="训练后端部署"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -202,7 +250,8 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="3"
+            <GroupBox x:Name="RuntimePathBindingSection"
+                      Grid.Row="4"
                       Header="运行环境路径绑定"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -321,7 +370,7 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="4"
+            <GroupBox Grid.Row="5"
                       Header="WSL 基础环境"
                       Margin="0,0,0,12"
                       Style="{StaticResource CyanGroupBoxStyle}">
@@ -389,135 +438,133 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Grid.Row="5"
-                      Header="Windows 原生训练后端"
+            <GroupBox x:Name="SdScriptsDeploymentSection"
+                      Grid.Row="6"
+                      Header="Windows sd-scripts 部署"
                       Margin="0,0,0,12"
+                      Focusable="True"
                       Style="{StaticResource CyanGroupBoxStyle}">
-                <StackPanel>
-                    <Border Style="{StaticResource CyanCardStyle}" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="sd-scripts Windows" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
-                                <TextBlock Text="支持 LoRA、LyCORIS、DoRA、LoHa、LoKr 与 Anima；优先复用 Python 3.10/3.11/3.12，无兼容版本时由 uv 准备 3.10。"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                <TextBlock Text="{Binding SdScriptsStatus, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
-                            </StackPanel>
-                            <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
-                                <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
-                                <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
-                                <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
-                                <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
-                            </WrapPanel>
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource CyanCardStyle}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="Anima Fast LoRA Windows" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
-                                <TextBlock Text="克隆 GALIAIS/LoraHub，仅部署 external/anima_lora 训练核心，并使用 uv 创建 Python 3.13 独立环境。"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                <TextBlock Text="{Binding AnimaFastLoraStatus, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
-                            </StackPanel>
-                            <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
-                                <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
-                                <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
-                                <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
-                                <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
-                            </WrapPanel>
-                        </Grid>
-                    </Border>
-                </StackPanel>
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="sd-scripts Windows" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
+                            <TextBlock Text="支持 LoRA、LyCORIS、DoRA、LoHa、LoKr 与 Anima；优先复用 Python 3.10/3.11/3.12，无兼容版本时由 uv 准备 3.10。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding SdScriptsStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
+                            <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
+                            <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
+                            <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
+                            <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
             </GroupBox>
 
-            <GroupBox Grid.Row="6"
-                      Header="WSL2 训练后端"
+            <GroupBox x:Name="AnimaFastLoraDeploymentSection"
+                      Grid.Row="7"
+                      Header="Windows Anima Fast LoRA 部署"
                       Margin="0,0,0,12"
+                      Focusable="True"
                       Style="{StaticResource CyanGroupBoxStyle}">
-                <StackPanel>
-                    <Border Style="{StaticResource CyanCardStyle}" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="wsl-sd-scripts" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
-                                <TextBlock Text="在 Ubuntu 中部署 sd-scripts、Python 3.10、torch cu128、LyCORIS 和 accelerate，并执行 1 step / 1 epoch smoke。"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                <TextBlock Text="{Binding WslSdScriptsStatus, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <TextBlock Text="安装镜像源" Style="{StaticResource CyanFormLabelStyle}"/>
-                                    <ComboBox ItemsSource="{Binding TrainingBackendMirrorOptions}"
-                                              SelectedItem="{Binding SelectedWslSdScriptsMirror}"
-                                              Width="150" MinHeight="30" Margin="0,0,10,0">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/></DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <TextBlock Text="本地代理端口" Style="{StaticResource CyanFormLabelStyle}"/>
-                                    <TextBox Text="{Binding WslSdScriptsProxyPort, UpdateSourceTrigger=PropertyChanged}" Width="90" MinHeight="30"/>
-                                </StackPanel>
-                            </StackPanel>
-                            <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
-                                <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
-                                <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
-                                <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
-                                <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
-                            </WrapPanel>
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource CyanCardStyle}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="diffusion-pipe" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
-                                <TextBlock Text="部署 tdrussell/diffusion-pipe、cu128 conda 环境、torch、flash-attn、Anima 补丁与 1 step smoke 训练。"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                <TextBlock Text="{Binding DiffusionPipeStatus, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <TextBlock Text="安装镜像源" Style="{StaticResource CyanFormLabelStyle}"/>
-                                    <ComboBox ItemsSource="{Binding TrainingBackendMirrorOptions}"
-                                              SelectedItem="{Binding SelectedDiffusionPipeMirror}"
-                                              Width="150" MinHeight="30" Margin="0,0,10,0">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/></DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <TextBlock Text="本地代理端口" Style="{StaticResource CyanFormLabelStyle}"/>
-                                    <TextBox Text="{Binding DiffusionPipeProxyPort, UpdateSourceTrigger=PropertyChanged}" Width="90" MinHeight="30"/>
-                                </StackPanel>
-                            </StackPanel>
-                            <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
-                                <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
-                                <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
-                                <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
-                                <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
-                            </WrapPanel>
-                        </Grid>
-                    </Border>
-                </StackPanel>
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Anima Fast LoRA Windows" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
+                            <TextBlock Text="克隆 GALIAIS/LoraHub，仅部署 external/anima_lora 训练核心，并使用 uv 创建 Python 3.13 独立环境。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding AnimaFastLoraStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
+                            <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
+                            <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
+                            <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
+                            <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="anima-fast-lora" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
             </GroupBox>
 
-            <GroupBox Grid.Row="7"
+            <GroupBox x:Name="WslSdScriptsDeploymentSection" Grid.Row="8" Header="WSL sd-scripts 部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="wsl-sd-scripts" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
+                            <TextBlock Text="在 Ubuntu 中部署 sd-scripts、Python 3.10、torch cu128、LyCORIS 和 accelerate，并执行 1 step / 1 epoch smoke。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding WslSdScriptsStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock Text="安装镜像源" Style="{StaticResource CyanFormLabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding TrainingBackendMirrorOptions}" SelectedItem="{Binding SelectedWslSdScriptsMirror}" Width="150" MinHeight="30" Margin="0,0,10,0"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                                <TextBlock Text="本地代理端口" Style="{StaticResource CyanFormLabelStyle}"/>
+                                <TextBox Text="{Binding WslSdScriptsProxyPort, UpdateSourceTrigger=PropertyChanged}" Width="90" MinHeight="30"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
+                            <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
+                            <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
+                            <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
+                            <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="wsl-sd-scripts" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox x:Name="DiffusionPipeDeploymentSection" Grid.Row="9" Header="WSL diffusion-pipe 部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="diffusion-pipe" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/>
+                            <TextBlock Text="部署 tdrussell/diffusion-pipe、cu128 conda 环境、torch、flash-attn、Anima 补丁与 1 step smoke 训练。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding DiffusionPipeStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock Text="安装镜像源" Style="{StaticResource CyanFormLabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding TrainingBackendMirrorOptions}" SelectedItem="{Binding SelectedDiffusionPipeMirror}" Width="150" MinHeight="30" Margin="0,0,10,0"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                                <TextBlock Text="本地代理端口" Style="{StaticResource CyanFormLabelStyle}"/>
+                                <TextBox Text="{Binding DiffusionPipeProxyPort, UpdateSourceTrigger=PropertyChanged}" Width="90" MinHeight="30"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Button Command="{Binding CheckTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/>
+                            <Button Command="{Binding InstallTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanPrimaryActionButtonStyle}" Content="安装"/>
+                            <Button Command="{Binding ValidateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="校验"/>
+                            <Button Command="{Binding UpdateTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="更新"/>
+                            <Button Command="{Binding ReinstallTrainingBackendCommand}" CommandParameter="diffusion-pipe" Style="{StaticResource CyanCommandButtonStyle}" Content="重装"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox x:Name="ComfyUiWindowsDeploymentSection" Grid.Row="10" Header="ComfyUI（Windows）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="ComfyUI（Windows）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 ComfyUI Windows 绑定检测程序根目录和 main.py。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ComfyUiWindowsStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="comfyui-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="comfyui-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox x:Name="ComfyUiWslDeploymentSection" Grid.Row="11" Header="ComfyUI（WSL）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="ComfyUI（WSL）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 ComfyUI WSL 绑定检测 Ubuntu 路径、main.py 和 Conda 环境配置。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ComfyUiWslStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="comfyui-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="comfyui-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox x:Name="ForgeNeoWindowsDeploymentSection" Grid.Row="12" Header="Webui Forge Neo（Windows）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Webui Forge Neo（Windows）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 Forge Neo Windows 绑定检测程序根目录和 launch.py。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ForgeNeoWindowsStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="forge-neo-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="forge-neo-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox x:Name="ForgeNeoWslDeploymentSection" Grid.Row="13" Header="Webui Forge Neo（WSL）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
+                <Border Style="{StaticResource CyanCardStyle}">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Webui Forge Neo（WSL）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 Forge Neo WSL 绑定检测 Ubuntu 路径、launch.py 和 Conda 环境配置。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ForgeNeoWslStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="forge-neo-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="forge-neo-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox Grid.Row="14"
                       Header="日志"
                       Style="{StaticResource CyanGroupBoxStyle}">
                 <TextBox Text="{Binding LogText, Mode=OneWay}"
