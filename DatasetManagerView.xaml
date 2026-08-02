@@ -501,7 +501,7 @@
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="{Binding TagTokens.Count, StringFormat=标签数: {0}}"
+                            <TextBlock Text="{Binding TagTokens.Count, Converter={StaticResource LocalizedTextConverter}, ConverterParameter='标签数: {0}'}"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,0,0,4"/>
                             <Grid>
@@ -552,7 +552,7 @@
                                     </DataTemplate>
                                 </Button.ContentTemplate>
                             </Button>
-                            <TextBlock Text="{Binding TagTranslationCountDisplay}"
+                            <TextBlock Text="{Binding TagTranslationCountDisplay, Converter={StaticResource LocalizedTextConverter}}"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,4,0,0"/>
                         </StackPanel>

@@ -134,7 +134,7 @@ namespace CyanTools
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show(
+                MessageBox.Show(
                     LocalizationManager.Format(
                         "页面加载失败: {0}\n{1}\n\n{2}",
                         LocalizationManager.Translate(page.DisplayName),
@@ -175,7 +175,7 @@ namespace CyanTools
             UnlockState.DownloadersUnlocked = true;
             _homeView.ShowUnlockedImage();
             RefreshMenuItems();
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 "再敲咬你啊",
                 LocalizationManager.Translate("提示"),
                 System.Windows.MessageBoxButton.OK,

@@ -357,7 +357,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "请选择一个文件夹"
+                Title = LocalizationManager.Translate("请选择一个文件夹")
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -456,7 +456,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"加载文件夹时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"加载文件夹时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -513,7 +513,7 @@ namespace CyanTools.ViewModel
 
             if (!DataItemsWithOperations.Any())
             {
-                System.Windows.MessageBox.Show("没有需要处理的数据。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                MessageBox.Show("没有需要处理的数据。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 return;
             }
 
@@ -557,7 +557,7 @@ namespace CyanTools.ViewModel
                             }
                             else
                             {
-                                System.Windows.MessageBox.Show($"分类{item.Operation}的目标文件夹未设置或不存在。", "警告", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                                MessageBox.Show($"分类{item.Operation}的目标文件夹未设置或不存在。", "警告", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
                                 skippedCount++;
                                 continue;
                             }
@@ -568,13 +568,13 @@ namespace CyanTools.ViewModel
                     catch (Exception ex)
                     {
                         errorCount++;
-                        System.Windows.MessageBox.Show($"处理文件 {item.DisplayName} 时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                        MessageBox.Show($"处理文件 {item.DisplayName} 时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                     }
                 }
 
                 if (processedCount == 0 && errorCount == 0 && skippedCount == 0)
                 {
-                    System.Windows.MessageBox.Show("没有需要保存的更改。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    MessageBox.Show("没有需要保存的更改。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                     return;
                 }
 
@@ -593,11 +593,11 @@ namespace CyanTools.ViewModel
                     message += $"\n未勾选分类而跳过: {uncheckedCategorySkippedCount} 条数据";
                 }
 
-                System.Windows.MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"应用更改时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"应用更改时出错: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -660,7 +660,7 @@ namespace CyanTools.ViewModel
             {
                 CurrentTextContent = "";
                 ResetTagEditor();
-                System.Windows.MessageBox.Show($"读取文本失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"读取文本失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -1269,7 +1269,7 @@ namespace CyanTools.ViewModel
 
             var dialog = new Window
             {
-                Title = "打乱提示词（数据集）",
+                Title = LocalizationManager.Translate("打乱提示词（数据集）"),
                 Content = panel,
                 SizeToContent = SizeToContent.WidthAndHeight,
                 ResizeMode = ResizeMode.NoResize,
@@ -1288,7 +1288,7 @@ namespace CyanTools.ViewModel
             {
                 if (!int.TryParse(inputBox.Text?.Trim(), out int parsed) || parsed < 0)
                 {
-                    System.Windows.MessageBox.Show(dialog, "请输入大于等于 0 的整数。", "提示",
+                    MessageBox.Show(dialog, "请输入大于等于 0 的整数。", "提示",
                         System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                     inputBox.Focus();
                     inputBox.SelectAll();
@@ -1578,7 +1578,7 @@ namespace CyanTools.ViewModel
         {
             if (updatedCount == 0 && errorCount == 0)
             {
-                System.Windows.MessageBox.Show("未找到需要处理的标签。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                MessageBox.Show("未找到需要处理的标签。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 return;
             }
 
@@ -1601,14 +1601,14 @@ namespace CyanTools.ViewModel
                 message += $"\n失败: {errorCount} 个";
             }
 
-            System.Windows.MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
 
         private void ShowDatasetPromptShuffleResult(int updatedCount, int errorCount, int fixedTagCount)
         {
             if (updatedCount == 0 && errorCount == 0)
             {
-                System.Windows.MessageBox.Show("未找到可打乱的提示词。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                MessageBox.Show("未找到可打乱的提示词。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 return;
             }
 
@@ -1618,7 +1618,7 @@ namespace CyanTools.ViewModel
                 message += $"\n失败: {errorCount} 个";
             }
 
-            System.Windows.MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            MessageBox.Show(message, "完成", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
 
         public void CommitPendingTags(bool flushAll)
@@ -1814,7 +1814,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"保存标签翻译失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"保存标签翻译失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -1930,7 +1930,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"翻译未翻译标签失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"翻译未翻译标签失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
             finally
             {
@@ -2119,7 +2119,7 @@ namespace CyanTools.ViewModel
                 }
                 else
                 {
-                    System.Windows.MessageBox.Show("当前数据没有可保存的 Prompt 文件。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    MessageBox.Show("当前数据没有可保存的 Prompt 文件。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                     return;
                 }
             }
@@ -2134,11 +2134,11 @@ namespace CyanTools.ViewModel
                     SelectedDataItem.TextPath = targetPath;
                 }
 
-                System.Windows.MessageBox.Show("Prompt 已保存！", "成功", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                MessageBox.Show("Prompt 已保存！", "成功", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"保存 Prompt 失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"保存 Prompt 失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -2164,7 +2164,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = $"请选择分类{categoryNumber}的目标文件夹"
+                Title = LocalizationManager.Format("请选择分类{0}的目标文件夹", categoryNumber)
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -2328,7 +2328,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"加载图像失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                MessageBox.Show($"加载图像失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 CurrentImageSource = null;
                 _currentFilePath = null;
                 ResetState();

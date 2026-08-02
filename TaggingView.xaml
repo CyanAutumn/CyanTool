@@ -108,9 +108,14 @@
                           ItemsSource="{Binding TaggerSeries}"
                           SelectedValue="{Binding SelectedTaggerSeriesId, UpdateSourceTrigger=PropertyChanged}"
                           SelectedValuePath="Id"
-                          DisplayMemberPath="DisplayName"
                           IsEnabled="{Binding IsIdle}"
-                          Margin="0,0,18,0"/>
+                          Margin="0,0,18,0">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBlock Grid.Column="2"
                            Text="打标模型"
                            Style="{StaticResource CyanFormLabelStyle}"/>
@@ -281,9 +286,14 @@
                           ItemsSource="{Binding ToriiGateCaptionFormats}"
                           SelectedValue="{Binding ToriiGateCaptionFormatId}"
                           SelectedValuePath="Id"
-                          DisplayMemberPath="DisplayName"
                           IsEnabled="{Binding IsIdle}"
-                          Margin="0,10,18,0"/>
+                          Margin="0,10,18,0">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBlock Grid.Row="2"
                            Grid.Column="2"
                            Text="最大输入 MP"

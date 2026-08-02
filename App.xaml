@@ -10,6 +10,7 @@
     <Application.Resources>
         <ResourceDictionary>
             <loc:LocalizedTextConverter x:Key="LocalizedTextConverter" />
+            <loc:TrainingBackendBindingTextConverter x:Key="TrainingBackendBindingTextConverter" />
 
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Light" />

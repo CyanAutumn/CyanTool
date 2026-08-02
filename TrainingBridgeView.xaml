@@ -115,18 +115,28 @@
                     <TextBlock Text="导入训练器" Style="{StaticResource CyanFormLabelStyle}"/>
                     <ComboBox ItemsSource="{Binding BackendBindings}"
                               SelectedItem="{Binding SelectedSourceBinding}"
-                              DisplayMemberPath="DisplayName"
-                              ToolTip="{Binding SelectedSourceBinding.LocationSummary}"
-                              MinHeight="34"/>
+                              ToolTip="{Binding SelectedSourceBinding, Converter={StaticResource TrainingBackendBindingTextConverter}, ConverterParameter=LocationSummary}"
+                              MinHeight="34">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource TrainingBackendBindingTextConverter}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Margin="0,0,10,0">
                     <TextBlock Text="训练器" Style="{StaticResource CyanFormLabelStyle}"/>
                     <ComboBox ItemsSource="{Binding BackendBindings}"
                               SelectedItem="{Binding SelectedTargetBinding}"
-                              DisplayMemberPath="DisplayName"
-                              ToolTip="{Binding SelectedTargetBinding.LocationSummary}"
-                              MinHeight="34"/>
+                              ToolTip="{Binding SelectedTargetBinding, Converter={StaticResource TrainingBackendBindingTextConverter}, ConverterParameter=LocationSummary}"
+                              MinHeight="34">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource TrainingBackendBindingTextConverter}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </StackPanel>
 
                 <WrapPanel Grid.Column="3" VerticalAlignment="Bottom">
@@ -196,7 +206,7 @@
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center"/>
                             <Border Style="{StaticResource CyanPillStyle}" Margin="10,0,0,0">
-                                <TextBlock Text="{Binding ParameterCountText}"
+                                <TextBlock Text="{Binding ParameterCountText, Converter={StaticResource LocalizedTextConverter}}"
                                            Style="{StaticResource CyanSecondaryTextBlockStyle}"/>
                             </Border>
                         </StackPanel>
@@ -291,7 +301,7 @@
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    TextWrapping="Wrap"
                                                    MaxHeight="32"
-                                                   ToolTip="{Binding HelpText}"/>
+                                                   ToolTip="{Binding HelpText, Converter={StaticResource LocalizedTextConverter}}"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -507,7 +517,7 @@
                                                    Margin="0,4,0,2"
                                                    FontSize="18"
                                                    FontWeight="Bold"/>
-                                        <TextBlock Text="{Binding CpuDetailText}"
+                                        <TextBlock Text="{Binding CpuDetailText, Converter={StaticResource LocalizedTextConverter}}"
                                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                                    FontSize="11"/>
                                     </StackPanel>
@@ -565,7 +575,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <TextBlock Text="{Binding MonitorSampleText}"
+                            <TextBlock Text="{Binding MonitorSampleText, Converter={StaticResource LocalizedTextConverter}}"
                                        HorizontalAlignment="Right"
                                        Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                        FontSize="11"/>

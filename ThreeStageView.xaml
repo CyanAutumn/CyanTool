@@ -349,7 +349,7 @@
 
                         <StackPanel Grid.Row="1"
                                     Margin="0,12,0,0">
-                            <TextBlock Text="{Binding ProgressText}"
+                            <TextBlock Text="{Binding ProgressText, Converter={StaticResource LocalizedTextConverter}}"
                                        Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                        Margin="0,0,0,6" />
                             <ProgressBar Height="20"

@@ -54,6 +54,8 @@ namespace CyanTools.Localization
         static LocalizationManager()
         {
             LocalizationSupplement.AddTo(Translations);
+            LocalizationCompletenessSupplement.AddTo(Translations);
+            LocalizationDialogsSupplement.AddTo(Translations);
         }
 
         public static event EventHandler? LanguageChanged;
@@ -100,6 +102,7 @@ namespace CyanTools.Localization
 
             _currentLanguage = language;
             ApplyCulture(language);
+            ApplyToOpenWindows();
             LanguageChanged?.Invoke(null, EventArgs.Empty);
         }
 
@@ -123,6 +126,9 @@ namespace CyanTools.Localization
             };
         }
 
+        public static bool HasTranslation(string? source)
+            => !string.IsNullOrEmpty(source) && Translations.ContainsKey(source);
+
         public static string Format(string source, params object[] args)
         {
             return string.Format(CultureInfo.CurrentCulture, Translate(source), args);
@@ -141,7 +147,7 @@ namespace CyanTools.Localization
                 var args = new object[match.Groups.Count - 1];
                 for (var i = 1; i < match.Groups.Count; i++)
                 {
-                    args[i - 1] = match.Groups[i].Value;
+                    args[i - 1] = Translate(match.Groups[i].Value);
                 }
 
                 var template = _currentLanguage switch
@@ -276,9 +282,8 @@ namespace CyanTools.Localization
 
         private static void LocalizeTextBlock(TextBlock textBlock)
         {
-            if (BindingOperations.IsDataBound(textBlock, TextBlock.TextProperty))
+            if (LocalizeBoundString(textBlock, TextBlock.TextProperty))
             {
-                textBlock.GetBindingExpression(TextBlock.TextProperty)?.UpdateTarget();
                 return;
             }
 
@@ -297,7 +302,17 @@ namespace CyanTools.Localization
 
             foreach (var inline in GetInlinesSnapshot(textBlock))
             {
-                if (inline is Run run && !BindingOperations.IsDataBound(run, Run.TextProperty))
+                if (inline is not Run run)
+                {
+                    continue;
+                }
+
+                if (LocalizeBoundString(run, Run.TextProperty))
+                {
+                    continue;
+                }
+
+                if (!BindingOperations.IsDataBound(run, Run.TextProperty))
                 {
                     var inlineKey = GetOrCreateOriginalKey(run, OriginalTextKeyProperty, run.Text);
                     if (inlineKey != null)
@@ -310,9 +325,8 @@ namespace CyanTools.Localization
 
         private static void LocalizeContent(ContentControl contentControl)
         {
-            if (BindingOperations.IsDataBound(contentControl, ContentControl.ContentProperty))
+            if (LocalizeBoundString(contentControl, ContentControl.ContentProperty))
             {
-                contentControl.GetBindingExpression(ContentControl.ContentProperty)?.UpdateTarget();
                 return;
             }
 
@@ -330,9 +344,8 @@ namespace CyanTools.Localization
 
         private static void LocalizeHeader(HeaderedContentControl control)
         {
-            if (BindingOperations.IsDataBound(control, HeaderedContentControl.HeaderProperty))
+            if (LocalizeBoundString(control, HeaderedContentControl.HeaderProperty))
             {
-                control.GetBindingExpression(HeaderedContentControl.HeaderProperty)?.UpdateTarget();
                 return;
             }
 
@@ -350,9 +363,8 @@ namespace CyanTools.Localization
 
         private static void LocalizeHeader(HeaderedItemsControl control)
         {
-            if (BindingOperations.IsDataBound(control, HeaderedItemsControl.HeaderProperty))
+            if (LocalizeBoundString(control, HeaderedItemsControl.HeaderProperty))
             {
-                control.GetBindingExpression(HeaderedItemsControl.HeaderProperty)?.UpdateTarget();
                 return;
             }
 
@@ -370,9 +382,8 @@ namespace CyanTools.Localization
 
         private static void LocalizeToolTip(FrameworkElement element)
         {
-            if (BindingOperations.IsDataBound(element, FrameworkElement.ToolTipProperty))
+            if (LocalizeBoundString(element, FrameworkElement.ToolTipProperty))
             {
-                element.GetBindingExpression(FrameworkElement.ToolTipProperty)?.UpdateTarget();
                 return;
             }
 
@@ -390,7 +401,7 @@ namespace CyanTools.Localization
 
         private static void LocalizeWindowTitle(Window window)
         {
-            if (BindingOperations.IsDataBound(window, Window.TitleProperty))
+            if (LocalizeBoundString(window, Window.TitleProperty))
             {
                 return;
             }
@@ -407,6 +418,11 @@ namespace CyanTools.Localization
             var columns = new List<DataGridColumn>(dataGrid.Columns);
             foreach (var column in columns)
             {
+                if (LocalizeBoundString(column, DataGridColumn.HeaderProperty))
+                {
+                    continue;
+                }
+
                 if (column.Header is not string header)
                 {
                     continue;
@@ -425,6 +441,11 @@ namespace CyanTools.Localization
             var columns = new List<GridViewColumn>(gridView.Columns);
             foreach (var column in columns)
             {
+                if (LocalizeBoundString(column, GridViewColumn.HeaderProperty))
+                {
+                    continue;
+                }
+
                 if (column.Header is not string header)
                 {
                     continue;
@@ -452,6 +473,66 @@ namespace CyanTools.Localization
 
             owner.SetValue(property, current);
             return current;
+        }
+
+        private static bool LocalizeBoundString(DependencyObject owner, DependencyProperty property)
+        {
+            if (!BindingOperations.IsDataBound(owner, property))
+            {
+                return false;
+            }
+
+            UpdateBindingTarget(owner, property);
+            return true;
+        }
+
+        private static void UpdateBindingTarget(DependencyObject owner, DependencyProperty property)
+        {
+            if (BindingOperations.GetBindingExpression(owner, property) is BindingExpression binding)
+            {
+                binding.UpdateTarget();
+                return;
+            }
+
+            if (BindingOperations.GetMultiBindingExpression(owner, property) is MultiBindingExpression multiBinding)
+            {
+                multiBinding.UpdateTarget();
+                return;
+            }
+
+            BindingOperations.GetPriorityBindingExpression(owner, property)?.UpdateTarget();
+        }
+
+        private static void ApplyToOpenWindows()
+        {
+            Application? application = Application.Current;
+            if (application == null)
+            {
+                return;
+            }
+
+            void Apply()
+            {
+                var windows = new List<Window>();
+                foreach (Window window in application.Windows)
+                {
+                    windows.Add(window);
+                }
+
+                foreach (Window window in windows)
+                {
+                    ApplyTo(window);
+                }
+            }
+
+            if (application.Dispatcher.CheckAccess())
+            {
+                Apply();
+            }
+            else
+            {
+                application.Dispatcher.Invoke(Apply);
+            }
         }
 
         private static List<DependencyObject> GetVisualChildrenSnapshot(DependencyObject root)

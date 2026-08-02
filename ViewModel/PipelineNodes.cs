@@ -347,8 +347,8 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择训练配置文件",
-                Filter = "训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*",
+                Title = LocalizationManager.Translate("选择训练配置文件"),
+                Filter = LocalizationManager.Translate("训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*"),
                 CheckFileExists = true,
                 FileName = ConfigurationFilePath
             };

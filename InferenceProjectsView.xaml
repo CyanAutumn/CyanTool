@@ -77,11 +77,11 @@
 
                 <DockPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0">
                     <TextBlock DockPanel.Dock="Right"
-                               Text="{Binding SelectedRuntimeText}"
+                               Text="{Binding SelectedRuntimeText, Converter={StaticResource LocalizedTextConverter}}"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                Margin="16,0,0,0"
                                VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding StatusText}"
+                    <TextBlock Text="{Binding StatusText, Converter={StaticResource LocalizedTextConverter}}"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                TextWrapping="Wrap"
                                VerticalAlignment="Center"/>

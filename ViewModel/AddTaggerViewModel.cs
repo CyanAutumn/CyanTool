@@ -62,7 +62,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new CommonOpenFileDialog
             {
-                Title = "选择 ONNX 模型文件",
+                Title = LocalizationManager.Translate("选择 ONNX 模型文件"),
                 IsFolderPicker = false
             };
             dialog.Filters.Add(new CommonFileDialogFilter("ONNX 模型", "*.onnx"));
@@ -83,7 +83,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new CommonOpenFileDialog
             {
-                Title = "选择标签映射文件",
+                Title = LocalizationManager.Translate("选择标签映射文件"),
                 IsFolderPicker = false
             };
             dialog.Filters.Add(new CommonFileDialogFilter("标签映射", "*.csv;*.json"));

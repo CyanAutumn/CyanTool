@@ -672,8 +672,8 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = $"导入 {SelectedSourceBinding.Name} 配置（支持自动识别训练器）",
-                Filter = "训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*",
+                Title = LocalizationManager.Format("导入 {0} 配置（支持自动识别训练器）", SelectedSourceBinding.Name),
+                Filter = LocalizationManager.Translate("训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*"),
                 Multiselect = true,
                 CheckFileExists = true
             };

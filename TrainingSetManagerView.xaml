@@ -62,7 +62,7 @@
                         Style="{StaticResource CyanStatusStripStyle}"
                         VerticalAlignment="Center"
                         Margin="0,0,8,0">
-                    <TextBlock Text="{Binding GitStatusText}"
+                    <TextBlock Text="{Binding GitStatusText, Converter={StaticResource LocalizedTextConverter}}"
                                FontWeight="SemiBold" />
                 </Border>
                 <Button Grid.Column="3"
@@ -121,10 +121,10 @@
                     <Border Style="{StaticResource CyanStatusStripStyle}"
                             Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="{Binding StorageAllocationText}"
+                            <TextBlock Text="{Binding StorageAllocationText, Converter={StaticResource LocalizedTextConverter}}"
                                        FontWeight="SemiBold"
                                        TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding LfsPolicyText}"
+                            <TextBlock Text="{Binding LfsPolicyText, Converter={StaticResource LocalizedTextConverter}}"
                                        Style="{StaticResource CyanTinyTextBlockStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap" />
@@ -212,7 +212,7 @@
                                                        Style="{StaticResource CyanTinyTextBlockStyle}"
                                                        Margin="0,2,0,0"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding ParentSummary}"
+                                            <TextBlock Text="{Binding ParentSummary, Converter={StaticResource LocalizedTextConverter}}"
                                                        Style="{StaticResource CyanTinyTextBlockStyle}"
                                                        Margin="0,2,0,0"
                                                        TextTrimming="CharacterEllipsis" />
@@ -243,7 +243,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="当前时间点："
                                        FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding CurrentSnapshotText}" />
+                            <TextBlock Text="{Binding CurrentSnapshotText, Converter={StaticResource LocalizedTextConverter}}" />
                         </StackPanel>
                     </Border>
                     <local:DatasetManagerView Grid.Row="1"
@@ -657,7 +657,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <TextBlock Text="{Binding ToastMessage}"
+            <TextBlock Text="{Binding ToastMessage, Converter={StaticResource LocalizedTextConverter}}"
                        TextWrapping="Wrap"
                        FontWeight="SemiBold" />
         </Border>

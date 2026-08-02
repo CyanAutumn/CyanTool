@@ -103,7 +103,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Text="{Binding InputImages.Count, StringFormat=已选择 {0} 张}"
+                                <TextBlock Text="{Binding InputImages.Count, Converter={StaticResource LocalizedTextConverter}, ConverterParameter='已选择 {0} 张'}"
                                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                            VerticalAlignment="Center"/>
                                 <Button Grid.Column="1"
@@ -453,7 +453,7 @@
                             <TextBlock Grid.Row="3"
                                        Grid.Column="1"
                                        Grid.ColumnSpan="4"
-                                       Text="{Binding ImageSizeValidationError}"
+                                       Text="{Binding ImageSizeValidationError, Converter={StaticResource LocalizedTextConverter}}"
                                        Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                                        Margin="0,8,0,0"
                                        Visibility="{Binding HasImageSizeValidationError, Converter={StaticResource BooleanToVisibilityConverter}}"/>

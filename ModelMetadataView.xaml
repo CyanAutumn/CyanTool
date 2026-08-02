@@ -101,9 +101,9 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding FileInfoText}"
+                        <TextBlock Text="{Binding FileInfoText, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}" />
-                        <TextBlock Text="{Binding StatusText}"
+                        <TextBlock Text="{Binding StatusText, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanTinyTextBlockStyle}"
                                    Margin="0,3,0,0" />
                     </StackPanel>

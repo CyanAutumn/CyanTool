@@ -279,7 +279,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new SaveFileDialog
             {
-                Title = "选择输出文件",
+                Title = LocalizationManager.Translate("选择输出文件"),
                 Filter = SafetensorsFilter,
                 DefaultExt = ".safetensors",
                 AddExtension = true,

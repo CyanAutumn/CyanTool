@@ -224,7 +224,7 @@
                             <GridViewColumn Header="序号" DisplayMemberBinding="{Binding SequenceNumber}" Width="70" />
                             <GridViewColumn Header="原文件名" DisplayMemberBinding="{Binding OriginalName}" Width="240" />
                             <GridViewColumn Header="新文件名" DisplayMemberBinding="{Binding NewName}" Width="240" />
-                            <GridViewColumn Header="状态" DisplayMemberBinding="{Binding Status}" Width="120" />
+                            <GridViewColumn Header="状态" DisplayMemberBinding="{Binding Status, Converter={StaticResource LocalizedTextConverter}}" Width="120" />
                         </GridView>
                     </ListView.View>
                     <ListView.ItemContainerStyle>

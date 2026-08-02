@@ -586,7 +586,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择 cuDNN Windows zip 安装包",
+                Title = LocalizationManager.Translate("选择 cuDNN Windows zip 安装包"),
                 Filter = "cuDNN zip package (*.zip)|*.zip|All files (*.*)|*.*",
                 CheckFileExists = true,
                 Multiselect = false

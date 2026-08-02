@@ -375,7 +375,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding SelectedFunction, StringFormat=当前任务：{0}}"
+                        <TextBlock Text="{Binding SelectedFunction, Converter={StaticResource LocalizedTextConverter}, ConverterParameter='当前任务：{0}'}"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                    VerticalAlignment="Center"/>
                         <Button Grid.Column="1"

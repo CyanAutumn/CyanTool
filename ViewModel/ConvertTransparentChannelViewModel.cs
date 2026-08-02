@@ -157,7 +157,7 @@ namespace CyanTools.ViewModel
                 pipelineLog?.Invoke(validationMessage);
                 if (showDialogs)
                 {
-                    System.Windows.MessageBox.Show(validationMessage, "提示");
+                    MessageBox.Show(validationMessage, "提示");
                 }
                 else if (rethrowErrors)
                 {
@@ -173,7 +173,7 @@ namespace CyanTools.ViewModel
                 pipelineLog?.Invoke(inputMissingMessage);
                 if (showDialogs)
                 {
-                    System.Windows.MessageBox.Show(inputMissingMessage, "提示");
+                    MessageBox.Show(inputMissingMessage, "提示");
                 }
                 else if (rethrowErrors)
                 {

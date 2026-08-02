@@ -462,7 +462,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择或创建训练集 Git 仓库目录"
+                Title = LocalizationManager.Translate("选择或创建训练集 Git 仓库目录")
             };
 
             if (dialog.ShowDialog() != CommonFileDialogResult.Ok)
@@ -499,7 +499,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "打开训练集 Git 仓库目录"
+                Title = LocalizationManager.Translate("打开训练集 Git 仓库目录")
             };
 
             if (dialog.ShowDialog() != CommonFileDialogResult.Ok)
@@ -618,7 +618,9 @@ namespace CyanTools.ViewModel
             var parent = SelectedNode;
             var node = new TrainingSetVersionNode
             {
-                Title = HistoryNodes.Count == 0 ? "初始训练集" : $"训练版本 {HistoryNodes.Count + 1}",
+                Title = HistoryNodes.Count == 0
+                    ? LocalizationManager.Translate("初始训练集")
+                    : LocalizationManager.Format("训练版本 {0}", HistoryNodes.Count + 1),
                 Branch = _git.GetCurrentBranch(Project.RootPath),
                 NotePath = $".cyantools/notes/{Guid.NewGuid():N}.md"
             };
@@ -823,7 +825,7 @@ namespace CyanTools.ViewModel
             var dialog = new OpenFileDialog
             {
                 Title = title,
-                Filter = "配置文件|*.toml;*.json;*.yaml;*.yml;*.txt|所有文件|*.*",
+                Filter = LocalizationManager.Translate("配置文件|*.toml;*.json;*.yaml;*.yml;*.txt|所有文件|*.*"),
                 Multiselect = true
             };
             return dialog.ShowDialog() == true ? dialog.FileNames : Array.Empty<string>();
@@ -951,8 +953,8 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择封面图片",
-                Filter = "图片文件|*.png;*.jpg;*.jpeg;*.webp;*.bmp|所有文件|*.*"
+                Title = LocalizationManager.Translate("选择封面图片"),
+                Filter = LocalizationManager.Translate("图片文件|*.png;*.jpg;*.jpeg;*.webp;*.bmp|所有文件|*.*")
             };
 
             return dialog.ShowDialog() == true
@@ -1010,7 +1012,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择 TensorBoard 日志目录"
+                Title = LocalizationManager.Translate("选择 TensorBoard 日志目录")
             };
 
             if (dialog.ShowDialog() != CommonFileDialogResult.Ok)

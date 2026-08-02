@@ -41,28 +41,28 @@
                                TextWrapping="Wrap"/>
                     <UniformGrid Grid.Row="1" Columns="2" Margin="0,10,0,0">
                         <Button Tag="sd-scripts" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding SdScriptsInstallState}"/><TextBlock Text="sd-scripts（Windows）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding SdScriptsInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="sd-scripts（Windows）"/></DockPanel>
                         </Button>
                         <Button Tag="wsl-sd-scripts" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding WslSdScriptsInstallState}"/><TextBlock Text="sd-scripts（WSL）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding WslSdScriptsInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="sd-scripts（WSL）"/></DockPanel>
                         </Button>
                         <Button Tag="anima-fast-lora" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding AnimaFastLoraInstallState}"/><TextBlock Text="Anima Fast LoRA（Windows）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding AnimaFastLoraInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="Anima Fast LoRA（Windows）"/></DockPanel>
                         </Button>
                         <Button Tag="diffusion-pipe" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding DiffusionPipeInstallState}"/><TextBlock Text="diffusion-pipe（WSL）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding DiffusionPipeInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="diffusion-pipe（WSL）"/></DockPanel>
                         </Button>
                         <Button Tag="comfyui-windows" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ComfyUiWindowsInstallState}"/><TextBlock Text="ComfyUI（Windows）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ComfyUiWindowsInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="ComfyUI（Windows）"/></DockPanel>
                         </Button>
                         <Button Tag="comfyui-wsl" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ComfyUiWslInstallState}"/><TextBlock Text="ComfyUI（WSL）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ComfyUiWslInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="ComfyUI（WSL）"/></DockPanel>
                         </Button>
                         <Button Tag="forge-neo-windows" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ForgeNeoWindowsInstallState}"/><TextBlock Text="Webui Forge Neo（Windows）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ForgeNeoWindowsInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="Webui Forge Neo（Windows）"/></DockPanel>
                         </Button>
                         <Button Tag="forge-neo-wsl" Click="BackendStatusButton_Click" Style="{StaticResource CyanCommandButtonStyle}" HorizontalContentAlignment="Stretch">
-                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ForgeNeoWslInstallState}"/><TextBlock Text="Webui Forge Neo（WSL）"/></DockPanel>
+                            <DockPanel MinWidth="260"><TextBlock DockPanel.Dock="Right" Text="{Binding ForgeNeoWslInstallState, Converter={StaticResource LocalizedTextConverter}}"/><TextBlock Text="Webui Forge Neo（WSL）"/></DockPanel>
                         </Button>
                     </UniformGrid>
                 </Grid>
@@ -281,10 +281,15 @@
                         <TextBlock Text="已绑定运行环境" Style="{StaticResource CyanFormLabelStyle}"/>
                         <ComboBox ItemsSource="{Binding TrainingBackendBindings}"
                                   SelectedItem="{Binding SelectedTrainingBackendBinding}"
-                                  DisplayMemberPath="DisplayName"
-                                  ToolTip="{Binding SelectedTrainingBackendBinding.LocationSummary}"
+                                  ToolTip="{Binding SelectedTrainingBackendBinding, Converter={StaticResource TrainingBackendBindingTextConverter}, ConverterParameter=LocationSummary}"
                                   MinHeight="32"
-                                  MinWidth="390"/>
+                                  MinWidth="390">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource TrainingBackendBindingTextConverter}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <WrapPanel Grid.Row="1" Grid.Column="3" Margin="10,10,0,0">
                         <Button Command="{Binding NewTrainingBackendBindingCommand}"
@@ -361,7 +366,7 @@
                                 Command="{Binding CheckPathBindingCommand}"
                                 Style="{StaticResource CyanCommandButtonStyle}"
                                 Content="检测绑定路径"/>
-                        <TextBlock Text="{Binding PathBindingStatus}"
+                        <TextBlock Text="{Binding PathBindingStatus, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                    TextWrapping="Wrap"
                                    VerticalAlignment="Center"
@@ -542,25 +547,25 @@
 
             <GroupBox x:Name="ComfyUiWindowsDeploymentSection" Grid.Row="10" Header="ComfyUI（Windows）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
                 <Border Style="{StaticResource CyanCardStyle}">
-                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="ComfyUI（Windows）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 ComfyUI Windows 绑定检测程序根目录和 main.py。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ComfyUiWindowsStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="comfyui-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="comfyui-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="ComfyUI（Windows）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 ComfyUI Windows 绑定检测程序根目录和 main.py。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ComfyUiWindowsStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="comfyui-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="comfyui-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
                 </Border>
             </GroupBox>
 
             <GroupBox x:Name="ComfyUiWslDeploymentSection" Grid.Row="11" Header="ComfyUI（WSL）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
                 <Border Style="{StaticResource CyanCardStyle}">
-                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="ComfyUI（WSL）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 ComfyUI WSL 绑定检测 Ubuntu 路径、main.py 和 Conda 环境配置。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ComfyUiWslStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="comfyui-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="comfyui-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="ComfyUI（WSL）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 ComfyUI WSL 绑定检测 Ubuntu 路径、main.py 和 Conda 环境配置。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ComfyUiWslStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="comfyui-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="comfyui-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
                 </Border>
             </GroupBox>
 
             <GroupBox x:Name="ForgeNeoWindowsDeploymentSection" Grid.Row="12" Header="Webui Forge Neo（Windows）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
                 <Border Style="{StaticResource CyanCardStyle}">
-                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Webui Forge Neo（Windows）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 Forge Neo Windows 绑定检测程序根目录和 launch.py。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ForgeNeoWindowsStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="forge-neo-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="forge-neo-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Webui Forge Neo（Windows）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 Forge Neo Windows 绑定检测程序根目录和 launch.py。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ForgeNeoWindowsStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="forge-neo-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="forge-neo-windows" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
                 </Border>
             </GroupBox>
 
             <GroupBox x:Name="ForgeNeoWslDeploymentSection" Grid.Row="13" Header="Webui Forge Neo（WSL）部署" Margin="0,0,0,12" Focusable="True" Style="{StaticResource CyanGroupBoxStyle}">
                 <Border Style="{StaticResource CyanCardStyle}">
-                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Webui Forge Neo（WSL）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 Forge Neo WSL 绑定检测 Ubuntu 路径、launch.py 和 Conda 环境配置。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ForgeNeoWslStatus}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="forge-neo-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="forge-neo-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Webui Forge Neo（WSL）" Style="{StaticResource CyanSectionTitleStyle}" FontSize="15"/><TextBlock Text="使用路径管理中的优先 Forge Neo WSL 绑定检测 Ubuntu 路径、launch.py 和 Conda 环境配置。" Style="{StaticResource CyanSecondaryTextBlockStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding ForgeNeoWslStatus, Converter={StaticResource LocalizedTextConverter}}" Style="{StaticResource CyanSecondaryTextBlockStyle}" Margin="0,4,0,0"/></StackPanel><WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><Button Command="{Binding CheckInferenceBackendCommand}" CommandParameter="forge-neo-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="检测"/><Button Command="{Binding OpenInferenceBackendDirectoryCommand}" CommandParameter="forge-neo-wsl" Style="{StaticResource CyanCommandButtonStyle}" Content="打开目录"/></WrapPanel></Grid>
                 </Border>
             </GroupBox>
 

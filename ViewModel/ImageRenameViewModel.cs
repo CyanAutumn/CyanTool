@@ -176,7 +176,7 @@ namespace CyanTools.ViewModel
                 using var dialog = new CommonOpenFileDialog
                 {
                     IsFolderPicker = true,
-                    Title = "请选择图片所在的文件夹"
+                    Title = LocalizationManager.Translate("请选择图片所在的文件夹")
                 };
 
                 if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
