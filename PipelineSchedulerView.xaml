@@ -497,38 +497,26 @@
                   IsExpanded="True"
                   Margin="0"
                   Style="{StaticResource CyanExpanderStyle}">
-            <Border Height="145"
-                    Padding="12"
-                    Margin="0,8,0,0"
-                    Style="{StaticResource CyanCardStyle}">
-                <DockPanel>
-                    <Border DockPanel.Dock="Top"
-                            Style="{StaticResource CyanStatusStripStyle}"
-                            Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="工作流执行输出"
-                                       Style="{StaticResource CyanSecondaryTextBlockStyle}"
-                                       VerticalAlignment="Center" />
-                            <Button Grid.Column="1"
-                                    Command="{Binding ClearLogCommand}"
-                                    Style="{StaticResource PipelineButtonStyle}"
-                                    Margin="0">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="Broom24" Margin="0,0,6,0" />
-                                    <TextBlock Text="清空日志" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Border>
-                    <TextBox Text="{Binding LogText, Mode=OneWay}"
-                             Style="{StaticResource CyanLogTextBoxStyle}"
-                             HorizontalScrollBarVisibility="Auto" />
-                </DockPanel>
-            </Border>
+            <Grid Height="220"
+                  Margin="0,8,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Button Command="{Binding ClearLogCommand}"
+                        Style="{StaticResource PipelineButtonStyle}"
+                        HorizontalAlignment="Right"
+                        Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Broom24" Margin="0,0,6,0" />
+                        <TextBlock Text="清空日志" />
+                    </StackPanel>
+                </Button>
+                <TextBox Grid.Row="1"
+                         Text="{Binding LogText, Mode=OneWay}"
+                         Style="{StaticResource CyanLogTextBoxStyle}"
+                         HorizontalScrollBarVisibility="Auto" />
+            </Grid>
         </Expander>
     </Grid>
 </UserControl>

@@ -78,6 +78,11 @@ namespace CyanTools.Pipeline
             return this as IPipelineOutputPortProvider;
         }
 
+        public virtual IPipelineInputPortProvider? GetPipelineInputPortProvider()
+        {
+            return this as IPipelineInputPortProvider;
+        }
+
         public virtual void SetWorkflowEditorMode(bool isWorkflowMode)
         {
             var directoryNode = GetDirectoryAutomationNode();

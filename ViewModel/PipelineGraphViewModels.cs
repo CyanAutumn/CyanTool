@@ -30,7 +30,8 @@ namespace CyanTools.ViewModel
             if ((directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None) ||
                 outputPathSelectorNode != null)
             {
-                Input.Add(new PipelineCanvasConnectorViewModel(this, "输入", isInput: true));
+                string inputTitle = PipelineNode.GetPipelineInputPortProvider()?.GetPipelineInputPortTitle() ?? "输入";
+                Input.Add(new PipelineCanvasConnectorViewModel(this, inputTitle, isInput: true));
             }
 
             if ((directoryNode != null && directoryNode.DirectoryBehavior != PipelineDirectoryBehavior.None) ||

@@ -54,6 +54,7 @@ namespace CyanTools.Pipeline
             Register(new PipelineNodeDescriptor("\u540C\u6E90\u56FE\u7247\u5F52\u7C7B", typeof(SameSourceImageGroupingViewModel), () => new SameSourceImageGroupingViewModel()));
             Register(new PipelineNodeDescriptor("\u56FE\u7247\u6253\u6807", typeof(TaggingPipelineNode), () => new TaggingPipelineNode()));
             Register(new PipelineNodeDescriptor("\u8BAD\u7EC3\u96C6\u914D\u5E73", typeof(TrainingSetBalancerPipelineNode), () => new TrainingSetBalancerPipelineNode()));
+            Register(new PipelineNodeDescriptor("\u8BAD\u7EC3", typeof(TrainingPipelineNode), () => new TrainingPipelineNode()));
             Register(new PipelineNodeDescriptor("\u56FE\u7247\u91CD\u547D\u540D", typeof(ImageRenamePipelineNode), () => new ImageRenamePipelineNode()));
             Register(new PipelineNodeDescriptor("\u6570\u636E\u96C6\u4E0B\u8F7D\u5668", typeof(DatasetDownloaderPipelineNode), () => new DatasetDownloaderPipelineNode()));
         }
