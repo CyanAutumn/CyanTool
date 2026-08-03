@@ -199,8 +199,8 @@ namespace CyanTools.ViewModel.TrainingSet
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (Equals(field, value)) return false;
             field = value;
@@ -208,7 +208,7 @@ namespace CyanTools.ViewModel.TrainingSet
             return true;
         }
 
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

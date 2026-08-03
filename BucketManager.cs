@@ -80,11 +80,8 @@ namespace CyanTools
             while ((h2 / (double)f) * (minDim / (double)f) <= maxTokens && h2 <= dimLimit)
             {
                 int w2 = minDim;
-                bool gotBase = false;
                 while ((h2 / (double)f) * ((w2 + div) / (double)f) <= maxTokens && (w2 + div) <= dimLimit)
                 {
-                    if (w2 == baseRes.Width && h2 == baseRes.Height)
-                        gotBase = true;
                     w2 += div;
                 }
                 resolutions.Add(new Size(w2, h2));

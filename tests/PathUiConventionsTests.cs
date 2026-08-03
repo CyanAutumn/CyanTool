@@ -604,14 +604,16 @@ public sealed class InputStateStoreTests : IDisposable
             RetryCount = 3,
             ApiToken = "do-not-store",
             StatusMessage = "completed",
-            IsRunning = true
+            IsRunning = true,
+            LayoutFlag = false
         });
 
         var restored = new SampleInputs
         {
             ApiToken = "unchanged-secret",
             StatusMessage = "waiting",
-            IsRunning = true
+            IsRunning = true,
+            LayoutFlag = true
         };
 
         new InputStateStore(_stateFilePath).Restore(restored);
@@ -624,7 +626,33 @@ public sealed class InputStateStoreTests : IDisposable
         Assert.Equal("unchanged-secret", restored.ApiToken);
         Assert.Equal("waiting", restored.StatusMessage);
         Assert.True(restored.IsRunning);
+        Assert.True(restored.LayoutFlag);
         Assert.DoesNotContain("do-not-store", File.ReadAllText(_stateFilePath), StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(SampleInputs.LayoutFlag), File.ReadAllText(_stateFilePath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Restore_IgnoresStaleValuesForPropertiesWithoutPublicSetters()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_stateFilePath)!);
+        string stateKey = typeof(SampleInputs).FullName!;
+        File.WriteAllText(
+            _stateFilePath,
+            $$"""
+            {
+              "{{stateKey}}": {
+                "LayoutFlag": false
+              }
+            }
+            """);
+        var restored = new SampleInputs
+        {
+            LayoutFlag = true
+        };
+
+        new InputStateStore(_stateFilePath).Restore(restored);
+
+        Assert.True(restored.LayoutFlag);
     }
 
     public void Dispose()
@@ -659,5 +687,7 @@ public sealed class InputStateStoreTests : IDisposable
         public string StatusMessage { get; set; } = string.Empty;
 
         public bool IsRunning { get; set; }
+
+        public bool LayoutFlag { get; internal set; }
     }
 }

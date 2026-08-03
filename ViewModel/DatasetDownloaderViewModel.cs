@@ -141,7 +141,10 @@ namespace CyanTools.ViewModel
 
         public DatasetDownloaderViewModel()
         {
-            _danbooruClient = new RestClient(new RestClientOptions(DanbooruBaseUrl) { MaxTimeout = -1 });
+            _danbooruClient = new RestClient(new RestClientOptions(DanbooruBaseUrl)
+            {
+                Timeout = System.Threading.Timeout.InfiniteTimeSpan
+            });
             _startStopCommand = new RelayCommand(async _ => await StartOrStopAsync(), _ => CanStartOrStop());
             _clearLogCommand = new RelayCommand(_ => ClearLog());
             _browseOutputFolderCommand = new RelayCommand(_ => BrowseOutputFolder());

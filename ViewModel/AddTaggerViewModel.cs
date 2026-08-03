@@ -19,7 +19,7 @@ namespace CyanTools.ViewModel
         private string _inputFormat = "NHWC";
         private string _statusMessage = string.Empty;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
         public event Action<bool> RequestClose;
 
         public AddTaggerViewModel()
@@ -170,13 +170,13 @@ namespace CyanTools.ViewModel
             return string.Empty;
         }
 
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
             CommandManager.InvalidateRequerySuggested();
         }
 
-        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (Equals(field, value)) return false;
             field = value;

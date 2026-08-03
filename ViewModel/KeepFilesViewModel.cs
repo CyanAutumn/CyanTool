@@ -290,7 +290,7 @@ namespace CyanTools.ViewModel
             LogText = _logBuilder.ToString();
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {

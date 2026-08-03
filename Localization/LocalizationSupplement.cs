@@ -579,6 +579,7 @@ namespace CyanTools.Localization
             Add(translations, "seed / 随机种子", "seed / random seed", "seed / ランダムシード");
 
             Add(translations, "选择文件夹", "Choose Folder", "フォルダーを選択");
+            Add(translations, "导入训练集", "Load Dataset", "学習データセットを読み込む");
             Add(translations, "图片聚类", "Image Clustering", "画像クラスタリング");
             Add(translations, "同源图片归类", "Same-source Image Grouping", "同一ソース画像の分類");
             Add(translations, "图片三分法", "Three-stage Image Processing", "画像三分割処理");

@@ -596,6 +596,7 @@ namespace CyanTools.Localization
             ["选择工作目录"] = new("Choose working folder", "作業フォルダーを選択"),
             ["选择目录"] = new("Choose Folder", "フォルダーを選択"),
             ["选择文件夹"] = new("Choose Folder", "フォルダーを選択"),
+            ["导入训练集"] = new("Load Dataset", "学習データセットを読み込む"),
             ["选择视频"] = new("Choose Video", "動画を選択"),
             ["浏览"] = new("Browse", "参照"),
             ["浏览..."] = new("Browse...", "参照..."),

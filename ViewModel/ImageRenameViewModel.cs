@@ -423,7 +423,7 @@ namespace CyanTools.ViewModel
             OnPropertyChanged(nameof(HasConflicts));
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
