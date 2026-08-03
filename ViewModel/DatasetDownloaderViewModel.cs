@@ -708,10 +708,7 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                PrepareSessionOutputSegments(input);
-
-                string resolvedOutputRoot = ResolveCurrentRunOutputRoot();
-                pipelineLog?.Invoke($"解析后的输出路径: {resolvedOutputRoot}");
+                PrepareSessionOutputIdSegment(input);
 
                 if (!HasSelectedTasks())
                 {
@@ -726,12 +723,18 @@ namespace CyanTools.ViewModel
                 }
 
                 ResetDownloadSummaries();
+                Task<string?> artistTagTask = ResolveSessionArtistTagAsync(input, token);
+                Task sourceTasks = RunSelectedTasksAsync(input, artistTagTask, token);
+                string? resolvedOutputRoot = null;
                 try
                 {
-                    await RunSelectedTasksAsync(input, token);
+                    await Task.WhenAll(sourceTasks, artistTagTask);
+                    resolvedOutputRoot = ResolveCurrentRunOutputRoot();
+                    pipelineLog?.Invoke($"解析后的输出路径: {resolvedOutputRoot}");
                 }
                 finally
                 {
+                    resolvedOutputRoot ??= ResolveCurrentRunOutputRoot();
                     SetOutputDirectoryImageTotalSummary(BuildOutputDirectoryImageTotalSummary(resolvedOutputRoot));
                 }
 
@@ -769,20 +772,35 @@ namespace CyanTools.ViewModel
             return EnableDanbooru || (EnablePixiv && !IsTagOrPostMode) || (EnableKemono && !IsTagOrPostMode);
         }
 
-        private void PrepareSessionOutputSegments(string input)
+        private void PrepareSessionOutputIdSegment(string input)
         {
             _sessionOutputIdSegment = SanitizePathSegment(input, "unknown");
-            _sessionOutputArtistSegment = SanitizePathSegment(input, "unknown_artist");
+            _sessionOutputArtistSegment = "unknown_artist";
         }
 
-        private async Task RunSelectedTasksAsync(string input, CancellationToken token)
+        private async Task<string?> ResolveSessionArtistTagAsync(string input, CancellationToken token)
+        {
+            if (SelectedMode != DatasetDownloadMode.ArtistId)
+            {
+                return null;
+            }
+
+            string? artistTag = await ResolveDanbooruArtistTagByPixivUserIdAsync(input, token);
+            _sessionOutputArtistSegment = SanitizePathSegment(artistTag ?? string.Empty, "unknown_artist");
+            return artistTag;
+        }
+
+        private async Task RunSelectedTasksAsync(
+            string input,
+            Task<string?> artistTagTask,
+            CancellationToken token)
         {
             var tasks = new List<Task>();
             if (EnableDanbooru)
             {
                 tasks.Add(RunSourceIndependentlyAsync(
                     "Danbooru",
-                    () => RunDanbooruAsync(input, token),
+                    () => RunDanbooruAsync(input, artistTagTask, token),
                     SetDanbooruDownloadSummary,
                     token));
             }
@@ -791,7 +809,7 @@ namespace CyanTools.ViewModel
             {
                 tasks.Add(RunSourceIndependentlyAsync(
                     "Pixiv",
-                    () => RunPixivAsync(input, token),
+                    () => RunPixivAsync(input, artistTagTask, token),
                     SetPixivDownloadSummary,
                     token));
             }
@@ -800,7 +818,7 @@ namespace CyanTools.ViewModel
             {
                 tasks.Add(RunSourceIndependentlyAsync(
                     "Kemono",
-                    () => RunKemonoAsync(input, token),
+                    () => RunKemonoAsync(input, artistTagTask, token),
                     SetKemonoDownloadSummary,
                     token));
             }
@@ -829,7 +847,10 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task RunDanbooruAsync(string input, CancellationToken token)
+        private async Task RunDanbooruAsync(
+            string input,
+            Task<string?> artistTagTask,
+            CancellationToken token)
         {
             AppendLog("[Danbooru] 任务开始。");
             SetDanbooruDownloadSummary("Danbooru：正在获取下载清单…");
@@ -841,7 +862,7 @@ namespace CyanTools.ViewModel
                 {
                     case DatasetDownloadMode.ArtistId:
                     {
-                        var artistTag = await ResolveDanbooruArtistTagByPixivUserIdAsync(input, token);
+                        var artistTag = await artistTagTask;
                         if (string.IsNullOrWhiteSpace(artistTag))
                         {
                             AppendLog($"[Danbooru] 未找到 Pixiv 画师 ID {input} 对应 artist 标签。");
@@ -857,6 +878,7 @@ namespace CyanTools.ViewModel
                     }
                     case DatasetDownloadMode.Tag:
                     {
+                        await artistTagTask;
                         await SetDanbooruPlannedTotalAsync(input, counters, token);
                         var outputDirectory = ResolveSourceOutputDirectory("Danbooru", SanitizePathSegment(input, "tag"));
                         Directory.CreateDirectory(outputDirectory);
@@ -865,6 +887,7 @@ namespace CyanTools.ViewModel
                     }
                     case DatasetDownloadMode.PostId:
                     {
+                        await artistTagTask;
                         var ids = ParseIdentifiers(input);
                         if (ids.Count == 0)
                         {
@@ -1241,6 +1264,10 @@ namespace CyanTools.ViewModel
 
                 return (artists[0] as JObject)?["name"]?.ToString();
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 AppendLog($"[Danbooru] 解析 artist 标签失败: {ex.Message}");
@@ -1248,7 +1275,10 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task RunPixivAsync(string artistId, CancellationToken token)
+        private async Task RunPixivAsync(
+            string artistId,
+            Task<string?> artistTagTask,
+            CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(PixivRefreshToken))
             {
@@ -1257,13 +1287,9 @@ namespace CyanTools.ViewModel
                 return;
             }
 
-            var outputDirectory = ResolveSourceOutputDirectory("Pixiv", SanitizePathSegment(artistId, "unknown_artist"));
-            Directory.CreateDirectory(outputDirectory);
-            AppendLog($"[Pixiv] 输出目录: {outputDirectory}");
             SetPixivDownloadSummary("Pixiv：正在获取下载清单…");
 
             var counters = new SourceDownloadCounters(progress => SetPixivDownloadSummary(BuildDownloadSummary("Pixiv", progress)));
-            var existingPixivFiles = LoadExistingPixivImageKeys(outputDirectory);
 
             try
             {
@@ -1271,6 +1297,12 @@ namespace CyanTools.ViewModel
                 var downloadPlan = await BuildPixivDownloadPlanAsync(artistId, token);
                 counters.SetTotal(downloadPlan.Count);
                 AppendLog($"[Pixiv] 已发现 {downloadPlan.Count} 张远端图片。");
+
+                await artistTagTask;
+                var outputDirectory = ResolveSourceOutputDirectory("Pixiv", SanitizePathSegment(artistId, "unknown_artist"));
+                Directory.CreateDirectory(outputDirectory);
+                AppendLog($"[Pixiv] 输出目录: {outputDirectory}");
+                var existingPixivFiles = LoadExistingPixivImageKeys(outputDirectory);
 
                 foreach (var item in downloadPlan)
                 {
@@ -1652,16 +1684,16 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private async Task RunKemonoAsync(string artistId, CancellationToken token)
+        private async Task RunKemonoAsync(
+            string artistId,
+            Task<string?> artistTagTask,
+            CancellationToken token)
         {
             const string selectedService = "fanbox";
 
 
 
 
-            var outputDirectory = ResolveSourceOutputDirectory("Kemono", SanitizePathSegment(artistId, "unknown_artist"));
-            Directory.CreateDirectory(outputDirectory);
-            AppendLog($"[Kemono] 输出目录: {outputDirectory}");
             SetKemonoDownloadSummary("Kemono：正在获取下载清单…");
 
             var counters = new SourceDownloadCounters(progress => SetKemonoDownloadSummary(BuildDownloadSummary("Kemono", progress)));
@@ -1675,6 +1707,11 @@ namespace CyanTools.ViewModel
                 int imageTotal = downloadPlan.Count(asset => DownloadedImageValidator.HasSupportedImageExtension(asset.FileName));
                 counters.SetTotal(imageTotal);
                 AppendLog($"[Kemono] 已发现 {imageTotal} 张远端图片（另有 {downloadPlan.Count - imageTotal} 个非图片附件）。");
+
+                await artistTagTask;
+                var outputDirectory = ResolveSourceOutputDirectory("Kemono", SanitizePathSegment(artistId, "unknown_artist"));
+                Directory.CreateDirectory(outputDirectory);
+                AppendLog($"[Kemono] 输出目录: {outputDirectory}");
 
                 foreach (var asset in downloadPlan)
                 {

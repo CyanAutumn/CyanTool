@@ -391,6 +391,33 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void DatasetDownloader_ResolvesArtistNameOnceWithoutSerializingSourceDiscovery()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+
+        Assert.Contains("Task<string?> artistTagTask = ResolveSessionArtistTagAsync(input, token);", content);
+        Assert.Contains("Task sourceTasks = RunSelectedTasksAsync(input, artistTagTask, token);", content);
+        Assert.Contains("await Task.WhenAll(sourceTasks, artistTagTask);", content);
+        Assert.Contains("_sessionOutputArtistSegment = SanitizePathSegment(artistTag ?? string.Empty, \"unknown_artist\");", content);
+        Assert.Contains("var artistTag = await artistTagTask;", content);
+        Assert.DoesNotContain("_sessionOutputArtistSegment = SanitizePathSegment(input", content);
+        Assert.Equal(1, content.Split("ResolveDanbooruArtistTagByPixivUserIdAsync(input, token)").Length - 1);
+
+        int sourceStartup = content.IndexOf(
+            "Task sourceTasks = RunSelectedTasksAsync(input, artistTagTask, token);",
+            StringComparison.Ordinal);
+        int outputNameWait = content.IndexOf("await Task.WhenAll(sourceTasks, artistTagTask);", sourceStartup, StringComparison.Ordinal);
+        int pixivDiscovery = content.IndexOf("var downloadPlan = await BuildPixivDownloadPlanAsync", StringComparison.Ordinal);
+        int pixivOutputWait = content.IndexOf("await artistTagTask;", pixivDiscovery, StringComparison.Ordinal);
+        int kemonoDiscovery = content.IndexOf("var downloadPlan = await BuildKemonoDownloadPlanAsync", StringComparison.Ordinal);
+        int kemonoOutputWait = content.IndexOf("await artistTagTask;", kemonoDiscovery, StringComparison.Ordinal);
+
+        Assert.True(sourceStartup >= 0 && outputNameWait > sourceStartup);
+        Assert.True(pixivDiscovery >= 0 && pixivOutputWait > pixivDiscovery);
+        Assert.True(kemonoDiscovery >= 0 && kemonoOutputWait > kemonoDiscovery);
+    }
+
+    [Fact]
     public void WorkflowLog_IsCopyableContinuousText()
     {
         string view = ReadRepoFile("PipelineSchedulerView.xaml");
