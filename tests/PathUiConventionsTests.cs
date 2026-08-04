@@ -418,6 +418,20 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void DatasetDownloader_RetriesArtistLookupAndDoesNotReportRequestFailuresAsMissingArtists()
+    {
+        string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+
+        Assert.Contains("private const int DanbooruArtistLookupRetryCount = 3;", content);
+        Assert.Contains("new RestRequest(\"/artists.json\", Method.Get)", content);
+        Assert.Contains(".AddQueryParameter(\"search[url_matches]\", pattern)", content);
+        Assert.Contains(".AddQueryParameter(\"limit\", 1)", content);
+        Assert.Contains("artist 标签查询失败（第 {attempt} 次），将重试", content);
+        Assert.Contains("Danbooru artist 标签查询失败（已尝试 {DanbooruArtistLookupRetryCount} 次）", content);
+        Assert.DoesNotContain("/artists.json?search[url_matches]", content);
+    }
+
+    [Fact]
     public void WorkflowLog_IsCopyableContinuousText()
     {
         string view = ReadRepoFile("PipelineSchedulerView.xaml");

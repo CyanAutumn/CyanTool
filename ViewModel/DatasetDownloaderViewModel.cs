@@ -36,6 +36,7 @@ namespace CyanTools.ViewModel
     {
         private const string DanbooruBaseUrl = "https://danbooru.donmai.us";
         private const int DanbooruPageSize = 200;
+        private const int DanbooruArtistLookupRetryCount = 3;
         private const string KemonoApiBaseUrl = "https://kemono.cr";
         private const int KemonoPageSize = 50;
         private const int KemonoRetryCount = 3;
@@ -1245,34 +1246,67 @@ namespace CyanTools.ViewModel
 
         private async Task<string?> ResolveDanbooruArtistTagByPixivUserIdAsync(string pixivUserId, CancellationToken token)
         {
-            try
+            var pattern = $"*pixiv.net/users/{pixivUserId}*";
+            string lastFailure = "未知错误";
+
+            for (int attempt = 1; attempt <= DanbooruArtistLookupRetryCount; attempt++)
             {
-                var pattern = $"*pixiv.net/users/{pixivUserId}*";
-                var request = new RestRequest($"/artists.json?search[url_matches]={Uri.EscapeDataString(pattern)}", Method.Get);
-                await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
-                var response = await _danbooruClient.ExecuteAsync(request, token);
-                if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+                try
                 {
-                    return null;
+                    var request = new RestRequest("/artists.json", Method.Get)
+                        .AddQueryParameter("search[url_matches]", pattern)
+                        .AddQueryParameter("limit", 1);
+                    await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
+                    var response = await _danbooruClient.ExecuteAsync(request, token);
+                    if (!response.IsSuccessful)
+                    {
+                        lastFailure = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+                        if (!string.IsNullOrWhiteSpace(response.ErrorMessage))
+                        {
+                            lastFailure += $" - {response.ErrorMessage}";
+                        }
+                    }
+                    else if (string.IsNullOrWhiteSpace(response.Content))
+                    {
+                        lastFailure = "服务器返回空响应";
+                    }
+                    else
+                    {
+                        var artists = JArray.Parse(response.Content);
+                        if (artists.Count == 0)
+                        {
+                            return null;
+                        }
+
+                        string? artistTag = artists
+                            .OfType<JObject>()
+                            .Select(artist => artist["name"]?.ToString())
+                            .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
+                        if (!string.IsNullOrWhiteSpace(artistTag))
+                        {
+                            return artistTag;
+                        }
+
+                        lastFailure = "响应中缺少 artist 名称";
+                    }
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    lastFailure = ex.Message;
                 }
 
-                var artists = JArray.Parse(response.Content);
-                if (artists.Count == 0)
+                if (attempt < DanbooruArtistLookupRetryCount)
                 {
-                    return null;
+                    AppendLog($"[Danbooru] artist 标签查询失败（第 {attempt} 次），将重试: {lastFailure}");
                 }
+            }
 
-                return (artists[0] as JObject)?["name"]?.ToString();
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[Danbooru] 解析 artist 标签失败: {ex.Message}");
-                return null;
-            }
+            throw new InvalidOperationException(
+                $"Danbooru artist 标签查询失败（已尝试 {DanbooruArtistLookupRetryCount} 次）: {lastFailure}");
         }
 
         private async Task RunPixivAsync(
