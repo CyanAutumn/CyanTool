@@ -67,15 +67,15 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding TargetDirectory, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,8,0" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding BrowseDirectoryCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         ToolTip="选择输入路径">
                     <ui:SymbolIcon Symbol="FolderOpen24" />
-                </Button>
+                </ui:Button>
             </Grid>
         </GroupBox>
 
@@ -93,7 +93,7 @@
                   Grid.Column="1"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
-            <Button Command="{Binding StartProcessingCommand}"
+            <ui:Button Command="{Binding StartProcessingCommand}"
                     IsEnabled="{Binding IsIdle}"
                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
                 <StackPanel Orientation="Horizontal">
@@ -101,7 +101,7 @@
                                    Margin="0,0,6,0" />
                     <TextBlock Text="开始处理" />
                 </StackPanel>
-            </Button>
+            </ui:Button>
         </GroupBox>
 
         <GroupBox Header="日志"
@@ -109,7 +109,7 @@
                   Grid.Column="1"
                   Style="{StaticResource CyanGroupBoxStyle}">
             <DockPanel>
-                <Button Content="清空日志"
+                <ui:Button Content="清空日志"
                         Command="{Binding ClearLogCommand}"
                         IsEnabled="{Binding IsIdle}"
                         HorizontalAlignment="Right"

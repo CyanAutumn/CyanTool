@@ -186,7 +186,7 @@ public sealed class InputStateStore
     private static IEnumerable<PropertyInfo> GetPersistableProperties(Type targetType) =>
         targetType
             .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.CanRead && property.CanWrite)
+            .Where(property => property.GetMethod?.IsPublic == true && property.SetMethod?.IsPublic == true)
             .Where(property => IsSafeInputName(property.Name))
             .Where(property => IsSupportedScalarType(property.PropertyType));
 

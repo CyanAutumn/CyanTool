@@ -1,9 +1,10 @@
 using System.Windows;
 using CyanTools.ViewModel;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CyanTools
 {
-    public partial class AddTaggerWindow : Window
+    public partial class AddTaggerWindow : FluentWindow
     {
         public TaggerModel ResultModel { get; private set; }
 

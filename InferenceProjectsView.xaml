@@ -43,23 +43,23 @@
                 <WrapPanel Grid.Column="1"
                            VerticalAlignment="Bottom"
                            Margin="0,0,0,0">
-                    <Button Command="{Binding ReloadProjectsCommand}"
+                    <ui:Button Command="{Binding ReloadProjectsCommand}"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="刷新绑定"/>
-                    <Button Command="{Binding StartCommand}"
+                    <ui:Button Command="{Binding StartCommand}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Play24" Margin="0,0,6,0"/>
                             <TextBlock Text="启动"/>
                         </StackPanel>
-                    </Button>
-                    <Button Command="{Binding StopCommand}"
+                    </ui:Button>
+                    <ui:Button Command="{Binding StopCommand}"
                             Style="{StaticResource CyanCommandButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Stop24" Margin="0,0,6,0"/>
                             <TextBlock Text="停止"/>
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
                 </WrapPanel>
 
                 <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
@@ -68,7 +68,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="根目录" Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding SelectedRootPath, Mode=OneWay}"
                              IsReadOnly="True"
                              MinHeight="32"
@@ -103,27 +103,27 @@
                            TextWrapping="Wrap"
                            VerticalAlignment="Center"/>
                 <WrapPanel Grid.Column="1" Margin="14,0,0,0">
-                    <Button Command="{Binding OpenFolderCommand}"
+                    <ui:Button Command="{Binding OpenFolderCommand}"
                             CommandParameter="Root"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="打开根目录"/>
-                    <Button Command="{Binding OpenFolderCommand}"
+                    <ui:Button Command="{Binding OpenFolderCommand}"
                             CommandParameter="Checkpoint"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="Checkpoint / Model"/>
-                    <Button Command="{Binding OpenFolderCommand}"
+                    <ui:Button Command="{Binding OpenFolderCommand}"
                             CommandParameter="Lora"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="LoRA"/>
-                    <Button Command="{Binding OpenFolderCommand}"
+                    <ui:Button Command="{Binding OpenFolderCommand}"
                             CommandParameter="Vae"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="VAE"/>
-                    <Button Command="{Binding OpenFolderCommand}"
+                    <ui:Button Command="{Binding OpenFolderCommand}"
                             CommandParameter="Nodes"
                             Content="节点文件夹">
-                        <Button.Style>
-                            <Style TargetType="Button"
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button"
                                    BasedOn="{StaticResource CyanCommandButtonStyle}">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                                 <Style.Triggers>
@@ -132,8 +132,8 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Button.Style>
-                    </Button>
+                        </ui:Button.Style>
+                    </ui:Button>
                 </WrapPanel>
             </Grid>
         </GroupBox>
@@ -147,7 +147,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <DockPanel Margin="0,0,0,8">
-                    <Button DockPanel.Dock="Right"
+                    <ui:Button DockPanel.Dock="Right"
                             Command="{Binding ClearLogCommand}"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Content="清空日志"/>
@@ -155,7 +155,7 @@
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                VerticalAlignment="Center"/>
                 </DockPanel>
-                <TextBox Grid.Row="1"
+                <ui:TextBox Grid.Row="1"
                          Text="{Binding LogText, Mode=OneWay}"
                          IsReadOnly="True"
                          AcceptsReturn="True"

@@ -20,7 +20,7 @@
             <Setter Property="ContentTemplate">
                 <Setter.Value>
                     <DataTemplate>
-                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                        <ui:TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                  VerticalContentAlignment="Center" />
                     </DataTemplate>
                 </Setter.Value>
@@ -115,58 +115,58 @@
                                Grid.Column="0"
                                Text="lora-scripts 目录"
                                Style="{StaticResource CyanFormLabelStyle}" />
-                    <TextBox Grid.Row="0"
+                    <ui:TextBox Grid.Row="0"
                              Grid.Column="1"
                              Text="{Binding ScriptsRootPath, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,8,8" />
-                    <Button Grid.Row="0"
+                    <ui:Button Grid.Row="0"
                             Grid.Column="2"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             Command="{Binding BrowseScriptsRootCommand}"
                             ToolTip="浏览 lora-scripts 目录"
                             Margin="0,0,0,8">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
-                    </Button>
+                    </ui:Button>
 
                     <TextBlock Grid.Row="1"
                                Grid.Column="0"
                                Text="TOML 输出路径"
                                Style="{StaticResource CyanFormLabelStyle}" />
-                    <TextBox Grid.Row="1"
+                    <ui:TextBox Grid.Row="1"
                              Grid.Column="1"
                              Text="{Binding OutputTomlPath, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,8,8" />
-                    <Button Grid.Row="1"
+                    <ui:Button Grid.Row="1"
                             Grid.Column="2"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             Command="{Binding BrowseTomlCommand}"
                             ToolTip="选择 TOML 输出路径"
                             Margin="0,0,0,8">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
-                    </Button>
+                    </ui:Button>
 
                     <TextBlock Grid.Row="2"
                                Grid.Column="0"
                                Text="训练脚本路径"
                                Style="{StaticResource CyanFormLabelStyle}" />
-                    <TextBox Grid.Row="2"
+                    <ui:TextBox Grid.Row="2"
                              Grid.Column="1"
                              Text="{Binding ScriptPath, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,8,8" />
-                    <Button Grid.Row="2"
+                    <ui:Button Grid.Row="2"
                             Grid.Column="2"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             Command="{Binding BrowseScriptCommand}"
                             ToolTip="选择训练脚本"
                             Margin="0,0,0,8">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
-                    </Button>
+                    </ui:Button>
 
                     <TextBlock Grid.Row="3"
                                Grid.Column="0"
                                Text="附加参数"
                                Style="{StaticResource CyanFormLabelStyle}" />
-                    <TextBox Grid.Row="3"
+                    <ui:TextBox Grid.Row="3"
                              Grid.Column="1"
                              Grid.ColumnSpan="2"
                              Text="{Binding AdditionalArguments, UpdateSourceTrigger=PropertyChanged}" />
@@ -189,7 +189,7 @@
                               IsChecked="{Binding CloseAppAfterStart}"
                               VerticalAlignment="Center" />
 
-                    <Button Grid.Column="1"
+                    <ui:Button Grid.Column="1"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Command="{Binding ResetDefaultsCommand}">
                         <StackPanel Orientation="Horizontal">
@@ -197,9 +197,9 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="重置默认参数" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
 
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Style="{StaticResource CyanCommandButtonStyle}"
                             Command="{Binding GenerateTomlCommand}">
                         <StackPanel Orientation="Horizontal">
@@ -207,9 +207,9 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="仅生成 TOML" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
 
-                    <Button Grid.Column="3"
+                    <ui:Button Grid.Column="3"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}"
                             Command="{Binding RunTrainingCommand}">
                         <StackPanel Orientation="Horizontal">
@@ -217,7 +217,7 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="生成并开始训练" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
                 </Grid>
             </Border>
 

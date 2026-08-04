@@ -102,7 +102,7 @@ namespace CyanTools.Model
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (System.Collections.Generic.EqualityComparer<T>.Default.Equals(field, value)) return false;
             field = value;
@@ -110,7 +110,7 @@ namespace CyanTools.Model
             return true;
         }
 
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

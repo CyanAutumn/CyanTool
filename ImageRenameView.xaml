@@ -66,17 +66,17 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding SelectInputPathCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         ToolTip="选择输入路径"
                         Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                     <ui:SymbolIcon Symbol="FolderOpen24" />
-                </Button>
+                </ui:Button>
 
                 <TextBlock Grid.Row="1"
                            Grid.Column="1"
@@ -109,19 +109,19 @@
 
                 <TextBlock Text="名称前缀"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding NamePrefix, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,14,0" />
                 <TextBlock Grid.Column="2"
                            Text="起始编号"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="3"
+                <ui:TextBox Grid.Column="3"
                          Text="{Binding StartIndex, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,14,0" />
                 <TextBlock Grid.Column="4"
                            Text="编号位数"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="5"
+                <ui:TextBox Grid.Column="5"
                          Text="{Binding NumberPadding, UpdateSourceTrigger=PropertyChanged}" />
 
                 <TextBlock Grid.Row="1"
@@ -157,7 +157,7 @@
                     </StackPanel>
                 </Border>
 
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding RefreshPreviewCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -165,8 +165,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="生成预览" />
                     </StackPanel>
-                </Button>
-                <Button Grid.Column="3"
+                </ui:Button>
+                <ui:Button Grid.Column="3"
                         Command="{Binding ExecuteRenameCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -174,8 +174,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="开始重命名" />
                     </StackPanel>
-                </Button>
-                <Button Grid.Column="4"
+                </ui:Button>
+                <ui:Button Grid.Column="4"
                         Command="{Binding ShuffleRenameCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         Margin="6,0,0,0">
@@ -184,7 +184,7 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="开始打乱" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Grid>
         </GroupBox>
 
@@ -213,21 +213,21 @@
                     </TextBlock.Style>
                 </TextBlock>
 
-                <ListView Grid.Row="1"
+                <ui:ListView Grid.Row="1"
                           ItemsSource="{Binding PreviewItems}"
                           VirtualizingStackPanel.IsVirtualizing="True"
                           VirtualizingStackPanel.VirtualizationMode="Recycling"
                           BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                           Background="{DynamicResource ControlFillColorDefaultBrush}">
-                    <ListView.View>
+                    <ui:ListView.View>
                         <GridView>
                             <GridViewColumn Header="序号" DisplayMemberBinding="{Binding SequenceNumber}" Width="70" />
                             <GridViewColumn Header="原文件名" DisplayMemberBinding="{Binding OriginalName}" Width="240" />
                             <GridViewColumn Header="新文件名" DisplayMemberBinding="{Binding NewName}" Width="240" />
                             <GridViewColumn Header="状态" DisplayMemberBinding="{Binding Status, Converter={StaticResource LocalizedTextConverter}}" Width="120" />
                         </GridView>
-                    </ListView.View>
-                    <ListView.ItemContainerStyle>
+                    </ui:ListView.View>
+                    <ui:ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                             <Style.Triggers>
@@ -236,8 +236,8 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </ListView.ItemContainerStyle>
-                </ListView>
+                    </ui:ListView.ItemContainerStyle>
+                </ui:ListView>
             </Grid>
         </GroupBox>
     </Grid>

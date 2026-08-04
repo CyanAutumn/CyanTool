@@ -74,17 +74,17 @@
 
                     <TextBlock Text="输入路径"
                                Style="{StaticResource CyanFormLabelStyle}" />
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              IsReadOnly="{Binding HasInheritedInputPath}"
                              Margin="0,0,8,0" />
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Command="{Binding SelectInputCommand}"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             ToolTip="选择输入路径"
                             Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
-                    </Button>
+                    </ui:Button>
 
                     <TextBlock Grid.Row="1"
                                Grid.Column="1"
@@ -107,12 +107,12 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
-                    <TextBox Grid.Row="3"
+                    <ui:TextBox Grid.Row="3"
                              Grid.Column="1"
                              Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,8,0"
                              Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
-                    <Button Grid.Row="3"
+                    <ui:Button Grid.Row="3"
                             Grid.Column="2"
                             Command="{Binding SelectOutputCommand}"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
@@ -120,7 +120,7 @@
                             ToolTip="选择输出路径"
                             Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
-                    </Button>
+                    </ui:Button>
 
                     <TextBlock Grid.Row="4"
                                Grid.Column="1"
@@ -165,14 +165,14 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button Command="{Binding StartCommand}"
+                <ui:Button Command="{Binding StartCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="ImageMultiple24"
                                        Margin="0,0,6,0" />
                         <TextBlock Text="开始归类" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
                 <ProgressBar Grid.Column="1"
                              Value="{Binding Progress}"
                              Maximum="100"
@@ -184,7 +184,7 @@
 
         <GroupBox Grid.Row="3"
                   Header="日志和结果">
-            <TextBox Text="{Binding Log}"
+            <ui:TextBox Text="{Binding Log}"
                      MinHeight="160"
                      Style="{StaticResource CyanLogTextBoxStyle}" />
         </GroupBox>

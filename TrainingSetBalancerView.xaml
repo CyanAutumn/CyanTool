@@ -66,17 +66,17 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding SelectedFolderPath, UpdateSourceTrigger=LostFocus}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Content="..."
                         Command="{Binding BrowseFolderCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         ToolTip="选择输入路径"
                         Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}" />
-                <Button Grid.Column="3"
+                <ui:Button Grid.Column="3"
                         Command="{Binding BalanceCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}"
                         Margin="12,0,8,0">
@@ -85,8 +85,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="一键配平" />
                     </StackPanel>
-                </Button>
-                <Button Grid.Column="4"
+                </ui:Button>
+                <ui:Button Grid.Column="4"
                         Content="应用"
                         Command="{Binding ApplyRenamingCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}" />
@@ -104,17 +104,17 @@
         <GroupBox Header="子文件夹配平"
                   Grid.Row="2"
                   Style="{StaticResource CyanGroupBoxStyle}">
-            <DataGrid ItemsSource="{Binding FolderItems}"
+            <ui:DataGrid ItemsSource="{Binding FolderItems}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       Style="{StaticResource CyanDataGridStyle}">
-                <DataGrid.Columns>
+                <ui:DataGrid.Columns>
                     <DataGridTextColumn Header="子文件夹名" Binding="{Binding FolderName}" IsReadOnly="True" />
                     <DataGridTextColumn Header="图片数量" Binding="{Binding ImageCount}" IsReadOnly="True" />
                     <DataGridTextColumn Header="重复次数 (Repet)" Binding="{Binding Repetitions, UpdateSourceTrigger=PropertyChanged}" />
                     <DataGridTextColumn Header="训练步数占比 (%)" Binding="{Binding StepPercentage, StringFormat={}{0:F2}}" IsReadOnly="True" />
-                </DataGrid.Columns>
-            </DataGrid>
+                </ui:DataGrid.Columns>
+            </ui:DataGrid>
         </GroupBox>
     </Grid>
 </UserControl>

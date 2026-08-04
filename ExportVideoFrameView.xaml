@@ -61,11 +61,11 @@
 
                 <TextBlock Text="视频路径:"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          IsReadOnly="True"
                          Text="{Binding VideoPath}"
                          Margin="0,0,8,0" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding SelectVideoCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -73,18 +73,18 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="选择视频" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
 
                 <TextBlock Grid.Row="1"
                            Text="输出路径"
                            Style="{StaticResource CyanFormLabelStyle}"
                            Margin="0,12,10,0" />
-                <TextBox Grid.Row="1"
+                <ui:TextBox Grid.Row="1"
                          Grid.Column="1"
                          IsReadOnly="True"
                          Text="{Binding OutputFolder}"
                          Margin="0,12,8,0" />
-                <Button Grid.Row="1"
+                <ui:Button Grid.Row="1"
                         Grid.Column="2"
                         Command="{Binding SelectOutputCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
@@ -94,7 +94,7 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="选择目录" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Grid>
         </GroupBox>
 
@@ -125,16 +125,16 @@
 
                 <TextBlock Text="帧间隔"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          TextAlignment="Center"
                          Text="{Binding FrameIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          PreviewTextInput="FrameIntervalTextBox_PreviewTextInput" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Content="上一帧"
                         Command="{Binding PreviousFrameCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         Margin="14,0,8,0" />
-                <Button Grid.Column="3"
+                <ui:Button Grid.Column="3"
                         Content="下一帧"
                         Command="{Binding NextFrameCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}" />
@@ -152,30 +152,30 @@
         <Border Grid.Row="4"
                 Style="{StaticResource CyanToolbarSurfaceStyle}">
             <StackPanel Orientation="Horizontal">
-                <Button Command="{Binding ExportCurrentFrameCommand}"
+                <ui:Button Command="{Binding ExportCurrentFrameCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="ImageArrowForward24"
                                        Margin="0,0,6,0" />
                         <TextBlock Text="输出当前帧" />
                     </StackPanel>
-                </Button>
-                <Button Command="{Binding ExportAllFramesCommand}"
+                </ui:Button>
+                <ui:Button Command="{Binding ExportAllFramesCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="ImageMultiple24"
                                        Margin="0,0,6,0" />
                         <TextBlock Text="输出所有帧" />
                     </StackPanel>
-                </Button>
-                <Button Command="{Binding ExportGifCommand}"
+                </ui:Button>
+                <ui:Button Command="{Binding ExportGifCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Save24"
                                        Margin="0,0,6,0" />
                         <TextBlock Text="导出为 GIF" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </StackPanel>
         </Border>
     </Grid>

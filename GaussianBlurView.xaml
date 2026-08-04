@@ -69,17 +69,17 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}"/>
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0"/>
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding SelectInputCommand}"
                         Width="40"
                         ToolTip="选择输入路径"
                         Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                     <ui:SymbolIcon Symbol="FolderOpen24"/>
-                </Button>
+                </ui:Button>
 
                 <TextBlock Grid.Row="1"
                            Grid.Column="1"
@@ -102,12 +102,12 @@
                            Style="{StaticResource CyanFormLabelStyle}"
                            Margin="0,12,10,0"
                            Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                <TextBox Grid.Row="3"
+                <ui:TextBox Grid.Row="3"
                          Grid.Column="1"
                          Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,12,8,0"
                          Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                <Button Grid.Row="3"
+                <ui:Button Grid.Row="3"
                         Grid.Column="2"
                         Command="{Binding SelectOutputCommand}"
                         Width="40"
@@ -115,7 +115,7 @@
                         ToolTip="选择输出路径"
                         Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                     <ui:SymbolIcon Symbol="FolderOpen24"/>
-                </Button>
+                </ui:Button>
 
                 <TextBlock Grid.Row="4"
                            Grid.Column="1"
@@ -162,14 +162,14 @@
                   Grid.Row="3"
                   Margin="0,0,0,12"
                   Style="{StaticResource CyanGroupBoxStyle}">
-            <Button Command="{Binding ProcessCommand}"
+            <ui:Button Command="{Binding ProcessCommand}"
                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <ui:SymbolIcon Symbol="PlayCircle24"
                                    Margin="0,0,6,0"/>
                     <TextBlock Text="开始处理"/>
                 </StackPanel>
-            </Button>
+            </ui:Button>
         </GroupBox>
 
         <Border Grid.Row="4"

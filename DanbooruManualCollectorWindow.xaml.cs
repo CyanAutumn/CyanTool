@@ -8,10 +8,11 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CyanTools
 {
-    public partial class DanbooruManualCollectorWindow : Window
+    public partial class DanbooruManualCollectorWindow : FluentWindow
     {
         private const string DefaultStartUrl = "https://danbooru.donmai.us/posts?tags=";
         private const string DanbooruHost = "danbooru.donmai.us";

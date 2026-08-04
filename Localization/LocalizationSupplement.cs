@@ -256,6 +256,7 @@ namespace CyanTools.Localization
             Add(translations, "新建", "New", "新規");
             Add(translations, "保存配置文件", "Save Configuration File", "設定ファイルを保存");
             Add(translations, "删除", "Delete", "削除");
+            Add(translations, "项目名称", "Project Name", "プロジェクト名");
             Add(translations, "项目备注", "Project Notes", "プロジェクトメモ");
             Add(translations, "参数映射", "Parameter Mapping", "パラメーターマッピング");
             Add(translations, "导入配置", "Import Configuration", "設定をインポート");
@@ -293,6 +294,11 @@ namespace CyanTools.Localization
             Add(translations, "后端参数键", "Backend Parameter Key", "バックエンドパラメーターキー");
             Add(translations, "模型家族", "Model Family", "モデルファミリー");
             Add(translations, "训练集根目录", "Training Dataset Root", "学習データセットルート");
+            Add(translations, "根据数据集图片计算分桶", "Calculate Buckets from Dataset Images", "データセット画像からバケットを計算");
+            Add(translations, "扫描训练集根目录及子目录内的图片，按训练分辨率和 16 像素对齐自动填写 size_buckets。", "Scan images in the training dataset root and its subfolders, then fill size_buckets automatically using the training resolution and 16-pixel alignment.", "学習データセットのルートとサブフォルダー内の画像を走査し、学習解像度と 16 ピクセル単位に合わせて size_buckets を自動入力します。");
+            Add(translations, "输入名称后保存：同名配置文件会覆盖，不存在则创建。", "Enter a name and save. A configuration file with the same name is overwritten; otherwise, a new one is created.", "名前を入力して保存します。同名の設定ファイルは上書きし、存在しない場合は新規作成します。");
+            Add(translations, "确定删除草稿“{0}”吗？", "Delete draft \"{0}\"?", "下書き「{0}」を削除しますか？");
+            Add(translations, "删除训练草稿", "Delete Training Draft", "学習下書きを削除");
             Add(translations, "输出目录", "Output Directory", "出力ディレクトリ");
             Add(translations, "基础模型路径", "Base Model Path", "ベースモデルパス");
             Add(translations, "数据集分辨率", "Dataset Resolution", "データセット解像度");
@@ -589,6 +595,7 @@ namespace CyanTools.Localization
             Add(translations, "seed / 随机种子", "seed / random seed", "seed / ランダムシード");
 
             Add(translations, "选择文件夹", "Choose Folder", "フォルダーを選択");
+            Add(translations, "导入训练集", "Load Dataset", "学習データセットを読み込む");
             Add(translations, "图片聚类", "Image Clustering", "画像クラスタリング");
             Add(translations, "同源图片归类", "Same-source Image Grouping", "同一ソース画像の分類");
             Add(translations, "图片三分法", "Three-stage Image Processing", "画像三分割処理");

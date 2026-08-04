@@ -72,18 +72,18 @@
                                    Grid.Column="0"
                                    Text="输入路径"
                                    Style="{StaticResource CyanFormLabelStyle}" />
-                        <TextBox Grid.Row="0"
+                        <ui:TextBox Grid.Row="0"
                                  Grid.Column="1"
                                  Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,8,8"
                                  VerticalContentAlignment="Center" />
-                        <Button Grid.Row="0"
+                        <ui:Button Grid.Row="0"
                                 Grid.Column="2"
                                 Style="{StaticResource CyanSmallIconButtonStyle}"
                                 Command="{Binding BrowseInputCommand}"
                                 ToolTip="选择输入路径">
                             <ui:SymbolIcon Symbol="FolderOpen24" />
-                        </Button>
+                        </ui:Button>
 
                         <CheckBox Grid.Row="1"
                                   Grid.Column="1"
@@ -97,35 +97,35 @@
                                    Grid.Column="0"
                                    Text="坏图输出"
                                    Style="{StaticResource CyanFormLabelStyle}" />
-                        <TextBox Grid.Row="2"
+                        <ui:TextBox Grid.Row="2"
                                  Grid.Column="1"
                                  Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,8,8"
                                  VerticalContentAlignment="Center" />
-                        <Button Grid.Row="2"
+                        <ui:Button Grid.Row="2"
                                 Grid.Column="2"
                                 Style="{StaticResource CyanSmallIconButtonStyle}"
                                 Command="{Binding BrowseOutputCommand}"
                                 ToolTip="选择坏图输出路径">
                             <ui:SymbolIcon Symbol="FolderOpen24" />
-                        </Button>
+                        </ui:Button>
 
                         <TextBlock Grid.Row="3"
                                    Grid.Column="0"
                                    Text="好图输出"
                                    Style="{StaticResource CyanFormLabelStyle}" />
-                        <TextBox Grid.Row="3"
+                        <ui:TextBox Grid.Row="3"
                                  Grid.Column="1"
                                  Text="{Binding GoodOutputDirectory, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,8,0"
                                  VerticalContentAlignment="Center" />
-                        <Button Grid.Row="3"
+                        <ui:Button Grid.Row="3"
                                 Grid.Column="2"
                                 Style="{StaticResource CyanSmallIconButtonStyle}"
                                 Command="{Binding BrowseGoodOutputCommand}"
                                 ToolTip="选择好图输出路径">
                             <ui:SymbolIcon Symbol="FolderOpen24" />
-                        </Button>
+                        </ui:Button>
 
                         <TextBlock Grid.Row="4"
                                    Grid.Column="1"
@@ -206,7 +206,7 @@
                                        Grid.Column="0"
                                        Text="检测尺寸"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="3"
+                            <ui:TextBox Grid.Row="3"
                                      Grid.Column="1"
                                      Text="{Binding DetectorInputSize}"
                                      Margin="0,0,12,8" />
@@ -214,7 +214,7 @@
                                        Grid.Column="2"
                                        Text="置信度"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="3"
+                            <ui:TextBox Grid.Row="3"
                                      Grid.Column="3"
                                      Text="{Binding DetectorConfidence}"
                                      Margin="0,0,0,8" />
@@ -223,7 +223,7 @@
                                        Grid.Column="0"
                                        Text="IOU"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="4"
+                            <ui:TextBox Grid.Row="4"
                                      Grid.Column="1"
                                      Text="{Binding DetectorIouThreshold}"
                                      Margin="0,0,12,8" />
@@ -231,7 +231,7 @@
                                        Grid.Column="2"
                                        Text="手类 ID"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="4"
+                            <ui:TextBox Grid.Row="4"
                                      Grid.Column="3"
                                      Text="{Binding HandClassId}"
                                      Margin="0,0,0,8" />
@@ -240,7 +240,7 @@
                                        Grid.Column="0"
                                        Text="关键点尺寸"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="5"
+                            <ui:TextBox Grid.Row="5"
                                      Grid.Column="1"
                                      Text="{Binding LandmarkInputSize}"
                                      Margin="0,0,12,0" />
@@ -258,7 +258,7 @@
                                        Text="存在阈值"
                                        Style="{StaticResource CyanFormLabelStyle}"
                                        Margin="0,10,10,0" />
-                            <TextBox Grid.Row="6"
+                            <ui:TextBox Grid.Row="6"
                                      Grid.Column="1"
                                      Text="{Binding MinPresenceScore}"
                                      Margin="0,10,12,0" />
@@ -313,7 +313,7 @@
                                        Grid.Column="2"
                                        Text="裁剪缩放"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="1"
+                            <ui:TextBox Grid.Row="1"
                                      Grid.Column="3"
                                      Text="{Binding CropScale}"
                                      Margin="0,0,0,8" />
@@ -322,7 +322,7 @@
                                        Grid.Column="0"
                                        Text="最小指长"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="2"
+                            <ui:TextBox Grid.Row="2"
                                      Grid.Column="1"
                                      Text="{Binding MinFingerLengthRatio}"
                                      Margin="0,0,12,0" />
@@ -330,7 +330,7 @@
                                        Grid.Column="2"
                                        Text="指尖伸展"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Row="2"
+                            <ui:TextBox Grid.Row="2"
                                      Grid.Column="3"
                                      Text="{Binding MinTipToMcpRatio}" />
                         </Grid>
@@ -355,7 +355,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0"
+                        <ui:Button Grid.Column="0"
                                 Style="{StaticResource CyanPrimaryActionButtonStyle}"
                                 Command="{Binding StartCommand}"
                                 IsEnabled="{Binding IsIdle}">
@@ -364,9 +364,9 @@
                                                Margin="0,0,6,0" />
                                 <TextBlock Text="开始筛选" />
                             </StackPanel>
-                        </Button>
+                        </ui:Button>
 
-                        <Button Grid.Column="1"
+                        <ui:Button Grid.Column="1"
                                 Style="{StaticResource CyanCommandButtonStyle}"
                                 Command="{Binding ClearLogCommand}"
                                 IsEnabled="{Binding IsIdle}">
@@ -375,7 +375,7 @@
                                                Margin="0,0,6,0" />
                                 <TextBlock Text="清空日志" />
                             </StackPanel>
-                        </Button>
+                        </ui:Button>
 
                         <ProgressBar Grid.Column="2"
                                      Value="{Binding ProgressValue}"

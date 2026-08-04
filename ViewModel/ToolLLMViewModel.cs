@@ -106,7 +106,7 @@ namespace CyanTools.ViewModel
             ClearLogCommand = new RelayCommand(_ => LogLines.Clear());
 
             LoadAllConfigs();
-            ExecuteRefreshModelsCommand();
+            _ = ExecuteRefreshModelsCommand();
         }
         
         private void AddLog(string message)
@@ -252,14 +252,14 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value)) return false;
             field = value;

@@ -53,7 +53,7 @@
                                Margin="0,4,0,0"/>
                 </StackPanel>
 
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding RunCommand}"
                         IsEnabled="{Binding IsRunEnabled}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}"
@@ -64,7 +64,7 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="运行"/>
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Grid>
         </Border>
 
@@ -102,7 +102,7 @@
 
                             <TextBlock Text="API 地址"
                                        Style="{StaticResource CyanFormLabelStyle}"/>
-                            <TextBox Grid.Column="1"
+                            <ui:TextBox Grid.Column="1"
                                      Text="{Binding ApiUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
                                      ToolTip="API 地址"/>
@@ -137,7 +137,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0"
+                                <ui:Button Grid.Column="0"
                                         Command="{Binding RefreshModelsCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}">
                                     <StackPanel Orientation="Horizontal">
@@ -145,7 +145,7 @@
                                                        Margin="0,0,6,0"/>
                                         <TextBlock Text="刷新"/>
                                     </StackPanel>
-                                </Button>
+                                </ui:Button>
                                 <CheckBox Grid.Column="1"
                                           Content="推理模式"
                                           IsChecked="{Binding IsReasoning}"
@@ -165,7 +165,7 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBox Grid.Row="0"
+                            <ui:TextBox Grid.Row="0"
                                      Text="{Binding MainInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      TextWrapping="Wrap"
                                      VerticalScrollBarVisibility="Auto"
@@ -181,17 +181,17 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="工作目录"
                                            Style="{StaticResource CyanFormLabelStyle}"/>
-                                <TextBox Grid.Column="1"
+                                <ui:TextBox Grid.Column="1"
                                          Text="{Binding WorkingDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          VerticalContentAlignment="Center"
                                          Margin="0,0,8,0"/>
-                                <Button Grid.Column="2"
+                                <ui:Button Grid.Column="2"
                                         Command="{Binding SelectFolderCommand}"
                                         CommandParameter="WorkingDirectory"
                                         Style="{StaticResource CyanSmallIconButtonStyle}"
                                         ToolTip="选择工作目录">
                                     <ui:SymbolIcon Symbol="FolderOpen24"/>
-                                </Button>
+                                </ui:Button>
                             </Grid>
                         </Grid>
                     </GroupBox>
@@ -217,28 +217,28 @@
 
                             <TextBlock Text="路径 1"
                                        Style="{StaticResource CyanFormLabelStyle}"/>
-                            <TextBox Grid.Column="1"
+                            <ui:TextBox Grid.Column="1"
                                      Text="{Binding Path1, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
                                      Margin="0,0,8,0"/>
-                            <Button Grid.Column="2"
+                            <ui:Button Grid.Column="2"
                                     Command="{Binding SelectFolderCommand}"
                                     CommandParameter="Path1"
                                     Style="{StaticResource CyanSmallIconButtonStyle}"
                                     ToolTip="选择路径 1">
                                 <ui:SymbolIcon Symbol="FolderOpen24"/>
-                            </Button>
+                            </ui:Button>
 
                             <TextBlock Grid.Row="1"
                                        Text="路径 2"
                                        Style="{StaticResource CyanFormLabelStyle}"
                                        Margin="0,8,10,0"/>
-                            <TextBox Grid.Row="1"
+                            <ui:TextBox Grid.Row="1"
                                      Grid.Column="1"
                                      Text="{Binding Path2, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
                                      Margin="0,8,8,0"/>
-                            <Button Grid.Row="1"
+                            <ui:Button Grid.Row="1"
                                     Grid.Column="2"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
@@ -246,18 +246,18 @@
                                     Style="{StaticResource CyanSmallIconButtonStyle}"
                                     ToolTip="选择路径 2">
                                 <ui:SymbolIcon Symbol="FolderOpen24"/>
-                            </Button>
+                            </ui:Button>
 
                             <TextBlock Grid.Row="2"
                                        Text="路径 3"
                                        Style="{StaticResource CyanFormLabelStyle}"
                                        Margin="0,8,10,0"/>
-                            <TextBox Grid.Row="2"
+                            <ui:TextBox Grid.Row="2"
                                      Grid.Column="1"
                                      Text="{Binding Path3, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
                                      Margin="0,8,8,0"/>
-                            <Button Grid.Row="2"
+                            <ui:Button Grid.Row="2"
                                     Grid.Column="2"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
@@ -265,18 +265,18 @@
                                     Style="{StaticResource CyanSmallIconButtonStyle}"
                                     ToolTip="选择路径 3">
                                 <ui:SymbolIcon Symbol="FolderOpen24"/>
-                            </Button>
+                            </ui:Button>
 
                             <TextBlock Grid.Row="3"
                                        Text="路径 4"
                                        Style="{StaticResource CyanFormLabelStyle}"
                                        Margin="0,8,10,0"/>
-                            <TextBox Grid.Row="3"
+                            <ui:TextBox Grid.Row="3"
                                      Grid.Column="1"
                                      Text="{Binding Path4, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
                                      Margin="0,8,8,0"/>
-                            <Button Grid.Row="3"
+                            <ui:Button Grid.Row="3"
                                     Grid.Column="2"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
@@ -284,18 +284,18 @@
                                     Style="{StaticResource CyanSmallIconButtonStyle}"
                                     ToolTip="选择路径 4">
                                 <ui:SymbolIcon Symbol="FolderOpen24"/>
-                            </Button>
+                            </ui:Button>
 
                             <TextBlock Grid.Row="4"
                                        Text="路径 5"
                                        Style="{StaticResource CyanFormLabelStyle}"
                                        Margin="0,8,10,0"/>
-                            <TextBox Grid.Row="4"
+                            <ui:TextBox Grid.Row="4"
                                      Grid.Column="1"
                                      Text="{Binding Path5, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
                                      Margin="0,8,8,0"/>
-                            <Button Grid.Row="4"
+                            <ui:Button Grid.Row="4"
                                     Grid.Column="2"
                                     Margin="0,8,0,0"
                                     Command="{Binding SelectFolderCommand}"
@@ -303,7 +303,7 @@
                                     Style="{StaticResource CyanSmallIconButtonStyle}"
                                     ToolTip="选择路径 5">
                                 <ui:SymbolIcon Symbol="FolderOpen24"/>
-                            </Button>
+                            </ui:Button>
                         </Grid>
                     </GroupBox>
 
@@ -329,17 +329,17 @@
                                       VerticalContentAlignment="Center"
                                       IsEditable="True"
                                       Margin="0,0,8,0"/>
-                            <Button Grid.Column="1"
+                            <ui:Button Grid.Column="1"
                                     Command="{Binding SaveConfigCommand}"
                                     Content="保存"
                                     Style="{StaticResource CyanCommandButtonStyle}"/>
-                            <Button Grid.Column="2"
+                            <ui:Button Grid.Column="2"
                                     Command="{Binding DeleteConfigCommand}"
                                     Content="删除"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Margin="0"/>
 
-                            <Button Grid.Row="1"
+                            <ui:Button Grid.Row="1"
                                     Grid.ColumnSpan="3"
                                     Command="{Binding RunCommand}"
                                     IsEnabled="{Binding IsRunEnabled}"
@@ -352,7 +352,7 @@
                                                    Margin="0,0,6,0"/>
                                     <TextBlock Text="运行"/>
                                 </StackPanel>
-                            </Button>
+                            </ui:Button>
                         </Grid>
                     </GroupBox>
                 </Grid>
@@ -378,7 +378,7 @@
                         <TextBlock Text="{Binding SelectedFunction, Converter={StaticResource LocalizedTextConverter}, ConverterParameter='当前任务：{0}'}"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                    VerticalAlignment="Center"/>
-                        <Button Grid.Column="1"
+                        <ui:Button Grid.Column="1"
                                 Command="{Binding ClearLogCommand}"
                                 Style="{StaticResource CyanCommandButtonStyle}"
                                 Margin="0">
@@ -387,10 +387,10 @@
                                                Margin="0,0,6,0"/>
                                 <TextBlock Text="清空日志"/>
                             </StackPanel>
-                        </Button>
+                        </ui:Button>
                     </Grid>
 
-                    <TextBox Grid.Row="1"
+                    <ui:TextBox Grid.Row="1"
                              Text="{Binding LogText, Mode=OneWay}"
                              Style="{StaticResource CyanLogTextBoxStyle}"
                              HorizontalScrollBarVisibility="Disabled"/>

@@ -42,7 +42,7 @@ namespace CyanTools.Utils
             {
                 try
                 {
-                    var imageInfo = Image.Identify(filePath);
+                    ImageInfo? imageInfo = Image.Identify(filePath);
                     if (imageInfo is null || imageInfo.Width <= 0 || imageInfo.Height <= 0)
                     {
                         skippedFileCount++;
