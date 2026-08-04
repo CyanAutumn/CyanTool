@@ -124,24 +124,24 @@
                         <StackPanel Grid.Column="4"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center">
-                            <Button Style="{StaticResource CyanTitleBarButtonStyle}"
+                            <ui:Button Style="{StaticResource CyanTitleBarButtonStyle}"
                                     ToolTip="最小化"
                                     Click="AppTitleBar_MinimizeClicked">
                                 <ui:SymbolIcon Symbol="LineHorizontal124"
                                                FontSize="18" />
-                            </Button>
-                            <Button Style="{StaticResource CyanTitleBarButtonStyle}"
+                            </ui:Button>
+                            <ui:Button Style="{StaticResource CyanTitleBarButtonStyle}"
                                     ToolTip="最大化/还原"
                                     Click="AppTitleBar_MaximizeClicked">
                                 <ui:SymbolIcon Symbol="FullScreenMaximize24"
                                                FontSize="16" />
-                            </Button>
-                            <Button Style="{StaticResource CyanTitleBarButtonStyle}"
+                            </ui:Button>
+                            <ui:Button Style="{StaticResource CyanTitleBarButtonStyle}"
                                     ToolTip="关闭"
                                     Click="AppTitleBar_CloseClicked">
                                 <ui:SymbolIcon Symbol="Dismiss24"
                                                FontSize="18" />
-                            </Button>
+                            </ui:Button>
                         </StackPanel>
                     </Grid>
                 </Grid>

@@ -186,7 +186,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择 lora-scripts 根目录"
+                Title = LocalizationManager.Translate("选择 lora-scripts 根目录")
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -199,8 +199,8 @@ namespace CyanTools.ViewModel
         {
             var dialog = new SaveFileDialog
             {
-                Title = "生成的 TOML 路径",
-                Filter = "TOML 文件 (*.toml)|*.toml|所有文件 (*.*)|*.*",
+                Title = LocalizationManager.Translate("生成的 TOML 路径"),
+                Filter = LocalizationManager.Translate("TOML 文件 (*.toml)|*.toml|所有文件 (*.*)|*.*"),
                 FileName = Path.GetFileName(OutputTomlPath)
             };
 
@@ -223,8 +223,8 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择训练脚本",
-                Filter = "PowerShell 脚本 (*.ps1)|*.ps1|所有文件 (*.*)|*.*"
+                Title = LocalizationManager.Translate("选择训练脚本"),
+                Filter = LocalizationManager.Translate("PowerShell 脚本 (*.ps1)|*.ps1|所有文件 (*.*)|*.*")
             };
 
             if (!string.IsNullOrWhiteSpace(ScriptPath))

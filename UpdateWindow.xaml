@@ -1,4 +1,4 @@
-<Window x:Class="CyanTools.UpdateWindow"
+<ui:FluentWindow x:Class="CyanTools.UpdateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -7,6 +7,8 @@
         Height="440"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
+        ExtendsContentIntoTitleBar="False"
+        WindowBackdropType="None"
         Background="{DynamicResource CyanShellBackgroundBrush}"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
     <Grid Style="{StaticResource CyanDialogRootGridStyle}">
@@ -46,7 +48,7 @@
 
         <Border Grid.Row="1"
                 Style="{StaticResource CyanCardStyle}">
-            <TextBox x:Name="NotesTextBox"
+            <ui:TextBox x:Name="NotesTextBox"
                      Style="{StaticResource CyanLogTextBoxStyle}"
                      BorderThickness="0"
                      HorizontalScrollBarVisibility="Disabled" />
@@ -57,7 +59,7 @@
                 Margin="0,14,0,0">
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right">
-                <Button x:Name="LaterButton"
+                <ui:Button x:Name="LaterButton"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         Click="LaterButton_Click">
                     <StackPanel Orientation="Horizontal">
@@ -65,8 +67,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="Later" />
                     </StackPanel>
-                </Button>
-                <Button x:Name="UpdateButton"
+                </ui:Button>
+                <ui:Button x:Name="UpdateButton"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}"
                         IsDefault="True"
                         Click="UpdateButton_Click">
@@ -75,8 +77,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="Update Now" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </StackPanel>
         </Border>
     </Grid>
-</Window>
+</ui:FluentWindow>

@@ -68,12 +68,12 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}"/>
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0"
                          VerticalContentAlignment="Center"/>
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Content="..."
                         Width="40"
                         Command="{Binding BrowseInputCommand}"
@@ -108,9 +108,14 @@
                           ItemsSource="{Binding TaggerSeries}"
                           SelectedValue="{Binding SelectedTaggerSeriesId, UpdateSourceTrigger=PropertyChanged}"
                           SelectedValuePath="Id"
-                          DisplayMemberPath="DisplayName"
                           IsEnabled="{Binding IsIdle}"
-                          Margin="0,0,18,0"/>
+                          Margin="0,0,18,0">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBlock Grid.Column="2"
                            Text="打标模型"
                            Style="{StaticResource CyanFormLabelStyle}"/>
@@ -119,7 +124,7 @@
                           SelectedItem="{Binding SelectedTaggerModel}"
                           DisplayMemberPath="DisplayName"
                           Margin="0,0,8,0"/>
-                <Button Grid.Column="4"
+                <ui:Button Grid.Column="4"
                         Command="{Binding AddTaggerCommand}"
                         IsEnabled="{Binding IsIdle}"
                         Style="{StaticResource CyanCommandButtonStyle}"
@@ -130,7 +135,7 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="添加打标器"/>
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Grid>
         </GroupBox>
 
@@ -155,7 +160,7 @@
                     <TextBlock Text="自定义标签（逗号分隔）"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                Margin="0,0,0,5"/>
-                    <TextBox Text="{Binding CustomTags, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding CustomTags, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding IsIdle}"
                              VerticalContentAlignment="Center"/>
                 </StackPanel>
@@ -164,7 +169,7 @@
                     <TextBlock Text="前置标签（逗号分隔）"
                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                Margin="0,0,0,5"/>
-                    <TextBox Text="{Binding PriorityTags, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding PriorityTags, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding IsIdle}"
                              VerticalContentAlignment="Center"/>
                 </StackPanel>
@@ -199,14 +204,14 @@
                                Text="通用阈值"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="18,0,10,0"/>
-                    <TextBox Grid.Column="3"
+                    <ui:TextBox Grid.Column="3"
                              Text="{Binding GeneralThreshold, UpdateSourceTrigger=LostFocus}"
                              VerticalContentAlignment="Center"/>
                     <TextBlock Grid.Column="4"
                                Text="角色阈值"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="18,0,10,0"/>
-                    <TextBox Grid.Column="5"
+                    <ui:TextBox Grid.Column="5"
                              Text="{Binding CharacterThreshold, UpdateSourceTrigger=LostFocus}"
                              VerticalContentAlignment="Center"/>
                 </Grid>
@@ -249,14 +254,14 @@
 
                 <TextBlock Text="接口地址"
                            Style="{StaticResource CyanFormLabelStyle}"/>
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding ToriiGateEndpoint, UpdateSourceTrigger=PropertyChanged}"
                          IsEnabled="{Binding IsIdle}"
                          Margin="0,0,18,0"/>
                 <TextBlock Grid.Column="2"
                            Text="服务端模型名"
                            Style="{StaticResource CyanFormLabelStyle}"/>
-                <TextBox Grid.Column="3"
+                <ui:TextBox Grid.Column="3"
                          Text="{Binding ToriiGateModelName, UpdateSourceTrigger=PropertyChanged}"
                          IsEnabled="{Binding IsIdle}"/>
 
@@ -281,15 +286,20 @@
                           ItemsSource="{Binding ToriiGateCaptionFormats}"
                           SelectedValue="{Binding ToriiGateCaptionFormatId}"
                           SelectedValuePath="Id"
-                          DisplayMemberPath="DisplayName"
                           IsEnabled="{Binding IsIdle}"
-                          Margin="0,10,18,0"/>
+                          Margin="0,10,18,0">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName, Converter={StaticResource LocalizedTextConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBlock Grid.Row="2"
                            Grid.Column="2"
                            Text="最大输入 MP"
                            Style="{StaticResource CyanFormLabelStyle}"
                            Margin="0,10,0,0"/>
-                <TextBox Grid.Row="2"
+                <ui:TextBox Grid.Row="2"
                          Grid.Column="3"
                          Text="{Binding ToriiGateMaxMegapixels, UpdateSourceTrigger=LostFocus}"
                          IsEnabled="{Binding IsIdle}"
@@ -302,22 +312,22 @@
                            IsEnabled="{Binding IsIdle}">
                     <TextBlock Text="最大输出 token"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Text="{Binding ToriiGateMaxTokens, UpdateSourceTrigger=LostFocus}"
+                    <ui:TextBox Text="{Binding ToriiGateMaxTokens, UpdateSourceTrigger=LostFocus}"
                              Width="78"
                              Margin="0,0,16,0"/>
                     <TextBlock Text="Temperature"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Text="{Binding ToriiGateTemperature, UpdateSourceTrigger=LostFocus}"
+                    <ui:TextBox Text="{Binding ToriiGateTemperature, UpdateSourceTrigger=LostFocus}"
                              Width="72"
                              Margin="0,0,16,0"/>
                     <TextBlock Text="并发请求"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Text="{Binding ToriiGateMaxParallelRequests, UpdateSourceTrigger=LostFocus}"
+                    <ui:TextBox Text="{Binding ToriiGateMaxParallelRequests, UpdateSourceTrigger=LostFocus}"
                              Width="60"
                              Margin="0,0,16,0"/>
                     <TextBlock Text="自定义标签（逗号分隔）"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Text="{Binding CustomTags, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding CustomTags, UpdateSourceTrigger=PropertyChanged}"
                              MinWidth="160"
                              Margin="0,0,16,0"/>
                     <TextBlock Text="同名 txt"
@@ -365,7 +375,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Button Command="{Binding StartTaggingCommand}"
+                <ui:Button Command="{Binding StartTaggingCommand}"
                         IsEnabled="{Binding IsIdle}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -373,8 +383,8 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="开始打标"/>
                     </StackPanel>
-                </Button>
-                <Button Grid.Column="1"
+                </ui:Button>
+                <ui:Button Grid.Column="1"
                         Command="{Binding ClearLogCommand}"
                         IsEnabled="{Binding IsIdle}"
                         Style="{StaticResource CyanCommandButtonStyle}">
@@ -383,7 +393,7 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="清空日志"/>
                     </StackPanel>
-                </Button>
+                </ui:Button>
                 <ProgressBar Grid.Column="3"
                              Value="{Binding ProgressValue}"
                              Minimum="0"

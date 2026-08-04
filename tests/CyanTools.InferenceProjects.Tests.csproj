@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="InferenceFrontendLaunchPlannerTests.cs" />
+    <Compile Include="TrainingDeploymentTaskStoreTests.cs" />
+    <Compile Include="../Utils/InferenceBackendInstallationDetector.cs" Link="Utils/InferenceBackendInstallationDetector.cs" />
+    <Compile Include="../Model/TrainingBridgeModels.cs" Link="Model/TrainingBridgeModels.cs" />
+    <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
+    <Compile Include="../Utils/TrainingBackendBindingStore.cs" Link="Utils/TrainingBackendBindingStore.cs" />
+    <Compile Include="../Utils/WslPathResolver.cs" Link="Utils/WslPathResolver.cs" />
+    <Compile Include="../Utils/InferenceFrontendManager.cs" Link="Utils/InferenceFrontendManager.cs" />
+    <Compile Include="../Utils/TrainingDeploymentTaskStore.cs" Link="Utils/TrainingDeploymentTaskStore.cs" />
+  </ItemGroup>
+</Project>

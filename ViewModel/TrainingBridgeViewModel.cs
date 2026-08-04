@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -19,7 +20,9 @@ namespace CyanTools.ViewModel
     public sealed class TrainingBridgeViewModel : INotifyPropertyChanged
     {
         private readonly TrainingBridgeProjectStore _projectStore;
+        private readonly TrainingBackendRunner _trainingRunner;
         private readonly TrainingBackendBindingStore _bindingStore;
+        private readonly WslPathResolver _wslPathResolver;
         private CancellationTokenSource? _monitorCancellation;
         private bool _isBusy;
         private bool _hasUnsavedChanges;
@@ -55,16 +58,44 @@ namespace CyanTools.ViewModel
         private bool _showSystemMonitorWidget = SystemMonitorWidgetController.IsEnabled;
 
         public TrainingBridgeViewModel()
-            : this(new TrainingBridgeProjectStore(), new TrainingBackendBindingStore())
+            : this(
+                new TrainingBridgeProjectStore(),
+                new TrainingBackendRunner(),
+                new TrainingBackendBindingStore(),
+                new WslPathResolver())
+        {
+        }
+
+        internal TrainingBridgeViewModel(TrainingBridgeProjectStore projectStore)
+            : this(projectStore, new TrainingBackendRunner(), new TrainingBackendBindingStore(), new WslPathResolver())
         {
         }
 
         internal TrainingBridgeViewModel(
             TrainingBridgeProjectStore projectStore,
+            TrainingBackendRunner trainingRunner)
+            : this(projectStore, trainingRunner, new TrainingBackendBindingStore(), new WslPathResolver())
+        {
+        }
+
+        internal TrainingBridgeViewModel(
+            TrainingBridgeProjectStore projectStore,
+            TrainingBackendRunner trainingRunner,
             TrainingBackendBindingStore bindingStore)
+            : this(projectStore, trainingRunner, bindingStore, new WslPathResolver())
+        {
+        }
+
+        internal TrainingBridgeViewModel(
+            TrainingBridgeProjectStore projectStore,
+            TrainingBackendRunner trainingRunner,
+            TrainingBackendBindingStore bindingStore,
+            WslPathResolver wslPathResolver)
         {
             _projectStore = projectStore;
+            _trainingRunner = trainingRunner;
             _bindingStore = bindingStore;
+            _wslPathResolver = wslPathResolver;
             BackendOptions = new ObservableCollection<TrainingBridgeBackendOption>
             {
                 new(TrainingBridgeConfigService.SdScriptsBackendId, "sd-scripts / Windows"),
@@ -78,10 +109,12 @@ namespace CyanTools.ViewModel
             BackendBindings = new ObservableCollection<TrainingBackendBinding>();
             _selectedSourceBackend = BackendOptions[0];
             _selectedTargetBackend = BackendOptions[0];
+            ReloadBackendBindings();
 
-            SaveProjectCommand = new RelayCommand(SaveProject, () => !IsBusy);
+            SaveProjectCommand = new RelayCommand(() => _ = SaveProject(), () => !IsBusy);
             DeleteProjectCommand = new RelayCommand(DeleteProject, () => !IsBusy && SelectedDraft != null);
             ImportConfigCommand = new RelayCommand(async _ => await ImportConfigAsync(), _ => !IsBusy);
+            StartTrainingCommand = new RelayCommand(async _ => await StartTrainingAsync(), _ => !IsBusy);
             PreviewExportCommand = new RelayCommand(PreviewExport, () => !IsBusy);
             ExportConfigCommand = new RelayCommand(ExportConfig, () => !IsBusy);
             AddParameterCommand = new RelayCommand(AddParameter, () => !IsBusy);
@@ -90,7 +123,6 @@ namespace CyanTools.ViewModel
             CalculateSizeBucketsCommand = new RelayCommand(async () => await CalculateSizeBucketsAsync(), () => !IsBusy);
             CopyPreviewCommand = new RelayCommand(CopySelectedPreview, () => SelectedGeneratedFile != null);
 
-            ReloadBackendBindings();
             RefreshDrafts();
             ReplaceParameters(TrainingBridgeConfigService.CreateDefaultValues());
             AppendLog("训练已就绪。");
@@ -109,6 +141,7 @@ namespace CyanTools.ViewModel
         public ICommand SaveProjectCommand { get; }
         public ICommand DeleteProjectCommand { get; }
         public ICommand ImportConfigCommand { get; }
+        public ICommand StartTrainingCommand { get; }
         public ICommand PreviewExportCommand { get; }
         public ICommand ExportConfigCommand { get; }
         public ICommand AddParameterCommand { get; }
@@ -179,6 +212,20 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public TrainingBackendBinding SelectedSourceBinding
+        {
+            get => _selectedSourceBinding;
+            set
+            {
+                if (value != null && SetField(ref _selectedSourceBinding, value))
+                {
+                    _selectedSourceBackend = FindBackend(value.BackendId);
+                    OnPropertyChanged(nameof(SelectedSourceBackend));
+                    MarkDirty();
+                }
+            }
+        }
+
         public TrainingBridgeBackendOption SelectedTargetBackend
         {
             get => _selectedTargetBackend;
@@ -194,20 +241,6 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public TrainingBackendBinding SelectedSourceBinding
-        {
-            get => _selectedSourceBinding;
-            set
-            {
-                if (value != null && SetField(ref _selectedSourceBinding, value))
-                {
-                    _selectedSourceBackend = FindBackend(value.BackendId);
-                    OnPropertyChanged(nameof(SelectedSourceBackend));
-                    MarkDirty();
-                }
-            }
-        }
-
         public TrainingBackendBinding SelectedTargetBinding
         {
             get => _selectedTargetBinding;
@@ -217,37 +250,12 @@ namespace CyanTools.ViewModel
                 {
                     _selectedTargetBackend = FindBackend(value.BackendId);
                     OnPropertyChanged(nameof(SelectedTargetBackend));
+                    OnPropertyChanged(nameof(IsDiffusionPipeTarget));
                     OnPropertyChanged(nameof(VisibleParameters));
                     MarkDirty();
                     GeneratedFiles.Clear();
                     SelectedGeneratedFile = null;
                 }
-            }
-        }
-
-        public TrainingBackendBinding SelectedTrainerBinding
-        {
-            get => _selectedTargetBinding;
-            set
-            {
-                if (value == null || ReferenceEquals(_selectedTargetBinding, value))
-                {
-                    return;
-                }
-
-                _selectedSourceBinding = value;
-                _selectedTargetBinding = value;
-                _selectedSourceBackend = FindBackend(value.BackendId);
-                _selectedTargetBackend = _selectedSourceBackend;
-                OnPropertyChanged(nameof(SelectedTrainerBinding));
-                OnPropertyChanged(nameof(SelectedSourceBinding));
-                OnPropertyChanged(nameof(SelectedTargetBinding));
-                OnPropertyChanged(nameof(SelectedSourceBackend));
-                OnPropertyChanged(nameof(SelectedTargetBackend));
-                OnPropertyChanged(nameof(VisibleParameters));
-                MarkDirty();
-                GeneratedFiles.Clear();
-                SelectedGeneratedFile = null;
             }
         }
 
@@ -547,14 +555,15 @@ namespace CyanTools.ViewModel
             DraftFileName = string.Empty;
             ProjectName = string.Empty;
             Notes = string.Empty;
-            SelectedTrainerBinding = BackendBindings[0];
+            SelectedSourceBinding = BackendBindings[0];
+            SelectedTargetBinding = BackendBindings[0];
             ReplaceParameters(TrainingBridgeConfigService.CreateDefaultValues());
             GeneratedFiles.Clear();
             SelectedGeneratedFile = null;
             HasUnsavedChanges = false;
         }
 
-        private void SaveProject()
+        private bool SaveProject()
         {
             try
             {
@@ -574,10 +583,10 @@ namespace CyanTools.ViewModel
                     Name = draftFileName,
                     ProjectName = ProjectName,
                     Notes = Notes,
-                    SourceBackendId = SelectedTrainerBinding.BackendId,
-                    TargetBackendId = SelectedTrainerBinding.BackendId,
-                    SourceBindingId = SelectedTrainerBinding.Id,
-                    TargetBindingId = SelectedTrainerBinding.Id,
+                    SourceBackendId = SelectedSourceBinding.BackendId,
+                    TargetBackendId = SelectedTargetBinding.BackendId,
+                    SourceBindingId = SelectedSourceBinding.Id,
+                    TargetBindingId = SelectedTargetBinding.Id,
                     Values = BuildValues()
                 };
                 _projectStore.Save(project);
@@ -586,10 +595,12 @@ namespace CyanTools.ViewModel
                 HasUnsavedChanges = false;
                 StatusMessage = $"草稿已保存：{project.Name}";
                 AppendLog(StatusMessage);
+                return true;
             }
             catch (Exception exception)
             {
                 ShowError("保存草稿失败", exception);
+                return false;
             }
         }
 
@@ -622,14 +633,15 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "导入训练配置（自动识别训练器）",
-                Filter = "训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*",
+                Title = LocalizationManager.Format("导入 {0} 配置（支持自动识别训练器）", SelectedSourceBinding.Name),
+                Filter = LocalizationManager.Translate("训练配置 (*.json;*.toml;*.txt;*.args;*.cfg)|*.json;*.toml;*.txt;*.args;*.cfg|所有文件 (*.*)|*.*"),
                 Multiselect = true,
                 CheckFileExists = true
             };
-            if (Directory.Exists(SelectedTrainerBinding.ConfigurationDirectory))
+            string sourceConfigurationDirectory = TryResolveConfigurationDirectory(SelectedSourceBinding);
+            if (Directory.Exists(sourceConfigurationDirectory))
             {
-                dialog.InitialDirectory = SelectedTrainerBinding.ConfigurationDirectory;
+                dialog.InitialDirectory = sourceConfigurationDirectory;
             }
             if (dialog.ShowDialog() != true)
             {
@@ -648,19 +660,23 @@ namespace CyanTools.ViewModel
                         path));
                 }
 
-                string? detectedBackendId = TrainingBridgeConfigService.DetectSourceBackend(files);
-                if (detectedBackendId != null)
+                string sourceBackendId = TrainingBridgeConfigService.DetectSourceBackend(files)
+                    ?? SelectedSourceBinding.BackendId;
+                TrainingBackendBinding detectedBinding = FindBindingForImportedFiles(files, sourceBackendId);
+                if (!string.Equals(SelectedSourceBinding.Id, detectedBinding.Id, StringComparison.OrdinalIgnoreCase))
                 {
-                    TrainingBackendBinding detectedBinding = FindBindingForImportedFiles(files, detectedBackendId);
-                    if (!string.Equals(SelectedTrainerBinding.Id, detectedBinding.Id, StringComparison.OrdinalIgnoreCase))
-                    {
-                        SelectedTrainerBinding = detectedBinding;
-                        AppendLog($"已自动识别训练器：{SelectedTrainerBinding.Name}。");
-                    }
+                    SelectedSourceBinding = detectedBinding;
+                    AppendLog($"已自动选择导入训练器：{SelectedSourceBinding.Name}。");
+                }
+
+                if (sourceBackendId == TrainingBridgeConfigService.DiffusionPipeBackendId && files.Count != 2)
+                {
+                    throw new InvalidOperationException(
+                        "Anima（diffusion-pipe）需要同时选择训练 TOML 和数据集 TOML 两个配置文件。");
                 }
 
                 IReadOnlyDictionary<string, string> imported = TrainingBridgeConfigService.Import(
-                    SelectedTrainerBinding.BackendId,
+                    sourceBackendId,
                     files);
                 MergeParameters(imported);
                 if (string.IsNullOrWhiteSpace(ProjectName))
@@ -669,7 +685,7 @@ namespace CyanTools.ViewModel
                 }
                 GeneratedFiles.Clear();
                 SelectedGeneratedFile = null;
-                StatusMessage = $"已导入 {SelectedTrainerBinding.Name} 配置：{files.Count} 个文件，映射 {imported.Count} 个参数。";
+                StatusMessage = $"已导入 {SelectedSourceBinding.Name} 配置：{files.Count} 个文件，映射 {imported.Count} 个参数。";
                 AppendLog(StatusMessage);
             }
             catch (Exception exception)
@@ -682,12 +698,46 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private async Task StartTrainingAsync()
+        {
+            if (string.IsNullOrWhiteSpace(ProjectName))
+            {
+                ShowError("开始训练失败", new InvalidOperationException("请先填写并保存配置文件名称。"));
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                if (!SaveProject())
+                {
+                    return;
+                }
+
+                Dictionary<string, string> values = BuildValues();
+                TrainingBackendLaunchPlan plan = await Task.Run(() =>
+                    _trainingRunner.Prepare(ProjectName, SelectedTargetBinding, values));
+                ApplyGeneratedFiles(plan.GeneratedFiles);
+                Process process = await Task.Run(() => _trainingRunner.Start(plan));
+                StatusMessage = $"已启动 {SelectedTargetBinding.Name} 训练（进程 {process.Id}）。配置：{plan.RunDirectory}";
+                AppendLog(StatusMessage);
+            }
+            catch (Exception exception)
+            {
+                ShowError("开始训练失败", exception);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
         private void PreviewExport()
         {
             try
             {
                 IReadOnlyList<TrainingBridgeConfigFile> files = GenerateFiles();
-                StatusMessage = $"已生成 {SelectedTrainerBinding.Name} 配置预览：{files.Count} 个文件。";
+                StatusMessage = $"已生成 {SelectedTargetBinding.Name} 配置预览：{files.Count} 个文件。";
                 AppendLog(StatusMessage);
             }
             catch (Exception exception)
@@ -698,70 +748,68 @@ namespace CyanTools.ViewModel
 
         private void ExportConfig()
         {
-            IReadOnlyList<TrainingBridgeConfigFile> files;
             try
             {
-                files = GenerateFiles();
-            }
-            catch (Exception exception)
-            {
-                ShowError("生成导出配置失败", exception);
-                return;
-            }
-
-            string destinationDirectory = SelectedTrainerBinding.ConfigurationDirectory;
-            if (string.IsNullOrWhiteSpace(destinationDirectory))
-            {
-                ShowError("导出配置失败", new InvalidOperationException("所选导出训练器未设置配置文件目录。"));
-                return;
-            }
-
-            string[] existingFiles = files
-                .Select(file => Path.Combine(destinationDirectory, file.FileName))
-                .Where(File.Exists)
-                .ToArray();
-            if (existingFiles.Length > 0)
-            {
-                MessageBoxResult overwrite = MessageBox.Show(
-                    $"目标目录中已有 {existingFiles.Length} 个同名文件，是否覆盖？",
-                    "覆盖训练配置",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-                if (overwrite != MessageBoxResult.Yes)
+                IReadOnlyList<TrainingBridgeConfigFile> files = GenerateFiles();
+                string destinationDirectory = ResolveConfigurationDirectory(SelectedTargetBinding);
+                if (string.IsNullOrWhiteSpace(destinationDirectory))
                 {
-                    return;
+                    throw new InvalidOperationException("所选训练器没有配置文件目录。");
                 }
-            }
 
-            try
-            {
+                string[] existingFiles = files
+                    .Select(file => Path.Combine(destinationDirectory, file.FileName))
+                    .Where(File.Exists)
+                    .ToArray();
+                if (existingFiles.Length > 0)
+                {
+                    MessageBoxResult overwrite = MessageBox.Show(
+                        $"目标目录中已有 {existingFiles.Length} 个同名文件，是否覆盖？",
+                        "覆盖训练配置",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+                    if (overwrite != MessageBoxResult.Yes)
+                    {
+                        return;
+                    }
+                }
+
                 Directory.CreateDirectory(destinationDirectory);
                 var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-                foreach (var file in files)
+                foreach (TrainingBridgeConfigFile file in files)
                 {
-                    File.WriteAllText(Path.Combine(destinationDirectory, file.FileName), file.Content, encoding);
+                    File.WriteAllText(
+                        Path.Combine(destinationDirectory, file.FileName),
+                        file.Content,
+                        encoding);
                 }
-                StatusMessage = $"已导出 {SelectedTrainerBinding.Name} 配置：{files.Count} 个文件。";
+
+                StatusMessage = $"已导出 {SelectedTargetBinding.Name} 配置：{files.Count} 个文件。";
                 AppendLog($"{StatusMessage} 目录：{destinationDirectory}");
             }
             catch (Exception exception)
             {
-                ShowError("写入配置文件失败", exception);
+                ShowError("导出训练配置失败", exception);
             }
         }
 
         private IReadOnlyList<TrainingBridgeConfigFile> GenerateFiles()
         {
             IReadOnlyList<TrainingBridgeConfigFile> files = TrainingBridgeConfigService.Export(
-                SelectedTrainerBinding.BackendId,
+                SelectedTargetBinding.BackendId,
                 BuildValues());
+            ApplyGeneratedFiles(files);
+            return files;
+        }
+
+        private void ApplyGeneratedFiles(IReadOnlyList<TrainingBridgeConfigFile> files)
+        {
             GeneratedFiles.Clear();
             foreach (var file in files)
             {
                 GeneratedFiles.Add(new TrainingBridgeGeneratedFileViewModel(file.FileName, file.Content));
             }
             SelectedGeneratedFile = GeneratedFiles.FirstOrDefault();
-            return files;
         }
 
         private void AddParameter()
@@ -881,17 +929,19 @@ namespace CyanTools.ViewModel
             DraftFileName = draft.Name;
             ProjectName = string.IsNullOrWhiteSpace(draft.ProjectName) ? draft.Name : draft.ProjectName;
             Notes = draft.Notes;
+            _selectedSourceBinding = FindBinding(
+                string.IsNullOrWhiteSpace(draft.SourceBindingId) ? draft.TargetBindingId : draft.SourceBindingId,
+                string.IsNullOrWhiteSpace(draft.SourceBackendId) ? draft.TargetBackendId : draft.SourceBackendId);
             _selectedTargetBinding = FindBinding(
                 string.IsNullOrWhiteSpace(draft.TargetBindingId) ? draft.SourceBindingId : draft.TargetBindingId,
                 string.IsNullOrWhiteSpace(draft.TargetBackendId) ? draft.SourceBackendId : draft.TargetBackendId);
-            _selectedSourceBinding = _selectedTargetBinding;
-            _selectedSourceBackend = FindBackend(_selectedTargetBinding.BackendId);
-            _selectedTargetBackend = _selectedSourceBackend;
-            OnPropertyChanged(nameof(SelectedTrainerBinding));
+            _selectedSourceBackend = FindBackend(_selectedSourceBinding.BackendId);
+            _selectedTargetBackend = FindBackend(_selectedTargetBinding.BackendId);
             OnPropertyChanged(nameof(SelectedSourceBinding));
             OnPropertyChanged(nameof(SelectedTargetBinding));
             OnPropertyChanged(nameof(SelectedSourceBackend));
             OnPropertyChanged(nameof(SelectedTargetBackend));
+            OnPropertyChanged(nameof(IsDiffusionPipeTarget));
             OnPropertyChanged(nameof(VisibleParameters));
             ReplaceParameters(draft.Values);
             _suppressParameterChanges = false;
@@ -902,26 +952,31 @@ namespace CyanTools.ViewModel
             AppendLog(StatusMessage);
         }
 
+        private TrainingBridgeBackendOption FindBackend(string backendId)
+            => BackendOptions.FirstOrDefault(option => option.Id == backendId) ?? BackendOptions[0];
+
         public void ReloadBackendBindings()
         {
+            string? sourceBindingId = _selectedSourceBinding?.Id;
             string? targetBindingId = _selectedTargetBinding?.Id;
+            string sourceBackendId = _selectedSourceBackend?.Id ?? TrainingBridgeConfigService.SdScriptsBackendId;
             string targetBackendId = _selectedTargetBackend?.Id ?? TrainingBridgeConfigService.SdScriptsBackendId;
 
             BackendBindings.Clear();
-            foreach (TrainingBackendBinding binding in _bindingStore.ListAll())
+            foreach (TrainingBackendBinding binding in _bindingStore.ListAll().Where(binding => binding.SupportsTraining))
             {
                 BackendBindings.Add(binding);
             }
 
+            _selectedSourceBinding = FindBinding(sourceBindingId, sourceBackendId);
             _selectedTargetBinding = FindBinding(targetBindingId, targetBackendId);
-            _selectedSourceBinding = _selectedTargetBinding;
-            _selectedSourceBackend = FindBackend(_selectedTargetBinding.BackendId);
-            _selectedTargetBackend = _selectedSourceBackend;
-            OnPropertyChanged(nameof(SelectedTrainerBinding));
+            _selectedSourceBackend = FindBackend(_selectedSourceBinding.BackendId);
+            _selectedTargetBackend = FindBackend(_selectedTargetBinding.BackendId);
             OnPropertyChanged(nameof(SelectedSourceBinding));
             OnPropertyChanged(nameof(SelectedTargetBinding));
             OnPropertyChanged(nameof(SelectedSourceBackend));
             OnPropertyChanged(nameof(SelectedTargetBackend));
+            OnPropertyChanged(nameof(IsDiffusionPipeTarget));
             OnPropertyChanged(nameof(VisibleParameters));
         }
 
@@ -938,10 +993,36 @@ namespace CyanTools.ViewModel
             string backendId)
             => BackendBindings.FirstOrDefault(binding =>
                     string.Equals(binding.BackendId, backendId, StringComparison.OrdinalIgnoreCase) &&
-                    files.Any(file => IsFileInConfigurationDirectory(file.SourcePath, binding.ConfigurationDirectory)))
+                    files.Any(file => IsFileInConfigurationDirectory(
+                        file.SourcePath,
+                        TryResolveConfigurationDirectory(binding))))
                 ?? FindBinding(null, backendId);
 
-        private static bool IsFileInConfigurationDirectory(string? filePath, string configurationDirectory)
+        private string ResolveConfigurationDirectory(TrainingBackendBinding binding)
+        {
+            if (string.IsNullOrWhiteSpace(binding.ConfigurationDirectory))
+            {
+                return string.Empty;
+            }
+
+            return _wslPathResolver.ResolveWindowsPath(binding, binding.ConfigurationDirectory);
+        }
+
+        private string TryResolveConfigurationDirectory(TrainingBackendBinding binding)
+        {
+            try
+            {
+                return ResolveConfigurationDirectory(binding);
+            }
+            catch
+            {
+                return binding.ConfigurationDirectory;
+            }
+        }
+
+        private static bool IsFileInConfigurationDirectory(
+            string? filePath,
+            string configurationDirectory)
         {
             if (string.IsNullOrWhiteSpace(filePath) || string.IsNullOrWhiteSpace(configurationDirectory))
             {
@@ -951,7 +1032,8 @@ namespace CyanTools.ViewModel
             try
             {
                 string directory = Path.GetFullPath(configurationDirectory)
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
                 string file = Path.GetFullPath(filePath);
                 return file.StartsWith(directory, StringComparison.OrdinalIgnoreCase);
             }
@@ -960,9 +1042,6 @@ namespace CyanTools.ViewModel
                 return filePath.StartsWith(configurationDirectory, StringComparison.OrdinalIgnoreCase);
             }
         }
-
-        private TrainingBridgeBackendOption FindBackend(string backendId)
-            => BackendOptions.FirstOrDefault(option => option.Id == backendId) ?? BackendOptions[0];
 
         private void RefreshDrafts(string? selectedId = null)
         {

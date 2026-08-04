@@ -64,17 +64,17 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding FolderPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Command="{Binding SelectFolderCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
                         ToolTip="选择输入路径"
                         Visibility="{Binding HasInheritedInputPath, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                     <ui:SymbolIcon Symbol="FolderOpen24" />
-                </Button>
+                </ui:Button>
 
                 <TextBlock Grid.Row="1"
                            Grid.Column="1"
@@ -111,7 +111,7 @@
             <Border Grid.Column="2"
                     Style="{StaticResource CyanToolbarSurfaceStyle}"
                     VerticalAlignment="Stretch">
-                <Button Command="{Binding DeleteFilesCommand}"
+                <ui:Button Command="{Binding DeleteFilesCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}"
                         VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
@@ -119,13 +119,13 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="删除其他文件" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Border>
         </Grid>
 
         <GroupBox Grid.Row="3"
                   Header="日志">
-            <TextBox Text="{Binding LogText, Mode=OneWay}"
+            <ui:TextBox Text="{Binding LogText, Mode=OneWay}"
                      Style="{StaticResource CyanLogTextBoxStyle}" />
         </GroupBox>
     </Grid>

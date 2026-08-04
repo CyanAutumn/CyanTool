@@ -166,7 +166,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择 Safetensors 模型",
+                Title = LocalizationManager.Translate("选择 Safetensors 模型"),
                 Filter = SafetensorsFilter,
                 Multiselect = false,
                 CheckFileExists = true
@@ -187,7 +187,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new SaveFileDialog
             {
-                Title = "选择输出 Safetensors 文件",
+                Title = LocalizationManager.Translate("选择输出 Safetensors 文件"),
                 Filter = SafetensorsFilter,
                 DefaultExt = ".safetensors",
                 AddExtension = true,

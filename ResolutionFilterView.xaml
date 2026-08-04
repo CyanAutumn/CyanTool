@@ -65,11 +65,11 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Content="..."
                         Command="{Binding BrowseInputCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
@@ -109,7 +109,7 @@
                                    Text="最小高度"
                                    Style="{StaticResource CyanFormLabelStyle}"
                                    IsEnabled="{Binding IsHeightFilterEnabled}" />
-                        <TextBox Grid.Column="2"
+                        <ui:TextBox Grid.Column="2"
                                  Text="{Binding MinHeight}"
                                  IsEnabled="{Binding IsHeightFilterEnabled}" />
                     </Grid>
@@ -129,7 +129,7 @@
                                    Text="最小宽度"
                                    Style="{StaticResource CyanFormLabelStyle}"
                                    IsEnabled="{Binding IsWidthFilterEnabled}" />
-                        <TextBox Grid.Column="2"
+                        <ui:TextBox Grid.Column="2"
                                  Text="{Binding MinWidth}"
                                  IsEnabled="{Binding IsWidthFilterEnabled}" />
                     </Grid>
@@ -152,7 +152,7 @@
                                    Text="最小分辨率"
                                    Style="{StaticResource CyanFormLabelStyle}"
                                    IsEnabled="{Binding IsResolutionFilterEnabled}" />
-                        <TextBox Grid.Column="2"
+                        <ui:TextBox Grid.Column="2"
                                  Text="{Binding MinResolutionWidth}"
                                  IsEnabled="{Binding IsResolutionFilterEnabled}" />
                         <TextBlock Grid.Column="3"
@@ -160,7 +160,7 @@
                                    VerticalAlignment="Center"
                                    Margin="8,0"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <TextBox Grid.Column="4"
+                        <ui:TextBox Grid.Column="4"
                                  Text="{Binding MinResolutionHeight}"
                                  IsEnabled="{Binding IsResolutionFilterEnabled}" />
                     </Grid>
@@ -182,7 +182,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Button Command="{Binding StartCommand}"
+                    <ui:Button Command="{Binding StartCommand}"
                             IsEnabled="{Binding IsStartButtonEnabled}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
                         <StackPanel Orientation="Horizontal">
@@ -190,7 +190,7 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="开始筛选" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
                     <ProgressBar Grid.Column="1"
                                  Value="{Binding ProgressValue}"
                                  Height="8"
@@ -201,7 +201,7 @@
 
             <GroupBox Grid.Row="1"
                       Header="日志">
-                <ListView ItemsSource="{Binding Logs}"
+                <ui:ListView ItemsSource="{Binding Logs}"
                           Style="{StaticResource CyanListBoxSurfaceStyle}" />
             </GroupBox>
         </Grid>

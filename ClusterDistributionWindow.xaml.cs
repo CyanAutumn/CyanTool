@@ -5,10 +5,11 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CyanTools
 {
-    public partial class ClusterDistributionWindow : Window
+    public partial class ClusterDistributionWindow : FluentWindow
     {
         private readonly string _outputRoot;
         private readonly ScaleTransform _imageScaleTransform = new(1d, 1d);

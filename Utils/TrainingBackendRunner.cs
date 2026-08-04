@@ -20,7 +20,7 @@ namespace CyanTools.Utils
         private const string WslSdScriptsEnvironment = "wsl-sd-scripts-cu128";
         private const string DiffusionPipeEnvironment = "diffusion-pipe-cu128";
         private const string WslCondaSource =
-            "{ cyan_conda_found=''; for cyan_conda_sh in \"$HOME/miniconda3/etc/profile.d/conda.sh\" \"$HOME/anaconda3/etc/profile.d/conda.sh\" \"/root/miniconda3/etc/profile.d/conda.sh\" \"/opt/conda/etc/profile.d/conda.sh\"; do if [ -f \"$cyan_conda_sh\" ]; then . \"$cyan_conda_sh\"; cyan_conda_found=1; break; fi; done; test -n \"$cyan_conda_found\"; }";
+            "{ cyan_conda_found=''; for cyan_conda_sh in \"$HOME/miniconda3/etc/profile.d/conda.sh\" \"$HOME/anaconda3/etc/profile.d/conda.sh\" \"/opt/conda/etc/profile.d/conda.sh\"; do if [ -f \"$cyan_conda_sh\" ]; then . \"$cyan_conda_sh\"; cyan_conda_found=1; break; fi; done; test -n \"$cyan_conda_found\"; }";
 
         private readonly string _managedRoot;
         private readonly string _runsRoot;
@@ -40,21 +40,42 @@ namespace CyanTools.Utils
             string backendId,
             IReadOnlyDictionary<string, string> values)
         {
+            TrainingBackendBinding binding = new TrainingBackendBindingStore(managedRoot: _managedRoot)
+                .ListAll()
+                .FirstOrDefault(candidate => string.Equals(
+                    candidate.BackendId,
+                    backendId,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"未找到训练器绑定：{backendId}");
+            return Prepare(configurationName, binding, values);
+        }
+
+        public TrainingBackendLaunchPlan Prepare(
+            string configurationName,
+            TrainingBackendBinding binding,
+            IReadOnlyDictionary<string, string> values)
+        {
             if (string.IsNullOrWhiteSpace(configurationName))
             {
                 throw new InvalidOperationException("请先填写并保存配置文件名称。");
             }
+            ArgumentNullException.ThrowIfNull(binding);
+            if (string.IsNullOrWhiteSpace(binding.BackendId) ||
+                string.IsNullOrWhiteSpace(binding.TrainerPath))
+            {
+                throw new InvalidOperationException("所选训练器绑定缺少训练器类型或根目录。");
+            }
 
             IReadOnlyDictionary<string, string> normalizedValues = TrainingBridgeConfigService.NormalizeValues(values);
-            IReadOnlyList<TrainingBridgeConfigFile> files = TrainingBridgeConfigService.Export(backendId, normalizedValues);
-            string runDirectory = CreateRunDirectory(configurationName, backendId);
+            IReadOnlyList<TrainingBridgeConfigFile> files = TrainingBridgeConfigService.Export(binding.BackendId, normalizedValues);
+            string runDirectory = CreateRunDirectory(configurationName, binding.BackendId);
             Directory.CreateDirectory(runDirectory);
 
             var generatedFiles = new List<TrainingBridgeConfigFile>(files.Count);
             foreach (TrainingBridgeConfigFile file in files)
             {
                 string content = file.Content;
-                if (backendId == TrainingBridgeConfigService.DiffusionPipeBackendId &&
+                if (binding.BackendId == TrainingBridgeConfigService.DiffusionPipeBackendId &&
                     string.Equals(file.FileName, "anima_train.toml", StringComparison.OrdinalIgnoreCase))
                 {
                     string datasetPath = TrainingBridgeConfigService.WindowsPathToWsl(
@@ -72,7 +93,7 @@ namespace CyanTools.Utils
                 generatedFiles.Add(new TrainingBridgeConfigFile(file.FileName, content));
             }
 
-            return BuildLaunchPlan(backendId, normalizedValues, runDirectory, generatedFiles);
+            return BuildLaunchPlan(binding, normalizedValues, runDirectory, generatedFiles);
         }
 
         public Process Start(TrainingBackendLaunchPlan plan)
@@ -96,39 +117,41 @@ namespace CyanTools.Utils
         }
 
         private TrainingBackendLaunchPlan BuildLaunchPlan(
-            string backendId,
+            TrainingBackendBinding binding,
             IReadOnlyDictionary<string, string> values,
             string runDirectory,
             IReadOnlyList<TrainingBridgeConfigFile> generatedFiles)
         {
-            return backendId switch
+            return binding.BackendId switch
             {
                 TrainingBridgeConfigService.SdScriptsBackendId => BuildSdScriptsPlan(
-                    backendId,
+                    binding,
                     values,
                     runDirectory,
                     generatedFiles,
                     isWsl: false),
                 TrainingBridgeConfigService.WslSdScriptsBackendId => BuildSdScriptsPlan(
-                    backendId,
+                    binding,
                     values,
                     runDirectory,
                     generatedFiles,
                     isWsl: true),
                 TrainingBridgeConfigService.AnimaFastLoraBackendId => BuildAnimaFastLoraPlan(
+                    binding,
                     values,
                     runDirectory,
                     generatedFiles),
                 TrainingBridgeConfigService.DiffusionPipeBackendId => BuildDiffusionPipePlan(
+                    binding,
                     values,
                     runDirectory,
                     generatedFiles),
-                _ => throw new InvalidOperationException($"不支持的训练器：{backendId}")
+                _ => throw new InvalidOperationException($"不支持的训练器：{binding.BackendId}")
             };
         }
 
         private TrainingBackendLaunchPlan BuildSdScriptsPlan(
-            string backendId,
+            TrainingBackendBinding binding,
             IReadOnlyDictionary<string, string> values,
             string runDirectory,
             IReadOnlyList<TrainingBridgeConfigFile> generatedFiles,
@@ -148,10 +171,10 @@ namespace CyanTools.Utils
 
             if (!isWsl)
             {
-                string repository = Path.Combine(_managedRoot, "repos", "sd-scripts");
-                string python = Path.Combine(_managedRoot, "venvs", "sd-scripts", "Scripts", "python.exe");
+                string repository = binding.TrainerPath;
+                string python = ResolveSdScriptsPython(binding);
                 return new TrainingBackendLaunchPlan(
-                    backendId,
+                    binding.BackendId,
                     values,
                     runDirectory,
                     generatedFiles,
@@ -167,11 +190,14 @@ namespace CyanTools.Utils
                     [python, Path.Combine(repository, trainingScript)]);
             }
 
+            string distribution = GetBindingValue(binding.WslDistribution, DefaultWslDistribution);
+            string condaEnvironment = GetBindingValue(binding.CondaEnvironment, WslSdScriptsEnvironment);
+            string trainerPath = ResolveWslTrainerPath(binding.TrainerPath);
             string command = string.Join(" ", new[]
             {
                 WslCondaSource,
-                $"conda activate {WslSdScriptsEnvironment}",
-                "cd ~/sd-scripts",
+                $"conda activate {ShellQuote(condaEnvironment)}",
+                $"cd {ShellPathQuote(trainerPath)}",
                 "PYTORCH_ALLOC_CONF=expandable_segments:True python -m accelerate.commands.accelerate_cli launch",
                 "--num_processes 1 --num_machines 1 --mixed_precision bf16 --dynamo_backend no",
                 "--gpu_ids 0 --num_cpu_threads_per_process 3",
@@ -179,17 +205,18 @@ namespace CyanTools.Utils
                 string.Join(" ", trainerArguments.Select(ShellQuote))
             });
             return new TrainingBackendLaunchPlan(
-                backendId,
+                binding.BackendId,
                 values,
                 runDirectory,
                 generatedFiles,
                 "wsl.exe",
-                ["-d", DefaultWslDistribution, "--", "bash", "-lc", command],
+                ["-d", distribution, "--", "bash", "-lc", command],
                 runDirectory,
                 Array.Empty<string>());
         }
 
         private TrainingBackendLaunchPlan BuildAnimaFastLoraPlan(
+            TrainingBackendBinding binding,
             IReadOnlyDictionary<string, string> values,
             string runDirectory,
             IReadOnlyList<TrainingBridgeConfigFile> generatedFiles)
@@ -201,7 +228,7 @@ namespace CyanTools.Utils
                     ? Path.Combine(runDirectory, "dataset.toml")
                     : argument)
                 .ToArray();
-            string trainingRoot = Path.Combine(_managedRoot, "repos", "anima-fast-lora", "external", "anima_lora");
+            string trainingRoot = binding.TrainerPath;
             string python = Path.Combine(trainingRoot, ".venv", "Scripts", "python.exe");
             return new TrainingBackendLaunchPlan(
                 TrainingBridgeConfigService.AnimaFastLoraBackendId,
@@ -221,17 +248,21 @@ namespace CyanTools.Utils
         }
 
         private TrainingBackendLaunchPlan BuildDiffusionPipePlan(
+            TrainingBackendBinding binding,
             IReadOnlyDictionary<string, string> values,
             string runDirectory,
             IReadOnlyList<TrainingBridgeConfigFile> generatedFiles)
         {
             string configurationPath = TrainingBridgeConfigService.WindowsPathToWsl(
                 Path.Combine(runDirectory, "anima_train.toml"));
+            string distribution = GetBindingValue(binding.WslDistribution, DefaultWslDistribution);
+            string condaEnvironment = GetBindingValue(binding.CondaEnvironment, DiffusionPipeEnvironment);
+            string trainerPath = ResolveWslTrainerPath(binding.TrainerPath);
             string command = string.Join(" ", new[]
             {
                 WslCondaSource,
-                $"conda activate {DiffusionPipeEnvironment}",
-                "cd ~/diffusion-pipe",
+                $"conda activate {ShellQuote(condaEnvironment)}",
+                $"cd {ShellPathQuote(trainerPath)}",
                 "export CUDA_HOME=$CONDA_PREFIX PATH=$CUDA_HOME/bin:$PATH",
                 "export PYTORCH_ALLOC_CONF=expandable_segments:True NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1",
                 "$CONDA_PREFIX/bin/deepspeed --num_gpus=1 train.py --deepspeed --config",
@@ -244,7 +275,7 @@ namespace CyanTools.Utils
                 runDirectory,
                 generatedFiles,
                 "wsl.exe",
-                ["-d", DefaultWslDistribution, "--", "bash", "-lc", command],
+                ["-d", distribution, "--", "bash", "-lc", command],
                 runDirectory,
                 Array.Empty<string>());
         }
@@ -327,10 +358,65 @@ namespace CyanTools.Utils
                 _ => "train_network.py"
             };
 
+        private string ResolveSdScriptsPython(TrainingBackendBinding binding)
+        {
+            string[] candidates = binding.IsManaged
+                ?
+                [
+                    Path.Combine(_managedRoot, "venvs", "sd-scripts", "Scripts", "python.exe"),
+                    Path.Combine(binding.TrainerPath, ".venv", "Scripts", "python.exe"),
+                    Path.Combine(binding.TrainerPath, "venv", "Scripts", "python.exe")
+                ]
+                :
+                [
+                    Path.Combine(binding.TrainerPath, ".venv", "Scripts", "python.exe"),
+                    Path.Combine(binding.TrainerPath, "venv", "Scripts", "python.exe")
+                ];
+            return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
+        }
+
         private static string GetValue(IReadOnlyDictionary<string, string> values, string key, string fallback = "")
             => values.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value)
                 ? value.Trim()
                 : fallback;
+
+        private static string GetBindingValue(string value, string fallback)
+            => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+        private static string ResolveWslTrainerPath(string value)
+        {
+            string path = value.Trim();
+            if (path.StartsWith(@"\\wsl.localhost\", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith(@"\\wsl$\", StringComparison.OrdinalIgnoreCase))
+            {
+                string[] segments = path.TrimStart('\\')
+                    .Split('\\', StringSplitOptions.RemoveEmptyEntries);
+                if (segments.Length >= 3)
+                {
+                    return "/" + string.Join('/', segments.Skip(2));
+                }
+            }
+            if (path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' &&
+                (path[2] == '\\' || path[2] == '/'))
+            {
+                return TrainingBridgeConfigService.WindowsPathToWsl(path);
+            }
+            return path.Replace('\\', '/');
+        }
+
+        private static string ShellPathQuote(string value)
+        {
+            string path = value.Trim();
+            if (path == "~")
+            {
+                return "\"$HOME\"";
+            }
+            if (path.StartsWith("~/", StringComparison.Ordinal))
+            {
+                return "\"$HOME\"/" + ShellQuote(path[2..]);
+            }
+            return ShellQuote(path);
+        }
 
         private static string ShellQuote(string value)
             => "'" + value.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";

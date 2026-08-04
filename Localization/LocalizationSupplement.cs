@@ -229,6 +229,10 @@ namespace CyanTools.Localization
             Add(translations, "配置文件", "Configuration Files", "設定ファイル");
             Add(translations, "配置文件名称", "Configuration File Name", "設定ファイル名");
             Add(translations, "训练器绑定", "Trainer Bindings", "トレーナーバインディング");
+            Add(translations, "运行环境路径绑定", "Runtime Path Bindings", "実行環境パスのバインディング");
+            Add(translations, "统一管理四个训练后端以及 ComfyUI、Webui Forge Neo 的 Windows / WSL2 路径。内置兼容路径只读且不代表已经安装；自定义绑定可新增、编辑和删除。", "Manage Windows and WSL2 paths for four training backends, ComfyUI, and Webui Forge Neo. Built-in compatibility paths are read-only and do not mean the software is installed; custom bindings can be added, edited, and removed.", "4 種類の学習バックエンド、ComfyUI、Webui Forge Neo の Windows / WSL2 パスを管理します。組み込み互換パスは読み取り専用で、インストール済みであることを示しません。カスタムバインディングは追加、編集、削除できます。");
+            Add(translations, "已绑定运行环境", "Bound Runtime", "関連付け済み実行環境");
+            Add(translations, "运行环境类型", "Runtime Type", "実行環境の種類");
             Add(translations, "CyanTools 安装的四个训练器会自动绑定到已知位置；也可添加已有训练器的根目录与配置文件目录。", "The four trainers installed by CyanTools are bound to their known locations automatically. You can also add an existing trainer's root and configuration directories.", "CyanTools がインストールした 4 種類のトレーナーは既知の場所に自動で関連付けられます。既存トレーナーのルートと設定フォルダーも追加できます。");
             Add(translations, "已绑定训练器", "Bound Trainer", "関連付け済みトレーナー");
             Add(translations, "新建绑定", "New Binding", "バインディングを新規作成");
@@ -239,13 +243,20 @@ namespace CyanTools.Localization
             Add(translations, "WSL 发行版（仅 WSL）", "WSL Distribution (WSL only)", "WSL ディストリビューション（WSL のみ）");
             Add(translations, "Conda 环境（仅 WSL）", "Conda Environment (WSL only)", "Conda 環境（WSL のみ）");
             Add(translations, "训练器根目录", "Trainer Root Directory", "トレーナーのルートフォルダー");
+            Add(translations, "程序根目录", "Application Root Directory", "アプリケーションのルートフォルダー");
             Add(translations, "配置文件目录", "Configuration Directory", "設定ファイルフォルダー");
+            Add(translations, "工作流目录", "Workflow Directory", "ワークフローフォルダー");
             Add(translations, "选择目录", "Choose Directory", "フォルダーを選択");
+            Add(translations, "打开", "Open", "開く");
+            Add(translations, "检测绑定路径", "Check Binding Paths", "バインディングパスを確認");
+            Add(translations, "训练类型绑定由“训练”页面用于配置导入、导出和启动。", "Training bindings are used by the Training page for configuration import, export, and launch.", "学習バインディングは「学習」ページで設定のインポート、エクスポート、起動に使用されます。");
+            Add(translations, "ComfyUI / Webui Forge Neo 的绑定会由“跑图管理”页用于启动、运行日志和模型目录管理。", "ComfyUI / Webui Forge Neo bindings are used by Image Generation Management for launching, live logs, and model-folder management.", "ComfyUI / Webui Forge Neo のバインディングは、画像生成管理の起動、ライブログ、モデルフォルダ管理に使用されます。");
             Add(translations, "训练器", "Trainer", "トレーナー");
             Add(translations, "导出到训练器", "Export to Trainer", "トレーナーへエクスポート");
             Add(translations, "新建", "New", "新規");
             Add(translations, "保存配置文件", "Save Configuration File", "設定ファイルを保存");
             Add(translations, "删除", "Delete", "削除");
+            Add(translations, "项目名称", "Project Name", "プロジェクト名");
             Add(translations, "项目备注", "Project Notes", "プロジェクトメモ");
             Add(translations, "参数映射", "Parameter Mapping", "パラメーターマッピング");
             Add(translations, "导入配置", "Import Configuration", "設定をインポート");
@@ -283,6 +294,11 @@ namespace CyanTools.Localization
             Add(translations, "后端参数键", "Backend Parameter Key", "バックエンドパラメーターキー");
             Add(translations, "模型家族", "Model Family", "モデルファミリー");
             Add(translations, "训练集根目录", "Training Dataset Root", "学習データセットルート");
+            Add(translations, "根据数据集图片计算分桶", "Calculate Buckets from Dataset Images", "データセット画像からバケットを計算");
+            Add(translations, "扫描训练集根目录及子目录内的图片，按训练分辨率和 16 像素对齐自动填写 size_buckets。", "Scan images in the training dataset root and its subfolders, then fill size_buckets automatically using the training resolution and 16-pixel alignment.", "学習データセットのルートとサブフォルダー内の画像を走査し、学習解像度と 16 ピクセル単位に合わせて size_buckets を自動入力します。");
+            Add(translations, "输入名称后保存：同名配置文件会覆盖，不存在则创建。", "Enter a name and save. A configuration file with the same name is overwritten; otherwise, a new one is created.", "名前を入力して保存します。同名の設定ファイルは上書きし、存在しない場合は新規作成します。");
+            Add(translations, "确定删除草稿“{0}”吗？", "Delete draft \"{0}\"?", "下書き「{0}」を削除しますか？");
+            Add(translations, "删除训练草稿", "Delete Training Draft", "学習下書きを削除");
             Add(translations, "输出目录", "Output Directory", "出力ディレクトリ");
             Add(translations, "基础模型路径", "Base Model Path", "ベースモデルパス");
             Add(translations, "数据集分辨率", "Dataset Resolution", "データセット解像度");
@@ -598,6 +614,20 @@ namespace CyanTools.Localization
             Add(translations, "训练输出整理", "Training Output Organizer", "学習出力整理");
             Add(translations, "图片重命名", "Image Rename", "画像リネーム");
             Add(translations, "数据集下载器", "Dataset Downloader", "データセットダウンローダー");
+            Add(translations, "跑图管理", "Image Generation Management", "画像生成管理");
+            Add(translations, "启动 ComfyUI 与 Webui Forge Neo，查看实时日志并快捷管理模型目录。", "Launch ComfyUI and Webui Forge Neo, view live logs, and quickly manage model folders.", "ComfyUI と Webui Forge Neo を起動し、ライブログとモデルフォルダを管理します。");
+            Add(translations, "运行环境路径绑定", "Runtime Path Binding", "実行環境パスの関連付け");
+            Add(translations, "刷新绑定", "Refresh Bindings", "関連付けを更新");
+            Add(translations, "启动", "Start", "起動");
+            Add(translations, "停止", "Stop", "停止");
+            Add(translations, "根目录", "Root Folder", "ルートフォルダ");
+            Add(translations, "模型目录", "Model Folders", "モデルフォルダ");
+            Add(translations, "打开根目录", "Open Root", "ルートを開く");
+            Add(translations, "节点文件夹", "Node Folder", "ノードフォルダー");
+            Add(translations, "快捷打开当前运行环境的常用资源目录；子目录不存在时会自动创建。", "Quickly open common resource folders for the current runtime; missing subfolders are created automatically.", "現在の実行環境でよく使うリソースフォルダーを開き、存在しないサブフォルダーは自動作成します。");
+            Add(translations, "输出日志", "Output Log", "出力ログ");
+            Add(translations, "清空日志", "Clear Log", "ログをクリア");
+            Add(translations, "实时合并显示标准输出与错误输出。", "Shows standard output and error output together in real time.", "標準出力と標準エラーをリアルタイムで一緒に表示します。");
         }
 
         private static void Add(

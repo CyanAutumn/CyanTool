@@ -172,7 +172,7 @@ public sealed class PathUiConventionsTests
         string content = ReadRepoFile("TrainingSetBalancerView.xaml");
         Match selectedFolderPathTextBox = Regex.Match(
             content,
-            "<TextBox[^>]*SelectedFolderPath[^>]*/>",
+            "<ui:TextBox[^>]*SelectedFolderPath[^>]*/>",
             RegexOptions.Singleline);
 
         Assert.True(selectedFolderPathTextBox.Success);
@@ -279,7 +279,7 @@ public sealed class PathUiConventionsTests
 
         Match logTextBox = Regex.Match(
             content,
-            "<TextBox[^>]*Text=\"\\{Binding LogText[^\\\"]*\\}\"[^>]*/>",
+            "<ui:TextBox[^>]*Text=\"\\{Binding LogText[^\\\"]*\\}\"[^>]*/>",
             RegexOptions.Singleline);
 
         Assert.True(logTextBox.Success);

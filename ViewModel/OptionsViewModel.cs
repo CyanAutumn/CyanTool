@@ -24,6 +24,7 @@ namespace CyanTools.ViewModel
         private const string CudnnWindowsDownloadUrl = "https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/";
         private readonly TrainingBackendDeployer _trainingBackendDeployer = new();
         private readonly TrainingBackendBindingStore _trainingBackendBindingStore = new();
+        private readonly WslPathResolver _wslPathResolver = new();
         private readonly Dictionary<string, TrainingBackendStatus> _trainingBackendStatuses = new(StringComparer.OrdinalIgnoreCase);
         private CancellationTokenSource? _trainingDeploymentCancellation;
         private bool _isBusy;
@@ -35,6 +36,18 @@ namespace CyanTools.ViewModel
         private string _animaFastLoraStatus = "尚未检测 Anima Fast LoRA Windows。";
         private string _wslSdScriptsStatus = "尚未检测 wsl-sd-scripts。";
         private string _diffusionPipeStatus = "尚未检测 diffusion-pipe / WSL2 环境。";
+        private string _sdScriptsInstallState = "检测中";
+        private string _animaFastLoraInstallState = "检测中";
+        private string _wslSdScriptsInstallState = "检测中";
+        private string _diffusionPipeInstallState = "检测中";
+        private string _comfyUiWindowsStatus = "尚未检测 ComfyUI Windows 路径。";
+        private string _comfyUiWslStatus = "尚未检测 ComfyUI WSL 路径。";
+        private string _forgeNeoWindowsStatus = "尚未检测 Webui Forge Neo Windows 路径。";
+        private string _forgeNeoWslStatus = "尚未检测 Webui Forge Neo WSL 路径。";
+        private string _comfyUiWindowsInstallState = "检测中";
+        private string _comfyUiWslInstallState = "检测中";
+        private string _forgeNeoWindowsInstallState = "检测中";
+        private string _forgeNeoWslInstallState = "检测中";
         private string _wslSdScriptsProxyPort = "7897";
         private string _diffusionPipeProxyPort = "7897";
         private TrainingBackendMirrorOption _selectedWslMirror = null!;
@@ -47,6 +60,7 @@ namespace CyanTools.ViewModel
         private string _bindingConfigurationDirectory = string.Empty;
         private string _bindingWslDistribution = "Ubuntu";
         private string _bindingCondaEnvironment = string.Empty;
+        private string _pathBindingStatus = "可检测并打开绑定目录；路径保存后可在“跑图管理”页启动。";
 
         public OptionsViewModel()
         {
@@ -67,7 +81,11 @@ namespace CyanTools.ViewModel
                 new(TrainingBridgeConfigService.SdScriptsBackendId, "sd-scripts / Windows"),
                 new(TrainingBridgeConfigService.AnimaFastLoraBackendId, "Anima Fast LoRA / Windows"),
                 new(TrainingBridgeConfigService.WslSdScriptsBackendId, "wsl-sd-scripts / WSL2"),
-                new(TrainingBridgeConfigService.DiffusionPipeBackendId, "diffusion-pipe / WSL2")
+                new(TrainingBridgeConfigService.DiffusionPipeBackendId, "diffusion-pipe / WSL2"),
+                new(RuntimePathBindingBackendIds.ComfyUiWindows, "ComfyUI / Windows"),
+                new(RuntimePathBindingBackendIds.ComfyUiWsl, "ComfyUI / WSL2"),
+                new(RuntimePathBindingBackendIds.ForgeNeoWindows, "Webui Forge Neo / Windows"),
+                new(RuntimePathBindingBackendIds.ForgeNeoWsl, "Webui Forge Neo / WSL2")
             };
             _selectedBindingBackend = BindingBackendOptions[0];
 
@@ -93,11 +111,17 @@ namespace CyanTools.ViewModel
             DeleteTrainingBackendBindingCommand = new RelayCommand(DeleteTrainingBackendBinding, () => !IsBusy && SelectedTrainingBackendBinding is { IsManaged: false });
             SelectBindingTrainerPathCommand = new RelayCommand(() => SelectBindingDirectory(isConfigurationDirectory: false), () => !IsBusy && !IsManagedBindingSelected);
             SelectBindingConfigurationDirectoryCommand = new RelayCommand(() => SelectBindingDirectory(isConfigurationDirectory: true), () => !IsBusy && !IsManagedBindingSelected);
+            CheckPathBindingCommand = new RelayCommand(CheckPathBinding, () => !IsBusy);
+            OpenBindingTrainerPathCommand = new RelayCommand(() => OpenBindingDirectory(isConfigurationDirectory: false), () => !IsBusy);
+            OpenBindingConfigurationDirectoryCommand = new RelayCommand(() => OpenBindingDirectory(isConfigurationDirectory: true), () => !IsBusy);
+            CheckInferenceBackendCommand = new RelayCommand(async parameter => await CheckInferenceBackendAsync(GetBackendId(parameter)), _ => !IsBusy);
+            OpenInferenceBackendDirectoryCommand = new RelayCommand(parameter => OpenInferenceBackendDirectory(GetBackendId(parameter)), _ => !IsBusy);
 
             ReloadTrainingBackendBindings();
             RefreshNvidiaAppStatus();
             _trainingBackendDeployer.RestoreTasksAndLogs(new Progress<string>(AddLog));
             _ = InitializeTrainingDeploymentAsync();
+            _ = RefreshAllInferenceBackendStatusesAsync();
         }
 
         public ObservableCollection<string> LogLines { get; }
@@ -116,6 +140,7 @@ namespace CyanTools.ViewModel
                     LoadTrainingBackendBindingEditor(value);
                     OnPropertyChanged(nameof(IsManagedBindingSelected));
                     OnPropertyChanged(nameof(CanEditTrainingBackendBinding));
+                    NotifyBindingMetadataChanged();
                     RaiseCommandStates();
                 }
             }
@@ -124,7 +149,14 @@ namespace CyanTools.ViewModel
         public TrainingBridgeBackendOption SelectedBindingBackend
         {
             get => _selectedBindingBackend;
-            set => SetField(ref _selectedBindingBackend, value);
+            set
+            {
+                if (value != null && SetField(ref _selectedBindingBackend, value))
+                {
+                    ApplySuggestedBindingPaths(value.Id);
+                    NotifyBindingMetadataChanged();
+                }
+            }
         }
 
         public string BindingName
@@ -159,6 +191,25 @@ namespace CyanTools.ViewModel
 
         public bool IsManagedBindingSelected => SelectedTrainingBackendBinding?.IsManaged == true;
         public bool CanEditTrainingBackendBinding => !IsManagedBindingSelected;
+        public bool IsSelectedBindingWsl => RuntimePathBindingBackendIds.IsWsl(SelectedBindingBackend?.Id);
+        public string BindingRootDirectoryLabel
+            => RuntimePathBindingBackendIds.SupportsTraining(SelectedBindingBackend?.Id)
+                ? "训练器根目录"
+                : "程序根目录";
+        public string BindingConfigurationDirectoryLabel
+            => SelectedBindingBackend?.Id is RuntimePathBindingBackendIds.ComfyUiWindows or RuntimePathBindingBackendIds.ComfyUiWsl
+                ? "工作流目录"
+                : "配置文件目录";
+        public string BindingCapabilityText
+            => RuntimePathBindingBackendIds.SupportsTraining(SelectedBindingBackend?.Id)
+                ? "训练类型绑定由“训练”页面用于配置导入、导出和启动。"
+                : "ComfyUI / Webui Forge Neo 的绑定会由“跑图管理”页用于启动、运行日志和模型目录管理。";
+
+        public string PathBindingStatus
+        {
+            get => _pathBindingStatus;
+            set => SetField(ref _pathBindingStatus, value);
+        }
 
         public bool IsBusy
         {
@@ -220,6 +271,78 @@ namespace CyanTools.ViewModel
             set => SetField(ref _diffusionPipeStatus, value);
         }
 
+        public string SdScriptsInstallState
+        {
+            get => _sdScriptsInstallState;
+            set => SetField(ref _sdScriptsInstallState, value);
+        }
+
+        public string AnimaFastLoraInstallState
+        {
+            get => _animaFastLoraInstallState;
+            set => SetField(ref _animaFastLoraInstallState, value);
+        }
+
+        public string WslSdScriptsInstallState
+        {
+            get => _wslSdScriptsInstallState;
+            set => SetField(ref _wslSdScriptsInstallState, value);
+        }
+
+        public string DiffusionPipeInstallState
+        {
+            get => _diffusionPipeInstallState;
+            set => SetField(ref _diffusionPipeInstallState, value);
+        }
+
+        public string ComfyUiWindowsStatus
+        {
+            get => _comfyUiWindowsStatus;
+            set => SetField(ref _comfyUiWindowsStatus, value);
+        }
+
+        public string ComfyUiWslStatus
+        {
+            get => _comfyUiWslStatus;
+            set => SetField(ref _comfyUiWslStatus, value);
+        }
+
+        public string ForgeNeoWindowsStatus
+        {
+            get => _forgeNeoWindowsStatus;
+            set => SetField(ref _forgeNeoWindowsStatus, value);
+        }
+
+        public string ForgeNeoWslStatus
+        {
+            get => _forgeNeoWslStatus;
+            set => SetField(ref _forgeNeoWslStatus, value);
+        }
+
+        public string ComfyUiWindowsInstallState
+        {
+            get => _comfyUiWindowsInstallState;
+            set => SetField(ref _comfyUiWindowsInstallState, value);
+        }
+
+        public string ComfyUiWslInstallState
+        {
+            get => _comfyUiWslInstallState;
+            set => SetField(ref _comfyUiWslInstallState, value);
+        }
+
+        public string ForgeNeoWindowsInstallState
+        {
+            get => _forgeNeoWindowsInstallState;
+            set => SetField(ref _forgeNeoWindowsInstallState, value);
+        }
+
+        public string ForgeNeoWslInstallState
+        {
+            get => _forgeNeoWslInstallState;
+            set => SetField(ref _forgeNeoWslInstallState, value);
+        }
+
         public string WslSdScriptsProxyPort
         {
             get => _wslSdScriptsProxyPort;
@@ -272,6 +395,11 @@ namespace CyanTools.ViewModel
         public ICommand DeleteTrainingBackendBindingCommand { get; }
         public ICommand SelectBindingTrainerPathCommand { get; }
         public ICommand SelectBindingConfigurationDirectoryCommand { get; }
+        public ICommand CheckPathBindingCommand { get; }
+        public ICommand OpenBindingTrainerPathCommand { get; }
+        public ICommand OpenBindingConfigurationDirectoryCommand { get; }
+        public ICommand CheckInferenceBackendCommand { get; }
+        public ICommand OpenInferenceBackendDirectoryCommand { get; }
 
         public async Task InstallCudnnPackageAsync(string packagePath)
         {
@@ -458,7 +586,7 @@ namespace CyanTools.ViewModel
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择 cuDNN Windows zip 安装包",
+                Title = LocalizationManager.Translate("选择 cuDNN Windows zip 安装包"),
                 Filter = "cuDNN zip package (*.zip)|*.zip|All files (*.*)|*.*",
                 CheckFileExists = true,
                 Multiselect = false
@@ -870,6 +998,7 @@ namespace CyanTools.ViewModel
                     new Progress<string>(AddLog));
                 _trainingBackendStatuses[backendId] = status;
                 SetBackendStatus(backendId, status.SummaryZh);
+                SetTrainingBackendInstallState(backendId, ToInstallStateLabel(status.State));
                 return status;
             }
             catch (Exception ex)
@@ -883,6 +1012,7 @@ namespace CyanTools.ViewModel
                 };
                 _trainingBackendStatuses[backendId] = status;
                 SetBackendStatus(backendId, status.SummaryZh);
+                SetTrainingBackendInstallState(backendId, "安装异常");
                 AddLog(status.SummaryZh);
                 if (showFailureDialog)
                 {
@@ -1044,6 +1174,8 @@ namespace CyanTools.ViewModel
             BindingConfigurationDirectory = string.Empty;
             BindingWslDistribution = "Ubuntu";
             BindingCondaEnvironment = string.Empty;
+            ApplySuggestedBindingPaths(SelectedBindingBackend.Id);
+            PathBindingStatus = "正在新建路径绑定；选择类型并确认目录后保存。";
             OnPropertyChanged(nameof(IsManagedBindingSelected));
             OnPropertyChanged(nameof(CanEditTrainingBackendBinding));
             RaiseCommandStates();
@@ -1072,7 +1204,7 @@ namespace CyanTools.ViewModel
             {
                 if (IsManagedBindingSelected)
                 {
-                    throw new InvalidOperationException("CyanTools 自动安装的训练器会自动绑定，无需手动保存。请新建一个已有训练器绑定。");
+                    throw new InvalidOperationException("CyanTools 托管的训练路径绑定为只读；请新建一个自定义路径绑定。");
                 }
 
                 string bindingId = SelectedTrainingBackendBinding?.Id ?? Guid.NewGuid().ToString("D");
@@ -1089,12 +1221,17 @@ namespace CyanTools.ViewModel
                 };
                 _trainingBackendBindingStore.SaveCustom(binding);
                 ReloadTrainingBackendBindings(binding.Id);
-                AddLog($"已保存训练器绑定：{binding.Name}。");
+                if (RuntimePathBindingBackendIds.IsInferenceFrontend(binding.BackendId))
+                {
+                    _ = CheckInferenceBackendAsync(binding.BackendId, writeLog: false);
+                }
+                PathBindingStatus = $"已保存路径绑定：{binding.Name}。";
+                AddLog(PathBindingStatus);
             }
             catch (Exception exception)
             {
-                AddLog($"保存训练器绑定失败：{exception.Message}");
-                MessageBox.Show(exception.Message, "训练器绑定", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AddLog($"保存路径绑定失败：{exception.Message}");
+                MessageBox.Show(exception.Message, "路径绑定", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -1107,8 +1244,8 @@ namespace CyanTools.ViewModel
             }
 
             if (MessageBox.Show(
-                    $"确定删除训练器绑定“{binding.Name}”吗？不会删除训练器文件。",
-                    "删除训练器绑定",
+                    $"确定删除路径绑定“{binding.Name}”吗？不会删除任何外部程序或目录。",
+                    "删除路径绑定",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
@@ -1117,29 +1254,280 @@ namespace CyanTools.ViewModel
 
             _trainingBackendBindingStore.DeleteCustom(binding.Id);
             ReloadTrainingBackendBindings();
-            AddLog($"已删除训练器绑定：{binding.Name}。");
+            if (RuntimePathBindingBackendIds.IsInferenceFrontend(binding.BackendId))
+            {
+                _ = CheckInferenceBackendAsync(binding.BackendId, writeLog: false);
+            }
+            PathBindingStatus = $"已删除路径绑定：{binding.Name}；外部文件未改动。";
+            AddLog(PathBindingStatus);
         }
 
         private void SelectBindingDirectory(bool isConfigurationDirectory)
         {
+            string configuredPath = isConfigurationDirectory
+                ? BindingConfigurationDirectory
+                : BindingTrainerPath;
             using var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = isConfigurationDirectory ? "选择配置文件目录" : "选择训练器根目录"
+                Title = isConfigurationDirectory
+                    ? $"选择{BindingConfigurationDirectoryLabel}"
+                    : $"选择{BindingRootDirectoryLabel}"
             };
+            try
+            {
+                string initialDirectory = ResolveEditorPath(configuredPath);
+                if (Directory.Exists(initialDirectory))
+                {
+                    dialog.InitialDirectory = initialDirectory;
+                }
+            }
+            catch
+            {
+
+            }
             if (dialog.ShowDialog() != CommonFileDialogResult.Ok)
             {
                 return;
             }
 
+            string selectedPath = IsSelectedBindingWsl
+                ? _wslPathResolver.ToPortableWslPath(BindingWslDistribution, dialog.FileName)
+                : dialog.FileName;
             if (isConfigurationDirectory)
             {
-                BindingConfigurationDirectory = dialog.FileName;
+                BindingConfigurationDirectory = selectedPath;
             }
             else
             {
-                BindingTrainerPath = dialog.FileName;
+                BindingTrainerPath = selectedPath;
             }
+        }
+
+        private void CheckPathBinding()
+        {
+            try
+            {
+                string root = ResolveEditorPath(BindingTrainerPath);
+                string configuration = ResolveEditorPath(BindingConfigurationDirectory);
+                bool rootExists = Directory.Exists(root);
+                bool configurationExists = Directory.Exists(configuration);
+                PathBindingStatus =
+                    $"根目录：{(rootExists ? "可用" : "未找到")}；{BindingConfigurationDirectoryLabel}：{(configurationExists ? "可用" : "未找到")}。";
+                AddLog($"路径绑定检测：{SelectedBindingBackend?.Label}；{PathBindingStatus}");
+            }
+            catch (Exception exception)
+            {
+                PathBindingStatus = $"路径检测失败：{exception.Message}";
+                AddLog(PathBindingStatus);
+            }
+        }
+
+        private async Task RefreshAllInferenceBackendStatusesAsync()
+        {
+            string[] backendIds =
+            [
+                RuntimePathBindingBackendIds.ComfyUiWindows,
+                RuntimePathBindingBackendIds.ComfyUiWsl,
+                RuntimePathBindingBackendIds.ForgeNeoWindows,
+                RuntimePathBindingBackendIds.ForgeNeoWsl
+            ];
+            await Task.WhenAll(backendIds.Select(id => CheckInferenceBackendAsync(id, writeLog: false)));
+        }
+
+        private async Task CheckInferenceBackendAsync(string backendId, bool writeLog = true)
+        {
+            TrainingBackendBinding? binding = GetPreferredInferenceBinding(backendId);
+            if (binding == null)
+            {
+                SetInferenceBackendStatus(backendId, "没有可用的路径绑定。", "未安装");
+                return;
+            }
+
+            SetInferenceBackendStatus(backendId, $"正在检测 {binding.Name}...", "检测中");
+            try
+            {
+                InferenceBackendInstallationStatus inspection = await Task.Run(() =>
+                    InferenceBackendInstallationDetector.Inspect(binding, ResolveBindingPath));
+                SetInferenceBackendStatus(backendId, inspection.Summary, inspection.InstallState);
+                if (writeLog)
+                {
+                    AddLog($"跑图后端检测：{GetInferenceBackendLabel(backendId)}；{inspection.Summary}");
+                }
+            }
+            catch (Exception exception)
+            {
+                string summary = $"路径检测失败：{exception.Message}";
+                SetInferenceBackendStatus(backendId, summary, "安装异常");
+                if (writeLog)
+                {
+                    AddLog($"{GetInferenceBackendLabel(backendId)} {summary}");
+                }
+            }
+        }
+
+        private void OpenInferenceBackendDirectory(string backendId)
+        {
+            try
+            {
+                TrainingBackendBinding binding = GetPreferredInferenceBinding(backendId)
+                    ?? throw new InvalidOperationException("没有可用的路径绑定。");
+                string root = ResolveBindingPath(binding, binding.TrainerPath);
+                if (!Directory.Exists(root))
+                {
+                    throw new DirectoryNotFoundException($"目录不存在：{root}");
+                }
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = true
+                };
+                startInfo.ArgumentList.Add(root);
+                Process.Start(startInfo);
+                AddLog($"已打开 {GetInferenceBackendLabel(backendId)}：{root}");
+            }
+            catch (Exception exception)
+            {
+                AddLog($"打开 {GetInferenceBackendLabel(backendId)} 目录失败：{exception.Message}");
+                MessageBox.Show(exception.Message, "跑图后端路径", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private TrainingBackendBinding? GetPreferredInferenceBinding(string backendId)
+            => TrainingBackendBindings
+                .Where(binding => string.Equals(binding.BackendId, backendId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(binding => binding.IsManaged ? 1 : 0)
+                .FirstOrDefault();
+
+        private string ResolveBindingPath(TrainingBackendBinding binding, string path)
+            => binding.IsWsl
+                ? _wslPathResolver.ResolveWindowsPath(binding, path)
+                : Path.GetFullPath(path.Trim());
+
+        private void SetInferenceBackendStatus(string backendId, string summary, string installState)
+        {
+            switch (backendId)
+            {
+                case RuntimePathBindingBackendIds.ComfyUiWindows:
+                    ComfyUiWindowsStatus = summary;
+                    ComfyUiWindowsInstallState = installState;
+                    break;
+                case RuntimePathBindingBackendIds.ComfyUiWsl:
+                    ComfyUiWslStatus = summary;
+                    ComfyUiWslInstallState = installState;
+                    break;
+                case RuntimePathBindingBackendIds.ForgeNeoWindows:
+                    ForgeNeoWindowsStatus = summary;
+                    ForgeNeoWindowsInstallState = installState;
+                    break;
+                case RuntimePathBindingBackendIds.ForgeNeoWsl:
+                    ForgeNeoWslStatus = summary;
+                    ForgeNeoWslInstallState = installState;
+                    break;
+            }
+        }
+
+        private static string GetInferenceBackendLabel(string backendId)
+            => backendId switch
+            {
+                RuntimePathBindingBackendIds.ComfyUiWindows => "ComfyUI（Windows）",
+                RuntimePathBindingBackendIds.ComfyUiWsl => "ComfyUI（WSL）",
+                RuntimePathBindingBackendIds.ForgeNeoWindows => "Webui Forge Neo（Windows）",
+                RuntimePathBindingBackendIds.ForgeNeoWsl => "Webui Forge Neo（WSL）",
+                _ => backendId
+            };
+
+        private void OpenBindingDirectory(bool isConfigurationDirectory)
+        {
+            try
+            {
+                string configuredPath = isConfigurationDirectory
+                    ? BindingConfigurationDirectory
+                    : BindingTrainerPath;
+                string directory = ResolveEditorPath(configuredPath);
+                if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+                {
+                    throw new DirectoryNotFoundException($"目录不存在：{directory}");
+                }
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = true
+                };
+                startInfo.ArgumentList.Add(directory);
+                Process.Start(startInfo);
+                PathBindingStatus = $"已打开目录：{directory}";
+            }
+            catch (Exception exception)
+            {
+                PathBindingStatus = $"打开目录失败：{exception.Message}";
+                AddLog(PathBindingStatus);
+                MessageBox.Show(exception.Message, "路径绑定", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private string ResolveEditorPath(string path)
+        {
+            if (!IsSelectedBindingWsl)
+            {
+                return path?.Trim() ?? string.Empty;
+            }
+
+            var binding = new TrainingBackendBinding
+            {
+                BackendId = SelectedBindingBackend.Id,
+                WslDistribution = BindingWslDistribution
+            };
+            return _wslPathResolver.ResolveWindowsPath(binding, path);
+        }
+
+        private void ApplySuggestedBindingPaths(string backendId)
+        {
+            if (SelectedTrainingBackendBinding != null)
+            {
+                return;
+            }
+
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            switch (backendId)
+            {
+                case RuntimePathBindingBackendIds.ComfyUiWindows:
+                    BindingTrainerPath = Path.Combine(userProfile, "ComfyUI");
+                    BindingConfigurationDirectory = Path.Combine(BindingTrainerPath, "user", "default", "workflows");
+                    BindingCondaEnvironment = string.Empty;
+                    break;
+                case RuntimePathBindingBackendIds.ComfyUiWsl:
+                    BindingTrainerPath = "~/ComfyUI";
+                    BindingConfigurationDirectory = "~/ComfyUI/user/default/workflows";
+                    BindingWslDistribution = string.IsNullOrWhiteSpace(BindingWslDistribution) ? "Ubuntu" : BindingWslDistribution;
+                    BindingCondaEnvironment = "comfyui-cu130";
+                    break;
+                case RuntimePathBindingBackendIds.ForgeNeoWindows:
+                    BindingTrainerPath = Path.Combine(userProfile, "sd-webui-forge-neo");
+                    BindingConfigurationDirectory = BindingTrainerPath;
+                    BindingCondaEnvironment = string.Empty;
+                    break;
+                case RuntimePathBindingBackendIds.ForgeNeoWsl:
+                    BindingTrainerPath = "~/sd-webui-forge-neo";
+                    BindingConfigurationDirectory = BindingTrainerPath;
+                    BindingWslDistribution = string.IsNullOrWhiteSpace(BindingWslDistribution) ? "Ubuntu" : BindingWslDistribution;
+                    BindingCondaEnvironment = "forge-neo-cu128";
+                    break;
+                default:
+                    BindingTrainerPath = string.Empty;
+                    BindingConfigurationDirectory = string.Empty;
+                    break;
+            }
+        }
+
+        private void NotifyBindingMetadataChanged()
+        {
+            OnPropertyChanged(nameof(IsSelectedBindingWsl));
+            OnPropertyChanged(nameof(BindingRootDirectoryLabel));
+            OnPropertyChanged(nameof(BindingConfigurationDirectoryLabel));
+            OnPropertyChanged(nameof(BindingCapabilityText));
         }
 
         private bool ConfirmTrainingBackendAction(string backendId, TrainingBackendAction action)
@@ -1221,6 +1609,33 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private void SetTrainingBackendInstallState(string backendId, string installState)
+        {
+            switch (backendId)
+            {
+                case "sd-scripts":
+                    SdScriptsInstallState = installState;
+                    break;
+                case "anima-fast-lora":
+                    AnimaFastLoraInstallState = installState;
+                    break;
+                case "wsl-sd-scripts":
+                    WslSdScriptsInstallState = installState;
+                    break;
+                case "diffusion-pipe":
+                    DiffusionPipeInstallState = installState;
+                    break;
+            }
+        }
+
+        private static string ToInstallStateLabel(TrainingBackendState state)
+            => state switch
+            {
+                TrainingBackendState.Available => "已安装",
+                TrainingBackendState.DetectedButUnusable => "安装异常",
+                _ => "未安装"
+            };
+
         private static string GetBackendId(object? parameter)
         {
             return parameter as string ?? "diffusion-pipe";
@@ -1295,6 +1710,11 @@ namespace CyanTools.ViewModel
             (DeleteTrainingBackendBindingCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (SelectBindingTrainerPathCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (SelectBindingConfigurationDirectoryCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (CheckPathBindingCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (OpenBindingTrainerPathCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (OpenBindingConfigurationDirectoryCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (CheckInferenceBackendCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (OpenInferenceBackendDirectoryCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
         private void AddLog(string message)

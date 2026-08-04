@@ -69,11 +69,11 @@
 
                     <TextBlock Text="输入路径"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding InputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              IsReadOnly="{Binding HasInheritedInputPath}"
                              Margin="0,0,8,0"/>
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Content="..."
                             Width="40"
                             Command="{Binding BrowseInputFolderCommand}"
@@ -101,12 +101,12 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <TextBox Grid.Row="3"
+                    <ui:TextBox Grid.Row="3"
                              Grid.Column="1"
                              Text="{Binding OutputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,8,0"
                              Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <Button Grid.Row="3"
+                    <ui:Button Grid.Row="3"
                             Grid.Column="2"
                             Content="..."
                             Width="40"
@@ -147,7 +147,7 @@
 
                     <TextBlock Text="分辨率步长"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding DivisibleText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              VerticalContentAlignment="Center"/>
 
@@ -155,7 +155,7 @@
                                Text="宽高比误差"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="18,0,10,0"/>
-                    <TextBox Grid.Column="3"
+                    <ui:TextBox Grid.Column="3"
                              Text="{Binding MaxArErrorText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              VerticalContentAlignment="Center"/>
 
@@ -163,7 +163,7 @@
                                Text="最大尺寸"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="18,0,10,0"/>
-                    <TextBox Grid.Column="5"
+                    <ui:TextBox Grid.Column="5"
                              Text="{Binding DimLimitText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              VerticalContentAlignment="Center"/>
 
@@ -199,7 +199,7 @@
                                  Height="18"
                                  VerticalAlignment="Center"
                                  Margin="0,0,10,0"/>
-                    <Button Grid.Column="1"
+                    <ui:Button Grid.Column="1"
                             Command="{Binding StartClassificationCommand}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
                         <StackPanel Orientation="Horizontal">
@@ -207,14 +207,14 @@
                                            Margin="0,0,6,0"/>
                             <TextBlock Text="开始分类"/>
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
                 </Grid>
             </GroupBox>
 
             <GroupBox Header="操作日志"
                       Grid.Row="4"
                       Style="{StaticResource CyanGroupBoxStyle}">
-                <TextBox Text="{Binding LogText, Mode=OneWay}"
+                <ui:TextBox Text="{Binding LogText, Mode=OneWay}"
                          Style="{StaticResource CyanLogTextBoxStyle}"/>
             </GroupBox>
         </Grid>

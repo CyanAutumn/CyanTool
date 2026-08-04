@@ -48,11 +48,11 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
+                <ui:TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="训练集名称"
                          VerticalContentAlignment="Center"
                          Margin="0,0,8,0" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding ProjectRootPath, Mode=OneWay}"
                          IsReadOnly="True"
                          ToolTip="Git 仓库"
@@ -62,34 +62,34 @@
                         Style="{StaticResource CyanStatusStripStyle}"
                         VerticalAlignment="Center"
                         Margin="0,0,8,0">
-                    <TextBlock Text="{Binding GitStatusText}"
+                    <TextBlock Text="{Binding GitStatusText, Converter={StaticResource LocalizedTextConverter}}"
                                FontWeight="SemiBold" />
                 </Border>
-                <Button Grid.Column="3"
+                <ui:Button Grid.Column="3"
                         Command="{Binding CreateProjectCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         ToolTip="新建训练集仓库">
                     <ui:SymbolIcon Symbol="AddSquare24" />
-                </Button>
-                <Button Grid.Column="4"
+                </ui:Button>
+                <ui:Button Grid.Column="4"
                         Command="{Binding OpenProjectCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         ToolTip="打开训练集仓库">
                     <ui:SymbolIcon Symbol="FolderOpen24" />
-                </Button>
-                <Button Grid.Column="5"
+                </ui:Button>
+                <ui:Button Grid.Column="5"
                         Command="{Binding OpenProjectFolderCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         ToolTip="在资源管理器中打开">
                     <ui:SymbolIcon Symbol="Open24" />
-                </Button>
-                <Button Grid.Column="6"
+                </ui:Button>
+                <ui:Button Grid.Column="6"
                         Command="{Binding RefreshHistoryCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         ToolTip="刷新 Git 历史">
                     <ui:SymbolIcon Symbol="ArrowClockwise24" />
-                </Button>
-                <Button Grid.Column="7"
+                </ui:Button>
+                <ui:Button Grid.Column="7"
                         Command="{Binding CreateVersionCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -97,8 +97,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="新版本" />
                     </StackPanel>
-                </Button>
-                <Button Grid.Column="8"
+                </ui:Button>
+                <ui:Button Grid.Column="8"
                         Command="{Binding SaveVersionCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -106,7 +106,7 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="提交版本" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Grid>
         </Border>
 
@@ -121,10 +121,10 @@
                     <Border Style="{StaticResource CyanStatusStripStyle}"
                             Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="{Binding StorageAllocationText}"
+                            <TextBlock Text="{Binding StorageAllocationText, Converter={StaticResource LocalizedTextConverter}}"
                                        FontWeight="SemiBold"
                                        TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding LfsPolicyText}"
+                            <TextBlock Text="{Binding LfsPolicyText, Converter={StaticResource LocalizedTextConverter}}"
                                        Style="{StaticResource CyanTinyTextBlockStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap" />
@@ -138,16 +138,16 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding NewBranchName, UpdateSourceTrigger=PropertyChanged}"
+                        <ui:TextBox Text="{Binding NewBranchName, UpdateSourceTrigger=PropertyChanged}"
                                  VerticalContentAlignment="Center"
                                  ToolTip="留空时自动生成 experiment/... 分支名"
                                  Margin="0,0,6,0" />
-                        <Button Grid.Column="1"
+                        <ui:Button Grid.Column="1"
                                 Command="{Binding CreateBranchFromCommitCommand}"
                                 Style="{StaticResource CyanCommandButtonStyle}"
                                 ToolTip="从所选 commit 创建并切换分支">
                             <ui:SymbolIcon Symbol="BranchFork24" />
-                        </Button>
+                        </ui:Button>
                     </Grid>
                 </StackPanel>
 
@@ -156,7 +156,7 @@
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type viewModel:TrainingSetCommitNodeViewModel}">
-                            <Button Command="{Binding SelectCommand}"
+                            <ui:Button Command="{Binding SelectCommand}"
                                     HorizontalContentAlignment="Stretch"
                                     Padding="0"
                                     Margin="0,0,0,8"
@@ -212,14 +212,14 @@
                                                        Style="{StaticResource CyanTinyTextBlockStyle}"
                                                        Margin="0,2,0,0"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding ParentSummary}"
+                                            <TextBlock Text="{Binding ParentSummary, Converter={StaticResource LocalizedTextConverter}}"
                                                        Style="{StaticResource CyanTinyTextBlockStyle}"
                                                        Margin="0,2,0,0"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                     </Border>
                                 </Grid>
-                            </Button>
+                            </ui:Button>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -243,7 +243,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="当前时间点："
                                        FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding CurrentSnapshotText}" />
+                            <TextBlock Text="{Binding CurrentSnapshotText, Converter={StaticResource LocalizedTextConverter}}" />
                         </StackPanel>
                     </Border>
                     <local:DatasetManagerView Grid.Row="1"
@@ -271,7 +271,7 @@
                                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center" />
-                                    <Button Command="{Binding SelectVersionCoverCommand}"
+                                    <ui:Button Command="{Binding SelectVersionCoverCommand}"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Bottom"
                                             Margin="8"
@@ -281,17 +281,17 @@
                                                            Margin="0,0,6,0" />
                                             <TextBlock Text="commit 封面" />
                                         </StackPanel>
-                                    </Button>
+                                    </ui:Button>
                                 </Grid>
                             </Border>
 
                             <TextBlock Text="版本标题 / commit message"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Text="{Binding SelectedNodeTitle, UpdateSourceTrigger=PropertyChanged}"
+                            <ui:TextBox Text="{Binding SelectedNodeTitle, UpdateSourceTrigger=PropertyChanged}"
                                      Margin="0,4,0,10" />
                             <TextBlock Text="版本说明"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Text="{Binding SelectedNodeDescription, UpdateSourceTrigger=PropertyChanged}"
+                            <ui:TextBox Text="{Binding SelectedNodeDescription, UpdateSourceTrigger=PropertyChanged}"
                                      AcceptsReturn="True"
                                      TextWrapping="Wrap"
                                      MinHeight="64"
@@ -300,7 +300,7 @@
                             <TextBlock Text="训练配置"
                                        Style="{StaticResource CyanSectionTitleStyle}"
                                        Margin="0,0,0,8" />
-                            <Button Command="{Binding ImportConfigCommand}"
+                            <ui:Button Command="{Binding ImportConfigCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     HorizontalAlignment="Left"
                                     Margin="0,0,0,8">
@@ -309,7 +309,7 @@
                                                    Margin="0,0,6,0" />
                                     <TextBlock Text="导入配置" />
                                 </StackPanel>
-                            </Button>
+                            </ui:Button>
                             <ItemsControl ItemsSource="{Binding SelectedNode.ConfigFiles}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type model:TrainingSetConfigFile}">
@@ -329,7 +329,7 @@
                                        Style="{StaticResource CyanSectionTitleStyle}"
                                        Margin="0,14,0,8" />
                             <WrapPanel Margin="0,0,0,8">
-                                <Button Command="{Binding AttachModelCommand}"
+                                <ui:Button Command="{Binding AttachModelCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}"
                                         Margin="0,0,8,8">
                                     <StackPanel Orientation="Horizontal">
@@ -337,8 +337,8 @@
                                                        Margin="0,0,6,0" />
                                         <TextBlock Text="模型" />
                                     </StackPanel>
-                                </Button>
-                                <Button Command="{Binding AttachOutputImageCommand}"
+                                </ui:Button>
+                                <ui:Button Command="{Binding AttachOutputImageCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}"
                                         Margin="0,0,8,8">
                                     <StackPanel Orientation="Horizontal">
@@ -346,8 +346,8 @@
                                                        Margin="0,0,6,0" />
                                         <TextBlock Text="样张" />
                                     </StackPanel>
-                                </Button>
-                                <Button Command="{Binding AttachTensorBoardLogCommand}"
+                                </ui:Button>
+                                <ui:Button Command="{Binding AttachTensorBoardLogCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}"
                                         Margin="0,0,8,8">
                                     <StackPanel Orientation="Horizontal">
@@ -355,7 +355,7 @@
                                                        Margin="0,0,6,0" />
                                         <TextBlock Text="TensorBoard" />
                                     </StackPanel>
-                                </Button>
+                                </ui:Button>
                             </WrapPanel>
                             <ItemsControl ItemsSource="{Binding SelectedNode.Artifacts}">
                                 <ItemsControl.ItemTemplate>
@@ -391,24 +391,24 @@
                                        Style="{StaticResource CyanSectionTitleStyle}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,12,8" />
-                            <Button Command="{Binding InsertVersionNoteHeadingCommand}"
+                            <ui:Button Command="{Binding InsertVersionNoteHeadingCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     ToolTip="标题"
                                     Margin="0,0,6,8">
                                 <ui:SymbolIcon Symbol="TextHeader124" />
-                            </Button>
-                            <Button Command="{Binding InsertVersionNoteTableCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding InsertVersionNoteTableCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     ToolTip="表格"
                                     Margin="0,0,6,8">
                                 <ui:SymbolIcon Symbol="Table24" />
-                            </Button>
-                            <Button Command="{Binding InsertVersionNoteChecklistCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding InsertVersionNoteChecklistCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     ToolTip="任务列表"
                                     Margin="0,0,6,8">
                                 <ui:SymbolIcon Symbol="CheckboxChecked24" />
-                            </Button>
+                            </ui:Button>
                         </WrapPanel>
                         <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
@@ -418,7 +418,7 @@
                             </Grid.ColumnDefinitions>
                             <GroupBox Header="编辑"
                                       Style="{StaticResource CyanGroupBoxStyle}">
-                                <TextBox Text="{Binding NoteEditorText, UpdateSourceTrigger=PropertyChanged}"
+                                <ui:TextBox Text="{Binding NoteEditorText, UpdateSourceTrigger=PropertyChanged}"
                                          AcceptsReturn="True"
                                          AcceptsTab="True"
                                          VerticalScrollBarVisibility="Auto"
@@ -462,7 +462,7 @@
                                                Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center" />
-                                    <Button Command="{Binding SelectProjectCoverCommand}"
+                                    <ui:Button Command="{Binding SelectProjectCoverCommand}"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Bottom"
                                             Margin="8"
@@ -472,14 +472,14 @@
                                                            Margin="0,0,6,0" />
                                             <TextBlock Text="更换封面" />
                                         </StackPanel>
-                                    </Button>
+                                    </ui:Button>
                                 </Grid>
                             </Border>
 
                             <TextBlock Text="训练集配置"
                                        Style="{StaticResource CyanSectionTitleStyle}"
                                        Margin="0,0,0,8" />
-                            <Button Command="{Binding ImportProjectConfigCommand}"
+                            <ui:Button Command="{Binding ImportProjectConfigCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     HorizontalAlignment="Left"
                                     Margin="0,0,0,8">
@@ -488,7 +488,7 @@
                                                    Margin="0,0,6,0" />
                                     <TextBlock Text="导入训练集配置" />
                                 </StackPanel>
-                            </Button>
+                            </ui:Button>
                             <ItemsControl ItemsSource="{Binding ProjectConfigFiles}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type model:TrainingSetConfigFile}">
@@ -519,24 +519,24 @@
                                        Style="{StaticResource CyanSectionTitleStyle}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,12,8" />
-                            <Button Command="{Binding InsertProjectNoteHeadingCommand}"
+                            <ui:Button Command="{Binding InsertProjectNoteHeadingCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     ToolTip="标题"
                                     Margin="0,0,6,8">
                                 <ui:SymbolIcon Symbol="TextHeader124" />
-                            </Button>
-                            <Button Command="{Binding InsertProjectNoteTableCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding InsertProjectNoteTableCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     ToolTip="表格"
                                     Margin="0,0,6,8">
                                 <ui:SymbolIcon Symbol="Table24" />
-                            </Button>
-                            <Button Command="{Binding InsertProjectNoteChecklistCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding InsertProjectNoteChecklistCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     ToolTip="任务列表"
                                     Margin="0,0,6,8">
                                 <ui:SymbolIcon Symbol="CheckboxChecked24" />
-                            </Button>
+                            </ui:Button>
                         </WrapPanel>
                         <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
@@ -546,7 +546,7 @@
                             </Grid.ColumnDefinitions>
                             <GroupBox Header="编辑"
                                       Style="{StaticResource CyanGroupBoxStyle}">
-                                <TextBox Text="{Binding ProjectNoteEditorText, UpdateSourceTrigger=PropertyChanged}"
+                                <ui:TextBox Text="{Binding ProjectNoteEditorText, UpdateSourceTrigger=PropertyChanged}"
                                          AcceptsReturn="True"
                                          AcceptsTab="True"
                                          VerticalScrollBarVisibility="Auto"
@@ -588,7 +588,7 @@
                                   SelectedItem="{Binding CompareTargetCommit}"
                                   DisplayMemberPath="Title"
                                   Margin="0,0,8,0" />
-                        <Button Grid.Column="2"
+                        <ui:Button Grid.Column="2"
                                 Grid.RowSpan="2"
                                 Command="{Binding CompareCommitsCommand}"
                                 Style="{StaticResource CyanPrimaryActionButtonStyle}">
@@ -597,7 +597,7 @@
                                                Margin="0,0,6,0" />
                                 <TextBlock Text="仅显示变化" />
                             </StackPanel>
-                        </Button>
+                        </ui:Button>
                         <ComboBox Grid.Row="1"
                                   ItemsSource="{Binding CompareSourceConfigs}"
                                   SelectedItem="{Binding CompareSourceConfig}"
@@ -610,11 +610,11 @@
                                   DisplayMemberPath="DisplayName"
                                   Margin="0,8,8,0" />
                     </Grid>
-                    <DataGrid ItemsSource="{Binding ConfigDiffRows}"
+                    <ui:DataGrid ItemsSource="{Binding ConfigDiffRows}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               IsReadOnly="True">
-                        <DataGrid.Columns>
+                        <ui:DataGrid.Columns>
                             <DataGridTextColumn Header="类型"
                                                 Binding="{Binding Kind}"
                                                 Width="90" />
@@ -627,8 +627,8 @@
                             <DataGridTextColumn Header="新值"
                                                 Binding="{Binding NewValue}"
                                                 Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                        </ui:DataGrid.Columns>
+                    </ui:DataGrid>
                 </DockPanel>
             </TabItem>
         </TabControl>
@@ -657,7 +657,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <TextBlock Text="{Binding ToastMessage}"
+            <TextBlock Text="{Binding ToastMessage, Converter={StaticResource LocalizedTextConverter}}"
                        TextWrapping="Wrap"
                        FontWeight="SemiBold" />
         </Border>

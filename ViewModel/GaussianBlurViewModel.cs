@@ -96,7 +96,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择输入路径"
+                Title = LocalizationManager.Translate("选择输入路径")
             };
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
@@ -109,7 +109,7 @@ namespace CyanTools.ViewModel
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "选择输出路径"
+                Title = LocalizationManager.Translate("选择输出路径")
             };
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {

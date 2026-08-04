@@ -2,10 +2,11 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CyanTools
 {
-    public partial class PixivAuthWindow : Window
+    public partial class PixivAuthWindow : FluentWindow
     {
         private const string RedirectUri = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback";
         private readonly TaskCompletionSource<string?> _codeCompletion = new();

@@ -103,10 +103,10 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Text="{Binding InputImages.Count, StringFormat=已选择 {0} 张}"
+                                <TextBlock Text="{Binding InputImages.Count, Converter={StaticResource LocalizedTextConverter}, ConverterParameter='已选择 {0} 张'}"
                                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                            VerticalAlignment="Center"/>
-                                <Button Grid.Column="1"
+                                <ui:Button Grid.Column="1"
                                         Command="{Binding SelectImageCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}">
                                     <StackPanel Orientation="Horizontal">
@@ -114,8 +114,8 @@
                                                        Margin="0,0,6,0"/>
                                         <TextBlock Text="添加图片"/>
                                     </StackPanel>
-                                </Button>
-                                <Button Grid.Column="2"
+                                </ui:Button>
+                                <ui:Button Grid.Column="2"
                                         Command="{Binding ClearInputCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}"
                                         Margin="0">
@@ -124,7 +124,7 @@
                                                        Margin="0,0,6,0"/>
                                         <TextBlock Text="清空"/>
                                     </StackPanel>
-                                </Button>
+                                </ui:Button>
                             </Grid>
 
                             <Border Grid.Row="1"
@@ -164,7 +164,7 @@
                                                                            TextTrimming="CharacterEllipsis"
                                                                            VerticalAlignment="Center"
                                                                            Margin="0,0,6,0"/>
-                                                                <Button Grid.Column="1"
+                                                                <ui:Button Grid.Column="1"
                                                                         Width="24"
                                                                         Height="24"
                                                                         Padding="0"
@@ -173,7 +173,7 @@
                                                                         ToolTip="移除">
                                                                     <ui:SymbolIcon Symbol="Broom24"
                                                                                    FontSize="13"/>
-                                                                </Button>
+                                                                </ui:Button>
                                                             </Grid>
                                                             <Border Grid.Row="1"
                                                                     Style="{StaticResource CyanImageWellStyle}"
@@ -243,7 +243,7 @@
                                 </Grid>
                             </Border>
 
-                            <Button Grid.Row="1"
+                            <ui:Button Grid.Row="1"
                                     Command="{Binding ClearResultCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     HorizontalAlignment="Right"
@@ -253,7 +253,7 @@
                                                    Margin="0,0,6,0"/>
                                     <TextBlock Text="清空结果"/>
                                 </StackPanel>
-                            </Button>
+                            </ui:Button>
                         </Grid>
                     </GroupBox>
                 </Grid>
@@ -297,11 +297,11 @@
                                       IsEditable="True"
                                       IsTextSearchEnabled="False"
                                       Margin="0,0,8,0"/>
-                            <Button Grid.Column="2"
+                            <ui:Button Grid.Column="2"
                                     Content="保存"
                                     Command="{Binding SaveConfigCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"/>
-                            <Button Grid.Column="3"
+                            <ui:Button Grid.Column="3"
                                     Content="删除"
                                     Command="{Binding DeleteConfigCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
@@ -328,7 +328,7 @@
                                       ItemsSource="{Binding AvailableModels}"
                                       SelectedItem="{Binding SelectedModel}"
                                       Margin="0,10,8,0"/>
-                            <TextBox Grid.Row="2"
+                            <ui:TextBox Grid.Row="2"
                                      Grid.Column="2"
                                      Grid.ColumnSpan="2"
                                      Text="{Binding ApiBaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -425,13 +425,13 @@
                                         Grid.Column="1"
                                         Orientation="Horizontal"
                                         Margin="0,10,0,0">
-                                <TextBox Width="68"
+                                <ui:TextBox Width="68"
                                          Text="{Binding DelayMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          VerticalContentAlignment="Center"/>
                                 <TextBlock Text="-"
                                            VerticalAlignment="Center"
                                            Margin="8,0"/>
-                                <TextBox Width="68"
+                                <ui:TextBox Width="68"
                                          Text="{Binding DelayMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          VerticalContentAlignment="Center"/>
                                 <TextBlock Text="秒"
@@ -444,7 +444,7 @@
                                        Text="张数"
                                        Style="{StaticResource CyanFormLabelStyle}"
                                        Margin="8,10,10,0"/>
-                            <TextBox Grid.Row="2"
+                            <ui:TextBox Grid.Row="2"
                                      Grid.Column="4"
                                      Text="{Binding BatchCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      VerticalContentAlignment="Center"
@@ -453,7 +453,7 @@
                             <TextBlock Grid.Row="3"
                                        Grid.Column="1"
                                        Grid.ColumnSpan="4"
-                                       Text="{Binding ImageSizeValidationError}"
+                                       Text="{Binding ImageSizeValidationError, Converter={StaticResource LocalizedTextConverter}}"
                                        Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                                        Margin="0,8,0,0"
                                        Visibility="{Binding HasImageSizeValidationError, Converter={StaticResource BooleanToVisibilityConverter}}"/>
@@ -464,7 +464,7 @@
                               Header="提示词"
                               Style="{StaticResource CyanGroupBoxStyle}"
                               Margin="0,0,0,12">
-                        <TextBox Text="{Binding Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        <ui:TextBox Text="{Binding Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"
@@ -482,15 +482,15 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button Command="{Binding GenerateCommand}"
+                            <ui:Button Command="{Binding GenerateCommand}"
                                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="PlayCircle24"
                                                    Margin="0,0,6,0"/>
                                     <TextBlock Text="开始生成"/>
                                 </StackPanel>
-                            </Button>
-                            <Button Grid.Column="1"
+                            </ui:Button>
+                            <ui:Button Grid.Column="1"
                                     Command="{Binding BatchGenerateCommand}"
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                                     Style="{StaticResource CyanCommandButtonStyle}">
@@ -499,7 +499,7 @@
                                                    Margin="0,0,6,0"/>
                                     <TextBlock Text="批量生成"/>
                                 </StackPanel>
-                            </Button>
+                            </ui:Button>
                             <ProgressBar Grid.Column="2"
                                          Height="18"
                                          Margin="10,0,0,0"

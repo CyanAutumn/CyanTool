@@ -3,5 +3,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/*-DESKTOP-*;**/*-DESKTOP-*.*;**/*_DESKTOP_*;**/*_DESKTOP_*.*</DefaultItemExcludes>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="**\*-DESKTOP-*.cs;**\*_DESKTOP_*.cs" />
+  </ItemGroup>
 </Project>

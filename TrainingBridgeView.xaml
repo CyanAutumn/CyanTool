@@ -9,7 +9,7 @@
              d:DesignWidth="1180">
     <UserControl.Resources>
         <DataTemplate x:Key="TrainingBridgeTextEditorTemplate">
-            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+            <ui:TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                      MinHeight="32"
                      VerticalContentAlignment="Center"/>
         </DataTemplate>
@@ -29,7 +29,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="TrainingBridgeTextareaEditorTemplate">
-            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+            <ui:TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto"
@@ -38,13 +38,13 @@
 
         <DataTemplate x:Key="TrainingBridgeBucketsEditorTemplate">
             <StackPanel>
-                <Button Command="{Binding DataContext.CalculateSizeBucketsCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                <ui:Button Command="{Binding DataContext.CalculateSizeBucketsCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                         Content="根据数据集图片计算分桶"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         HorizontalAlignment="Left"
                         Margin="0,0,0,6"
                         ToolTip="扫描训练集根目录及子目录内的图片，按训练分辨率和 16 像素对齐自动填写 size_buckets。"/>
-                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                <ui:TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
@@ -110,9 +110,10 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.2*"/>
+                    <ColumnDefinition Width="1.15*"/>
+                    <ColumnDefinition Width="1*"/>
                     <ColumnDefinition Width="1.35*"/>
-                    <ColumnDefinition Width="2.2*"/>
+                    <ColumnDefinition Width="1.35*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
@@ -129,48 +130,75 @@
 
                 <StackPanel Grid.Column="1" Margin="0,0,10,0">
                     <TextBlock Text="项目名称" Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
                              MinHeight="34"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Margin="0,0,10,0">
-                    <TextBlock Text="训练器" Style="{StaticResource CyanFormLabelStyle}"/>
+                    <TextBlock Text="导入训练器" Style="{StaticResource CyanFormLabelStyle}"/>
                     <ComboBox ItemsSource="{Binding BackendBindings}"
-                              SelectedItem="{Binding SelectedTrainerBinding}"
-                              DisplayMemberPath="DisplayName"
-                              MinHeight="34"/>
+                              SelectedItem="{Binding SelectedSourceBinding}"
+                              ToolTip="{Binding SelectedSourceBinding, Converter={StaticResource TrainingBackendBindingTextConverter}, ConverterParameter=LocationSummary}"
+                              MinHeight="34">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource TrainingBackendBindingTextConverter}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </StackPanel>
 
-                <WrapPanel Grid.Column="3" VerticalAlignment="Bottom">
-                    <Button Command="{Binding ImportConfigCommand}"
+                <StackPanel Grid.Column="3" Margin="0,0,10,0">
+                    <TextBlock Text="训练器" Style="{StaticResource CyanFormLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding BackendBindings}"
+                              SelectedItem="{Binding SelectedTargetBinding}"
+                              ToolTip="{Binding SelectedTargetBinding, Converter={StaticResource TrainingBackendBindingTextConverter}, ConverterParameter=LocationSummary}"
+                              MinHeight="34">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource TrainingBackendBindingTextConverter}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <WrapPanel Grid.Column="4" VerticalAlignment="Bottom">
+                    <ui:Button Command="{Binding ImportConfigCommand}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="ArrowUpload24" Margin="0,0,6,0"/>
                             <TextBlock Text="导入配置"/>
                         </StackPanel>
-                    </Button>
-                    <Button Command="{Binding SaveProjectCommand}"
+                    </ui:Button>
+                    <ui:Button Command="{Binding SaveProjectCommand}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Save24" Margin="0,0,6,0"/>
                             <TextBlock Text="保存配置文件"/>
                         </StackPanel>
-                    </Button>
-                    <Button Command="{Binding DeleteProjectCommand}"
+                    </ui:Button>
+                    <ui:Button Command="{Binding DeleteProjectCommand}"
                             Style="{StaticResource CyanCommandButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Delete24" Margin="0,0,6,0"/>
                             <TextBlock Text="删除"/>
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
+                    <ui:Button Command="{Binding StartTrainingCommand}"
+                            Style="{StaticResource CyanPrimaryActionButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="PlayCircle24" Margin="0,0,6,0"/>
+                            <TextBlock Text="开始训练"/>
+                        </StackPanel>
+                    </ui:Button>
                 </WrapPanel>
 
-                <Grid Grid.Row="1" Grid.ColumnSpan="4" Margin="0,12,0,0">
+                <Grid Grid.Row="1" Grid.ColumnSpan="5" Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
                              MinHeight="36"
                              Padding="10,7"
                              ToolTip="项目备注"/>
@@ -210,18 +238,18 @@
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center"/>
                             <Border Style="{StaticResource CyanPillStyle}" Margin="10,0,0,0">
-                                <TextBlock Text="{Binding ParameterCountText}"
+                                <TextBlock Text="{Binding ParameterCountText, Converter={StaticResource LocalizedTextConverter}}"
                                            Style="{StaticResource CyanSecondaryTextBlockStyle}"/>
                             </Border>
                         </StackPanel>
                         <WrapPanel Grid.Column="1">
-                            <Button Command="{Binding FillDefaultsCommand}"
+                            <ui:Button Command="{Binding FillDefaultsCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Content="补齐常用参数"/>
-                            <Button Command="{Binding AddParameterCommand}"
+                            <ui:Button Command="{Binding AddParameterCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Content="添加参数"/>
-                            <Button Command="{Binding RemoveParameterCommand}"
+                            <ui:Button Command="{Binding RemoveParameterCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Content="删除选中参数"/>
                         </WrapPanel>
@@ -260,7 +288,7 @@
                                                    FontSize="12"
                                                    FontWeight="Bold"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <TextBox Grid.Row="1"
+                                        <ui:TextBox Grid.Row="1"
                                                  Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
                                                  IsReadOnly="{Binding IsKnownParameter}"
                                                  Margin="0,5,0,6"
@@ -302,7 +330,7 @@
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    TextWrapping="Wrap"
                                                    MaxHeight="32"
-                                                   ToolTip="{Binding HelpText}"/>
+                                                   ToolTip="{Binding HelpText, Converter={StaticResource LocalizedTextConverter}}"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -414,7 +442,7 @@
                                                    Margin="0,4,0,2"
                                                    FontSize="18"
                                                    FontWeight="Bold"/>
-                                        <TextBlock Text="{Binding CpuDetailText}"
+                                        <TextBlock Text="{Binding CpuDetailText, Converter={StaticResource LocalizedTextConverter}}"
                                                    Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                                    FontSize="11"/>
                                     </StackPanel>
@@ -472,7 +500,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <TextBlock Text="{Binding MonitorSampleText}"
+                            <TextBlock Text="{Binding MonitorSampleText, Converter={StaticResource LocalizedTextConverter}}"
                                        HorizontalAlignment="Right"
                                        Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                        FontSize="11"/>
@@ -490,21 +518,21 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         <WrapPanel Margin="0,0,0,8">
-                            <Button Command="{Binding PreviewExportCommand}"
+                            <ui:Button Command="{Binding PreviewExportCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="Eye24" Margin="0,0,6,0"/>
                                     <TextBlock Text="生成预览"/>
                                 </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ExportConfigCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding ExportConfigCommand}"
                                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="FolderArrowRight24" Margin="0,0,6,0"/>
                                     <TextBlock Text="导出到训练器"/>
                                 </StackPanel>
-                            </Button>
-                            <Button Command="{Binding CopyPreviewCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding CopyPreviewCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}"
                                     Content="复制当前文件"/>
                         </WrapPanel>
@@ -516,7 +544,7 @@
                                  Style="{StaticResource CyanListBoxSurfaceStyle}"
                                  Margin="0,0,0,8"/>
 
-                        <TextBox Grid.Row="2"
+                        <ui:TextBox Grid.Row="2"
                                  Text="{Binding PreviewText, Mode=OneWay, Converter={StaticResource LocalizedTextConverter}}"
                                  Style="{StaticResource CyanLogTextBoxStyle}"
                                  HorizontalScrollBarVisibility="Auto"
@@ -529,7 +557,7 @@
         <GroupBox Grid.Row="2"
                   Header="状态与日志"
                   Style="{StaticResource CyanGroupBoxStyle}">
-            <TextBox Text="{Binding LogText, Mode=OneWay}"
+            <ui:TextBox Text="{Binding LogText, Mode=OneWay}"
                      Style="{StaticResource CyanLogTextBoxStyle}"
                      TextChanged="LogTextBox_TextChanged"
                      HorizontalScrollBarVisibility="Auto"

@@ -46,18 +46,18 @@
 
                     <TextBlock Text="输入模型"
                                Style="{StaticResource CyanFormLabelStyle}" />
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,8,0"
                              ToolTip="支持拖入 .safetensors 文件" />
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Command="{Binding BrowseInputCommand}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanSmallIconButtonStyle}"
                             ToolTip="选择模型">
                         <ui:SymbolIcon Symbol="FolderOpen24" />
-                    </Button>
-                    <Button Grid.Column="3"
+                    </ui:Button>
+                    <ui:Button Grid.Column="3"
                             Command="{Binding LoadCommand}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanCommandButtonStyle}"
@@ -67,18 +67,18 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="读取" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
 
                     <TextBlock Grid.Row="1"
                                Text="输出模型"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0" />
-                    <TextBox Grid.Row="1"
+                    <ui:TextBox Grid.Row="1"
                              Grid.Column="1"
                              Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,8,0"
                              ToolTip="默认写入同目录的 _metadata 副本；可改为原文件以覆盖" />
-                    <Button Grid.Row="1"
+                    <ui:Button Grid.Row="1"
                             Grid.Column="2"
                             Command="{Binding BrowseOutputCommand}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
@@ -86,7 +86,7 @@
                             Margin="0,12,0,0"
                             ToolTip="选择输出文件">
                         <ui:SymbolIcon Symbol="Save24" />
-                    </Button>
+                    </ui:Button>
                 </Grid>
             </GroupBox>
 
@@ -101,14 +101,14 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding FileInfoText}"
+                        <TextBlock Text="{Binding FileInfoText, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanSecondaryTextBlockStyle}" />
-                        <TextBlock Text="{Binding StatusText}"
+                        <TextBlock Text="{Binding StatusText, Converter={StaticResource LocalizedTextConverter}}"
                                    Style="{StaticResource CyanTinyTextBlockStyle}"
                                    Margin="0,3,0,0" />
                     </StackPanel>
 
-                    <Button Grid.Column="1"
+                    <ui:Button Grid.Column="1"
                             Command="{Binding PurgeMetadataCommand}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanCommandButtonStyle}"
@@ -118,9 +118,9 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="清除并另存为" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
 
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Command="{Binding SaveMetadataCommand}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanToInverseBooleanConverter}}"
                             Style="{StaticResource CyanPrimaryActionButtonStyle}">
@@ -129,7 +129,7 @@
                                            Margin="0,0,6,0" />
                             <TextBlock Text="保存元数据" />
                         </StackPanel>
-                    </Button>
+                    </ui:Button>
                 </Grid>
             </Border>
 
@@ -178,7 +178,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBox Grid.Row="0"
+                        <ui:TextBox Grid.Row="0"
                                  Text="{Binding MetadataJson, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  AcceptsReturn="True"
                                  TextWrapping="NoWrap"

@@ -37,7 +37,7 @@ namespace CyanTools.ViewModel
                     }
                     catch (Exception ex)
                     {
-                        System.Windows.MessageBox.Show($"读取文件失败: {ex.Message}");
+                        MessageBox.Show($"读取文件失败: {ex.Message}");
                     }
                 }
             }
@@ -72,7 +72,7 @@ namespace CyanTools.ViewModel
 
         private void OpenFolder()
         {
-            var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "请选择一个文件夹" };
+            var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = LocalizationManager.Translate("请选择一个文件夹") };
             if (dialog.ShowDialog() != CommonFileDialogResult.Ok) return;
 
             _currentFolderPath = dialog.FileName;
@@ -88,7 +88,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"加载文件夹时出错: {ex.Message}");
+                MessageBox.Show($"加载文件夹时出错: {ex.Message}");
             }
         }
 
@@ -105,7 +105,7 @@ namespace CyanTools.ViewModel
             string existingFile = FindFileWithSameContent(CurrentPromptContent, fileName);
             if (!string.IsNullOrEmpty(existingFile))
             {
-                System.Windows.MessageBox.Show($"该内容已存在于文件: {existingFile}\n跳过添加。", "内容重复", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"该内容已存在于文件: {existingFile}\n跳过添加。", "内容重复", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -117,11 +117,11 @@ namespace CyanTools.ViewModel
                     PromptFiles.Add(fileName);
                     SelectedPromptFile = fileName;
                 }
-                System.Windows.MessageBox.Show("文件已保存！");
+                MessageBox.Show("文件已保存！");
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"保存文件失败: {ex.Message}");
+                MessageBox.Show($"保存文件失败: {ex.Message}");
             }
         }
 
@@ -151,7 +151,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"检查重复内容时出错: {ex.Message}");
+                MessageBox.Show($"检查重复内容时出错: {ex.Message}");
             }
 
             return null;
@@ -160,7 +160,7 @@ namespace CyanTools.ViewModel
         private void DeleteFile()
         {
             string fullPath = Path.Combine(_currentFolderPath, SelectedPromptFile);
-            if (System.Windows.MessageBox.Show($"确定要删除 {SelectedPromptFile} 吗？", "确认删除", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (MessageBox.Show($"确定要删除 {SelectedPromptFile} 吗？", "确认删除", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
             {
                 try
                 {
@@ -179,7 +179,7 @@ namespace CyanTools.ViewModel
                             }
                             catch (Exception ex)
                             {
-                                System.Windows.MessageBox.Show($"删除关联图片文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                                MessageBox.Show($"删除关联图片文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                             }
                         }
                     }
@@ -198,7 +198,7 @@ namespace CyanTools.ViewModel
                 }
                 catch (Exception ex)
                 {
-                    System.Windows.MessageBox.Show($"删除文件失败: {ex.Message}");
+                    MessageBox.Show($"删除文件失败: {ex.Message}");
                 }
             }
         }
@@ -224,7 +224,7 @@ namespace CyanTools.ViewModel
             string existingFile = FindFileWithSameContent(CurrentPromptContent);
             if (!string.IsNullOrEmpty(existingFile))
             {
-                System.Windows.MessageBox.Show($"该内容已存在于文件: {existingFile}", "内容重复", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"该内容已存在于文件: {existingFile}", "内容重复", MessageBoxButton.OK, MessageBoxImage.Information);
                 if (PromptFiles.Contains(existingFile))
                 {
                     SelectedPromptFile = existingFile;
@@ -250,11 +250,11 @@ namespace CyanTools.ViewModel
                 }
                 CurrentFileName = newFileName;
                 SelectedPromptFile = newFileName;
-                System.Windows.MessageBox.Show($"已创建文件: {newFileName}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"已创建文件: {newFileName}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"保存文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"保存文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

@@ -76,7 +76,8 @@ namespace CyanTools.Navigation
                 return ToolPageCategory.DatasetClassification;
             }
 
-            if (controlType == typeof(global::CyanTools.OptionsView))
+            if (controlType == typeof(global::CyanTools.OptionsView) ||
+                controlType == typeof(global::CyanTools.InferenceProjectsView))
             {
                 return ToolPageCategory.EnvironmentSettings;
             }

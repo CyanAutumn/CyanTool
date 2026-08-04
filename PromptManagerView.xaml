@@ -58,7 +58,7 @@
             <GroupBox Grid.Column="0"
                       Header="文件列表"
                       Margin="0,0,12,0">
-                <ListView ItemsSource="{Binding PromptFiles}"
+                <ui:ListView ItemsSource="{Binding PromptFiles}"
                           SelectedItem="{Binding SelectedPromptFile}"
                           Style="{StaticResource CyanListBoxSurfaceStyle}" />
             </GroupBox>
@@ -74,7 +74,7 @@
 
                 <GroupBox Grid.Row="0"
                           Header="内容">
-                    <TextBox Text="{Binding CurrentPromptContent, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding CurrentPromptContent, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
@@ -97,7 +97,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0"
+                        <ui:Button Grid.Column="0"
                                 Command="{Binding OpenFolderCommand}"
                                 Style="{StaticResource CyanCommandButtonStyle}">
                             <StackPanel Orientation="Horizontal">
@@ -105,7 +105,7 @@
                                                Margin="0,0,6,0" />
                                 <TextBlock Text="打开文件夹" />
                             </StackPanel>
-                        </Button>
+                        </ui:Button>
 
                         <Grid Grid.Column="1"
                               Margin="10,0,0,0">
@@ -115,7 +115,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="文件名"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <TextBox Grid.Column="1"
+                            <ui:TextBox Grid.Column="1"
                                      Text="{Binding CurrentFileName, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
@@ -123,38 +123,38 @@
                                     Grid.ColumnSpan="2"
                                     Orientation="Horizontal"
                                     Margin="0,12,0,0">
-                            <Button Command="{Binding CreateOrEditCommand}"
+                            <ui:Button Command="{Binding CreateOrEditCommand}"
                                     Style="{StaticResource CyanPrimaryActionButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="Add24"
                                                    Margin="0,0,6,0" />
                                     <TextBlock Text="新建/修改" />
                                 </StackPanel>
-                            </Button>
-                            <Button Command="{Binding DeleteCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding DeleteCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="Delete24"
                                                    Margin="0,0,6,0" />
                                     <TextBlock Text="删除" />
                                 </StackPanel>
-                            </Button>
-                            <Button Command="{Binding GetRandomPromptCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding GetRandomPromptCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="ArrowShuffle24"
                                                    Margin="0,0,6,0" />
                                     <TextBlock Text="随机复制" />
                                 </StackPanel>
-                            </Button>
-                            <Button Command="{Binding AutoIncrementAddCommand}"
+                            </ui:Button>
+                            <ui:Button Command="{Binding AutoIncrementAddCommand}"
                                     Style="{StaticResource CyanCommandButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="AddCircle24"
                                                    Margin="0,0,6,0" />
                                     <TextBlock Text="自增添加" />
                                 </StackPanel>
-                            </Button>
+                            </ui:Button>
                         </StackPanel>
                     </Grid>
                 </Border>

@@ -429,7 +429,9 @@ public sealed class TrainingBridgeTests
 
         Assert.Contains("Header=\"配置文件\"", xaml);
         Assert.Contains("ItemsSource=\"{Binding BackendBindings}\"", xaml);
-        Assert.Contains("SelectedItem=\"{Binding SelectedTrainerBinding}\"", xaml);
+        Assert.Contains("SelectedItem=\"{Binding SelectedSourceBinding}\"", xaml);
+        Assert.Contains("SelectedItem=\"{Binding SelectedTargetBinding}\"", xaml);
+        Assert.Contains("Command=\"{Binding StartTrainingCommand}\"", xaml);
         Assert.Contains("Text=\"配置文件名称\"", xaml);
         Assert.Contains("IsEditable=\"True\"", xaml);
         Assert.Contains("Text=\"{Binding DraftFileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", xaml);
@@ -439,6 +441,7 @@ public sealed class TrainingBridgeTests
         Assert.Contains("<WrapPanel Orientation=\"Horizontal\"/>", xaml);
         Assert.Contains("Binding DisplayLabel", xaml);
         Assert.DoesNotContain("<DataGrid", xaml);
+        Assert.DoesNotContain("<ui:DataGrid", xaml);
         Assert.Contains("Header=\"系统监控\"", xaml);
         Assert.Contains("Value=\"{Binding GpuLoadPercent}\"", xaml);
         Assert.Contains("Value=\"{Binding VramLoadPercent}\"", xaml);

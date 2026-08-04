@@ -61,24 +61,24 @@
 
                 <TextBlock Text="开始"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding XyzStartText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,16,0" />
 
                 <TextBlock Grid.Column="2"
                            Text="结束"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="3"
+                <ui:TextBox Grid.Column="3"
                          Text="{Binding XyzEndText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,16,0" />
 
                 <TextBlock Grid.Column="4"
                            Text="间隔"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <TextBox Grid.Column="5"
+                <ui:TextBox Grid.Column="5"
                          Text="{Binding XyzIntervalText, UpdateSourceTrigger=PropertyChanged}" />
 
-                <Button Grid.Column="7"
+                <ui:Button Grid.Column="7"
                         Command="{Binding CopyXyzPromptCommand}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -86,9 +86,9 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="复制" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
 
-                <TextBox Grid.Row="1"
+                <ui:TextBox Grid.Row="1"
                          Grid.Column="0"
                          Grid.ColumnSpan="8"
                          Text="{Binding XyzPromptText, Mode=OneWay}"

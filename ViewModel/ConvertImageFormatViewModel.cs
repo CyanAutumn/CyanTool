@@ -154,7 +154,7 @@ namespace CyanTools.ViewModel
                 pipelineLog?.Invoke(validationMessage);
                 if (showDialogs)
                 {
-                    System.Windows.MessageBox.Show(validationMessage, "提示");
+                    MessageBox.Show(validationMessage, "提示");
                 }
                 else if (rethrowErrors)
                 {
@@ -184,7 +184,7 @@ namespace CyanTools.ViewModel
                 pipelineLog?.Invoke(failureMessage);
                 if (showDialogs)
                 {
-                    System.Windows.MessageBox.Show(failureMessage, "错误");
+                    MessageBox.Show(failureMessage, "错误");
                 }
 
                 if (rethrowErrors)

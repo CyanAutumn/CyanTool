@@ -8,6 +8,38 @@ public sealed class TrainingDeploymentTaskStoreTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "cyantools-deployment-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void OptionsView_UsesIndependentBackendRowsAndClickableSystemStatuses()
+    {
+        string root = FindRepositoryRoot();
+        string view = File.ReadAllText(Path.Combine(root, "OptionsView.xaml"));
+        string codeBehind = File.ReadAllText(Path.Combine(root, "OptionsView.xaml.cs"));
+
+        Assert.Contains("Header=\"系统检查\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Header=\"Windows 原生训练后端\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Header=\"WSL2 训练后端\"", view, StringComparison.Ordinal);
+        (string BackendId, string TargetName, string Header)[] rows =
+        [
+            ("sd-scripts", "SdScriptsDeploymentSection", "Windows sd-scripts 部署"),
+            ("anima-fast-lora", "AnimaFastLoraDeploymentSection", "Windows Anima Fast LoRA 部署"),
+            ("wsl-sd-scripts", "WslSdScriptsDeploymentSection", "WSL sd-scripts 部署"),
+            ("diffusion-pipe", "DiffusionPipeDeploymentSection", "WSL diffusion-pipe 部署"),
+            ("comfyui-windows", "ComfyUiWindowsDeploymentSection", "ComfyUI（Windows）部署"),
+            ("comfyui-wsl", "ComfyUiWslDeploymentSection", "ComfyUI（WSL）部署"),
+            ("forge-neo-windows", "ForgeNeoWindowsDeploymentSection", "Webui Forge Neo（Windows）部署"),
+            ("forge-neo-wsl", "ForgeNeoWslDeploymentSection", "Webui Forge Neo（WSL）部署")
+        ];
+        foreach ((string backendId, string targetName, string header) in rows)
+        {
+            Assert.Contains($"Tag=\"{backendId}\" Click=\"BackendStatusButton_Click\"", view, StringComparison.Ordinal);
+            Assert.Contains($"x:Name=\"{targetName}\"", view, StringComparison.Ordinal);
+            Assert.Contains($"Header=\"{header}\"", view, StringComparison.Ordinal);
+            Assert.Contains($"\"{backendId}\" => {targetName}", codeBehind, StringComparison.Ordinal);
+        }
+        Assert.Contains("target.BringIntoView();", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("target.Focus();", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PersistsTaskStateAndSanitizedLogs()
     {
         var store = new TrainingDeploymentTaskStore(_root);

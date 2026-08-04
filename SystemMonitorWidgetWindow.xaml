@@ -102,7 +102,7 @@
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"/>
                     <TextBlock Width="142"
-                               Text="{Binding LossCurveStateText}"
+                               Text="{Binding LossCurveStateText, Converter={StaticResource LocalizedTextConverter}}"
                                Canvas.Top="21"
                                FontSize="8"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"

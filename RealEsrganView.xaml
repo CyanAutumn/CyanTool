@@ -70,11 +70,11 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}"/>
-                <TextBox Grid.Column="1"
+                <ui:TextBox Grid.Column="1"
                          Text="{Binding InputDirectory, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0"/>
-                <Button Grid.Column="2"
+                <ui:Button Grid.Column="2"
                         Content="..."
                         Command="{Binding BrowseInputCommand}"
                         Width="40"
@@ -99,11 +99,11 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,8,0"
                              Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Content="..."
                             Command="{Binding BrowseOutputCommand}"
                             Width="40"
@@ -209,7 +209,7 @@
                                 <ColumnDefinition Width="120"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding TileSize, UpdateSourceTrigger=PropertyChanged}"/>
+                            <ui:TextBox Text="{Binding TileSize, UpdateSourceTrigger=PropertyChanged}"/>
                             <TextBlock Grid.Column="1"
                                        Text="0 为不分块"
                                        Style="{StaticResource CyanSecondaryTextBlockStyle}"
@@ -260,7 +260,7 @@
                                Text="裁剪大小"
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"/>
-                    <TextBox Grid.Row="1"
+                    <ui:TextBox Grid.Row="1"
                              Grid.Column="1"
                              Text="{Binding Waifu2xCropSize, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,0,0"/>
@@ -281,7 +281,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Button Command="{Binding StartCommand}"
+                <ui:Button Command="{Binding StartCommand}"
                         IsEnabled="{Binding IsIdle}"
                         Style="{StaticResource CyanPrimaryActionButtonStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -289,14 +289,14 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="开始超分"/>
                     </StackPanel>
-                </Button>
+                </ui:Button>
 
                 <CheckBox Grid.Column="2"
                           Content="完成后打开目录"
                           IsChecked="{Binding ShouldOpenOutputDirectory}"
                           VerticalAlignment="Center"
                           Margin="10,0,0,0"/>
-                <Button Grid.Column="3"
+                <ui:Button Grid.Column="3"
                         Command="{Binding RestoreDefaultsCommand}"
                         Style="{StaticResource CyanCommandButtonStyle}"
                         Margin="14,0,0,0">
@@ -305,8 +305,8 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="恢复默认"/>
                     </StackPanel>
-                </Button>
-                <Button Grid.Column="4"
+                </ui:Button>
+                <ui:Button Grid.Column="4"
                         Command="{Binding ClearLogCommand}"
                         IsEnabled="{Binding IsIdle}"
                         Style="{StaticResource CyanCommandButtonStyle}"
@@ -316,7 +316,7 @@
                                        Margin="0,0,6,0"/>
                         <TextBlock Text="清空日志"/>
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </Grid>
         </GroupBox>
 

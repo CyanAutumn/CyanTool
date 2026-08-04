@@ -1,4 +1,4 @@
-<Window x:Class="CyanTools.ClusterDistributionWindow"
+<ui:FluentWindow x:Class="CyanTools.ClusterDistributionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -6,6 +6,8 @@
         Width="1180"
         Height="820"
         WindowStartupLocation="CenterOwner"
+        ExtendsContentIntoTitleBar="False"
+        WindowBackdropType="None"
         Background="{DynamicResource CyanShellBackgroundBrush}"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
     <Grid Style="{StaticResource CyanDialogRootGridStyle}">
@@ -70,15 +72,15 @@
                 Margin="0,14,0,0">
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right">
-                <Button Style="{StaticResource CyanCommandButtonStyle}"
+                <ui:Button Style="{StaticResource CyanCommandButtonStyle}"
                         Click="OpenOutputFolder_Click">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="FolderOpen24"
                                        Margin="0,0,6,0" />
                         <TextBlock Text="打开结果目录" />
                     </StackPanel>
-                </Button>
-                <Button Style="{StaticResource CyanPrimaryActionButtonStyle}"
+                </ui:Button>
+                <ui:Button Style="{StaticResource CyanPrimaryActionButtonStyle}"
                         IsDefault="True"
                         Click="Close_Click">
                     <StackPanel Orientation="Horizontal">
@@ -86,8 +88,8 @@
                                        Margin="0,0,6,0" />
                         <TextBlock Text="关闭" />
                     </StackPanel>
-                </Button>
+                </ui:Button>
             </StackPanel>
         </Border>
     </Grid>
-</Window>
+</ui:FluentWindow>

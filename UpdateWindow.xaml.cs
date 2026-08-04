@@ -1,8 +1,9 @@
 using System.Windows;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CyanTools
 {
-    public partial class UpdateWindow : Window
+    public partial class UpdateWindow : FluentWindow
     {
         public UpdateWindow(string currentVersion, string installedVersion, string notes, bool isMandatory)
         {

@@ -70,11 +70,11 @@
 
                     <TextBlock Text="输入路径"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              IsReadOnly="{Binding HasInheritedInputPath}"
                              Margin="0,0,8,0"/>
-                    <Button Grid.Column="2"
+                    <ui:Button Grid.Column="2"
                             Content="..."
                             Width="40"
                             Command="{Binding SelectInputCommand}"
@@ -102,12 +102,12 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <TextBox Grid.Row="3"
+                    <ui:TextBox Grid.Row="3"
                              Grid.Column="1"
                              Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,8,0"
                              Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <Button Grid.Row="3"
+                    <ui:Button Grid.Row="3"
                             Grid.Column="2"
                             Content="..."
                             Width="40"
@@ -271,10 +271,10 @@
 
                         <TextBlock Text="聚类数量 (K)"
                                    Style="{StaticResource CyanFormLabelStyle}"/>
-                        <TextBox Grid.Column="1"
+                        <ui:TextBox Grid.Column="1"
                                  Text="{Binding NumClusters, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                            <TextBox.Style>
-                                <Style TargetType="TextBox">
+                            <ui:TextBox.Style>
+                                <Style TargetType="ui:TextBox">
                                     <Setter Property="Visibility" Value="Visible"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding UseBestKBySilhouette}" Value="True">
@@ -285,8 +285,8 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </TextBox.Style>
-                        </TextBox>
+                            </ui:TextBox.Style>
+                        </ui:TextBox>
                         <CheckBox Grid.Column="2"
                                   Content="最优"
                                   IsChecked="{Binding UseBestKBySilhouette, Mode=TwoWay}"
@@ -308,10 +308,10 @@
                                    Text="最小簇大小"
                                    Style="{StaticResource CyanFormLabelStyle}"
                                    Margin="0,0,10,0"/>
-                        <TextBox Grid.Column="4"
+                        <ui:TextBox Grid.Column="4"
                                  Text="{Binding MinClusterSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                            <TextBox.Style>
-                                <Style TargetType="TextBox">
+                            <ui:TextBox.Style>
+                                <Style TargetType="ui:TextBox">
                                     <Setter Property="Visibility" Value="Visible"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsHdbscanSelected}" Value="False">
@@ -319,8 +319,8 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </TextBox.Style>
-                        </TextBox>
+                            </ui:TextBox.Style>
+                        </ui:TextBox>
 
                         <Grid Grid.Row="1"
                               Grid.ColumnSpan="7"
@@ -377,7 +377,7 @@
                     <TextBlock Text="n_neighbors"
                                Style="{StaticResource CyanFormLabelStyle}"
                                ToolTip="大=分组更粗，小=分组更细"/>
-                    <TextBox Grid.Column="1"
+                    <ui:TextBox Grid.Column="1"
                              Text="{Binding UmapNNeighbors, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <TextBlock Grid.Row="1"
@@ -385,7 +385,7 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                ToolTip="小=更抱团，大=更松散"/>
-                    <TextBox Grid.Row="1"
+                    <ui:TextBox Grid.Row="1"
                              Grid.Column="1"
                              Margin="0,12,0,0"
                              Text="{Binding UmapMinDist, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
@@ -395,7 +395,7 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                ToolTip="大=组间更开，小=组间更近"/>
-                    <TextBox Grid.Row="2"
+                    <ui:TextBox Grid.Row="2"
                              Grid.Column="1"
                              Margin="0,12,0,0"
                              Text="{Binding UmapSpread, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
@@ -426,10 +426,10 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Command="{Binding ResetParametersCommand}"
+                        <ui:Button Command="{Binding ResetParametersCommand}"
                                 Margin="0,0,8,0">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
+                            <ui:Button.Style>
+                                <Style TargetType="ui:Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
                                     <Setter Property="IsEnabled" Value="True"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsClustering}" Value="True">
@@ -437,17 +437,17 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Button.Style>
+                            </ui:Button.Style>
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="ArrowReset24"
                                                Margin="0,0,6,0"/>
                                 <TextBlock Text="初始化参数"/>
                             </StackPanel>
-                        </Button>
-                        <Button Grid.Column="1"
+                        </ui:Button>
+                        <ui:Button Grid.Column="1"
                                 Command="{Binding MoveFilesToTopLevelCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
+                            <ui:Button.Style>
+                                <Style TargetType="ui:Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
                                     <Setter Property="IsEnabled" Value="True"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsClustering}" Value="True">
@@ -455,14 +455,14 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Button.Style>
+                            </ui:Button.Style>
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="FolderArrowUp24"
                                                Margin="0,0,6,0"/>
                                 <TextBlock Text="移动子文件夹文件到最上层"/>
                             </StackPanel>
-                        </Button>
-                        <Button Grid.Column="3"
+                        </ui:Button>
+                        <ui:Button Grid.Column="3"
                                 Command="{Binding StartCommand}"
                                 Style="{StaticResource CyanPrimaryActionButtonStyle}">
                             <StackPanel Orientation="Horizontal">
@@ -470,7 +470,7 @@
                                                Margin="0,0,6,0"/>
                                 <TextBlock Text="开始聚类"/>
                             </StackPanel>
-                        </Button>
+                        </ui:Button>
                     </Grid>
                 </GroupBox>
 
@@ -478,7 +478,7 @@
                           Grid.Row="1"
                           Margin="0,0,0,12"
                           Style="{StaticResource CyanGroupBoxStyle}">
-                    <TextBox Text="{Binding Log}"
+                    <ui:TextBox Text="{Binding Log}"
                              Style="{StaticResource CyanLogTextBoxStyle}"
                              MinHeight="140"/>
                 </GroupBox>
