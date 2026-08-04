@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -58,6 +59,7 @@ namespace CyanTools.ViewModel
         private static readonly string DanbooruTokenFilePath = Path.Combine(AppContext.BaseDirectory, "cookies.txt");
         private static readonly string PixivRefreshTokenDirectory = Path.Combine(AppContext.BaseDirectory, "Configs", "Crawler");
         private static readonly string PixivRefreshTokenFilePath = Path.Combine(PixivRefreshTokenDirectory, "pixiv_refresh_token.txt");
+        private static readonly string PixivTokensFilePath = Path.Combine(PixivRefreshTokenDirectory, "pixiv_tokens.json");
         private static readonly TimeSpan PixivAccessTokenRefreshLeadTime = TimeSpan.FromMinutes(5);
         private static readonly string[] PixivContentTypes = { "illust", "manga" };
 
@@ -69,36 +71,18 @@ namespace CyanTools.ViewModel
             WriteIndented = true
         };
 
-        private static readonly HttpClient PixivAuthClient;
-        private static readonly HttpClient PixivApiClient;
-        private static readonly HttpClient PixivImageClient;
-        private static readonly HttpClient KemonoHttpClient;
-
-        static DatasetDownloaderViewModel()
-        {
-            PixivAuthClient = CreateHttpClient();
-            PixivApiClient = CreateHttpClient(new Uri(PixivApiBaseUrl));
-            PixivImageClient = CreateHttpClient();
-            ConfigurePixivApiClient(PixivApiClient);
-            ConfigurePixivImageClient(PixivImageClient);
-
-            var kemonoHandler = new HttpClientHandler
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
-            };
-            KemonoHttpClient = new HttpClient(kemonoHandler)
-            {
-                BaseAddress = new Uri(KemonoApiBaseUrl),
-                Timeout = TimeSpan.FromSeconds(60)
-            };
-            KemonoHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) CyanToolsDatasetDownloader/1.0");
-            KemonoHttpClient.DefaultRequestHeaders.Accept.Clear();
-            KemonoHttpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/css"));
-            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Clear();
-            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
-            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
-            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("br"));
-        }
+        private readonly HttpClient PixivAuthClient;
+        private readonly HttpClient PixivApiClient;
+        private readonly HttpClient PixivImageClient;
+        private readonly HttpClient KemonoHttpClient;
+        private readonly bool _persistCredentials;
+        private readonly ObservableCollection<PixivTokenEntry> _pixivTokens = new();
+        private readonly ObservableCollection<DatasetDownloadTask> _downloadTasks = new();
+        private ProxyNode _selectedProxyNode = null!;
+        private PixivTokenEntry? _selectedPixivToken;
+        private readonly RelayCommand _addPixivTokenCommand;
+        private readonly RelayCommand _deletePixivTokenCommand;
+        private readonly RelayCommand _verifyPixivTokenCommand;
 
         private readonly RelayCommand _startStopCommand;
         private readonly RelayCommand _clearLogCommand;
@@ -107,7 +91,6 @@ namespace CyanTools.ViewModel
         private readonly RelayCommand _openDanbooruManualCollectorCommand;
         private readonly RestClient _danbooruClient;
 
-        private CancellationTokenSource? _cancellationTokenSource;
         private readonly RemoteRequestPacer _danbooruRequestPacer = new();
         private readonly RemoteRequestPacer _pixivRequestPacer = new();
         private readonly RemoteRequestPacer _kemonoRequestPacer = new();
@@ -139,22 +122,62 @@ namespace CyanTools.ViewModel
         private string _sessionOutputIdSegment = "unknown";
         private string _sessionOutputArtistSegment = "unknown_name";
         private string _lastDanbooruListUrl = $"{DanbooruBaseUrl}/posts?tags=";
+        private int _danbooruProgressCurrent;
+        private int _danbooruProgressTotal;
+        private int _pixivProgressCurrent;
+        private int _pixivProgressTotal;
+        private int _kemonoProgressCurrent;
+        private int _kemonoProgressTotal;
 
         public DatasetDownloaderViewModel()
+            : this(null, true)
         {
+        }
+
+        public DatasetDownloaderViewModel(ProxyNode? proxyNode, bool persistCredentials = true)
+        {
+            _persistCredentials = persistCredentials;
+            _selectedProxyNode = proxyNode ?? ProxySettingsStore.Shared.GetSelectedNodeOrLocal();
+            var transportProxyNode = _selectedProxyNode.IsUsable
+                ? _selectedProxyNode
+                : ProxySettingsStore.Shared.LocalNode;
+            PixivAuthClient = CreateHttpClient(transportProxyNode);
+            PixivApiClient = CreateHttpClient(new Uri(PixivApiBaseUrl), transportProxyNode);
+            PixivImageClient = CreateHttpClient(transportProxyNode);
+            ConfigurePixivApiClient(PixivApiClient);
+            ConfigurePixivImageClient(PixivImageClient);
+
+            var kemonoHandler = CreateHttpClientHandler(transportProxyNode);
+            KemonoHttpClient = new HttpClient(kemonoHandler)
+            {
+                BaseAddress = new Uri(KemonoApiBaseUrl),
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+            KemonoHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) CyanToolsDatasetDownloader/1.0");
+            KemonoHttpClient.DefaultRequestHeaders.Accept.Clear();
+            KemonoHttpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/css"));
+            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Clear();
+            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
+            KemonoHttpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("br"));
+
             _danbooruClient = new RestClient(new RestClientOptions(DanbooruBaseUrl)
             {
-                Timeout = System.Threading.Timeout.InfiniteTimeSpan
+                Timeout = System.Threading.Timeout.InfiniteTimeSpan,
+                Proxy = transportProxyNode.CreateWebProxy()
             });
             _startStopCommand = new RelayCommand(async _ => await StartOrStopAsync(), _ => CanStartOrStop());
             _clearLogCommand = new RelayCommand(_ => ClearLog());
             _browseOutputFolderCommand = new RelayCommand(_ => BrowseOutputFolder());
             _getPixivRefreshTokenCommand = new RelayCommand(async _ => await FetchPixivRefreshTokenAsync(), _ => !IsDownloading);
             _openDanbooruManualCollectorCommand = new RelayCommand(async _ => await OpenDanbooruManualCollectorAsync(), _ => !IsDownloading);
+            _addPixivTokenCommand = new RelayCommand(async _ => await FetchPixivRefreshTokenAsync(), _ => !IsDownloading);
+            _deletePixivTokenCommand = new RelayCommand(_ => DeleteSelectedPixivToken(), _ => SelectedPixivToken is { UsageCount: 0 });
+            _verifyPixivTokenCommand = new RelayCommand(_ => VerifySelectedPixivToken(), _ => SelectedPixivToken != null && !IsDownloading);
 
             LoadSettings();
             LoadDanbooruToken();
-            LoadPixivRefreshToken();
+            LoadPixivTokens();
         }
 
         public DatasetDownloadMode SelectedMode
@@ -180,6 +203,7 @@ namespace CyanTools.ViewModel
                 OnPropertyChanged(nameof(IsPostIdMode));
                 OnPropertyChanged(nameof(IsTagOrPostMode));
                 OnPropertyChanged(nameof(CanSelectAllSources));
+                OnPropertyChanged(nameof(CanEditPixivSettings));
                 _startStopCommand.RaiseCanExecuteChanged();
             }
         }
@@ -241,6 +265,8 @@ namespace CyanTools.ViewModel
 
         public bool CanEditDanbooruSettings => EnableDanbooru;
 
+        public bool CanEditPixivSettings => EnablePixiv && !IsTagOrPostMode;
+
         public bool EnablePixiv
         {
             get => _enablePixiv;
@@ -251,6 +277,7 @@ namespace CyanTools.ViewModel
                 {
                     _enablePixiv = normalized;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(CanEditPixivSettings));
                     _startStopCommand.RaiseCanExecuteChanged();
                 }
             }
@@ -365,19 +392,82 @@ namespace CyanTools.ViewModel
             }
         }
 
+        public ObservableCollection<PixivTokenEntry> PixivTokens => _pixivTokens;
+
+        public PixivTokenEntry? SelectedPixivToken
+        {
+            get => _selectedPixivToken;
+            set
+            {
+                if (ReferenceEquals(_selectedPixivToken, value))
+                {
+                    return;
+                }
+
+                _selectedPixivToken = value;
+                _pixivAccessToken = null;
+                _pixivAccessTokenExpiresAtUtc = DateTimeOffset.MinValue;
+                _pixivRefreshToken = value?.RefreshToken ?? string.Empty;
+                DatasetDownloaderCredentialState.PublishPixivRefreshToken(_pixivRefreshToken);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PixivRefreshToken));
+                OnPropertyChanged(nameof(HasPixivToken));
+                _startStopCommand.RaiseCanExecuteChanged();
+                _deletePixivTokenCommand.RaiseCanExecuteChanged();
+                _verifyPixivTokenCommand.RaiseCanExecuteChanged();
+            }
+        }
+
+        public bool HasPixivToken => SelectedPixivToken != null && !string.IsNullOrWhiteSpace(SelectedPixivToken.RefreshToken);
+
         public string PixivRefreshToken
         {
             get => _pixivRefreshToken;
             set
             {
-                if (_pixivRefreshToken != value)
+                var normalized = value?.Trim() ?? string.Empty;
+                if (_pixivRefreshToken != normalized)
                 {
-                    _pixivRefreshToken = value ?? string.Empty;
+                    _pixivRefreshToken = normalized;
+                    if (SelectedPixivToken != null)
+                    {
+                        SelectedPixivToken.RefreshToken = normalized;
+                    }
                     DatasetDownloaderCredentialState.PublishPixivRefreshToken(_pixivRefreshToken);
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasPixivToken));
                 }
             }
         }
+
+        public ProxyNode SelectedProxyNode
+        {
+            get => _selectedProxyNode;
+            set
+            {
+                var normalized = value ?? ProxySettingsStore.Shared.LocalNode;
+                if (ReferenceEquals(_selectedProxyNode, normalized))
+                {
+                    return;
+                }
+
+                _selectedProxyNode = normalized;
+                OnPropertyChanged();
+                _startStopCommand.RaiseCanExecuteChanged();
+            }
+        }
+
+        public ObservableCollection<ProxyNode> ProxyNodes => ProxySettingsStore.Shared.Nodes;
+
+        public ObservableCollection<DatasetDownloadTask> DownloadTasks => _downloadTasks;
+
+        public int DanbooruProgressCurrent => _danbooruProgressCurrent;
+        public int DanbooruProgressTotal => _danbooruProgressTotal;
+        public int PixivProgressCurrent => _pixivProgressCurrent;
+        public int PixivProgressTotal => _pixivProgressTotal;
+        public int KemonoProgressCurrent => _kemonoProgressCurrent;
+        public int KemonoProgressTotal => _kemonoProgressTotal;
+        public string ResolvedArtistName => _sessionOutputArtistSegment;
 
         public int DownloadIntervalSeconds
         {
@@ -443,13 +533,16 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public string StartButtonText => IsDownloading ? "停止" : "开始下载";
+        public string StartButtonText => "开始下载";
 
         public ICommand StartStopCommand => _startStopCommand;
         public ICommand ClearLogCommand => _clearLogCommand;
         public ICommand BrowseOutputFolderCommand => _browseOutputFolderCommand;
         public ICommand GetPixivRefreshTokenCommand => _getPixivRefreshTokenCommand;
         public ICommand OpenDanbooruManualCollectorCommand => _openDanbooruManualCollectorCommand;
+        public ICommand AddPixivTokenCommand => _addPixivTokenCommand;
+        public ICommand DeletePixivTokenCommand => _deletePixivTokenCommand;
+        public ICommand VerifyPixivTokenCommand => _verifyPixivTokenCommand;
 
         private bool CanStartOrStop()
         {
@@ -460,7 +553,8 @@ namespace CyanTools.ViewModel
 
             return !string.IsNullOrWhiteSpace(InputText)
                 && !string.IsNullOrWhiteSpace(OutputDirectory)
-                && (EnableDanbooru || EnablePixiv || EnableKemono);
+                && (EnableDanbooru || EnablePixiv || EnableKemono)
+                && (!EnablePixiv || (HasPixivToken && SelectedPixivToken!.UsageCount == 0));
         }
 
         private void ResetRemoteRequestPacing()
@@ -477,37 +571,121 @@ namespace CyanTools.ViewModel
 
         private async Task StartOrStopAsync()
         {
-            if (IsDownloading)
+            if (!CanStartOrStop())
             {
-                _cancellationTokenSource?.Cancel();
                 return;
             }
 
-            _cancellationTokenSource = new CancellationTokenSource();
+            var snapshot = CreateTaskSnapshot();
+            var taskItem = new DatasetDownloadTask(
+                snapshot.SelectedMode == DatasetDownloadMode.ArtistId ? "正在解析画师" : snapshot.InputText,
+                snapshot.EnableDanbooru,
+                snapshot.EnablePixiv,
+                snapshot.EnableKemono)
+            {
+                PixivId = snapshot.InputText,
+                SelectedProxyName = snapshot.ProxyNode.DisplayName
+            };
+            _downloadTasks.Add(taskItem);
+            snapshot.ProxyNode.Acquire();
+            if (snapshot.EnablePixiv)
+            {
+                snapshot.PixivToken?.Acquire();
+            }
             IsDownloading = true;
+            _ = RunDownloadTaskAsync(taskItem, snapshot);
+            await Task.CompletedTask;
+        }
+
+        private async Task RunDownloadTaskAsync(DatasetDownloadTask taskItem, DownloadTaskSnapshot snapshot)
+        {
+            using var taskCancellation = new CancellationTokenSource();
+            taskItem.AttachCancellation(taskCancellation);
+            var worker = new DatasetDownloaderViewModel(snapshot.ProxyNode, persistCredentials: false)
+            {
+                InputText = snapshot.InputText,
+                OutputDirectory = snapshot.OutputDirectory,
+                DownloadIntervalSeconds = snapshot.DownloadIntervalSeconds,
+                EnableDanbooru = snapshot.EnableDanbooru,
+                EnablePixiv = snapshot.EnablePixiv,
+                EnableKemono = snapshot.EnableKemono,
+                DanbooruToken = snapshot.DanbooruToken,
+                IncludeArtist = snapshot.IncludeArtist,
+                IncludeCopyright = snapshot.IncludeCopyright,
+                IncludeCharacter = snapshot.IncludeCharacter,
+                IncludeGeneral = snapshot.IncludeGeneral,
+                IncludeMeta = snapshot.IncludeMeta,
+                SelectedMode = snapshot.SelectedMode,
+                PixivRefreshToken = snapshot.PixivRefreshToken
+            };
+            worker.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName is nameof(DanbooruDownloadSummary) or nameof(PixivDownloadSummary) or nameof(KemonoDownloadSummary)
+                    or nameof(DanbooruProgressCurrent) or nameof(DanbooruProgressTotal)
+                    or nameof(PixivProgressCurrent) or nameof(PixivProgressTotal)
+                    or nameof(KemonoProgressCurrent) or nameof(KemonoProgressTotal)
+                    or nameof(ResolvedArtistName))
+                {
+                    taskItem.UpdateFrom(worker);
+                }
+            };
+
             try
             {
-                await ExecuteDownloadAsync(
-                    _cancellationTokenSource.Token,
-                    pipelineLog: null,
-                    rethrowErrors: false,
-                    validateWorkflowOutput: false);
-                AppendLog("所有任务结束。");
+                await worker.ExecuteDownloadAsync(taskCancellation.Token, null, rethrowErrors: false, validateWorkflowOutput: false);
+                taskItem.StatusText = "已完成";
             }
             catch (OperationCanceledException)
             {
-                AppendLog("任务已取消。");
+                taskItem.StatusText = "已取消";
             }
             catch (Exception ex)
             {
-                AppendLog($"发生错误: {ex.Message}");
+                taskItem.StatusText = $"失败：{ex.Message}";
             }
             finally
             {
-                _cancellationTokenSource.Dispose();
-                _cancellationTokenSource = null;
-                IsDownloading = false;
+                taskItem.IsRunning = false;
+                snapshot.ProxyNode.Release();
+                if (snapshot.EnablePixiv)
+                {
+                    if (snapshot.PixivToken != null && !string.IsNullOrWhiteSpace(worker.PixivRefreshToken))
+                    {
+                        snapshot.PixivToken.RefreshToken = worker.PixivRefreshToken;
+                        if (ReferenceEquals(snapshot.PixivToken, SelectedPixivToken))
+                        {
+                            PixivRefreshToken = worker.PixivRefreshToken;
+                        }
+                        await SavePixivTokensAsync();
+                    }
+                    snapshot.PixivToken?.Release();
+                }
+                IsDownloading = _downloadTasks.Any(item => item.IsRunning);
+                _startStopCommand.RaiseCanExecuteChanged();
+                _deletePixivTokenCommand.RaiseCanExecuteChanged();
+                _verifyPixivTokenCommand.RaiseCanExecuteChanged();
             }
+        }
+
+        private DownloadTaskSnapshot CreateTaskSnapshot()
+        {
+            return new DownloadTaskSnapshot(
+                InputText,
+                OutputDirectory,
+                DownloadIntervalSeconds,
+                SelectedMode,
+                EnableDanbooru,
+                EnablePixiv,
+                EnableKemono,
+                DanbooruToken,
+                IncludeArtist,
+                IncludeCopyright,
+                IncludeCharacter,
+                IncludeGeneral,
+                IncludeMeta,
+                SelectedPixivToken,
+                PixivRefreshToken,
+                SelectedProxyNode);
         }
 
         public void ResetRuntimeOutputPath()
@@ -538,7 +716,7 @@ namespace CyanTools.ViewModel
                 DanbooruToken = danbooruToken;
             }
 
-            if (DatasetDownloaderCredentialState.TryGetPixivRefreshToken(out string pixivRefreshToken))
+            if (_persistCredentials && SelectedPixivToken == null && DatasetDownloaderCredentialState.TryGetPixivRefreshToken(out string pixivRefreshToken))
             {
                 PixivRefreshToken = pixivRefreshToken;
             }
@@ -546,6 +724,7 @@ namespace CyanTools.ViewModel
 
         private async Task FetchPixivRefreshTokenAsync()
         {
+            var tokenId = Guid.NewGuid().ToString("N");
             try
             {
                 var codeVerifier = GeneratePixivCodeVerifier();
@@ -553,7 +732,7 @@ namespace CyanTools.ViewModel
                 var loginUrl = BuildPixivLoginUrl(codeChallenge);
 
                 AppendLog("[Pixiv] 打开登录窗口...");
-                var authWindow = new PixivAuthWindow(loginUrl)
+                var authWindow = new PixivAuthWindow(loginUrl, GetPixivUserDataDirectory(tokenId))
                 {
                     Owner = Application.Current?.MainWindow,
                     WindowStartupLocation = WindowStartupLocation.CenterOwner
@@ -573,15 +752,66 @@ namespace CyanTools.ViewModel
                     throw new InvalidOperationException("Pixiv 返回空 refresh_token。");
                 }
 
-                PixivRefreshToken = tokenResponse.RefreshToken;
+                var existingToken = PixivTokens.FirstOrDefault(item => string.Equals(item.RefreshToken, tokenResponse.RefreshToken, StringComparison.Ordinal));
+                if (existingToken != null)
+                {
+                    SelectedPixivToken = existingToken;
+                    _pixivAccessToken = tokenResponse.AccessToken;
+                    UpdatePixivAccessTokenExpiry(tokenResponse);
+                    AppendLog("[Pixiv] 该令牌已存在，已切换到已有条目。");
+                    return;
+                }
+
+                var tokenEntry = new PixivTokenEntry(
+                    tokenId,
+                    $"Pixiv {PixivTokens.Count + 1}",
+                    tokenResponse.RefreshToken,
+                    GetPixivUserDataDirectory(tokenId));
+                PixivTokens.Add(tokenEntry);
+                SelectedPixivToken = tokenEntry;
                 _pixivAccessToken = tokenResponse.AccessToken;
                 UpdatePixivAccessTokenExpiry(tokenResponse);
-                await SavePixivRefreshTokenAsync();
+                await SavePixivTokensAsync();
                 AppendLog("[Pixiv] 刷新令牌已更新。");
             }
             catch (Exception ex)
             {
                 AppendLog($"[Pixiv] 获取刷新令牌失败: {ex.Message}");
+            }
+        }
+
+        private void DeleteSelectedPixivToken()
+        {
+            if (SelectedPixivToken is not { UsageCount: 0 } token)
+            {
+                return;
+            }
+
+            PixivTokens.Remove(token);
+            SelectedPixivToken = PixivTokens.FirstOrDefault();
+            _ = SavePixivTokensAsync();
+        }
+
+        private void VerifySelectedPixivToken()
+        {
+            if (SelectedPixivToken == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var authWindow = new PixivAuthWindow("https://www.pixiv.net/", SelectedPixivToken.UserDataDirectory)
+                {
+                    Owner = Application.Current?.MainWindow,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Title = $"Pixiv - {SelectedPixivToken.DisplayName}"
+                };
+                authWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Pixiv] 打开验证页面失败: {ex.Message}");
             }
         }
 
@@ -788,6 +1018,7 @@ namespace CyanTools.ViewModel
 
             string? artistTag = await ResolveDanbooruArtistTagByPixivUserIdAsync(input, token);
             _sessionOutputArtistSegment = SanitizePathSegment(artistTag ?? string.Empty, "unknown_artist");
+            OnPropertyChanged(nameof(ResolvedArtistName));
             return artistTag;
         }
 
@@ -855,7 +1086,11 @@ namespace CyanTools.ViewModel
         {
             AppendLog("[Danbooru] 任务开始。");
             SetDanbooruDownloadSummary("Danbooru：正在获取下载清单…");
-            var counters = new SourceDownloadCounters(progress => SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", progress)));
+            var counters = new SourceDownloadCounters(progress =>
+            {
+                SetDanbooruDownloadProgress(progress);
+                SetDanbooruDownloadSummary(BuildDownloadSummary("Danbooru", progress));
+            });
 
             try
             {
@@ -1323,7 +1558,11 @@ namespace CyanTools.ViewModel
 
             SetPixivDownloadSummary("Pixiv：正在获取下载清单…");
 
-            var counters = new SourceDownloadCounters(progress => SetPixivDownloadSummary(BuildDownloadSummary("Pixiv", progress)));
+            var counters = new SourceDownloadCounters(progress =>
+            {
+                SetPixivDownloadProgress(progress);
+                SetPixivDownloadSummary(BuildDownloadSummary("Pixiv", progress));
+            });
 
             try
             {
@@ -1730,7 +1969,11 @@ namespace CyanTools.ViewModel
 
             SetKemonoDownloadSummary("Kemono：正在获取下载清单…");
 
-            var counters = new SourceDownloadCounters(progress => SetKemonoDownloadSummary(BuildDownloadSummary("Kemono", progress)));
+            var counters = new SourceDownloadCounters(progress =>
+            {
+                SetKemonoDownloadProgress(progress);
+                SetKemonoDownloadSummary(BuildDownloadSummary("Kemono", progress));
+            });
             int savedCount = 0;
             int skippedCount = 0;
             var postContentCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -2190,10 +2433,45 @@ namespace CyanTools.ViewModel
 
         private void ResetDownloadSummaries()
         {
+            SetProgress(nameof(DanbooruProgressCurrent), ref _danbooruProgressCurrent, 0);
+            SetProgress(nameof(DanbooruProgressTotal), ref _danbooruProgressTotal, 0);
+            SetProgress(nameof(PixivProgressCurrent), ref _pixivProgressCurrent, 0);
+            SetProgress(nameof(PixivProgressTotal), ref _pixivProgressTotal, 0);
+            SetProgress(nameof(KemonoProgressCurrent), ref _kemonoProgressCurrent, 0);
+            SetProgress(nameof(KemonoProgressTotal), ref _kemonoProgressTotal, 0);
             SetDanbooruDownloadSummary(EnableDanbooru ? "Danbooru：等待下载" : "Danbooru：未选择");
             SetPixivDownloadSummary(EnablePixiv && !IsTagOrPostMode ? "Pixiv：等待下载" : "Pixiv：未选择");
             SetKemonoDownloadSummary(EnableKemono && !IsTagOrPostMode ? "Kemono：等待下载" : "Kemono：未选择");
             SetOutputDirectoryImageTotalSummary("输出目录总计：等待下载");
+        }
+
+        private void SetDanbooruDownloadProgress(SourceDownloadCounters counters)
+        {
+            SetProgress(nameof(DanbooruProgressCurrent), ref _danbooruProgressCurrent, counters.Processed);
+            SetProgress(nameof(DanbooruProgressTotal), ref _danbooruProgressTotal, counters.Total ?? 0);
+        }
+
+        private void SetPixivDownloadProgress(SourceDownloadCounters counters)
+        {
+            SetProgress(nameof(PixivProgressCurrent), ref _pixivProgressCurrent, counters.Processed);
+            SetProgress(nameof(PixivProgressTotal), ref _pixivProgressTotal, counters.Total ?? 0);
+        }
+
+        private void SetKemonoDownloadProgress(SourceDownloadCounters counters)
+        {
+            SetProgress(nameof(KemonoProgressCurrent), ref _kemonoProgressCurrent, counters.Processed);
+            SetProgress(nameof(KemonoProgressTotal), ref _kemonoProgressTotal, counters.Total ?? 0);
+        }
+
+        private void SetProgress(string propertyName, ref int field, int value)
+        {
+            if (field == value)
+            {
+                return;
+            }
+
+            field = value;
+            OnPropertyChanged(propertyName);
         }
 
         private void SetDanbooruDownloadSummary(string value)
@@ -2403,20 +2681,34 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void LoadPixivRefreshToken()
+        private void LoadPixivTokens()
         {
             try
             {
-                if (DatasetDownloaderCredentialState.TryGetPixivRefreshToken(out string sharedToken))
+                if (File.Exists(PixivTokensFilePath))
                 {
-                    PixivRefreshToken = sharedToken;
-                    return;
+                    var entries = System.Text.Json.JsonSerializer.Deserialize<List<PixivTokenFileEntry>>(File.ReadAllText(PixivTokensFilePath), SettingsSerializerOptions) ?? new List<PixivTokenFileEntry>();
+                    foreach (var entry in entries
+                                 .Where(entry => !string.IsNullOrWhiteSpace(entry.RefreshToken))
+                                 .GroupBy(entry => entry.RefreshToken!, StringComparer.Ordinal)
+                                 .Select(group => group.First()))
+                    {
+                        var id = string.IsNullOrWhiteSpace(entry.Id) ? Guid.NewGuid().ToString("N") : entry.Id;
+                        var userDataDirectory = GetPixivUserDataDirectory(id);
+                        PixivTokens.Add(new PixivTokenEntry(id, entry.DisplayName ?? $"Pixiv {PixivTokens.Count + 1}", entry.RefreshToken!, userDataDirectory));
+                    }
                 }
 
-                if (File.Exists(PixivRefreshTokenFilePath))
+                if (PixivTokens.Count == 0 && DatasetDownloaderCredentialState.TryGetPixivRefreshToken(out string sharedToken))
                 {
-                    PixivRefreshToken = File.ReadAllText(PixivRefreshTokenFilePath).Trim();
+                    AddLoadedPixivToken(sharedToken);
                 }
+                else if (PixivTokens.Count == 0 && File.Exists(PixivRefreshTokenFilePath))
+                {
+                    AddLoadedPixivToken(File.ReadAllText(PixivRefreshTokenFilePath).Trim());
+                }
+
+                SelectedPixivToken = PixivTokens.FirstOrDefault();
             }
             catch (Exception ex)
             {
@@ -2424,11 +2716,28 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private void AddLoadedPixivToken(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return;
+            }
+
+            var id = Guid.NewGuid().ToString("N");
+            PixivTokens.Add(new PixivTokenEntry(id, "Pixiv 1", refreshToken, GetPixivUserDataDirectory(id)));
+        }
+
         private async Task SavePixivRefreshTokenAsync()
         {
+            if (!_persistCredentials)
+            {
+                return;
+            }
+
             try
             {
-                if (!string.IsNullOrWhiteSpace(PixivRefreshToken))
+                await SavePixivTokensAsync();
+                if (!string.IsNullOrWhiteSpace(PixivRefreshToken) && !File.Exists(PixivRefreshTokenFilePath))
                 {
                     Directory.CreateDirectory(PixivRefreshTokenDirectory);
                     await File.WriteAllTextAsync(PixivRefreshTokenFilePath, PixivRefreshToken.Trim());
@@ -2440,6 +2749,35 @@ namespace CyanTools.ViewModel
             }
         }
 
+        private async Task SavePixivTokensAsync()
+        {
+            if (!_persistCredentials)
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(PixivRefreshTokenDirectory);
+                var entries = PixivTokens.Select(token => new PixivTokenFileEntry
+                {
+                    Id = token.Id,
+                    DisplayName = token.DisplayName,
+                    RefreshToken = token.RefreshToken,
+                    UserDataDirectory = token.UserDataDirectory
+                }).ToList();
+                var json = System.Text.Json.JsonSerializer.Serialize(entries, SettingsSerializerOptions);
+                await File.WriteAllTextAsync(PixivTokensFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"保存 Pixiv 令牌列表失败: {ex.Message}");
+            }
+        }
+
+        private static string GetPixivUserDataDirectory(string tokenId)
+            => Path.Combine(PixivRefreshTokenDirectory, "users", SanitizePathSegment(tokenId, "default"));
+
         public async Task SaveStateOnCloseAsync()
         {
             await SaveSettingsAsync();
@@ -2447,12 +2785,12 @@ namespace CyanTools.ViewModel
             await SavePixivRefreshTokenAsync();
         }
 
-        private static HttpClient CreateHttpClient(Uri? baseAddress = null)
+        private static HttpClient CreateHttpClient(ProxyNode? proxyNode)
+            => CreateHttpClient(null, proxyNode);
+
+        private static HttpClient CreateHttpClient(Uri? baseAddress = null, ProxyNode? proxyNode = null)
         {
-            var handler = new HttpClientHandler
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
-            };
+            var handler = CreateHttpClientHandler(proxyNode);
 
             var client = new HttpClient(handler)
             {
@@ -2465,6 +2803,22 @@ namespace CyanTools.ViewModel
             }
 
             return client;
+        }
+
+        private static HttpClientHandler CreateHttpClientHandler(ProxyNode? proxyNode)
+        {
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+            };
+            var proxy = proxyNode?.CreateWebProxy();
+            if (proxy != null)
+            {
+                handler.Proxy = proxy;
+                handler.UseProxy = true;
+            }
+
+            return handler;
         }
 
         private static void ConfigurePixivApiClient(HttpClient client)
@@ -2542,6 +2896,23 @@ namespace CyanTools.ViewModel
 
         private sealed record PixivDownloadItem(string Url, string FileName, string FileKey);
         private sealed record KemonoAssetDownload(string Url, string FileName, string? Content, string? PostId);
+        private sealed record DownloadTaskSnapshot(
+            string InputText,
+            string OutputDirectory,
+            int DownloadIntervalSeconds,
+            DatasetDownloadMode SelectedMode,
+            bool EnableDanbooru,
+            bool EnablePixiv,
+            bool EnableKemono,
+            string DanbooruToken,
+            bool IncludeArtist,
+            bool IncludeCopyright,
+            bool IncludeCharacter,
+            bool IncludeGeneral,
+            bool IncludeMeta,
+            PixivTokenEntry? PixivToken,
+            string PixivRefreshToken,
+            ProxyNode ProxyNode);
 
         private sealed class RemoteRequestPacer
         {
@@ -2656,6 +3027,14 @@ namespace CyanTools.ViewModel
             public bool IncludeGeneral { get; set; } = true;
             public bool IncludeMeta { get; set; } = true;
             public string? DanbooruManualListUrl { get; set; }
+        }
+
+        private sealed class PixivTokenFileEntry
+        {
+            public string? Id { get; set; }
+            public string? DisplayName { get; set; }
+            public string? RefreshToken { get; set; }
+            public string? UserDataDirectory { get; set; }
         }
 
         private sealed class KemonoPost

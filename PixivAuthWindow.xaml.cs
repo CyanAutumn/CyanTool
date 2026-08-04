@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
@@ -11,11 +12,13 @@ namespace CyanTools
         private const string RedirectUri = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback";
         private readonly TaskCompletionSource<string?> _codeCompletion = new();
         private readonly string _loginUrl;
+        private readonly string? _userDataFolder;
 
-        public PixivAuthWindow(string loginUrl)
+        public PixivAuthWindow(string loginUrl, string? userDataFolder = null)
         {
             InitializeComponent();
             _loginUrl = loginUrl ?? throw new ArgumentNullException(nameof(loginUrl));
+            _userDataFolder = userDataFolder;
             Loaded += OnLoaded;
             Closed += OnClosed;
         }
@@ -27,7 +30,16 @@ namespace CyanTools
             try
             {
                 WebView.NavigationStarting += OnNavigationStarting;
-                await WebView.EnsureCoreWebView2Async();
+                if (!string.IsNullOrWhiteSpace(_userDataFolder))
+                {
+                    Directory.CreateDirectory(_userDataFolder);
+                    var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
+                    await WebView.EnsureCoreWebView2Async(environment);
+                }
+                else
+                {
+                    await WebView.EnsureCoreWebView2Async();
+                }
                 WebView.Source = new Uri(_loginUrl);
             }
             catch (Exception ex)

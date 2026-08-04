@@ -93,7 +93,28 @@ namespace CyanTools.Localization
             Add(translations, "请求间隔", "Request Interval", "リクエスト間隔");
             Add(translations, "秒；适用于图片、附件、分页和补充内容等全部远端请求", "seconds; applies to all remote requests, including images, attachments, paging, and supplementary content", "秒。画像、添付、ページング、補足コンテンツなど、すべてのリモートリクエストに適用されます");
             Add(translations, "集中配置来源、令牌、标签和输出目录，下载统计与日志显示在输出与执行区域下方。", "Configure sources, tokens, tags, and the output folder in one place. Download statistics and logs appear below the output and execution area.", "ソース、トークン、タグ、出力フォルダーをまとめて設定し、ダウンロード統計とログを出力・実行領域の下に表示します。");
+            Add(translations, "集中配置来源、令牌、标签和输出目录，下载任务进度显示在输出与执行区域下方。", "Configure sources, tokens, tags, and the output folder in one place. Download task progress appears below the output and execution area.", "ソース、トークン、タグ、出力フォルダーをまとめて設定し、ダウンロードタスクの進捗を出力・実行領域の下に表示します。");
             Add(translations, "任务列表", "Task List", "タスクリスト");
+            Add(translations, "运行时", "Runtime", "ランタイム");
+            Add(translations, "代理", "Proxy", "プロキシ");
+            Add(translations, "订阅链接", "Subscription URL", "サブスクリプション URL");
+            Add(translations, "Clash 订阅", "Clash Subscription", "Clash サブスクリプション");
+            Add(translations, "更新节点", "Refresh Nodes", "ノードを更新");
+            Add(translations, "清空", "Clear", "クリア");
+            Add(translations, "本地端口", "Local Port", "ローカルポート");
+            Add(translations, "HTTP / Mixed 端口", "HTTP / Mixed Port", "HTTP / Mixed ポート");
+            Add(translations, "节点", "Node", "ノード");
+            Add(translations, "名称", "Name", "名前");
+            Add(translations, "协议", "Protocol", "プロトコル");
+            Add(translations, "地址", "Endpoint", "アドレス");
+            Add(translations, "可用", "Available", "利用可能");
+            Add(translations, "可直接连接", "Directly Connectable", "直接接続可能");
+            Add(translations, "需经本地 Clash", "Requires Local Clash", "ローカル Clash が必要");
+            Add(translations, "令牌列表", "Token List", "トークン一覧");
+            Add(translations, "添加 Pixiv 令牌", "Add Pixiv Token", "Pixiv トークンを追加");
+            Add(translations, "删除选中的 Pixiv 令牌", "Delete Selected Pixiv Token", "選択した Pixiv トークンを削除");
+            Add(translations, "在独立浏览器数据目录中打开 Pixiv 验证页面", "Open the Pixiv verification page in an isolated browser profile", "独立したブラウザープロファイルで Pixiv の確認ページを開きます");
+            Add(translations, "验证", "Verify", "確認");
             Add(translations, "用时/总时间，格式为 天d时:分:秒", "Elapsed/total time in days d hours:minutes:seconds", "経過時間/合計時間。形式は 日d時:分:秒");
 
             Add(translations, "检测中", "Checking", "確認中");

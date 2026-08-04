@@ -40,7 +40,7 @@
                     <TextBlock Text="数据集下载器"
                                Style="{StaticResource CyanPageTitleStyle}"
                                FontSize="30" />
-                    <TextBlock Text="集中配置来源、令牌、标签和输出目录，下载统计与日志显示在输出与执行区域下方。"
+                    <TextBlock Text="集中配置来源、令牌、标签和输出目录，下载任务进度显示在输出与执行区域下方。"
                                Style="{StaticResource CyanPageSubtitleStyle}"
                                Margin="0,4,0,0" />
                 </StackPanel>
@@ -180,29 +180,81 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBlock Text="令牌"
+                            <TextBlock Text="令牌列表"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <PasswordBox Grid.Column="1"
-                                         utils:PasswordBoxHelper.BindPassword="True"
-                                         utils:PasswordBoxHelper.BoundPassword="{Binding PixivRefreshToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:Button Grid.Column="2"
-                                    Command="{Binding GetPixivRefreshTokenCommand}"
-                                    Style="{StaticResource CyanCommandButtonStyle}"
-                                    Margin="10,0,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="Key24"
-                                                   Margin="0,0,6,0" />
-                                    <TextBlock Text="登录获取" />
+                            <Grid Grid.Column="1"
+                                  IsEnabled="{Binding CanEditPixivSettings}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ListBox ItemsSource="{Binding PixivTokens}"
+                                         SelectedItem="{Binding SelectedPixivToken, Mode=TwoWay}"
+                                         MinHeight="54"
+                                         MaxHeight="110"
+                                         BorderThickness="0">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="IsEnabled" Value="True" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsInUse}" Value="True">
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                    <Setter Property="Opacity" Value="0.45" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel MinWidth="260">
+                                                <TextBlock DockPanel.Dock="Right"
+                                                           Text="{Binding StatusText}"
+                                                           Style="{StaticResource CyanTinyTextBlockStyle}" />
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Top"
+                                            Margin="8,0,0,0">
+                                    <ui:Button Command="{Binding AddPixivTokenCommand}"
+                                               Style="{StaticResource CyanCommandButtonStyle}"
+                                               ToolTip="添加 Pixiv 令牌">
+                                        <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Add24" Margin="0,0,5,0"/><TextBlock Text="添加"/></StackPanel>
+                                    </ui:Button>
+                                    <ui:Button Command="{Binding DeletePixivTokenCommand}"
+                                               Style="{StaticResource CyanCommandButtonStyle}"
+                                               ToolTip="删除选中的 Pixiv 令牌">
+                                        <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Delete24" Margin="0,0,5,0"/><TextBlock Text="删除"/></StackPanel>
+                                    </ui:Button>
+                                    <ui:Button Command="{Binding VerifyPixivTokenCommand}"
+                                               Style="{StaticResource CyanCommandButtonStyle}"
+                                               ToolTip="在独立浏览器数据目录中打开 Pixiv 验证页面">
+                                        <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="CheckmarkCircle24" Margin="0,0,5,0"/><TextBlock Text="验证"/></StackPanel>
+                                    </ui:Button>
                                 </StackPanel>
-                            </ui:Button>
+                            </Grid>
 
+                            <TextBlock Grid.Row="1"
+                                       Text="节点"
+                                       Style="{StaticResource CyanFormLabelStyle}"
+                                       Margin="0,10,10,0" />
+                            <ComboBox Grid.Row="1"
+                                      Grid.Column="1"
+                                      ItemsSource="{Binding ProxyNodes}"
+                                      SelectedItem="{Binding SelectedProxyNode, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayName"
+                                      Margin="0,10,0,0" />
                         </Grid>
                     </GroupBox>
 
@@ -212,8 +264,6 @@
                               Margin="0,0,0,12">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -280,14 +330,6 @@
                                         <TextBlock Text="{Binding StartButtonText, Converter={StaticResource LocalizedTextConverter}}" />
                                     </StackPanel>
                                 </ui:Button>
-                                <ui:Button Command="{Binding ClearLogCommand}"
-                                        Style="{StaticResource CyanCommandButtonStyle}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Broom24"
-                                                       Margin="0,0,6,0" />
-                                        <TextBlock Text="清空日志" />
-                                    </StackPanel>
-                                </ui:Button>
                                 <ui:Button Command="{Binding OpenDanbooruManualCollectorCommand}"
                                         Style="{StaticResource CyanCommandButtonStyle}">
                                     <StackPanel Orientation="Horizontal">
@@ -298,48 +340,85 @@
                                 </ui:Button>
                             </WrapPanel>
 
-                            <Grid Grid.Row="4"
-                                  Grid.Column="1"
-                                  Grid.ColumnSpan="2"
-                                  Margin="0,16,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Text="{Binding DanbooruDownloadSummary, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanTinyTextBlockStyle}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,10,0" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding PixivDownloadSummary, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanTinyTextBlockStyle}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,10,0" />
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding KemonoDownloadSummary, Converter={StaticResource LocalizedTextConverter}}"
-                                           Style="{StaticResource CyanTinyTextBlockStyle}"
-                                           TextWrapping="Wrap" />
-                            </Grid>
-
-                            <TextBlock Grid.Row="5"
-                                       Grid.Column="1"
-                                       Grid.ColumnSpan="2"
-                                       Text="{Binding OutputDirectoryImageTotalSummary, Converter={StaticResource LocalizedTextConverter}}"
-                                       Style="{StaticResource CyanTinyTextBlockStyle}"
-                                       FontWeight="SemiBold"
-                                       Margin="0,10,0,0" />
                         </Grid>
                     </GroupBox>
 
                     <GroupBox Grid.Row="4"
-                              Header="下载日志"
+                              Header="任务列表"
                               Style="{StaticResource CyanGroupBoxStyle}">
-                        <ui:TextBox Text="{Binding LogText, Mode=OneWay}"
-                                 Style="{StaticResource CyanLogTextBoxStyle}"
-                                 MinHeight="260"
-                                 HorizontalScrollBarVisibility="Auto" />
+                        <ItemsControl ItemsSource="{Binding DownloadTasks}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource CyanCardStyle}"
+                                            Padding="12"
+                                            Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="220" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ArtistName}"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding PixivId}"
+                                                           Style="{StaticResource CyanSecondaryTextBlockStyle}"
+                                                           Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding StatusText, Converter={StaticResource LocalizedTextConverter}}"
+                                                           Style="{StaticResource CyanTinyTextBlockStyle}"
+                                                           Margin="0,8,0,0" />
+                                                <TextBlock Text="{Binding SelectedProxyName}"
+                                                           Style="{StaticResource CyanTinyTextBlockStyle}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="14,0,14,0">
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Style.Triggers><DataTrigger Binding="{Binding EnableDanbooru}" Value="False"><Setter Property="Opacity" Value="0.35" /></DataTrigger></Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Danbooru" VerticalAlignment="Center" />
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding DanbooruPercent}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnableDanbooru}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding DanbooruProgressText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Style.Triggers><DataTrigger Binding="{Binding EnablePixiv}" Value="False"><Setter Property="Opacity" Value="0.35" /></DataTrigger></Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Pixiv" VerticalAlignment="Center" />
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding PixivPercent}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnablePixiv}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding PixivProgressText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Style.Triggers><DataTrigger Binding="{Binding EnableKemono}" Value="False"><Setter Property="Opacity" Value="0.35" /></DataTrigger></Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Kemono" VerticalAlignment="Center" />
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding KemonoPercent}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnableKemono}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding KemonoProgressText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </StackPanel>
+                                            <ui:Button Grid.Column="2"
+                                                       Command="{Binding StopCommand}"
+                                                       Style="{StaticResource CyanCommandButtonStyle}"
+                                                       VerticalAlignment="Top">
+                                                <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Stop24" Margin="0,0,5,0"/><TextBlock Text="停止"/></StackPanel>
+                                            </ui:Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </GroupBox>
                 </Grid>
             </ScrollViewer>

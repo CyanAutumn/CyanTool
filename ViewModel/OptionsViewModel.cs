@@ -126,6 +126,7 @@ namespace CyanTools.ViewModel
 
         public ObservableCollection<string> LogLines { get; }
         public string LogText => string.Join(Environment.NewLine, LogLines);
+        public ProxySettingsViewModel ProxySettings { get; } = ProxySettingsStore.Shared;
         public ObservableCollection<TrainingBackendMirrorOption> TrainingBackendMirrorOptions { get; }
         public ObservableCollection<TrainingBackendBinding> TrainingBackendBindings { get; }
         public ObservableCollection<TrainingBridgeBackendOption> BindingBackendOptions { get; }
