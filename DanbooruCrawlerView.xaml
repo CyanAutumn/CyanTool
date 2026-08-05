@@ -189,8 +189,7 @@
 
                             <TextBlock Text="令牌列表"
                                        Style="{StaticResource CyanFormLabelStyle}" />
-                            <Grid Grid.Column="1"
-                                  IsEnabled="{Binding CanEditPixivSettings}">
+                            <Grid Grid.Column="1">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />

@@ -293,6 +293,13 @@ namespace CyanTools.Localization
             Add(translations, "信息", "Information", "情報");
             Add(translations, "参数错误", "Parameter Error", "パラメーターエラー");
             Add(translations, "验证错误", "Validation Error", "検証エラー");
+            Add(translations, "验证成功", "Verification Successful", "検証成功");
+            Add(translations, "Pixiv 登录验证", "Pixiv Sign-in Verification", "Pixiv ログイン確認");
+            Add(translations, "正在检查已保存的登录凭证…", "Checking the saved sign-in session…", "保存済みのログイン情報を確認しています…");
+            Add(translations, "未检测到有效登录，请手动登录。成功后窗口会自动关闭。", "No valid sign-in session was found. Sign in manually; this window will close automatically after success.", "有効なログイン情報が見つかりません。手動でログインしてください。成功するとこのウィンドウは自動的に閉じます。");
+            Add(translations, "无法连接 Pixiv，请检查网络后重试。", "Could not connect to Pixiv. Check the network and try again.", "Pixiv に接続できません。ネットワークを確認して再試行してください。");
+            Add(translations, "Pixiv 登录凭证验证成功。", "The Pixiv sign-in session is valid.", "Pixiv のログイン情報は有効です。");
+            Add(translations, "Pixiv 登录凭证验证失败：{0}", "Pixiv sign-in verification failed: {0}", "Pixiv のログイン確認に失敗しました：{0}");
             Add(translations, "处理失败", "Processing Failed", "処理失敗");
             Add(translations, "操作完成", "Operation Completed", "操作完了");
             Add(translations, "内容重复", "Duplicate Content", "内容の重複");

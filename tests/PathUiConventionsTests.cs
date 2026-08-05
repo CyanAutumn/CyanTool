@@ -531,6 +531,23 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void DatasetDownloader_PixivTokenManagementAndVerificationUseIndependentBrowserProfiles()
+    {
+        string view = ReadRepoFile("DanbooruCrawlerView.xaml");
+        string viewModel = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+        string authWindow = ReadRepoFile("PixivAuthWindow.xaml.cs");
+
+        Assert.DoesNotContain("IsEnabled=\"{Binding CanEditPixivSettings}\"", view);
+        Assert.Contains("CreateSessionVerification(token.UserDataDirectory)", viewModel);
+        Assert.Contains("WaitForSessionVerificationAsync", viewModel);
+        Assert.Contains("Pixiv 登录凭证验证成功。", viewModel);
+        Assert.Contains("https://www.pixiv.net/settings/profile", authWindow);
+        Assert.Contains("https://accounts.pixiv.net/login?return_to=", authWindow);
+        Assert.Contains("IsVerifiedSessionUri(WebView.Source)", authWindow);
+        Assert.Contains("_sessionVerificationCompletion.TrySetResult(false)", authWindow);
+    }
+
+    [Fact]
     public void WorkflowOnlyParameters_ExcludeInputsRepresentedByNodeConnections()
     {
         string content = ReadRepoFile(Path.Combine("ViewModel", "PipelineNodeParameterViewModels.cs"));

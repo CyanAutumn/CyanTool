@@ -16,6 +16,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using CyanTools.Localization;
 using CyanTools.Model;
 using CyanTools.Pipeline;
 using CyanTools.Utils;
@@ -118,6 +119,7 @@ namespace CyanTools.ViewModel
         private bool _includeGeneral = true;
         private bool _includeMeta = true;
         private bool _isDownloading;
+        private bool _isVerifyingPixivToken;
         private DatasetDownloadMode _selectedMode = DatasetDownloadMode.ArtistId;
         private string _sessionOutputIdSegment = "unknown";
         private string _sessionOutputArtistSegment = "unknown_name";
@@ -172,8 +174,12 @@ namespace CyanTools.ViewModel
             _getPixivRefreshTokenCommand = new RelayCommand(async _ => await FetchPixivRefreshTokenAsync(), _ => !IsDownloading);
             _openDanbooruManualCollectorCommand = new RelayCommand(async _ => await OpenDanbooruManualCollectorAsync(), _ => !IsDownloading);
             _addPixivTokenCommand = new RelayCommand(async _ => await FetchPixivRefreshTokenAsync(), _ => !IsDownloading);
-            _deletePixivTokenCommand = new RelayCommand(_ => DeleteSelectedPixivToken(), _ => SelectedPixivToken is { UsageCount: 0 });
-            _verifyPixivTokenCommand = new RelayCommand(_ => VerifySelectedPixivToken(), _ => SelectedPixivToken != null && !IsDownloading);
+            _deletePixivTokenCommand = new RelayCommand(
+                _ => DeleteSelectedPixivToken(),
+                _ => !IsDownloading && SelectedPixivToken is { UsageCount: 0 });
+            _verifyPixivTokenCommand = new RelayCommand(
+                async _ => await VerifySelectedPixivTokenAsync(),
+                _ => SelectedPixivToken != null && !IsDownloading && !_isVerifyingPixivToken);
 
             LoadSettings();
             LoadDanbooruToken();
@@ -203,7 +209,6 @@ namespace CyanTools.ViewModel
                 OnPropertyChanged(nameof(IsPostIdMode));
                 OnPropertyChanged(nameof(IsTagOrPostMode));
                 OnPropertyChanged(nameof(CanSelectAllSources));
-                OnPropertyChanged(nameof(CanEditPixivSettings));
                 _startStopCommand.RaiseCanExecuteChanged();
             }
         }
@@ -265,8 +270,6 @@ namespace CyanTools.ViewModel
 
         public bool CanEditDanbooruSettings => EnableDanbooru;
 
-        public bool CanEditPixivSettings => EnablePixiv && !IsTagOrPostMode;
-
         public bool EnablePixiv
         {
             get => _enablePixiv;
@@ -277,7 +280,6 @@ namespace CyanTools.ViewModel
                 {
                     _enablePixiv = normalized;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(CanEditPixivSettings));
                     _startStopCommand.RaiseCanExecuteChanged();
                 }
             }
@@ -529,6 +531,9 @@ namespace CyanTools.ViewModel
                     _startStopCommand.RaiseCanExecuteChanged();
                     _getPixivRefreshTokenCommand.RaiseCanExecuteChanged();
                     _openDanbooruManualCollectorCommand.RaiseCanExecuteChanged();
+                    _addPixivTokenCommand.RaiseCanExecuteChanged();
+                    _deletePixivTokenCommand.RaiseCanExecuteChanged();
+                    _verifyPixivTokenCommand.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -813,26 +818,52 @@ namespace CyanTools.ViewModel
             _ = SavePixivTokensAsync();
         }
 
-        private void VerifySelectedPixivToken()
+        private async Task VerifySelectedPixivTokenAsync()
         {
-            if (SelectedPixivToken == null)
+            PixivTokenEntry? token = SelectedPixivToken;
+            if (token == null)
             {
                 return;
             }
 
+            _isVerifyingPixivToken = true;
+            _verifyPixivTokenCommand.RaiseCanExecuteChanged();
             try
             {
-                var authWindow = new PixivAuthWindow("https://www.pixiv.net/", SelectedPixivToken.UserDataDirectory)
-                {
-                    Owner = Application.Current?.MainWindow,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Title = $"Pixiv - {SelectedPixivToken.DisplayName}"
-                };
+                AppendLog($"[Pixiv] 正在验证 {token.DisplayName} 的登录凭证...");
+                var authWindow = PixivAuthWindow.CreateSessionVerification(token.UserDataDirectory);
+                authWindow.Owner = Application.Current?.MainWindow;
+                authWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                authWindow.Title = $"Pixiv - {token.DisplayName}";
                 authWindow.Show();
+
+                bool verified = await authWindow.WaitForSessionVerificationAsync();
+                if (!verified)
+                {
+                    AppendLog($"[Pixiv] {token.DisplayName} 的登录验证已取消。");
+                    return;
+                }
+
+                AppendLog($"[Pixiv] {token.DisplayName} 的登录凭证验证成功。");
+                LocalizedMessageBox.Show(
+                    "Pixiv 登录凭证验证成功。",
+                    "验证成功",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                AppendLog($"[Pixiv] 打开验证页面失败: {ex.Message}");
+                AppendLog($"[Pixiv] 登录凭证验证失败: {ex.Message}");
+                LocalizedMessageBox.Show(
+                    $"Pixiv 登录凭证验证失败：{ex.Message}",
+                    "验证错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isVerifyingPixivToken = false;
+                _verifyPixivTokenCommand.RaiseCanExecuteChanged();
             }
         }
 

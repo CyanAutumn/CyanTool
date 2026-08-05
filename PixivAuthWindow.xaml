@@ -34,9 +34,11 @@
                                    VerticalAlignment="Center" />
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Pixiv Login"
+                    <TextBlock x:Name="HeaderTitleText"
+                               Text="Pixiv Login"
                                Style="{StaticResource CyanSectionTitleStyle}" />
-                    <TextBlock Text="登录完成后窗口会自动返回授权码。"
+                    <TextBlock x:Name="HeaderSubtitleText"
+                               Text="登录完成后窗口会自动返回授权码。"
                                Style="{StaticResource CyanTinyTextBlockStyle}" />
                 </StackPanel>
             </StackPanel>
