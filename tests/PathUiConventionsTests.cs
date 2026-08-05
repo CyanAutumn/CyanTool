@@ -328,21 +328,33 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
-    public void DatasetDownloaderView_PlacesStatisticsAndLogBelowOutputExecution()
+    public void DatasetDownloaderView_PlacesTaskListBelowOutputExecution()
     {
         string content = ReadRepoFile("DanbooruCrawlerView.xaml");
 
-        Assert.Contains("DanbooruDownloadSummary", content);
-        Assert.Contains("PixivDownloadSummary", content);
-        Assert.Contains("KemonoDownloadSummary", content);
-        Assert.Contains("OutputDirectoryImageTotalSummary", content);
         Assert.Contains("DownloadIntervalSeconds", content);
         Assert.Contains("图片、附件、分页和补充内容", content);
         Assert.DoesNotContain("PixivDownloadIntervalSeconds", content);
         Assert.Contains("<GroupBox Grid.Row=\"4\"", content);
-        Assert.Contains("Header=\"下载日志\"", content);
-        Assert.Contains("Text=\"{Binding LogText, Mode=OneWay}\"", content);
+        Assert.Contains("Header=\"任务列表\"", content);
+        Assert.Contains("ItemsSource=\"{Binding DownloadTasks}\"", content);
+        Assert.Contains("Text=\"{Binding DanbooruProgressText}\"", content);
+        Assert.Contains("Text=\"{Binding PixivProgressText}\"", content);
+        Assert.Contains("Text=\"{Binding KemonoProgressText}\"", content);
+        Assert.Contains("Command=\"{Binding StopCommand}\"", content);
+        Assert.DoesNotContain("Header=\"下载日志\"", content);
+        Assert.DoesNotContain("Text=\"{Binding LogText, Mode=OneWay}\"", content);
         Assert.DoesNotContain("<GridSplitter", content);
+    }
+
+    [Fact]
+    public void DatasetDownloaderView_ReadOnlyTaskPercentBindingsAreOneWay()
+    {
+        string content = ReadRepoFile("DanbooruCrawlerView.xaml");
+
+        Assert.Contains("Value=\"{Binding DanbooruPercent, Mode=OneWay}\"", content);
+        Assert.Contains("Value=\"{Binding PixivPercent, Mode=OneWay}\"", content);
+        Assert.Contains("Value=\"{Binding KemonoPercent, Mode=OneWay}\"", content);
     }
 
     [Fact]

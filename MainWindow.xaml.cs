@@ -53,6 +53,7 @@ namespace CyanTools
             [typeof(GeminiImageGenerationView)] = "素材、提示词、模型参数和生成结果集中在一个更清爽的工作台里。",
             [typeof(PipelineSchedulerView)] = "在节点画布中编排处理流程，保存工作流并查看执行日志。",
             [typeof(OptionsView)] = "管理本机运行环境与共享工具设置。",
+            [typeof(ProxySettingsView)] = "管理 Clash 订阅、本地代理端口和数据集下载节点。",
             [typeof(InferenceProjectsView)] = "启动 ComfyUI 与 Webui Forge Neo，查看实时日志并快捷管理模型目录。",
             [typeof(PromptManagerView)] = "维护本地提示词文件，快速创建、编辑、随机复制和自增添加。"
         };
@@ -432,6 +433,11 @@ namespace CyanTools
             if (controlType == typeof(OptionsView))
             {
                 return SymbolRegular.WrenchSettings24;
+            }
+
+            if (controlType == typeof(ProxySettingsView))
+            {
+                return SymbolRegular.ArrowRouting24;
             }
 
             if (controlType == typeof(InferenceProjectsView))

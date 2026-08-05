@@ -382,7 +382,7 @@
                                                     </Grid.Style>
                                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
                                                     <TextBlock Text="Danbooru" VerticalAlignment="Center" />
-                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding DanbooruPercent}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnableDanbooru}" />
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding DanbooruPercent, Mode=OneWay}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnableDanbooru}" />
                                                     <TextBlock Grid.Column="2" Text="{Binding DanbooruProgressText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                                 </Grid>
                                                 <Grid Margin="0,0,0,8">
@@ -393,7 +393,7 @@
                                                     </Grid.Style>
                                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
                                                     <TextBlock Text="Pixiv" VerticalAlignment="Center" />
-                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding PixivPercent}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnablePixiv}" />
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding PixivPercent, Mode=OneWay}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnablePixiv}" />
                                                     <TextBlock Grid.Column="2" Text="{Binding PixivProgressText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                                 </Grid>
                                                 <Grid>
@@ -404,7 +404,7 @@
                                                     </Grid.Style>
                                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
                                                     <TextBlock Text="Kemono" VerticalAlignment="Center" />
-                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding KemonoPercent}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnableKemono}" />
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Value="{Binding KemonoPercent, Mode=OneWay}" VerticalAlignment="Center" Margin="8,0" IsEnabled="{Binding EnableKemono}" />
                                                     <TextBlock Grid.Column="2" Text="{Binding KemonoProgressText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                                 </Grid>
                                             </StackPanel>

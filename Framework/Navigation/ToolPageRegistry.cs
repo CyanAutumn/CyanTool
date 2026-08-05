@@ -77,6 +77,7 @@ namespace CyanTools.Navigation
             }
 
             if (controlType == typeof(global::CyanTools.OptionsView) ||
+                controlType == typeof(global::CyanTools.ProxySettingsView) ||
                 controlType == typeof(global::CyanTools.InferenceProjectsView))
             {
                 return ToolPageCategory.EnvironmentSettings;

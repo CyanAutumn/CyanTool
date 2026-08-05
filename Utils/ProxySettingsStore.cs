@@ -224,7 +224,9 @@ namespace CyanTools.Utils
                 using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("CyanTools/1.0");
                 var payload = await client.GetStringAsync(uri);
-                var parsed = ParseClashProxies(payload);
+                var parsed = ClashSubscriptionParser.Parse(payload)
+                    .Select(node => new ProxyNode(node.Id, node.Name, node.Type, node.Server, node.Port))
+                    .ToList();
                 ReplaceNodes(parsed);
                 StatusText = parsed.Count == 0
                     ? "订阅已响应，但没有解析到可用节点。"
@@ -357,101 +359,6 @@ namespace CyanTools.Utils
             }
         }
 
-        private static List<ProxyNode> ParseClashProxies(string payload)
-        {
-            var result = new List<ProxyNode>();
-            if (string.IsNullOrWhiteSpace(payload) || payload.Length > 8_000_000)
-            {
-                return result;
-            }
-
-            var inProxies = false;
-            Dictionary<string, string>? current = null;
-            void Flush()
-            {
-                if (current == null || !current.TryGetValue("server", out var server) || !int.TryParse(current.GetValueOrDefault("port"), out var port) || port <= 0)
-                {
-                    return;
-                }
-
-                var name = current.GetValueOrDefault("name") ?? $"{server}:{port}";
-                var type = current.GetValueOrDefault("type") ?? "http";
-                var id = $"subscription-{result.Count}-{name}";
-                result.Add(new ProxyNode(id, name, type, server, port));
-            }
-
-            foreach (var rawLine in payload.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var line = rawLine.Trim();
-                if (line.StartsWith("#", StringComparison.Ordinal) || line.Length == 0)
-                {
-                    continue;
-                }
-
-                if (line.Equals("proxies:", StringComparison.OrdinalIgnoreCase))
-                {
-                    inProxies = true;
-                    continue;
-                }
-
-                if (!inProxies)
-                {
-                    continue;
-                }
-
-                if (!rawLine.StartsWith(" ") && !rawLine.StartsWith("\t") && line.EndsWith(":", StringComparison.Ordinal))
-                {
-                    Flush();
-                    break;
-                }
-
-                if (line.StartsWith("- ", StringComparison.Ordinal))
-                {
-                    Flush();
-                    current = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    line = line[2..].Trim();
-                    if (line.StartsWith("{", StringComparison.Ordinal))
-                    {
-                        foreach (var pair in line.Trim('{', '}').Split(',', StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            AddKeyValue(current, pair);
-                        }
-                        Flush();
-                        current = null;
-                    }
-                    else
-                    {
-                        AddKeyValue(current, line);
-                    }
-                    continue;
-                }
-
-                if (current != null)
-                {
-                    AddKeyValue(current, line);
-                }
-            }
-
-            Flush();
-            return result;
-        }
-
-        private static void AddKeyValue(IDictionary<string, string> values, string line)
-        {
-            var separator = line.IndexOf(':');
-            if (separator <= 0)
-            {
-                return;
-            }
-
-            var key = line[..separator].Trim().Trim('"', '\'');
-            var value = line[(separator + 1)..].Trim().Trim('"', '\'');
-            if (key is "name" or "type" or "server" or "port")
-            {
-                values[key] = value;
-            }
-        }
-
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -472,6 +379,7 @@ namespace CyanTools.Utils
             public string? Server { get; set; }
             public int Port { get; set; }
         }
+
     }
 
     public static class ProxySettingsStore

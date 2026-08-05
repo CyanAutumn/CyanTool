@@ -97,6 +97,8 @@ namespace CyanTools.Localization
             Add(translations, "任务列表", "Task List", "タスクリスト");
             Add(translations, "运行时", "Runtime", "ランタイム");
             Add(translations, "代理", "Proxy", "プロキシ");
+            Add(translations, "代理设置", "Proxy Settings", "プロキシ設定");
+            Add(translations, "管理 Clash 订阅、本地代理端口和数据集下载节点。", "Manage the Clash subscription, local proxy port, and dataset download nodes.", "Clash サブスクリプション、ローカルプロキシポート、データセットダウンロードノードを管理します。");
             Add(translations, "订阅链接", "Subscription URL", "サブスクリプション URL");
             Add(translations, "Clash 订阅", "Clash Subscription", "Clash サブスクリプション");
             Add(translations, "更新节点", "Refresh Nodes", "ノードを更新");
