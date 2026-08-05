@@ -358,6 +358,22 @@ public sealed class PathUiConventionsTests
     }
 
     [Fact]
+    public void DatasetDownloader_UsesManagedMihomoForParsedSubscriptionNodes()
+    {
+        string viewModel = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));
+        string proxyView = ReadRepoFile("ProxySettingsView.xaml");
+
+        Assert.Contains("snapshot.ProxyNode.UsesManagedCore", viewModel);
+        Assert.Contains("ManagedMihomoService.Shared.AcquireAsync", viewModel);
+        Assert.Contains("await proxyLease.DisposeAsync()", viewModel);
+        Assert.Contains("Command=\"{Binding PrepareManagedCoreCommand}\"", proxyView);
+        Assert.Contains("Command=\"{Binding CheckManagedCoreUpdateCommand}\"", proxyView);
+        Assert.Contains("Command=\"{Binding UpdateManagedCoreCommand}\"", proxyView);
+        Assert.Contains("Text=\"当前版本\"", proxyView);
+        Assert.Contains("Text=\"最新版本\"", proxyView);
+    }
+
+    [Fact]
     public void DatasetDownloaderViewModel_ReportsPerSourceLiveTotalsAndOutputDirectoryTotal()
     {
         string content = ReadRepoFile(Path.Combine("ViewModel", "DatasetDownloaderViewModel.cs"));

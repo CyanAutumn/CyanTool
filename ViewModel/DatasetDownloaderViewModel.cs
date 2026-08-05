@@ -601,37 +601,52 @@ namespace CyanTools.ViewModel
         {
             using var taskCancellation = new CancellationTokenSource();
             taskItem.AttachCancellation(taskCancellation);
-            var worker = new DatasetDownloaderViewModel(snapshot.ProxyNode, persistCredentials: false)
-            {
-                InputText = snapshot.InputText,
-                OutputDirectory = snapshot.OutputDirectory,
-                DownloadIntervalSeconds = snapshot.DownloadIntervalSeconds,
-                EnableDanbooru = snapshot.EnableDanbooru,
-                EnablePixiv = snapshot.EnablePixiv,
-                EnableKemono = snapshot.EnableKemono,
-                DanbooruToken = snapshot.DanbooruToken,
-                IncludeArtist = snapshot.IncludeArtist,
-                IncludeCopyright = snapshot.IncludeCopyright,
-                IncludeCharacter = snapshot.IncludeCharacter,
-                IncludeGeneral = snapshot.IncludeGeneral,
-                IncludeMeta = snapshot.IncludeMeta,
-                SelectedMode = snapshot.SelectedMode,
-                PixivRefreshToken = snapshot.PixivRefreshToken
-            };
-            worker.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName is nameof(DanbooruDownloadSummary) or nameof(PixivDownloadSummary) or nameof(KemonoDownloadSummary)
-                    or nameof(DanbooruProgressCurrent) or nameof(DanbooruProgressTotal)
-                    or nameof(PixivProgressCurrent) or nameof(PixivProgressTotal)
-                    or nameof(KemonoProgressCurrent) or nameof(KemonoProgressTotal)
-                    or nameof(ResolvedArtistName))
-                {
-                    taskItem.UpdateFrom(worker);
-                }
-            };
+            ManagedMihomoService.ManagedMihomoLease? proxyLease = null;
+            DatasetDownloaderViewModel? worker = null;
 
             try
             {
+                var transportProxyNode = snapshot.ProxyNode;
+                if (snapshot.ProxyNode.UsesManagedCore)
+                {
+                    taskItem.StatusText = "正在准备托管代理内核";
+                    var progress = new Progress<string>(message => taskItem.StatusText = message);
+                    proxyLease = await ManagedMihomoService.Shared.AcquireAsync(
+                        snapshot.ProxyNode,
+                        taskCancellation.Token,
+                        progress);
+                    transportProxyNode = proxyLease.TransportNode;
+                }
+
+                worker = new DatasetDownloaderViewModel(transportProxyNode, persistCredentials: false)
+                {
+                    InputText = snapshot.InputText,
+                    OutputDirectory = snapshot.OutputDirectory,
+                    DownloadIntervalSeconds = snapshot.DownloadIntervalSeconds,
+                    EnableDanbooru = snapshot.EnableDanbooru,
+                    EnablePixiv = snapshot.EnablePixiv,
+                    EnableKemono = snapshot.EnableKemono,
+                    DanbooruToken = snapshot.DanbooruToken,
+                    IncludeArtist = snapshot.IncludeArtist,
+                    IncludeCopyright = snapshot.IncludeCopyright,
+                    IncludeCharacter = snapshot.IncludeCharacter,
+                    IncludeGeneral = snapshot.IncludeGeneral,
+                    IncludeMeta = snapshot.IncludeMeta,
+                    SelectedMode = snapshot.SelectedMode,
+                    PixivRefreshToken = snapshot.PixivRefreshToken
+                };
+                worker.PropertyChanged += (_, args) =>
+                {
+                    if (args.PropertyName is nameof(DanbooruDownloadSummary) or nameof(PixivDownloadSummary) or nameof(KemonoDownloadSummary)
+                        or nameof(DanbooruProgressCurrent) or nameof(DanbooruProgressTotal)
+                        or nameof(PixivProgressCurrent) or nameof(PixivProgressTotal)
+                        or nameof(KemonoProgressCurrent) or nameof(KemonoProgressTotal)
+                        or nameof(ResolvedArtistName))
+                    {
+                        taskItem.UpdateFrom(worker);
+                    }
+                };
+
                 await worker.ExecuteDownloadAsync(taskCancellation.Token, null, rethrowErrors: false, validateWorkflowOutput: false);
                 taskItem.StatusText = "已完成";
             }
@@ -649,7 +664,9 @@ namespace CyanTools.ViewModel
                 snapshot.ProxyNode.Release();
                 if (snapshot.EnablePixiv)
                 {
-                    if (snapshot.PixivToken != null && !string.IsNullOrWhiteSpace(worker.PixivRefreshToken))
+                    if (worker != null
+                        && snapshot.PixivToken != null
+                        && !string.IsNullOrWhiteSpace(worker.PixivRefreshToken))
                     {
                         snapshot.PixivToken.RefreshToken = worker.PixivRefreshToken;
                         if (ReferenceEquals(snapshot.PixivToken, SelectedPixivToken))
@@ -659,6 +676,10 @@ namespace CyanTools.ViewModel
                         await SavePixivTokensAsync();
                     }
                     snapshot.PixivToken?.Release();
+                }
+                if (proxyLease != null)
+                {
+                    await proxyLease.DisposeAsync();
                 }
                 IsDownloading = _downloadTasks.Any(item => item.IsRunning);
                 _startStopCommand.RaiseCanExecuteChanged();

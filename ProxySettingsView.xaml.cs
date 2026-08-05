@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using System.Windows;
 using CyanTools.Navigation;
 using CyanTools.Utils;
 
@@ -11,6 +12,12 @@ namespace CyanTools
         {
             InitializeComponent();
             DataContext = ProxySettingsStore.Shared;
+            Loaded += ProxySettingsView_Loaded;
+        }
+
+        private async void ProxySettingsView_Loaded(object sender, RoutedEventArgs e)
+        {
+            await ProxySettingsStore.Shared.TestNodesAsync();
         }
     }
 }

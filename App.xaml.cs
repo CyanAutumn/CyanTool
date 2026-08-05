@@ -52,6 +52,7 @@ namespace CyanTools
         protected override void OnExit(ExitEventArgs e)
         {
             UserControlInputState.SaveAll();
+            ManagedMihomoService.DisposeSharedIfCreated();
             SystemMonitorWidgetController.PrepareForApplicationShutdown();
             SystemMonitorWidgetController.Shutdown();
             base.OnExit(e);

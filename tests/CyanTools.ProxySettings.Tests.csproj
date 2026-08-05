@@ -1,0 +1,36 @@
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj/CyanTools.ProxySettings.Tests/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="ProxySettingsStoreTests.cs" />
+    <Compile Include="../Utils/ClashSubscriptionParser.cs" Link="Utils/ClashSubscriptionParser.cs" />
+    <Compile Include="../Utils/ManagedMihomoService.cs" Link="Utils/ManagedMihomoService.cs" />
+    <Compile Include="../Utils/ProxySettingsStore.cs" Link="Utils/ProxySettingsStore.cs" />
+    <Compile Include="../Utils/RelayCommand.cs" Link="Utils/RelayCommand.cs" />
+    <Compile Include="../Utils/WindowsDataProtector.cs" Link="Utils/WindowsDataProtector.cs" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

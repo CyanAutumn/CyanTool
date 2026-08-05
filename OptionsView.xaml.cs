@@ -14,6 +14,15 @@ namespace CyanTools
         {
             InitializeComponent();
             DataContext = new OptionsViewModel();
+            Loaded += OptionsView_Loaded;
+        }
+
+        private async void OptionsView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is OptionsViewModel viewModel)
+            {
+                await viewModel.ProxySettings.TestNodesAsync();
+            }
         }
 
         private void CudnnPackage_DragEnter(object sender, DragEventArgs e)

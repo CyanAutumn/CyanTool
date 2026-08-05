@@ -102,6 +102,13 @@ namespace CyanTools.Localization
             Add(translations, "订阅链接", "Subscription URL", "サブスクリプション URL");
             Add(translations, "Clash 订阅", "Clash Subscription", "Clash サブスクリプション");
             Add(translations, "更新节点", "Refresh Nodes", "ノードを更新");
+            Add(translations, "托管内核", "Managed Core", "管理コア");
+            Add(translations, "准备 / 校验内核", "Prepare / Verify Core", "コアを準備 / 検証");
+            Add(translations, "当前版本", "Current Version", "現在のバージョン");
+            Add(translations, "最新版本", "Latest Version", "最新バージョン");
+            Add(translations, "校验 / 修复", "Verify / Repair", "検証 / 修復");
+            Add(translations, "检查更新", "Check for Updates", "更新を確認");
+            Add(translations, "安装 / 更新", "Install / Update", "インストール / 更新");
             Add(translations, "清空", "Clear", "クリア");
             Add(translations, "本地端口", "Local Port", "ローカルポート");
             Add(translations, "HTTP / Mixed 端口", "HTTP / Mixed Port", "HTTP / Mixed ポート");

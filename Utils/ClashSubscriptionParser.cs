@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Globalization;
 using YamlDotNet.Serialization;
 
 namespace CyanTools.Utils
@@ -10,7 +10,8 @@ namespace CyanTools.Utils
         string Name,
         string Type,
         string Server,
-        int Port);
+        int Port,
+        string RawYaml);
 
     internal static class ClashSubscriptionParser
     {
@@ -23,47 +24,64 @@ namespace CyanTools.Utils
             }
 
             var deserializer = new DeserializerBuilder()
-                .IgnoreUnmatchedProperties()
                 .Build();
-            var document = deserializer.Deserialize<ClashSubscriptionDocument>(payload);
-            foreach (var proxy in document?.Proxies ?? Enumerable.Empty<ClashProxyEntry>())
+            var serializer = new SerializerBuilder()
+                .DisableAliases()
+                .Build();
+            var document = deserializer.Deserialize<Dictionary<object, object>>(payload);
+            if (document == null
+                || !TryGetValue(document, "proxies", out var proxyValue)
+                || proxyValue is not IEnumerable<object> proxies)
             {
-                if (string.IsNullOrWhiteSpace(proxy.Server)
-                    || !int.TryParse(proxy.Port, out var port)
+                return result;
+            }
+
+            foreach (var entry in proxies)
+            {
+                if (entry is not Dictionary<object, object> proxy)
+                {
+                    continue;
+                }
+
+                var serverValue = GetScalar(proxy, "server");
+                var portValue = GetScalar(proxy, "port");
+                if (string.IsNullOrWhiteSpace(serverValue)
+                    || !int.TryParse(portValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var port)
                     || port is <= 0 or > 65535)
                 {
                     continue;
                 }
 
-                var server = proxy.Server.Trim();
-                var name = string.IsNullOrWhiteSpace(proxy.Name) ? $"{server}:{port}" : proxy.Name.Trim();
-                var type = string.IsNullOrWhiteSpace(proxy.Type) ? "http" : proxy.Type.Trim().ToLowerInvariant();
+                var server = serverValue.Trim();
+                var nameValue = GetScalar(proxy, "name");
+                var typeValue = GetScalar(proxy, "type");
+                var name = string.IsNullOrWhiteSpace(nameValue) ? $"{server}:{port}" : nameValue.Trim();
+                var type = string.IsNullOrWhiteSpace(typeValue) ? "http" : typeValue.Trim().ToLowerInvariant();
                 var id = $"subscription-{result.Count}-{name}";
-                result.Add(new ClashProxyDefinition(id, name, type, server, port));
+                result.Add(new ClashProxyDefinition(id, name, type, server, port, serializer.Serialize(proxy)));
             }
 
             return result;
         }
 
-        private sealed class ClashSubscriptionDocument
+        private static string? GetScalar(Dictionary<object, object> mapping, string key)
+            => TryGetValue(mapping, key, out var value)
+                ? Convert.ToString(value, CultureInfo.InvariantCulture)
+                : null;
+
+        private static bool TryGetValue(Dictionary<object, object> mapping, string key, out object? value)
         {
-            [YamlMember(Alias = "proxies")]
-            public List<ClashProxyEntry>? Proxies { get; set; }
-        }
+            foreach (var pair in mapping)
+            {
+                if (string.Equals(Convert.ToString(pair.Key, CultureInfo.InvariantCulture), key, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = pair.Value;
+                    return true;
+                }
+            }
 
-        private sealed class ClashProxyEntry
-        {
-            [YamlMember(Alias = "name")]
-            public string? Name { get; set; }
-
-            [YamlMember(Alias = "type")]
-            public string? Type { get; set; }
-
-            [YamlMember(Alias = "server")]
-            public string? Server { get; set; }
-
-            [YamlMember(Alias = "port")]
-            public string? Port { get; set; }
+            value = null;
+            return false;
         }
     }
 }
