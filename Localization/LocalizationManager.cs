@@ -627,6 +627,8 @@ namespace CyanTools.Localization
             [" - 高斯模糊反下毒思路"] = new(" - Gaussian-blur anti-poisoning idea", " - ガウスぼかしによる対策アイデア"),
 
             ["主页"] = new("Home", "ホーム"),
+            ["搜索工具"] = new("Search tools", "ツールを検索"),
+            ["未找到匹配的工具"] = new("No matching tools", "一致するツールがありません"),
             ["训练"] = new("Training", "学習"),
             ["数据集获取"] = new("Dataset Acquisition", "データセット取得"),
             ["数据集归类"] = new("Dataset Classification", "データセット分類"),

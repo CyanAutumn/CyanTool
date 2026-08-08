@@ -162,8 +162,24 @@
                                    CompactPaneLength="58"
                                    FrameMargin="20,14,20,20"
                                    HeaderVisibility="Collapsed"
+                                   IsBackButtonVisible="Collapsed"
                                    Background="Transparent"
-                                   SelectionChanged="RootNavigationView_SelectionChanged" />
+                                   SelectionChanged="RootNavigationView_SelectionChanged">
+                    <ui:NavigationView.AutoSuggestBox>
+                        <ui:AutoSuggestBox x:Name="NavigationSearchBox"
+                                           PlaceholderText="搜索工具"
+                                           ToolTip="搜索工具"
+                                           ClearButtonEnabled="True"
+                                           TextChanged="NavigationSearchBox_TextChanged"
+                                           QuerySubmitted="NavigationSearchBox_QuerySubmitted">
+                            <ui:AutoSuggestBox.Icon>
+                                <ui:IconSourceElement>
+                                    <ui:SymbolIconSource Symbol="Search24" />
+                                </ui:IconSourceElement>
+                            </ui:AutoSuggestBox.Icon>
+                        </ui:AutoSuggestBox>
+                    </ui:NavigationView.AutoSuggestBox>
+                </ui:NavigationView>
             </Border>
         </Grid>
     </Grid>

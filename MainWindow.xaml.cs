@@ -70,6 +70,7 @@ namespace CyanTools
         private NavigationMenuEntry? _currentEntry;
         private bool _isUpdatingLanguageSelection;
         private bool _useDarkTheme;
+        private string _navigationSearchText = string.Empty;
 
         public MainWindow()
         {
@@ -79,6 +80,7 @@ namespace CyanTools
             _homeView.SecretImageClicked += HomeView_SecretImageClicked;
 
             InitializeLanguageSelector();
+            UpdateNavigationSearchText();
             ApplyTheme(useDarkTheme: false);
             RefreshMenuItems();
 
@@ -183,16 +185,47 @@ namespace CyanTools
                 System.Windows.MessageBoxImage.Information);
         }
 
+        private void NavigationSearchBox_TextChanged(
+            AutoSuggestBox sender,
+            AutoSuggestBoxTextChangedEventArgs args)
+        {
+            var searchText = sender.Text?.Trim() ?? string.Empty;
+            if (string.Equals(_navigationSearchText, searchText, StringComparison.CurrentCulture))
+            {
+                return;
+            }
+
+            _navigationSearchText = searchText;
+            RefreshMenuItems();
+        }
+
+        private void NavigationSearchBox_QuerySubmitted(
+            AutoSuggestBox sender,
+            AutoSuggestBoxQuerySubmittedEventArgs args)
+        {
+            if (string.IsNullOrWhiteSpace(_navigationSearchText))
+            {
+                return;
+            }
+
+            var firstMatch = _navigationItems.FirstOrDefault(pair => MatchesNavigationSearch(pair.Value));
+            if (firstMatch.Key != null)
+            {
+                NavigateToEntry(firstMatch.Value, firstMatch.Key);
+            }
+        }
+
         private void RefreshMenuItems()
         {
             var previousEntry = _currentEntry;
+            var hasSearchText = !string.IsNullOrWhiteSpace(_navigationSearchText);
             NavigationViewItem? activeItem = null;
             RootNavigationView.MenuItems.Clear();
             _navigationItems.Clear();
 
             var entries = _navigationService.GetMenuEntries(_downloadersUnlocked);
             var homeEntry = entries.FirstOrDefault(entry => entry.IsHome);
-            if (homeEntry != null)
+            if (homeEntry != null && MatchesNavigationSearch(homeEntry))
             {
                 var homeItem = CreateNavigationItem(homeEntry);
                 RootNavigationView.MenuItems.Add(homeItem);
@@ -203,7 +236,10 @@ namespace CyanTools
                 }
             }
 
-            var pageEntries = entries.Where(entry => !entry.IsHome && entry.Metadata != null).ToList();
+            var pageEntries = entries
+                .Where(entry => !entry.IsHome && entry.Metadata != null)
+                .Where(MatchesNavigationSearch)
+                .ToList();
             var standaloneEntries = pageEntries
                 .Where(IsStandaloneTopLevelEntry)
                 .OrderBy(entry => entry.Metadata?.Order ?? 0)
@@ -235,6 +271,7 @@ namespace CyanTools
                 }
 
                 var categoryItem = CreateCategoryItem(category);
+                categoryItem.IsExpanded = hasSearchText;
                 foreach (var entry in categoryEntries)
                 {
                     var item = CreateNavigationItem(entry);
@@ -251,7 +288,62 @@ namespace CyanTools
                 RootNavigationView.MenuItems.Add(categoryItem);
             }
 
+            if (RootNavigationView.MenuItems.Count == 0)
+            {
+                RootNavigationView.MenuItems.Add(new NavigationViewItem
+                {
+                    Content = LocalizationManager.Translate("未找到匹配的工具"),
+                    Icon = new SymbolIcon(SymbolRegular.Search24),
+                    IsEnabled = false
+                });
+            }
+
             MarkActiveItem(activeItem);
+        }
+
+        private bool MatchesNavigationSearch(NavigationMenuEntry entry)
+        {
+            if (string.IsNullOrWhiteSpace(_navigationSearchText))
+            {
+                return true;
+            }
+
+            if (entry.IsHome)
+            {
+                return ContainsNavigationSearchText("主页") ||
+                    ContainsNavigationSearchText(LocalizationManager.Translate("主页")) ||
+                    ContainsNavigationSearchText("AI 图像与数据集工作台") ||
+                    ContainsNavigationSearchText(LocalizationManager.Translate("AI 图像与数据集工作台"));
+            }
+
+            var metadata = entry.Metadata;
+            if (metadata == null)
+            {
+                return false;
+            }
+
+            if (ContainsNavigationSearchText(metadata.DisplayName) ||
+                ContainsNavigationSearchText(LocalizationManager.Translate(metadata.DisplayName)))
+            {
+                return true;
+            }
+
+            if (PageDescriptions.TryGetValue(metadata.ControlType, out var description) &&
+                (ContainsNavigationSearchText(description) ||
+                 ContainsNavigationSearchText(LocalizationManager.Translate(description))))
+            {
+                return true;
+            }
+
+            var category = NavigationCategories.FirstOrDefault(item => item.Category == metadata.Category);
+            return category != null &&
+                (ContainsNavigationSearchText(category.DisplayName) ||
+                 ContainsNavigationSearchText(LocalizationManager.Translate(category.DisplayName)));
+        }
+
+        private bool ContainsNavigationSearchText(string candidate)
+        {
+            return candidate.Contains(_navigationSearchText, StringComparison.CurrentCultureIgnoreCase);
         }
 
         private static bool IsStandaloneTopLevelEntry(NavigationMenuEntry entry)
@@ -604,10 +696,18 @@ namespace CyanTools
             _isUpdatingLanguageSelection = false;
 
             ApplyTheme(_useDarkTheme);
+            UpdateNavigationSearchText();
             RefreshMenuItems();
             UpdateNavigationHeader();
             LocalizationManager.ApplyTo(this);
             UpdateShellPageHeader();
+        }
+
+        private void UpdateNavigationSearchText()
+        {
+            var searchLabel = LocalizationManager.Translate("搜索工具");
+            NavigationSearchBox.PlaceholderText = searchLabel;
+            NavigationSearchBox.ToolTip = searchLabel;
         }
 
         private void UpdateNavigationHeader()
