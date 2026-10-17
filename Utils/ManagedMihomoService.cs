@@ -705,33 +705,21 @@ namespace CyanTools.Utils
             string expectedVersion,
             CancellationToken cancellationToken)
         {
-            using var process = new Process
+            var startInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = executablePath,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                }
+                FileName = executablePath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
             };
-            process.StartInfo.ArgumentList.Add("-v");
-            if (!process.Start())
-            {
-                throw new InvalidDataException("无法启动 Mihomo 进行版本校验。");
-            }
-
+            startInfo.ArgumentList.Add("-v");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            var standardOutput = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            var standardError = process.StandardError.ReadToEndAsync(timeout.Token);
-            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
-            var output = $"{await standardOutput.ConfigureAwait(false)}\n{await standardError.ConfigureAwait(false)}";
-            if (process.ExitCode != 0
-                || !Regex.IsMatch(
+            string output = await ExternalToolProcess.CaptureAsync(startInfo, timeout.Token).ConfigureAwait(false);
+            if (!Regex.IsMatch(
                     output,
                     $"\\bv{Regex.Escape(NormalizeVersion(expectedVersion))}\\b",
                     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,

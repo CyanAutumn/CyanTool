@@ -37,6 +37,7 @@ public sealed class InputStateStore
         "error",
         "exception",
         "isbusy",
+        "isidle",
         "isrunning",
         "isdownloading",
         "isprocessing"
@@ -75,7 +76,7 @@ public sealed class InputStateStore
                 {
                     try
                     {
-                        state[property.Name] = JsonSerializer.SerializeToElement(property.GetValue(target), property.PropertyType, SerializerOptions);
+                        state[property.Name] = JsonSerializer.SerializeToElement(MaterialClassificationSession.GetPersistedValue(target, property), property.PropertyType, SerializerOptions);
                     }
                     catch
                     {

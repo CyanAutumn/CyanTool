@@ -1,82 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector" Version="6.0.2">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
-    <PackageReference Include="SharpCompress" Version="0.36.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="../Utils/FolderProcessingOperation.cs" Link="Utils/FolderProcessingOperation.cs" />
-    <Compile Include="../Model/TrainingSetManagerModels.cs" Link="Model/TrainingSetManagerModels.cs" />
-    <Compile Include="../Utils/TrainingSetGitService.cs" Link="Utils/TrainingSetGitService.cs" />
-    <Compile Include="../Utils/TrainingDeploymentTaskStore.cs" Link="Utils/TrainingDeploymentTaskStore.cs" />
-    <Compile Include="../Utils/TrainingSetProjectStore.cs" Link="Utils/TrainingSetProjectStore.cs" />
-    <Compile Include="../Utils/TrainingSetConfigDiffService.cs" Link="Utils/TrainingSetConfigDiffService.cs" />
-    <Compile Include="../Model/TrainingBridgeModels.cs" Link="Model/TrainingBridgeModels.cs" />
-    <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
-    <Compile Include="../Utils/TrainingBackendBindingStore.cs" Link="Utils/TrainingBackendBindingStore.cs" />
-    <Compile Include="../Utils/TrainingBridgeProjectStore.cs" Link="Utils/TrainingBridgeProjectStore.cs" />
-    <Compile Include="../Utils/TrainingBackendRunner.cs" Link="Utils/TrainingBackendRunner.cs" />
-    <Compile Include="../Utils/TrainingBridgeSystemMetricsService.cs" Link="Utils/TrainingBridgeSystemMetricsService.cs" />
-    <Compile Include="../Utils/DesktopWidgetSettingsStore.cs" Link="Utils/DesktopWidgetSettingsStore.cs" />
-    <Compile Include="../Model/LayeredLoraMergeModels.cs" Link="Model/LayeredLoraMergeModels.cs" />
-    <Compile Include="../Utils/LayeredLoraWeightParser.cs" Link="Utils/LayeredLoraWeightParser.cs" />
-    <Compile Include="../Utils/LayeredLoraPresetStore.cs" Link="Utils/LayeredLoraPresetStore.cs" />
-    <Compile Include="../Utils/LoraLayerMapper.cs" Link="Utils/LoraLayerMapper.cs" />
-    <Compile Include="../Utils/SafetensorsFile.cs" Link="Utils/SafetensorsFile.cs" />
-    <Compile Include="../Utils/SafetensorsMetadataService.cs" Link="Utils/SafetensorsMetadataService.cs" />
-    <Compile Include="../Utils/LayeredLoraMerger.cs" Link="Utils/LayeredLoraMerger.cs" />
-    <Compile Include="../Utils/AdaptiveClusterMerger.cs" Link="Utils/AdaptiveClusterMerger.cs" />
-    <Compile Include="../Utils/StyleClusterPurityRefiner.cs" Link="Utils/StyleClusterPurityRefiner.cs" />
-    <Compile Include="../Utils/FolderProcessingPipelineProcessor.cs" Link="Utils/FolderProcessingPipelineProcessor.cs" />
-    <Compile Include="../Utils/SameSourceImageGroupingProcessor.cs" Link="Utils/SameSourceImageGroupingProcessor.cs" />
-    <Compile Include="../Utils/InputDirectoryCleanupHelper.cs" Link="Utils/InputDirectoryCleanupHelper.cs" />
-    <Compile Include="../Utils/DownloadedImageValidator.cs" Link="Utils/DownloadedImageValidator.cs" />
-    <Compile Include="../Utils/ImageRenamePipelineProcessor.cs" Link="Utils/ImageRenamePipelineProcessor.cs" />
-    <Compile Include="../Utils/KeepFilesPipelineProcessor.cs" Link="Utils/KeepFilesPipelineProcessor.cs" />
-    <Compile Include="../Utils/KeepFilesRetentionPolicy.cs" Link="Utils/KeepFilesRetentionPolicy.cs" />
-    <Compile Include="../Utils/ResolutionFilterPipelineProcessor.cs" Link="Utils/ResolutionFilterPipelineProcessor.cs" />
-    <Compile Include="../Utils/SiblingDirectoryPathBuilder.cs" Link="Utils/SiblingDirectoryPathBuilder.cs" />
-    <Compile Include="../Utils/TagCategoryOptions.cs" Link="Utils/TagCategoryOptions.cs" />
-    <Compile Include="../Utils/TaggingPipelineExecutor.cs" Link="Utils/TaggingPipelineExecutor.cs" />
-    <Compile Include="../Utils/TrainingSetBalancerPipelineProcessor.cs" Link="Utils/TrainingSetBalancerPipelineProcessor.cs" />
-    <Compile Include="../Utils/TagTextMergeHelper.cs" Link="Utils/TagTextMergeHelper.cs" />
-    <Compile Include="../Utils/VideoFrameWorkflowPlanner.cs" Link="Utils/VideoFrameWorkflowPlanner.cs" />
-    <Compile Include="../Utils/ToolOutputDirectoryDefaults.cs" Link="Utils/ToolOutputDirectoryDefaults.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineContext.cs" Link="Framework/Pipeline/PipelineContext.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineSnapshotProvider.cs" Link="Framework/Pipeline/IPipelineSnapshotProvider.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineInputPortProvider.cs" Link="Framework/Pipeline/IPipelineInputPortProvider.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineOutputPortProvider.cs" Link="Framework/Pipeline/IPipelineOutputPortProvider.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineNodeViewModelBase.cs" Link="Framework/Pipeline/PipelineNodeViewModelBase.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineRunner.cs" Link="Framework/Pipeline/PipelineRunner.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineDirectoryBehavior.cs" Link="Framework/Pipeline/PipelineDirectoryBehavior.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineDirectoryNode.cs" Link="Framework/Pipeline/IPipelineDirectoryNode.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineRuntimeOutputNode.cs" Link="Framework/Pipeline/IPipelineRuntimeOutputNode.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineOutputPathSelectorNode.cs" Link="Framework/Pipeline/IPipelineOutputPathSelectorNode.cs" />
-    <Compile Include="../Framework/Pipeline/IPipelineRunnableViewModel.cs" Link="Framework/Pipeline/IPipelineRunnableViewModel.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineRuntimeOutputDirectoryValidator.cs" Link="Framework/Pipeline/PipelineRuntimeOutputDirectoryValidator.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineSnapshotHelper.cs" Link="Framework/Pipeline/PipelineSnapshotHelper.cs" />
-    <Compile Include="../Framework/Pipeline/SimplePipelineNode.cs" Link="Framework/Pipeline/SimplePipelineNode.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineWorkflowValidation.cs" Link="Framework/Pipeline/PipelineWorkflowValidation.cs" />
-    <Compile Include="../Framework/Pipeline/PipelineWorkflowPathPlanner.cs" Link="Framework/Pipeline/PipelineWorkflowPathPlanner.cs" />
-  </ItemGroup>
+<PropertyGroup><TargetFramework>net8.0-windows</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsPackable>false</IsPackable></PropertyGroup>
+<ItemGroup><ProjectReference Include="../CyanTools.csproj"/><PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1"/><PackageReference Include="xunit" Version="2.9.2"/><PackageReference Include="xunit.runner.visualstudio" Version="2.8.2"/></ItemGroup>
+<ItemGroup>
+<Compile Include="AdaptiveClusterMergerTests.cs"/>
+<Compile Include="FolderProcessingPipelineIntegrationTests.cs"/>
+<Compile Include="InputDirectoryCleanupHelperTests.cs"/>
+<Compile Include="LayeredLoraPresetStoreTests.cs"/>
+<Compile Include="PipelineRuntimeOutputDirectoryValidatorTests.cs"/>
+<Compile Include="PipelineSnapshotHelperTests.cs"/>
+<Compile Include="PipelineWorkflowPathPlannerTests.cs"/>
+<Compile Include="PipelineWorkflowRunnerTests.cs"/>
+<Compile Include="PipelineWorkflowValidationTests.cs"/>
+<Compile Include="SimplePipelineNodeTests.cs"/>
+<Compile Include="StyleClusterPurityRefinerTests.cs"/>
+<Compile Include="TagTextMergeHelperTests.cs"/>
+<Compile Include="ToolOutputDirectoryDefaultsTests.cs"/>
+<Compile Include="TrainingBridgeTests.cs"/>
+<Compile Include="TrainingDeploymentTaskStoreTests.cs"/>
+<Compile Include="WorkflowNodeExecutionHelperTests.cs"/>
+</ItemGroup>
 </Project>

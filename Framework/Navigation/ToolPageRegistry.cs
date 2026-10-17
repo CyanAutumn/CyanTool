@@ -59,7 +59,8 @@ namespace CyanTools.Navigation
                 return ToolPageCategory.Training;
             }
 
-            if (controlType == typeof(global::CyanTools.DanbooruCrawlerView) ||
+            if (controlType == typeof(global::CyanTools.DanbooruManualDownloaderView) ||
+                controlType == typeof(global::CyanTools.DanbooruCrawlerView) ||
                 controlType == typeof(global::CyanTools.GeminiImageGenerationView))
             {
                 return ToolPageCategory.DatasetAcquisition;
@@ -70,6 +71,8 @@ namespace CyanTools.Navigation
                 controlType == typeof(global::CyanTools.ResolutionFilterView) ||
                 controlType == typeof(global::CyanTools.ImageClusteringView) ||
                 controlType == typeof(global::CyanTools.SameSourceImageGroupingView) ||
+                controlType == typeof(global::CyanTools.AestheticScoringView) ||
+                controlType == typeof(global::CyanTools.FarSceneDetectionView) ||
                 controlType == typeof(global::CyanTools.KeepFilesView) ||
                 controlType == typeof(global::CyanTools.HandIntegrityFilterView))
             {

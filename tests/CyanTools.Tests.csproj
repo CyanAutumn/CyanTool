@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -19,17 +19,12 @@
 
   <ItemGroup>
     <ProjectReference Include="../CyanTools.Agent/CyanTools.Agent.csproj" />
+    <ProjectReference Include="../CyanTools.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="PathUiConventionsTests.cs" />
     <Compile Include="AgentToolCatalogTests.cs" />
     <Compile Include="TrainingBackendRunnerTests.cs" />
-    <Compile Include="../Utils/InputStateStore.cs" Link="Utils/InputStateStore.cs" />
-    <Compile Include="../Model/TrainingBridgeModels.cs" Link="Model/TrainingBridgeModels.cs" />
-    <Compile Include="../Utils/TrainingBridgeConfigService.cs" Link="Utils/TrainingBridgeConfigService.cs" />
-    <Compile Include="../Utils/TrainingBackendBindingStore.cs" Link="Utils/TrainingBackendBindingStore.cs" />
-    <Compile Include="../Utils/WslPathResolver.cs" Link="Utils/WslPathResolver.cs" />
-    <Compile Include="../Utils/TrainingBackendRunner.cs" Link="Utils/TrainingBackendRunner.cs" />
   </ItemGroup>
 </Project>

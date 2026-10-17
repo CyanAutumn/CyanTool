@@ -290,7 +290,7 @@ namespace CyanTools.ViewModel
 
                 if (showDialogs)
                 {
-                    Application.Current?.Dispatcher?.Invoke(() =>
+                    UiDispatch.Invoke(() =>
                         MessageBox.Show(ex.Message, "\u9519\u8BEF", MessageBoxButton.OK, MessageBoxImage.Error));
                 }
 
@@ -337,13 +337,13 @@ namespace CyanTools.ViewModel
                 LogText = _logBuilder.ToString();
             }
 
-            if (Application.Current?.Dispatcher?.CheckAccess() == true)
+            if (UiDispatch.CheckAccess())
             {
                 UpdateLog();
             }
             else
             {
-                Application.Current?.Dispatcher?.Invoke(UpdateLog);
+                UiDispatch.Invoke(UpdateLog);
             }
         }
 

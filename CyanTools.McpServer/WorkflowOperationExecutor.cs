@@ -111,17 +111,19 @@ public sealed class WorkflowOperationExecutor
 
         PipelineNodeViewModelBase firstNode = nodes[0];
         PipelineOperationExecutor.ApplyParameters(firstNode, firstNodeParametersJson);
+        risk = ResolveWorkflowRisk(nodes);
         foreach (PipelineNodeViewModelBase node in nodes)
         {
+            PipelineOperationExecutor.RequireCleanupConfirmation(node, confirmDestructive);
             node.SetWorkflowEditorMode(true);
         }
 
         var logs = new List<string>();
         void AppendLog(string message)
         {
-            if (logs.Count < MaximumReturnedLogLines)
+            lock (logs)
             {
-                logs.Add(message);
+                if (logs.Count < MaximumReturnedLogLines) logs.Add(message);
             }
         }
 
@@ -192,7 +194,7 @@ public sealed class WorkflowOperationExecutor
         string? downloaderError = PipelineWorkflowValidation.ValidateSingletonFirstNode(
             nodes,
             node => node is DatasetDownloaderPipelineNode,
-            "数据集下载器");
+            "数据集管理器");
         if (!string.IsNullOrWhiteSpace(downloaderError))
         {
             throw new InvalidOperationException(downloaderError);
@@ -243,6 +245,7 @@ public sealed class WorkflowOperationExecutor
 
     private static AgentOperationRisk ResolveNodeRisk(PipelineNodeViewModelBase node)
     {
+        if (PipelineOperationExecutor.ClearsInput(node)) return AgentOperationRisk.Destructive;
         string nodeType = node.GetType().FullName ?? node.GetType().Name;
         AgentOperationDefinition? operation = AgentToolCatalog.GetPages()
             .SelectMany(page => page.Operations)

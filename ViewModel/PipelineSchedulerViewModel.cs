@@ -287,7 +287,7 @@ namespace CyanTools.ViewModel
             if (!PipelineWorkflowValidation.TryValidateSingletonFirstNode(
                 PipelineNodes,
                 node => node is DatasetDownloaderPipelineNode,
-                "数据集下载器",
+                "数据集管理器",
                 AppendLog))
             {
                 return;
@@ -563,6 +563,13 @@ namespace CyanTools.ViewModel
                 var nodes = WorkflowStorage.LoadWithLayout(name, _downloadersUnlocked);
                 LoadCanvasFromWorkflowNodes(nodes);
                 _loadedWorkflowName = name;
+            }
+            catch (Exception ex)
+            {
+                SelectedWorkflowName = _loadedWorkflowName;
+                AppendLog($"工作流加载失败: {ex.Message}");
+                MessageBox.Show(ex.Message, "工作流加载失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
             }
             finally
             {

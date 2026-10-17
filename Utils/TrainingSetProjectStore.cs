@@ -109,17 +109,21 @@ namespace CyanTools.Utils
 
         public TrainingSetProject LoadProject(string rootPath)
         {
-            var managerPath = GetManagerPath(rootPath);
-            if (!File.Exists(managerPath))
+            if (!Directory.Exists(rootPath)) throw new DirectoryNotFoundException(rootPath);
+            return RecoverableFileBatch.Read(rootPath, () =>
             {
-                throw new FileNotFoundException("未找到训练集管理器项目文件。", managerPath);
-            }
+                var managerPath = GetManagerPath(rootPath);
+                if (!File.Exists(managerPath))
+                {
+                    throw new FileNotFoundException("未找到训练集管理器项目文件。", managerPath);
+                }
 
-            var json = File.ReadAllText(managerPath);
-            var project = JsonConvert.DeserializeObject<TrainingSetProject>(json) ?? new TrainingSetProject();
-            project.RootPath = rootPath;
-            ApplyGlobalProfile(project);
-            return project;
+                var json = File.ReadAllText(managerPath);
+                var project = JsonConvert.DeserializeObject<TrainingSetProject>(json) ?? new TrainingSetProject();
+                project.RootPath = rootPath;
+                ApplyGlobalProfile(project);
+                return project;
+            });
         }
 
         public void SaveProject(TrainingSetProject project)
@@ -136,15 +140,16 @@ namespace CyanTools.Utils
 
             EnsureLayout(project.RootPath);
             project.UpdatedAt = DateTime.Now;
-            PersistGlobalProfile(project);
+            var writes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            PersistGlobalProfile(project, writes);
             var managerPath = GetManagerPath(project.RootPath);
-            File.WriteAllText(managerPath, JsonConvert.SerializeObject(project, JsonSettings));
+            writes[managerPath] = JsonConvert.SerializeObject(project, JsonSettings);
 
             if (!string.IsNullOrWhiteSpace(project.NotePath))
             {
                 var projectNotePath = ResolveRelativePath(project.RootPath, project.NotePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(projectNotePath) ?? project.RootPath);
-                File.WriteAllText(projectNotePath, project.NoteMarkdown ?? string.Empty);
+                writes[projectNotePath] = project.NoteMarkdown ?? string.Empty;
             }
 
             var nodeFolder = Path.Combine(project.RootPath, MetadataDirectoryName, "nodes");
@@ -153,15 +158,16 @@ namespace CyanTools.Utils
                 node.UpdatedAt = DateTime.Now;
                 var safeNodeName = SanitizeFileName(node.NodeId);
                 var nodePath = Path.Combine(nodeFolder, $"{safeNodeName}.json");
-                File.WriteAllText(nodePath, JsonConvert.SerializeObject(node, JsonSettings));
+                writes[nodePath] = JsonConvert.SerializeObject(node, JsonSettings);
 
                 if (!string.IsNullOrWhiteSpace(node.NotePath) && !string.IsNullOrEmpty(node.NoteMarkdown))
                 {
                     var notePath = ResolveRelativePath(project.RootPath, node.NotePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(notePath) ?? project.RootPath);
-                    File.WriteAllText(notePath, node.NoteMarkdown);
+                    writes[notePath] = node.NoteMarkdown;
                 }
             }
+            RecoverableFileBatch.Save(project.RootPath, writes);
         }
 
         public static void EnsureLayout(string rootPath)
@@ -309,7 +315,7 @@ namespace CyanTools.Utils
             }
         }
 
-        private static void PersistGlobalProfile(TrainingSetProject project)
+        private static void PersistGlobalProfile(TrainingSetProject project, IDictionary<string, string> writes)
         {
             project.NotePath = $"{GlobalProjectDirectoryRelativePath}/README.md";
             project.CoverPath = MigrateGlobalFile(
@@ -340,7 +346,7 @@ namespace CyanTools.Utils
 
             var notePath = ResolveRelativePath(project.RootPath, project.NotePath);
             Directory.CreateDirectory(Path.GetDirectoryName(notePath) ?? project.RootPath);
-            File.WriteAllText(notePath, project.NoteMarkdown ?? string.Empty);
+            writes[notePath] = project.NoteMarkdown ?? string.Empty;
 
             var profile = new TrainingSetProjectProfile
             {
@@ -355,7 +361,7 @@ namespace CyanTools.Utils
             };
             var profilePath = ResolveRelativePath(project.RootPath, GlobalProfileRelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(profilePath) ?? project.RootPath);
-            File.WriteAllText(profilePath, JsonConvert.SerializeObject(profile, JsonSettings));
+            writes[profilePath] = JsonConvert.SerializeObject(profile, JsonSettings);
         }
 
         private static string MigrateGlobalFile(string rootPath, string relativePath, string targetDirectory)

@@ -25,25 +25,32 @@ namespace CyanTools.Utils
             return Tensors[name];
         }
 
-        public static SafetensorsFile Load(string path)
+        public static SafetensorsFile Load(string path, long? maxDataBytes = null)
         {
+            if (maxDataBytes < 0) throw new ArgumentOutOfRangeException(nameof(maxDataBytes));
             using var stream = File.OpenRead(path);
             Span<byte> headerLengthBytes = stackalloc byte[8];
             ReadExactly(stream, headerLengthBytes);
             ulong headerLength = BinaryPrimitives.ReadUInt64LittleEndian(headerLengthBytes);
-            if (headerLength > int.MaxValue)
+            if (headerLength > 64 * 1024 * 1024 || headerLength > (ulong)(stream.Length - stream.Position))
             {
-                throw new InvalidDataException("safetensors header is too large.");
+                throw new InvalidDataException("safetensors header exceeds the file boundary or the 64 MiB limit.");
             }
 
             var headerBytes = new byte[(int)headerLength];
             ReadExactly(stream, headerBytes);
             long dataStart = stream.Position;
+            long budget = maxDataBytes ?? Math.Max(0,
+                (GC.GetGCMemoryInfo().TotalAvailableMemoryBytes - GC.GetTotalMemory(false)) / 2);
+            if (stream.Length - dataStart > budget)
+                throw new InvalidDataException($"Tensor payload exceeds the available memory budget ({budget} bytes).");
 
             using var document = JsonDocument.Parse(headerBytes);
             var root = document.RootElement;
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
             var tensors = new List<SafetensorsTensor>();
+            var descriptors = new List<(string Name, string DType, long[] Shape, long Start, long End)>();
+            var names = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var property in root.EnumerateObject())
             {
@@ -62,17 +69,36 @@ namespace CyanTools.Utils
                 string dtype = property.Value.GetProperty("dtype").GetString() ?? throw new InvalidDataException("Tensor dtype is missing.");
                 var shape = property.Value.GetProperty("shape").EnumerateArray().Select(value => value.GetInt64()).ToArray();
                 var offsets = property.Value.GetProperty("data_offsets").EnumerateArray().Select(value => value.GetInt64()).ToArray();
-                if (offsets.Length != 2 || offsets[1] < offsets[0])
+                if (!names.Add(property.Name) || offsets.Length != 2 || offsets[0] < 0 ||
+                    offsets[1] < offsets[0] || offsets[1] > stream.Length - dataStart ||
+                    offsets[1] - offsets[0] > Array.MaxLength)
                 {
                     throw new InvalidDataException($"Tensor {property.Name} has invalid data offsets.");
                 }
 
-                var data = new byte[offsets[1] - offsets[0]];
-                stream.Position = dataStart + offsets[0];
-                ReadExactly(stream, data);
-                tensors.Add(new SafetensorsTensor(property.Name, dtype, shape, data));
+                if (GetTensorByteLength(dtype, shape) != offsets[1] - offsets[0])
+                    throw new InvalidDataException($"Tensor {property.Name} shape/dtype does not match its data length.");
+                descriptors.Add((property.Name, dtype, shape, offsets[0], offsets[1]));
             }
 
+            long expectedOffset = 0;
+            foreach (var descriptor in descriptors.OrderBy(d => d.Start).ThenBy(d => d.End))
+            {
+                if (descriptor.Start != expectedOffset)
+                    throw new InvalidDataException("Tensor data contains overlapping ranges or gaps.");
+                expectedOffset = descriptor.End;
+            }
+            if (expectedOffset != stream.Length - dataStart)
+                throw new InvalidDataException("Tensor data does not cover the file payload.");
+
+
+            foreach (var descriptor in descriptors)
+            {
+                var data = new byte[descriptor.End - descriptor.Start];
+                stream.Position = dataStart + descriptor.Start;
+                ReadExactly(stream, data);
+                tensors.Add(new SafetensorsTensor(descriptor.Name, descriptor.DType, descriptor.Shape, data));
+            }
             return new SafetensorsFile(tensors, metadata);
         }
 
@@ -82,9 +108,9 @@ namespace CyanTools.Utils
             Span<byte> headerLengthBytes = stackalloc byte[8];
             ReadExactly(stream, headerLengthBytes);
             ulong headerLength = BinaryPrimitives.ReadUInt64LittleEndian(headerLengthBytes);
-            if (headerLength > int.MaxValue)
+            if (headerLength > 64 * 1024 * 1024 || headerLength > (ulong)(stream.Length - stream.Position))
             {
-                throw new InvalidDataException("safetensors header is too large.");
+                throw new InvalidDataException("safetensors header exceeds the file boundary or the 64 MiB limit.");
             }
 
             var headerBytes = new byte[(int)headerLength];
@@ -136,6 +162,27 @@ namespace CyanTools.Utils
             {
                 stream.Write(tensor.Data);
             }
+        }
+
+        private static long GetTensorByteLength(string dtype, long[] shape)
+        {
+            int width = dtype switch
+            {
+                "BOOL" or "I8" or "U8" or "F8_E4M3" or "F8_E5M2" => 1,
+                "I16" or "U16" or "F16" or "BF16" => 2,
+                "I32" or "U32" or "F32" => 4,
+                "I64" or "U64" or "F64" => 8,
+                _ => throw new InvalidDataException($"Unsupported tensor dtype: {dtype}")
+            };
+            if (shape.Any(d => d < 0)) throw new InvalidDataException("Tensor dimensions cannot be negative.");
+            if (shape.Contains(0)) return 0;
+            try
+            {
+                long length = width;
+                foreach (long dimension in shape) length = checked(length * dimension);
+                return length;
+            }
+            catch (OverflowException ex) { throw new InvalidDataException("Tensor shape overflows its byte length.", ex); }
         }
 
         private static void ReadExactly(Stream stream, Span<byte> buffer)

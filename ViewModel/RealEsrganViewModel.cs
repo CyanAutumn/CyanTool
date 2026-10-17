@@ -144,14 +144,17 @@ namespace CyanTools.ViewModel
         
         private void AddLog(string message)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            void Append()
             {
                 LogLines.Add(message);
                 if (LogLines.Count > MaxLogLines)
                 {
                     LogLines.RemoveAt(0);
                 }
-            });
+            }
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.Invoke(Append);
+            else Append();
         }
 
         private void RestoreDefaults()
@@ -200,7 +203,7 @@ namespace CyanTools.ViewModel
             IsIdle = false;
             (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
             LogLines.Clear();
-            var progress = new Progress<string>(message =>
+            var progress = new ExecutionProgress<string>(message =>
             {
                 AddLog(message);
                 pipelineLog?.Invoke(message);
@@ -212,12 +215,17 @@ namespace CyanTools.ViewModel
                 token.ThrowIfCancellationRequested();
                 if (SelectedTool == "Real-ESRGAN")
                 {
-                    await _realEsrganProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedRealEsrganModel, SelectedScale, SelectedGpu.Id, TileSize, progress);
+                    await _realEsrganProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedRealEsrganModel, SelectedScale, SelectedGpu.Id, TileSize, progress, token);
                 }
                 else if (SelectedTool == "waifu2x")
                 {
-                    await _waifu2xProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedScale, SelectedWaifu2xNoiseLevel, Waifu2xUsePhotoModel, Waifu2xCropSize, progress);
+                    await _waifu2xProcessor.RunAsync(InputDirectory, OutputDirectory, SelectedScale, SelectedWaifu2xNoiseLevel, Waifu2xUsePhotoModel, Waifu2xCropSize, progress, token);
                 }
+                else
+                {
+                    throw new InvalidOperationException("未知超分工具: " + SelectedTool);
+                }
+                token.ThrowIfCancellationRequested();
                 success = true;
                 AddLog("处理完成。");
                 pipelineLog?.Invoke("处理完成。");

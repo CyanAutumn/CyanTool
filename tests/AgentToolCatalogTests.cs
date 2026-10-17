@@ -10,7 +10,7 @@ public sealed class AgentToolCatalogTests
     {
         IReadOnlyList<AgentPageDefinition> pages = AgentToolCatalog.GetPages();
 
-        Assert.Equal(32, pages.Count);
+        Assert.Equal(37, pages.Count);
         Assert.Equal(17, pages.SelectMany(page => page.Operations).Count(operation => operation.ExecutionKind == AgentExecutionKind.PipelineNode));
         Assert.Equal(pages.Count, pages.Select(page => page.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(pages, page => Assert.NotEmpty(page.Operations));

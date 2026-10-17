@@ -9,11 +9,11 @@ public sealed class McpServerDiscoveryTests
     public async Task StdioServer_ExposesTheDocumentedTopLevelTools()
     {
         string repositoryRoot = FindRepositoryRoot();
-        string serverProject = Path.Combine(repositoryRoot, "CyanTools.McpServer", "CyanTools.McpServer.csproj");
+        string serverAssembly = typeof(CyanTools.McpServer.PipelineOperationExecutor).Assembly.Location;
         var transport = new StdioClientTransport(new StdioClientTransportOptions
         {
             Command = "dotnet",
-            Arguments = ["run", "--project", serverProject, "--no-launch-profile"],
+            Arguments = [serverAssembly],
             WorkingDirectory = repositoryRoot,
             ShutdownTimeout = TimeSpan.FromSeconds(10)
         });

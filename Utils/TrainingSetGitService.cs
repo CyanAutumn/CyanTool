@@ -278,6 +278,7 @@ namespace CyanTools.Utils
             catch (OperationCanceledException)
             {
                 TryKill(process);
+                await process.WaitForExitAsync().ConfigureAwait(false);
                 throw;
             }
         }

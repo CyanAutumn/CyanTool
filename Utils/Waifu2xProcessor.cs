@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace CyanTools.Utils
 {
@@ -11,7 +12,7 @@ namespace CyanTools.Utils
         private static readonly string ToolDirectory = Path.Combine(AppContext.BaseDirectory, "waifu2x-caffe");
         private static readonly string ExecutablePath = Path.Combine(ToolDirectory, "waifu2x-caffe-cui.exe");
 
-        public async Task RunAsync(string inputDir, string outputDir, int scale, int noiseLevel, bool usePhotoModel, int cropSize, IProgress<string> progress)
+        public async Task RunAsync(string inputDir, string outputDir, int scale, int noiseLevel, bool usePhotoModel, int cropSize, IProgress<string> progress, CancellationToken token = default)
         {
             if (!File.Exists(ExecutablePath))
             {
@@ -61,39 +62,7 @@ namespace CyanTools.Utils
                 WorkingDirectory = ToolDirectory,
             };
 
-            using (var process = new Process { StartInfo = processStartInfo })
-            {
-                process.OutputDataReceived += (sender, args) => 
-                {
-                    if(args.Data != null) 
-                    {
-                        progress.Report(args.Data);
-                    }
-                };
-                process.ErrorDataReceived += (sender, args) => 
-                {
-                    if (args.Data != null) 
-                    {
-                        progress.Report($"ERROR: {args.Data}");
-                    }
-                };
-
-                progress.Report($"开始执行: {processStartInfo.FileName} {processStartInfo.Arguments}");
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode == 0)
-                {
-                    progress.Report("任务成功完成。");
-                }
-                else
-                {
-                    progress.Report($"进程异常退出，退出代码: {process.ExitCode}。");
-                }
-            }
+            await ExternalToolProcess.RunAsync(processStartInfo, progress, token);
         }
     }
 }

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using CyanTools.ViewModel;
+using CyanTools.Utils;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace CyanTools.Pipeline
 {
@@ -70,8 +72,8 @@ namespace CyanTools.Pipeline
                 OutputPortKey = item.OutputPortKey ?? item.Node.WorkflowOutputPortKey
             }).ToList();
 
-            var json = JsonConvert.SerializeObject(definitions, Formatting.Indented);
-            File.WriteAllText(path, json);
+            var json = SerializeDefinitions(definitions);
+            AtomicFile.WriteAllText(path, json);
         }
 
         public static List<PipelineNodeViewModelBase> Load(
@@ -97,7 +99,24 @@ namespace CyanTools.Pipeline
             }
 
             var json = File.ReadAllText(path);
-            var definitions = JsonConvert.DeserializeObject<List<WorkflowNodeDefinition>>(json) ?? new List<WorkflowNodeDefinition>();
+            var document = JToken.Parse(json);
+            JToken nodesToken;
+            if (document is JArray) nodesToken = document;
+            else if (document is JObject envelope && envelope.Value<int?>("Version") == 1 && envelope["Nodes"] is JArray)
+                nodesToken = envelope["Nodes"]!;
+            else throw new InvalidDataException("工作流格式或版本不受支持，原文件保持不变。");
+            var definitions = nodesToken.ToObject<List<WorkflowNodeDefinition>>()
+                ?? throw new InvalidDataException("工作流内容为空或无效。");
+            var descriptors = PipelineCatalog.GetAll().ToDictionary(d => d.NodeType.FullName!);
+
+            foreach (var definition in definitions)
+            {
+                if (definition == null || string.IsNullOrWhiteSpace(definition.NodeType) ||
+                    !descriptors.TryGetValue(definition.NodeType, out var descriptor))
+                    throw new InvalidDataException($"工作流包含不可用节点：{definition?.NodeType ?? "<null>"}。未加载任何节点，请恢复对应功能后重试。");
+                if (descriptor.RequiresUnlock && !downloadersUnlocked)
+                    throw new InvalidDataException($"工作流节点尚未解锁：{definition.NodeType}。未加载任何节点。");
+            }
             bool removedSensitiveValues = false;
 
             foreach (WorkflowNodeDefinition definition in definitions)
@@ -120,16 +139,7 @@ namespace CyanTools.Pipeline
             var nodes = new List<WorkflowNodeLayout>();
             foreach (var def in definitions)
             {
-                var descriptor = PipelineCatalog.GetAll().FirstOrDefault(d => d.NodeType.FullName == def.NodeType);
-                if (descriptor == null)
-                {
-                    continue;
-                }
-
-                if (descriptor.RequiresUnlock && !downloadersUnlocked)
-                {
-                    continue;
-                }
+                var descriptor = descriptors[def.NodeType];
 
                 var instance = descriptor.Factory();
                 Apply(instance, def.Snapshot);
@@ -193,8 +203,8 @@ namespace CyanTools.Pipeline
         {
             try
             {
-                string json = JsonConvert.SerializeObject(definitions, Formatting.Indented);
-                File.WriteAllText(path, json);
+                string json = SerializeDefinitions(definitions);
+                AtomicFile.WriteAllText(path, json);
             }
             catch
             {
@@ -202,6 +212,9 @@ namespace CyanTools.Pipeline
 
             }
         }
+
+        private static string SerializeDefinitions(IEnumerable<WorkflowNodeDefinition> nodes)
+            => JsonConvert.SerializeObject(new { Version = 1, Nodes = nodes }, Formatting.Indented);
 
         private sealed class WorkflowNodeDefinition
         {

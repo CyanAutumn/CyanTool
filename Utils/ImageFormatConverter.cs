@@ -25,8 +25,12 @@ namespace CyanTools.Utils
             ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".psd"
         };
 
-        public static async Task ConvertAsync(string inputPath, string outputPath, string targetFormat, IProgress<double> progress)
+        public static async Task ConvertAsync(string inputPath, string outputPath, string targetFormat, IProgress<double> progress,
+            bool clearConvertedSources = false, CancellationToken token = default)
         {
+            inputPath = Path.GetFullPath(inputPath);
+            outputPath = Path.GetFullPath(outputPath);
+            _ = GetEncoder(targetFormat);
             var files = Directory.GetFiles(inputPath, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -38,6 +42,13 @@ namespace CyanTools.Utils
                 return;
             }
 
+
+
+            var duplicateTarget = files.GroupBy(file => GetOutputFilePath(file, outputPath, targetFormat), StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(group => group.Skip(1).Any());
+            if (duplicateTarget != null)
+                throw new IOException($"多个源图片映射到同一输出文件，请先重命名：{duplicateTarget.Key}");
+
             Directory.CreateDirectory(outputPath);
 
             if (files.Any(IsPsdFile))
@@ -47,32 +58,40 @@ namespace CyanTools.Utils
 
             int maxParallelism = Math.Clamp(Environment.ProcessorCount, 1, Math.Min(MaxParallelUpperBound, files.Length));
             int completed = 0;
-            var outputLocks = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+            var convertedSources = new ConcurrentBag<string>();
+            var errors = new ConcurrentBag<Exception>();
 
             await Parallel.ForEachAsync(
                 files,
-                new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                new ParallelOptions { MaxDegreeOfParallelism = maxParallelism, CancellationToken = token },
                 async (file, cancellationToken) =>
                 {
                     string outputFilePath = GetOutputFilePath(file, outputPath, targetFormat);
-                    SemaphoreSlim outputLock = outputLocks.GetOrAdd(outputFilePath, static _ => new SemaphoreSlim(1, 1));
-
-                    await outputLock.WaitAsync(cancellationToken);
                     try
                     {
                         await ConvertSingleFileAsync(file, inputPath, outputPath, targetFormat, outputFilePath, cancellationToken);
+                        convertedSources.Add(file);
                     }
+                    catch (OperationCanceledException) { throw; }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Failed to convert {file}: {ex.Message}");
+                        errors.Add(new IOException($"Failed to convert {file}: {ex.Message}", ex));
                     }
                     finally
                     {
-                        outputLock.Release();
                         int done = Interlocked.Increment(ref completed);
                         progress.Report(done * 100.0 / files.Length);
                     }
                 });
+            if (!errors.IsEmpty) throw new AggregateException(errors);
+            token.ThrowIfCancellationRequested();
+            if (clearConvertedSources)
+                foreach (var source in convertedSources)
+                {
+
+                    if (!string.Equals(Path.GetExtension(source), "." + targetFormat, StringComparison.OrdinalIgnoreCase))
+                        File.Delete(source);
+                }
         }
 
         private static async Task ConvertSingleFileAsync(
@@ -83,17 +102,26 @@ namespace CyanTools.Utils
             string outputFilePath,
             CancellationToken cancellationToken)
         {
-            if (IsPsdFile(file))
+            if (!string.Equals(Path.GetFullPath(file), Path.GetFullPath(outputFilePath), StringComparison.OrdinalIgnoreCase))
             {
-                using var image = new MagickImage(file);
-                image.Format = GetMagickFormat(targetFormat);
-                image.Write(outputFilePath);
-            }
-            else
-            {
-                using var image = await Image.LoadAsync(file, cancellationToken);
-                var encoder = GetEncoder(targetFormat);
-                await image.SaveAsync(outputFilePath, encoder, cancellationToken);
+                var temporary = outputFilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                try
+                {
+                    if (IsPsdFile(file))
+                    {
+                        using var image = new MagickImage(file);
+                        image.Format = GetMagickFormat(targetFormat);
+                        image.Write(temporary);
+                    }
+                    else
+                    {
+                        using var image = await Image.LoadAsync(file, cancellationToken);
+                        await image.SaveAsync(temporary, GetEncoder(targetFormat), cancellationToken);
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    File.Move(temporary, outputFilePath, true);
+                }
+                finally { if (File.Exists(temporary)) File.Delete(temporary); }
             }
 
             if (!string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
@@ -107,6 +135,7 @@ namespace CyanTools.Utils
             switch (format.ToUpperInvariant())
             {
                 case "PNG": return new PngEncoder();
+                case "JPG":
                 case "JPEG": return new JpegEncoder();
                 case "BMP": return new BmpEncoder();
                 case "WEBP": return new WebpEncoder();
@@ -119,6 +148,7 @@ namespace CyanTools.Utils
             switch (format.ToUpperInvariant())
             {
                 case "PNG": return MagickFormat.Png;
+                case "JPG":
                 case "JPEG": return MagickFormat.Jpeg;
                 case "BMP": return MagickFormat.Bmp;
                 case "WEBP": return MagickFormat.WebP;

@@ -70,12 +70,22 @@ public static class AgentToolCatalog
                 Dedicated("xyz_generate", "生成 XYZ 序列", "根据起止值和步长生成文本参数序列。", AgentOperationRisk.ReadOnly)),
             Page("image_rename", "图片重命名", "数据集处理", "预览并批量重命名图片及同名标签文件。",
                 Pipeline("images_rename", "重命名图片", "按前缀和编号规则重命名文件；必须确认。", "CyanTools.ViewModel.ImageRenamePipelineNode", AgentOperationRisk.Destructive)),
-            Page("dataset_downloader", "数据集下载器", "数据集获取", "从已配置的站点下载图片和标签。",
+            Page("dataset_downloader", "数据集管理器", "数据集获取", "从已配置的站点下载图片和标签。",
                 Pipeline("dataset_download", "下载数据集", "按选择的下载来源获取图片；需要已配置的凭据。", "CyanTools.ViewModel.DatasetDownloaderPipelineNode", AgentOperationRisk.ExternalService)),
             Page("gemini_generation", "Gemini图像生成", "数据集获取", "通过已配置的 Gemini 服务生成或编辑图片。",
                 Dedicated("images_generate_gemini", "生成 Gemini 图片", "向已配置的外部图片生成服务提交任务。", AgentOperationRisk.ExternalService)),
             Page("options", "选项", "环境设置", "检查和管理 GPU、CUDA、WSL 与训练后端。",
-                Dedicated("environment_manage", "管理运行环境", "检查或变更本地训练运行环境；安装/删除动作必须确认。", AgentOperationRisk.EnvironmentChange))
+                Dedicated("environment_manage", "管理运行环境", "检查或变更本地训练运行环境；安装/删除动作必须确认。", AgentOperationRisk.EnvironmentChange)),
+            Page("aesthetic_scoring", "美学评分", "数据集归类", "评估图片美学等级并输出归类结果。",
+                Dedicated("images_score_aesthetic", "美学评分", "使用本地模型评分和归类图片。", AgentOperationRisk.WritesOutput)),
+            Page("far_scene_detection", "远景图检测", "数据集归类", "检测素材中的远景与近景图片。",
+                Dedicated("images_detect_far_scene", "检测远景", "生成素材分类索引。", AgentOperationRisk.WritesOutput)),
+            Page("danbooru_manual", "Danbooru 手动下载器", "数据集获取", "交互式选择并下载 Danbooru 图片。",
+                Dedicated("dataset_collect_danbooru", "手动采集图片", "从外部站点采集图片。", AgentOperationRisk.ExternalService)),
+            Page("inference_projects", "跑图管理", "环境设置", "管理本地图片推理前端及进程。",
+                Dedicated("inference_manage", "管理推理前端", "启动或停止已配置的推理进程。", AgentOperationRisk.EnvironmentChange)),
+            Page("proxy_settings", "代理设置", "环境设置", "管理代理订阅、节点及托管内核。",
+                Dedicated("proxy_manage", "管理代理", "配置代理或更新托管内核。", AgentOperationRisk.EnvironmentChange))
         ]);
 
     public static IReadOnlyList<AgentPageDefinition> GetPages() => Pages;

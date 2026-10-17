@@ -336,7 +336,7 @@ public sealed class PathUiConventionsTests
         Assert.Contains("图片、附件、分页和补充内容", content);
         Assert.DoesNotContain("PixivDownloadIntervalSeconds", content);
         Assert.Contains("<GroupBox Grid.Row=\"4\"", content);
-        Assert.Contains("Header=\"任务列表\"", content);
+        Assert.Contains("Header=\"素材库\"", content);
         Assert.Contains("ItemsSource=\"{Binding DownloadTasks}\"", content);
         Assert.Contains("Text=\"{Binding DanbooruProgressText}\"", content);
         Assert.Contains("Text=\"{Binding PixivProgressText}\"", content);
@@ -452,7 +452,9 @@ public sealed class PathUiConventionsTests
 
         Assert.Contains("private const int DanbooruArtistLookupRetryCount = 3;", content);
         Assert.Contains("new RestRequest(\"/artists.json\", Method.Get)", content);
-        Assert.Contains(".AddQueryParameter(\"search[url_matches]\", pattern)", content);
+        Assert.Contains("var artistUrl = $\"https://www.pixiv.net/users/{pixivUserId}\";", content);
+        Assert.Contains(".AddQueryParameter(\"search[url_matches]\", artistUrl)", content);
+        Assert.DoesNotContain("*pixiv.net/users/{pixivUserId}*", content);
         Assert.Contains(".AddQueryParameter(\"limit\", 1)", content);
         Assert.Contains("artist 标签查询失败（第 {attempt} 次），将重试", content);
         Assert.Contains("Danbooru artist 标签查询失败（已尝试 {DanbooruArtistLookupRetryCount} 次）", content);
@@ -501,8 +503,8 @@ public sealed class PathUiConventionsTests
         string catalog = ReadRepoFile(Path.Combine("Framework", "Pipeline", "PipelineCatalog.cs"));
         string mainWindow = ReadRepoFile("MainWindow.xaml.cs");
 
-        Assert.Contains("[ToolPage(\"数据集下载器\", 290)]", downloaderPage);
-        Assert.DoesNotContain("[ToolPage(\"数据集下载器\", 290, true)]", downloaderPage);
+        Assert.Contains("[ToolPage(\"数据集管理器\", 290)]", downloaderPage);
+        Assert.DoesNotContain("[ToolPage(\"数据集管理器\", 290, true)]", downloaderPage);
         Assert.Contains("typeof(DatasetDownloaderPipelineNode), () => new DatasetDownloaderPipelineNode())", catalog);
         Assert.DoesNotContain("DatasetDownloaderPipelineNode(), requiresUnlock: true", catalog);
         Assert.Contains("_secretImageClickCount < 5", mainWindow);
@@ -690,6 +692,7 @@ public sealed class InputStateStoreTests : IDisposable
             RetryCount = 3,
             ApiToken = "do-not-store",
             StatusMessage = "completed",
+            IsIdle = false,
             IsRunning = true,
             LayoutFlag = false
         });
@@ -698,6 +701,7 @@ public sealed class InputStateStoreTests : IDisposable
         {
             ApiToken = "unchanged-secret",
             StatusMessage = "waiting",
+            IsIdle = true,
             IsRunning = true,
             LayoutFlag = true
         };
@@ -711,9 +715,11 @@ public sealed class InputStateStoreTests : IDisposable
         Assert.Equal(3, restored.RetryCount);
         Assert.Equal("unchanged-secret", restored.ApiToken);
         Assert.Equal("waiting", restored.StatusMessage);
+        Assert.True(restored.IsIdle);
         Assert.True(restored.IsRunning);
         Assert.True(restored.LayoutFlag);
         Assert.DoesNotContain("do-not-store", File.ReadAllText(_stateFilePath), StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(SampleInputs.IsIdle), File.ReadAllText(_stateFilePath), StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(SampleInputs.LayoutFlag), File.ReadAllText(_stateFilePath), StringComparison.Ordinal);
     }
 
@@ -739,6 +745,32 @@ public sealed class InputStateStoreTests : IDisposable
         new InputStateStore(_stateFilePath).Restore(restored);
 
         Assert.True(restored.LayoutFlag);
+    }
+
+    [Fact]
+    public void Restore_IgnoresStaleIdleRuntimeState()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_stateFilePath)!);
+        string stateKey = typeof(SampleInputs).FullName!;
+        File.WriteAllText(
+            _stateFilePath,
+            $$"""
+            {
+              "{{stateKey}}": {
+                "SearchText": "restored",
+                "IsIdle": false
+              }
+            }
+            """);
+        var restored = new SampleInputs
+        {
+            IsIdle = true
+        };
+
+        new InputStateStore(_stateFilePath).Restore(restored);
+
+        Assert.Equal("restored", restored.SearchText);
+        Assert.True(restored.IsIdle);
     }
 
     public void Dispose()
@@ -771,6 +803,8 @@ public sealed class InputStateStoreTests : IDisposable
         public string ApiToken { get; set; } = string.Empty;
 
         public string StatusMessage { get; set; } = string.Empty;
+
+        public bool IsIdle { get; set; }
 
         public bool IsRunning { get; set; }
 

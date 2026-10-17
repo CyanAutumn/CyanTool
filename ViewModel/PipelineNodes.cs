@@ -639,6 +639,6 @@ namespace CyanTools.ViewModel
 
     public sealed class DatasetDownloaderPipelineNode : CyanTools.Pipeline.SimplePipelineNode<DatasetDownloaderViewModel>
     {
-        public DatasetDownloaderPipelineNode() : base("数据集下载器") { }
+        public DatasetDownloaderPipelineNode() : base("数据集管理器") { }
     }
 }

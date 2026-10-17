@@ -187,7 +187,7 @@ namespace CyanTools.ViewModel
             ProgressValue = 0;
             Logs.Clear();
 
-            var progress = new Progress<double>(value => ProgressValue = value);
+            var progress = new ExecutionProgress<double>(value => ProgressValue = value);
             Action<string> logAction = message =>
             {
                 App.Current.Dispatcher.Invoke(() => Logs.Add(message));

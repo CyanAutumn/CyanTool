@@ -56,6 +56,9 @@ namespace CyanTools.Localization
             LocalizationSupplement.AddTo(Translations);
             LocalizationCompletenessSupplement.AddTo(Translations);
             LocalizationDialogsSupplement.AddTo(Translations);
+            AestheticLocalization.AddTo(Translations);
+            DatasetLibraryLocalization.AddTo(Translations);
+            Translations["当前版本使用 CPU；旧的 auto/cuda 设置会自动按 CPU 执行。"] = new("This version uses CPU; legacy auto/cuda settings also run on CPU.", "現在のバージョンは CPU を使用します。以前の auto/cuda 設定も CPU で実行されます。");
         }
 
         public static event EventHandler? LanguageChanged;

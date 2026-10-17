@@ -6,6 +6,7 @@ namespace CyanTools.Localization
     {
         public static void AddTo(Dictionary<string, LocalizationManager.LocalizedText> translations)
         {
+            Add(translations, "工作流加载失败", "Failed to load workflow", "ワークフローの読み込みに失敗しました");
             Add(translations, "选择本地 ONNX 模型和标签映射文件，并配置输入参数。", "Choose a local ONNX model and tag mapping file, then configure input parameters.", "ローカルの ONNX モデルとタグマッピングファイルを選択し、入力パラメータを設定します。");
             Add(translations, "名称", "Name", "名前");
             Add(translations, "模型文件", "Model File", "モデルファイル");

@@ -7,24 +7,31 @@ namespace CyanTools.Pipeline
     public static class PipelineCatalog
     {
         private static readonly List<PipelineNodeDescriptor> _descriptors = new();
+        private static readonly object Gate = new();
         private static bool _initialized;
 
         public static IReadOnlyList<PipelineNodeDescriptor> GetAll()
         {
-            EnsureInitialized();
-            return _descriptors.ToList();
+            lock (Gate)
+            {
+                EnsureInitialized();
+                return _descriptors.ToList();
+            }
         }
 
         public static void Register(PipelineNodeDescriptor descriptor)
         {
-            var existingIndex = _descriptors.FindIndex(d => d.NodeType == descriptor.NodeType);
-            if (existingIndex >= 0)
+            lock (Gate)
             {
-                _descriptors[existingIndex] = descriptor;
-            }
-            else
-            {
-                _descriptors.Add(descriptor);
+                var existingIndex = _descriptors.FindIndex(d => d.NodeType == descriptor.NodeType);
+                if (existingIndex >= 0)
+                {
+                    _descriptors[existingIndex] = descriptor;
+                }
+                else
+                {
+                    _descriptors.Add(descriptor);
+                }
             }
         }
 

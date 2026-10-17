@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace CyanTools.Utils
 {
@@ -23,7 +24,7 @@ namespace CyanTools.Utils
                 .ToArray();
         }
 
-        public async Task RunAsync(string inputDir, string outputDir, string model, int scale, int gpuId, int tileSize, IProgress<string> progress)
+        public async Task RunAsync(string inputDir, string outputDir, string model, int scale, int gpuId, int tileSize, IProgress<string> progress, CancellationToken token = default)
         {
             if (!File.Exists(ExecutablePath))
             {
@@ -51,41 +52,10 @@ namespace CyanTools.Utils
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
+                WorkingDirectory = ToolDirectory,
             };
 
-            using (var process = new Process { StartInfo = processStartInfo })
-            {
-                process.OutputDataReceived += (sender, args) => 
-                {
-                    if(args.Data != null) 
-                    {
-                        progress.Report(args.Data);
-                    }
-                };
-                process.ErrorDataReceived += (sender, args) => 
-                {
-                    if (args.Data != null) 
-                    {
-                        progress.Report($"ERROR: {args.Data}");
-                    }
-                };
-
-                progress.Report($"开始执行: {processStartInfo.FileName} {processStartInfo.Arguments}");
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode == 0)
-                {
-                    progress.Report("任务成功完成。");
-                }
-                else
-                {
-                    progress.Report($"进程异常退出，退出代码: {process.ExitCode}。");
-                }
-            }
+            await ExternalToolProcess.RunAsync(processStartInfo, progress, token);
         }
     }
 }

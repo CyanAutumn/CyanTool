@@ -33,6 +33,7 @@ namespace CyanTools.Utils {
 
 
             var (processedImage, oldSize, newSize, scale, padLeft, padTop) = PreprocessImage(image, maxInferSize);
+            using var preparedImageLifetime = processedImage;
 
 
             var inputTensor = ImageToTensor(processedImage);

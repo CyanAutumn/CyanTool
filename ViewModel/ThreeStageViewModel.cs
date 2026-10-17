@@ -284,7 +284,7 @@ namespace CyanTools.ViewModel
                 pipelineLog?.Invoke($"找到 {imageFiles.Count} 个图片文件");
                 Directory.CreateDirectory(OutputFolder);
 
-                var progress = new Progress<string>(message =>
+                var progress = new ExecutionProgress<string>(message =>
                 {
                     AddLog(message);
                     pipelineLog?.Invoke(message);
@@ -320,7 +320,7 @@ namespace CyanTools.ViewModel
                             }
 
                             processedCount++;
-                            Application.Current.Dispatcher.Invoke(() =>
+                            UiDispatch.Invoke(() =>
                             {
                                 ProgressPercentage = (double)processedCount / imageFiles.Count * 100;
                                 ProgressText = $"已处理 {processedCount}/{imageFiles.Count} 个文件";
@@ -459,7 +459,7 @@ namespace CyanTools.ViewModel
 
         private void AddLog(string message)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            UiDispatch.Invoke(() =>
             {
                 var timestamp = DateTime.Now.ToString("HH:mm:ss");
                 LogLines.Add($"[{timestamp}] {message}");

@@ -18,12 +18,36 @@ public sealed class SameSourceImageGroupingProcessorTests : IDisposable
         Directory.CreateDirectory(_root);
     }
 
-    [Fact]
-    public void ResolveComputeBackend_AutoFallsBackToCpu_WhenCudaUnavailable()
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("cpu")]
+    [InlineData("cuda")]
+    public void ResolveComputeBackend_UsesCpuForAllLegacyChoices(string requestedDevice)
     {
-        string backend = SameSourceImageGroupingProcessor.ResolveComputeBackend("auto");
+        string backend = SameSourceImageGroupingProcessor.ResolveComputeBackend(requestedDevice);
 
         Assert.Equal("cpu", backend);
+    }
+
+    [Fact]
+    public void Process_LegacyCudaSelection_ContinuesOnCpu()
+    {
+        string inputDir = Path.Combine(_root, "input-legacy-cuda");
+        string outputDir = Path.Combine(_root, "output-legacy-cuda");
+        Directory.CreateDirectory(inputDir);
+        SaveRgb(Path.Combine(inputDir, "sample.png"), 48, 48, BuildStructuredPixels(48, 48));
+        var messages = new List<string>();
+
+        SameSourceImageGroupingProcessor.Process(
+            inputDir,
+            outputDir,
+            new SameSourceGroupingOptions { ComputeBackend = "cuda" },
+            progress: null,
+            messages.Add,
+            CancellationToken.None);
+
+        Assert.True(File.Exists(Path.Combine(outputDir, "原图", "sample.png")));
+        Assert.Contains(messages, message => message.Contains("已自动切换为 CPU", StringComparison.Ordinal));
     }
 
     [Fact]

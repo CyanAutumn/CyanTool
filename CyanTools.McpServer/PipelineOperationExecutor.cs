@@ -93,6 +93,7 @@ public sealed class PipelineOperationExecutor
 
         PipelineNodeViewModelBase node = CreateNode(operation);
         ApplyParameters(node, parametersJson);
+        RequireCleanupConfirmation(node, confirmDestructive);
 
         IPipelineDirectoryNode? directoryNode = node.GetDirectoryAutomationNode();
         if (directoryNode == null)
@@ -103,19 +104,23 @@ public sealed class PipelineOperationExecutor
         directoryNode.IsWorkflowMode = true;
         directoryNode.HasInheritedInputPath = false;
         directoryNode.PipelineInputPath = normalizedInput;
-        directoryNode.PipelineOutputPath = normalizedOutput ?? string.Empty;
+        directoryNode.PipelineOutputPath = normalizedOutput ??
+            (directoryNode.DirectoryBehavior == PipelineDirectoryBehavior.GeneratedOutput
+                ? ToolOutputDirectoryDefaults.BuildDefaultOutputDirectory(normalizedInput, node.DisplayName)
+                : normalizedInput);
 
         var logs = new List<string>();
         void AppendLog(string message)
         {
-            if (logs.Count < MaximumReturnedLogLines)
+            lock (logs)
             {
-                logs.Add(message);
+                if (logs.Count < MaximumReturnedLogLines) logs.Add(message);
             }
         }
 
         var context = new PipelineContext(AppendLog);
-        context.UpdateEffectivePaths(normalizedInput, normalizedOutput ?? string.Empty, 1);
+        context.UpdateEffectivePaths(normalizedInput, directoryNode.PipelineOutputPath, 1);
+        AllowedPathGuard.ValidateNodePaths(node, context);
         node.AttachLogger(AppendLog);
 
         await node.RunAsync(context, cancellationToken).ConfigureAwait(false);
@@ -124,6 +129,16 @@ public sealed class PipelineOperationExecutor
             ? null
             : directoryNode.PipelineOutputPath;
         return new PipelineOperationResult(operation.Id, "completed", normalizedInput, resolvedOutput, logs);
+    }
+
+    internal static bool ClearsInput(PipelineNodeViewModelBase node) =>
+        ResolveParameterTarget(node).GetType().GetProperty("ShouldClearInputDirectoryAfterCompletion")
+            ?.GetValue(ResolveParameterTarget(node)) is true;
+
+    internal static void RequireCleanupConfirmation(PipelineNodeViewModelBase node, bool confirmed)
+    {
+        if (ClearsInput(node) && !confirmed)
+            throw new InvalidOperationException("Input cleanup deletes source files. Obtain explicit user confirmation and set confirm_destructive to true.");
     }
 
     private static PipelineNodeViewModelBase CreateNode(AgentOperationDefinition operation)
@@ -288,6 +303,18 @@ internal static class AllowedPathGuard
             throw new DirectoryNotFoundException($"{argumentName} does not exist: {normalizedPath}");
         }
 
+
+        var pending = new Stack<string>();
+        pending.Push(normalizedPath);
+        while (pending.Count > 0)
+        {
+            foreach (string entry in Directory.EnumerateFileSystemEntries(pending.Pop()))
+            {
+                RejectLink(entry);
+                if (Directory.Exists(entry)) pending.Push(entry);
+            }
+        }
+
         return normalizedPath;
     }
 
@@ -310,7 +337,18 @@ internal static class AllowedPathGuard
             throw new UnauthorizedAccessException($"{argumentName} is outside the configured MCP allowed roots.");
         }
 
+        for (string? cursor = normalizedPath; cursor != null; cursor = Path.GetDirectoryName(cursor))
+            RejectLink(cursor);
+
         return normalizedPath;
+    }
+
+    private static void RejectLink(string path)
+    {
+
+        FileSystemInfo info = Directory.Exists(path) ? new DirectoryInfo(path) : new FileInfo(path);
+        if (info.LinkTarget != null)
+            throw new UnauthorizedAccessException("MCP file operations do not allow symbolic links or junctions: " + path);
     }
 
     public static void ValidateNodePaths(PipelineNodeViewModelBase node, PipelineContext context)
@@ -385,7 +423,7 @@ internal static class AllowedPathGuard
             return;
         }
 
-        if (requireExistingDirectory)
+        if (requireExistingDirectory || Directory.Exists(normalized))
         {
             RequireDirectory(normalized, argumentName);
         }

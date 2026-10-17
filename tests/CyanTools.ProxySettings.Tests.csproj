@@ -26,6 +26,7 @@
   <ItemGroup>
     <Compile Include="ProxySettingsStoreTests.cs" />
     <Compile Include="../Utils/ClashSubscriptionParser.cs" Link="Utils/ClashSubscriptionParser.cs" />
+    <Compile Include="../Utils/ExternalToolProcess.cs" Link="Utils/ExternalToolProcess.cs" />
     <Compile Include="../Utils/ManagedMihomoService.cs" Link="Utils/ManagedMihomoService.cs" />
     <Compile Include="../Utils/ProxySettingsStore.cs" Link="Utils/ProxySettingsStore.cs" />
     <Compile Include="../Utils/RelayCommand.cs" Link="Utils/RelayCommand.cs" />

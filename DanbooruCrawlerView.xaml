@@ -37,7 +37,7 @@
                 </Border>
 
                 <StackPanel Grid.Column="1">
-                    <TextBlock Text="数据集下载器"
+                    <TextBlock Text="数据集管理器"
                                Style="{StaticResource CyanPageTitleStyle}"
                                FontSize="30" />
                     <TextBlock Text="集中配置来源、令牌、标签和输出目录，下载任务进度显示在输出与执行区域下方。"
@@ -64,6 +64,23 @@
 
         <Grid Grid.Row="1">
             <ScrollViewer Style="{StaticResource CyanPageScrollViewerStyle}">
+              <StackPanel>
+                <GroupBox Header="素材库管理" Style="{StaticResource CyanGroupBoxStyle}" Margin="0,0,0,12">
+                  <StackPanel>
+                    <TextBlock Text="管理目录" />
+                    <DockPanel Margin="0,6,0,10">
+                      <ui:Button DockPanel.Dock="Right" Content="选择目录" Command="{Binding BrowseManagementDirectoryCommand}" />
+                      <ui:TextBox Text="{Binding ManagementDirectory, UpdateSourceTrigger=LostFocus}" />
+                    </DockPanel>
+                    <TextBlock Text="素材文件夹名（支持 {name}、{artist}、{id}、{time}；输出到素材目录下的原图）" TextWrapping="Wrap" />
+                    <ui:TextBox Text="{Binding MaterialFolderTemplate, UpdateSourceTrigger=LostFocus}" Margin="0,6,0,10" />
+                    <WrapPanel>
+                      <ui:Button Content="刷新素材库" Command="{Binding RefreshLibraryCommand}" Margin="0,0,8,0" />
+                      <ui:Button Content="保存选中素材参数" Command="{Binding SaveMaterialCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding LibraryStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                  </StackPanel>
+                </GroupBox>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -274,29 +291,9 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBlock Text="输出目录"
-                                       Style="{StaticResource CyanFormLabelStyle}" />
-                            <ui:TextBox Grid.Column="1"
-                                     Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}"
-                                     Margin="0,0,8,0" />
-                            <ui:Button Grid.Column="2"
-                                    Command="{Binding BrowseOutputFolderCommand}"
-                                    Style="{StaticResource CyanCommandButtonStyle}"
-                                    Margin="0">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="FolderOpen24"
-                                                   Margin="0,0,6,0" />
-                                    <TextBlock Text="选择目录" />
-                                </StackPanel>
-                            </ui:Button>
-
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Grid.ColumnSpan="2"
-                                       Text="可用占位符: {time} {id} {name}"
-                                       Style="{StaticResource CyanTinyTextBlockStyle}"
-                                       Margin="0,8,0,0" />
-
+                            <TextBlock Text="输出格式" Style="{StaticResource CyanFormLabelStyle}" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding OutputFormat}" />
+                            <CheckBox Grid.Row="1" Grid.Column="1" Content="不下载本地已有图片（检查同名不同后缀）" IsChecked="{Binding SkipExisting}" Margin="0,8,0,0" />
                             <TextBlock Grid.Row="2"
                                        Text="请求间隔"
                                        Style="{StaticResource CyanFormLabelStyle}"
@@ -329,28 +326,36 @@
                                         <TextBlock Text="{Binding StartButtonText, Converter={StaticResource LocalizedTextConverter}}" />
                                     </StackPanel>
                                 </ui:Button>
-                                <ui:Button Command="{Binding OpenDanbooruManualCollectorCommand}"
-                                        Style="{StaticResource CyanCommandButtonStyle}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="DocumentSearch24"
-                                                       Margin="0,0,6,0" />
-                                        <TextBlock Text="Danbooru 正则手动获取" />
-                                    </StackPanel>
-                                </ui:Button>
+
                             </WrapPanel>
 
                         </Grid>
                     </GroupBox>
 
                     <GroupBox Grid.Row="4"
-                              Header="任务列表"
+                              Header="素材库"
                               Style="{StaticResource CyanGroupBoxStyle}">
-                        <ItemsControl ItemsSource="{Binding DownloadTasks}">
-                            <ItemsControl.ItemTemplate>
+                        <ListBox ItemsSource="{Binding DownloadTasks}" SelectedItem="{Binding SelectedMaterial, Mode=TwoWay}" HorizontalContentAlignment="Stretch">
+                            <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource CyanCardStyle}"
                                             Padding="12"
+                                            ToolTip="{Binding MaterialDirectory}"
                                             Margin="0,0,0,10">
+                                        <Border.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                <MenuItem Header="打开素材目录" Click="OpenMaterialDirectory_Click" />
+                                                <MenuItem Header="格式转换" Click="ConvertMaterial_Click" />
+                                        <Separator />
+                                        <MenuItem Header="同源图片归类" Tag="SameSource" Click="ClassifyMaterial_Click" />
+                                        <MenuItem Header="图片分辨率归类" Tag="ResolutionBuckets" Click="ClassifyMaterial_Click" />
+                                        <MenuItem Header="分辨率筛选" Tag="ResolutionFilter" Click="ClassifyMaterial_Click" />
+                                        <MenuItem Header="图片聚类" Tag="Clustering" Click="ClassifyMaterial_Click" />
+                                        <MenuItem Header="美学评分" Tag="Aesthetic" Click="ClassifyMaterial_Click" />
+                                        <MenuItem Header="远景图检测" Tag="FarScene" Click="ClassifyMaterial_Click" />
+                                        <MenuItem Header="还原原图" Click="RestoreMaterial_Click" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="220" />
@@ -362,6 +367,7 @@
                                                            FontSize="18"
                                                            FontWeight="SemiBold"
                                                            TextTrimming="CharacterEllipsis" />
+                                                <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding SelectedFolder, Mode=TwoWay}" Margin="0,6,0,4" ToolTip="选择素材子文件夹" />
                                                 <TextBlock Text="{Binding PixivId}"
                                                            Style="{StaticResource CyanSecondaryTextBlockStyle}"
                                                            Margin="0,4,0,0" />
@@ -409,17 +415,41 @@
                                             </StackPanel>
                                             <ui:Button Grid.Column="2"
                                                        Command="{Binding StopCommand}"
-                                                       Style="{StaticResource CyanCommandButtonStyle}"
                                                        VerticalAlignment="Top">
+                                                <ui:Button.Style>
+                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:Button.Style>
                                                 <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Stop24" Margin="0,0,5,0"/><TextBlock Text="停止"/></StackPanel>
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="2"
+                                                       Command="{Binding CheckCommand}"
+                                                       VerticalAlignment="Top">
+                                                <ui:Button.Style>
+                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:Button.Style>
+                                                <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="ArrowSync24" Margin="0,0,5,0"/><TextBlock Text="检查"/></StackPanel>
                                             </ui:Button>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </GroupBox>
                 </Grid>
+            </StackPanel>
             </ScrollViewer>
         </Grid>
     </Grid>

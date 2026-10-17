@@ -203,7 +203,7 @@ namespace CyanTools.ViewModel
 
         private void AddLog(string message)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            UiDispatch.Invoke(() =>
             {
                 if (message.StartsWith("Downloading"))
                 {

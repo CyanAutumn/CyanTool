@@ -160,29 +160,10 @@ namespace CyanTools.Utils
 
             try
             {
-                using var process = new Process { StartInfo = startInfo };
-                if (!process.Start())
-                {
-                    return null;
-                }
-
-                Task<string> outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-                Task<string> errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(4));
-                try
-                {
-                    await process.WaitForExitAsync(timeout.Token);
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    TryKill(process);
-                    return null;
-                }
-
-                string output = await outputTask;
-                _ = await errorTask;
-                return process.ExitCode == 0 ? ParsePrimaryGpuCsv(output) : null;
+                string output = await ExternalToolProcess.CaptureAsync(startInfo, timeout.Token).ConfigureAwait(false);
+                return ParsePrimaryGpuCsv(output);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

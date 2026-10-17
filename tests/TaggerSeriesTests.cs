@@ -52,7 +52,7 @@ public sealed class TaggerSeriesTests
 
         Assert.Equal("character focus, anime, A girl standing beside a window, looking outside.", caption);
         Assert.Equal(
-            "First caption.\nSecond caption.",
+            "First caption." + Environment.NewLine + "Second caption.",
             ToriiGateCaptionOutput.MergeUniqueCaption("First caption.", "Second caption."));
     }
 

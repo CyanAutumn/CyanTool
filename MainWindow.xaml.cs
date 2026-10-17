@@ -42,6 +42,8 @@ namespace CyanTools
             [typeof(GaussianBlurView)] = "批量生成指定半径的模糊图片。",
             [typeof(ImageClusteringView)] = "按特征空间、聚类算法和 UMAP 参数整理图片分组。",
             [typeof(SameSourceImageGroupingView)] = "识别原图、缩略图、副本、被包含图和差分图，并导出清晰的分组结果。",
+            [typeof(FarSceneDetectionView)] = "按半身检测面积生成近景与远景索引，查看时移动，支持还原。",
+            [typeof(AestheticScoringView)] = "评估动漫图片的美学质量，查看七档评分并按等级整理训练集。",
             [typeof(ConvertImageFormatView)] = "批量转换图片格式并保留原有目录结构。",
             [typeof(ConvertTransparentChannelView)] = "将透明像素填充为白色，支持 PNG / WEBP / BMP / JPEG。",
             [typeof(TaggingView)] = "选择输入路径、打标模型和阈值后批量生成标签文件。",
@@ -49,7 +51,8 @@ namespace CyanTools
             [typeof(TrainingOutputOrganizerView)] = "将 diffusion-pipe epoch 输出整理为 sd-script 可识别的 adapter_model 序列。",
             [typeof(XyzToolView)] = "按开始、结束和间隔生成可复制的序号提示词。",
             [typeof(ImageRenameView)] = "按前缀、起始编号和位数批量预览并重命名图片。",
-            [typeof(DanbooruCrawlerView)] = "集中配置来源、令牌、标签和输出目录，下载日志在右侧持续追踪。",
+            [typeof(DanbooruCrawlerView)] = "管理素材库，保存每个素材的下载参数，并检查补全原图。",
+            [typeof(DanbooruManualDownloaderView)] = "通过浏览器正则采集 Danbooru 帖子，并按标签设置下载。",
             [typeof(GeminiImageGenerationView)] = "素材、提示词、模型参数和生成结果集中在一个更清爽的工作台里。",
             [typeof(PipelineSchedulerView)] = "在节点画布中编排处理流程，保存工作流并查看执行日志。",
             [typeof(OptionsView)] = "管理本机运行环境与共享工具设置。",
@@ -114,6 +117,27 @@ namespace CyanTools
 
             NavigateToEntry(entry, item);
             e.Handled = true;
+        }
+
+        public void NavigateToTool(Type pageType, Action<UserControl>? configure = null)
+        {
+
+            NavigationSearchBox.Text = string.Empty;
+            var match = _navigationItems.FirstOrDefault(pair => pair.Value.Metadata?.ControlType == pageType);
+            if (match.Key == null) return;
+            var control = _navigationService.GetOrCreateControl(match.Value.Metadata!);
+            if (control == null) return;
+            configure?.Invoke(control);
+            NavigateToEntry(match.Value, match.Key);
+        }
+
+        public void OpenMaterialFormatConversion(string path, string? materialRoot = null)
+        {
+            NavigateToTool(typeof(ConvertImageFormatView), control =>
+            {
+                if (control is ConvertImageFormatView converter)
+                    converter.OpenFromLibrary(path, () => NavigateToTool(typeof(DanbooruCrawlerView)), materialRoot);
+            });
         }
 
         private void NavigateToEntry(NavigationMenuEntry entry, NavigationViewItem activeItem)
@@ -422,7 +446,7 @@ namespace CyanTools
                 return SymbolRegular.NumberSymbolSquare24;
             }
 
-            if (controlType == typeof(DanbooruCrawlerView))
+            if (controlType == typeof(DanbooruCrawlerView) || controlType == typeof(DanbooruManualDownloaderView))
             {
                 return SymbolRegular.ArrowDownload24;
             }
@@ -447,7 +471,7 @@ namespace CyanTools
                 return SymbolRegular.Filter24;
             }
 
-            if (controlType == typeof(ImageClusteringView))
+            if (controlType == typeof(ImageClusteringView) || controlType == typeof(FarSceneDetectionView))
             {
                 return SymbolRegular.ImageSearch24;
             }
@@ -455,6 +479,11 @@ namespace CyanTools
             if (controlType == typeof(SameSourceImageGroupingView))
             {
                 return SymbolRegular.FolderPeople24;
+            }
+
+            if (controlType == typeof(AestheticScoringView))
+            {
+                return SymbolRegular.Sparkle24;
             }
 
             if (controlType == typeof(KeepFilesView))
@@ -802,10 +831,11 @@ namespace CyanTools
 
         private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (_navigationService.TryGetCachedControl(typeof(DanbooruCrawlerView), out var danbooruView) &&
-                danbooruView.DataContext is ViewModel.DatasetDownloaderViewModel viewModel)
+            foreach (var pageType in new[] { typeof(DanbooruCrawlerView), typeof(DanbooruManualDownloaderView) })
             {
-                await viewModel.SaveStateOnCloseAsync();
+                if (_navigationService.TryGetCachedControl(pageType, out var downloaderView) &&
+                    downloaderView.DataContext is ViewModel.DatasetDownloaderViewModel viewModel)
+                    await viewModel.SaveStateOnCloseAsync();
             }
 
             if (_navigationService.TryGetCachedControl(typeof(ImageClusteringView), out var imageClusteringView) &&

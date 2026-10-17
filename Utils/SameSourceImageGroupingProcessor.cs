@@ -16,7 +16,7 @@ namespace CyanTools.Utils
 {
     public sealed class SameSourceGroupingOptions
     {
-        public string ComputeBackend { get; set; } = "auto";
+        public string ComputeBackend { get; set; } = "cpu";
     }
 
     public static class SameSourceImageGroupingProcessor
@@ -60,7 +60,7 @@ namespace CyanTools.Utils
         public static string ResolveComputeBackend(string requestedDevice)
         {
             string normalized = string.IsNullOrWhiteSpace(requestedDevice)
-                ? "auto"
+                ? "cpu"
                 : requestedDevice.Trim().ToLowerInvariant();
 
             if (normalized is not ("auto" or "cpu" or "cuda"))
@@ -68,14 +68,9 @@ namespace CyanTools.Utils
                 throw new ArgumentOutOfRangeException(nameof(requestedDevice), $"unsupported device: {requestedDevice}");
             }
 
-            bool cudaAvailable = IsCudaBackendAvailable();
-            return normalized switch
-            {
-                "cpu" => "cpu",
-                "cuda" when cudaAvailable => "cuda",
-                "cuda" => throw new InvalidOperationException("CUDA backend requested but unavailable. Please use auto or cpu."),
-                _ => cudaAvailable ? "cuda" : "cpu"
-            };
+
+
+            return "cpu";
         }
 
         public static void Process(
@@ -109,7 +104,12 @@ namespace CyanTools.Utils
                 throw new InvalidOperationException("输出目录不能位于输入目录内。");
             }
 
-            string computeBackend = ResolveComputeBackend(options?.ComputeBackend ?? "auto");
+            string requestedBackend = options?.ComputeBackend ?? "cpu";
+            string computeBackend = ResolveComputeBackend(requestedBackend);
+            if (string.Equals(requestedBackend?.Trim(), "cuda", StringComparison.OrdinalIgnoreCase))
+            {
+                logAction?.Invoke("当前同源图片归类实现使用 CPU；旧版 CUDA 设置已自动切换为 CPU。");
+            }
             logAction?.Invoke($"使用计算后端: {computeBackend}");
 
             ClassificationResult result = ClassifyDirectory(inputFull, progress, logAction, token, computeBackend);
@@ -243,7 +243,7 @@ namespace CyanTools.Utils
             var updatedCache = new Dictionary<string, CachedRecord>(StringComparer.OrdinalIgnoreCase);
             var records = new Dictionary<string, LoadedImage>(StringComparer.OrdinalIgnoreCase);
 
-            IEnumerable<string> files = Directory.EnumerateFiles(inputDir, "*.*", SearchOption.TopDirectoryOnly)
+            IEnumerable<string> files = Directory.EnumerateFiles(inputDir, "*.*", MaterialClassificationSession.Current != null ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)
                 .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
 
@@ -254,7 +254,7 @@ namespace CyanTools.Utils
                 try
                 {
                     FileInfo info = new(file);
-                    string fileName = Path.GetFileName(file);
+                    string fileName = MaterialClassificationSession.Current != null ? Path.GetRelativePath(inputDir, file) : Path.GetFileName(file);
                     long mtimeNs = ToUnixTimeNanoseconds(info.LastWriteTimeUtc);
                     CachedRecord? cached = existingCache.GetValueOrDefault(fileName);
 
@@ -639,7 +639,7 @@ namespace CyanTools.Utils
             CancellationToken token)
         {
             Directory.CreateDirectory(outputDir);
-            foreach (string folderName in OutputFolders.Values)
+            foreach (string folderName in MaterialClassificationSession.Current == null ? OutputFolders.Values : Enumerable.Empty<string>())
             {
                 string folderPath = Path.Combine(outputDir, folderName);
                 if (Directory.Exists(folderPath))
@@ -651,7 +651,7 @@ namespace CyanTools.Utils
             }
 
             string manifestPath = Path.Combine(outputDir, "manifest.json");
-            if (File.Exists(manifestPath))
+            if (MaterialClassificationSession.Current == null && File.Exists(manifestPath))
             {
                 File.Delete(manifestPath);
             }
@@ -681,8 +681,13 @@ namespace CyanTools.Utils
                     destinationPath = Path.Combine(outputDir, folderName, fileName);
                 }
 
-                File.Copy(entry.SrcPath, destinationPath, overwrite: true);
-                CopySidecarTxt(entry.SrcPath, destinationPath);
+                if (MaterialClassificationSession.Current?.Builder is { } materialIndex)
+                    materialIndex.RecordImage(entry.SrcPath, destinationPath);
+                else
+                {
+                    File.Copy(entry.SrcPath, destinationPath, overwrite: true);
+                    CopySidecarTxt(entry.SrcPath, destinationPath);
+                }
 
                 manifestRows.Add(new
                 {
@@ -698,7 +703,7 @@ namespace CyanTools.Utils
                 progress?.Report(90 + 10.0 * processed / Math.Max(1, result.Entries.Count));
             }
 
-            File.WriteAllText(manifestPath, JsonConvert.SerializeObject(manifestRows, Formatting.Indented), Encoding.UTF8);
+            if (MaterialClassificationSession.Current == null) File.WriteAllText(manifestPath, JsonConvert.SerializeObject(manifestRows, Formatting.Indented), Encoding.UTF8);
             logAction?.Invoke($"导出完成，结果数量: {result.Entries.Count}");
         }
 
@@ -964,20 +969,6 @@ namespace CyanTools.Utils
             string normalizedBase = basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                     + Path.DirectorySeparatorChar;
             return candidatePath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsCudaBackendAvailable()
-        {
-            try
-            {
-                string buildInfo = Cv2.GetBuildInformation();
-                return buildInfo.IndexOf("NVIDIA CUDA", StringComparison.OrdinalIgnoreCase) >= 0
-                       && buildInfo.IndexOf("YES", StringComparison.OrdinalIgnoreCase) >= 0;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private static long ToUnixTimeNanoseconds(DateTime utcDateTime)

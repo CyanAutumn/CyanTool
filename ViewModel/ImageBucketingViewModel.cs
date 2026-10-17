@@ -261,8 +261,10 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private void StartClassification()
+        private async void StartClassification()
         {
+            if (IsProcessing) return;
+            if (await MaterialClassificationSession.TryRunAsync(this, () => ExecutePipelineClassificationAsync(null, MaterialClassificationSession.Current?.Token ?? CancellationToken.None))) return;
             OutputFolder = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputFolder, InputFolder, ToolDisplayName);
             if (!ValidateInput(showDialogs: true, out var parameters, out _))
             {
@@ -319,7 +321,7 @@ namespace CyanTools.ViewModel
                     {
                         if (progress > 0)
                         {
-                            Application.Current.Dispatcher.Invoke(() =>
+                            UiDispatch.Invoke(() =>
                             {
                                 IsProgressIndeterminate = false;
                                 ProgressValue = Math.Min(progress, 100);
@@ -338,6 +340,7 @@ namespace CyanTools.ViewModel
                 LogClassificationSummary(result);
                 pipelineLog?.Invoke("分类完成。");
                 success = true;
+                MaterialClassificationSession.MarkSuccessful();
             }
             finally
             {
@@ -372,7 +375,7 @@ namespace CyanTools.ViewModel
             {
                 var supportedExtensions = new[] { "*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif" };
                 var imageFiles = supportedExtensions.SelectMany(ext =>
-                    Directory.GetFiles(InputFolder, ext, SearchOption.TopDirectoryOnly)).ToArray();
+                    Directory.GetFiles(InputFolder, ext, MaterialClassificationSession.Current != null ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)).ToArray();
 
                 if (imageFiles.Length == 0)
                 {
@@ -441,20 +444,22 @@ namespace CyanTools.ViewModel
 
             var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
             var imageFiles = supportedExtensions.SelectMany(ext =>
-                Directory.GetFiles(parameters.InputFolder, $"*{ext}", SearchOption.TopDirectoryOnly)).ToArray();
+                Directory.GetFiles(parameters.InputFolder, $"*{ext}", MaterialClassificationSession.Current != null ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)).ToArray();
 
             int processedFiles = 0;
             foreach (var filePath in imageFiles)
             {
+                MaterialClassificationSession.Current?.Token.ThrowIfCancellationRequested();
                 try
                 {
                     using var image = Image.Load<Rgba32>(filePath);
                     imageData[fileIndex.ToString()] = image.Size;
-                    dicFileName[fileIndex.ToString()] = Path.GetFileName(filePath);
+                    dicFileName[fileIndex.ToString()] = MaterialClassificationSession.Current != null ? Path.GetRelativePath(parameters.InputFolder, filePath) : Path.GetFileName(filePath);
                     fileIndex++;
                 }
                 catch (Exception ex)
                 {
+                    if (MaterialClassificationSession.Current != null) throw;
                     reportProgress(0, $"处理 {Path.GetFileName(filePath)} 时出错: {ex.Message}");
                 }
 
@@ -492,7 +497,8 @@ namespace CyanTools.ViewModel
 
                     try
                     {
-                        File.Copy(fileSrcPath, destPath, true);
+                        if (MaterialClassificationSession.Current?.Builder is { } index) index.RecordImage(fileSrcPath, destPath);
+                        else File.Copy(fileSrcPath, destPath, true);
                         copiedImages++;
 
                         if (parameters.Debug)
@@ -502,6 +508,7 @@ namespace CyanTools.ViewModel
                     }
                     catch (Exception ex)
                     {
+                        if (MaterialClassificationSession.Current != null) throw;
                         reportProgress(0, $"复制 {fileName} 时出错: {ex.Message}");
                     }
 
@@ -565,6 +572,7 @@ namespace CyanTools.ViewModel
 
         private void TryClearInputDirectoryAfterCompletion(Action<string>? pipelineLog)
         {
+            if (MaterialClassificationSession.Current != null) return;
             if (!ShouldClearInputDirectoryAfterCompletion)
             {
                 return;
@@ -599,13 +607,13 @@ namespace CyanTools.ViewModel
                 LogText = _logBuilder.ToString();
             }
 
-            if (Application.Current?.Dispatcher?.CheckAccess() == true)
+            if (UiDispatch.CheckAccess())
             {
                 Update();
             }
             else
             {
-                Application.Current?.Dispatcher?.Invoke(Update);
+                UiDispatch.Invoke(Update);
             }
         }
 

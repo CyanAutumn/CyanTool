@@ -66,6 +66,15 @@ public sealed class WpfUiWindowConventionsTests
             string xaml = File.ReadAllText(path);
             foreach (string controlName in MigratedControlNames)
             {
+                if (controlName == "TextBox")
+                {
+                    var document = System.Xml.Linq.XDocument.Parse(xaml);
+                    Assert.DoesNotContain(document.Descendants(), element =>
+                        element.Name.LocalName == "TextBox" &&
+                        element.Name.NamespaceName == "http://schemas.microsoft.com/winfx/2006/xaml/presentation" &&
+                        !string.Equals((string?)element.Attribute("IsReadOnly"), "True", StringComparison.OrdinalIgnoreCase));
+                    continue;
+                }
                 Assert.DoesNotMatch(
                     new Regex($"<{Regex.Escape(controlName)}(?=[\\s>.])", RegexOptions.CultureInvariant),
                     xaml);

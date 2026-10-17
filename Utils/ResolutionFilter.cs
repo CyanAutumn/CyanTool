@@ -29,6 +29,7 @@ namespace CyanTools.Utils
 
             for (int i = 0; i < files.Count; i++)
             {
+                MaterialClassificationSession.Current?.Token.ThrowIfCancellationRequested();
                 var file = files[i];
                 bool shouldDelete = false;
                 string reason = string.Empty;
@@ -58,7 +59,11 @@ namespace CyanTools.Utils
                         }
                     }
 
-                    if (shouldDelete)
+                    if (MaterialClassificationSession.Current?.Builder is { } index)
+                    {
+                        index.RecordImage(file, Path.Combine(index.OutputPath, shouldDelete ? "排除" : "保留", Path.GetRelativePath(index.InputPath, file)));
+                    }
+                    else if (shouldDelete)
                     {
                         File.Delete(file);
                         var txtFile = Path.ChangeExtension(file, ".txt");
@@ -73,12 +78,13 @@ namespace CyanTools.Utils
                 }
                 catch (Exception ex)
                 {
+                    if (MaterialClassificationSession.Current != null) throw;
                     logAction($"错误: 处理文件 {file} 时发生错误: {ex.Message}");
                 }
 
                 progress.Report((double)(i + 1) / files.Count * 100);
             }
-            logAction($"筛选完成。共删除了 {deletedCount} 个文件。");
+            logAction(MaterialClassificationSession.Current != null ? "筛选索引已生成：保留 / 排除，未删除图片。" : $"筛选完成。共删除了 {deletedCount} 个文件。");
         }
     }
 }

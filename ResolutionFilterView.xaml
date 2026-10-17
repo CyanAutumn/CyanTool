@@ -11,6 +11,8 @@
              d:DesignHeight="560"
              d:DesignWidth="900">
     <UserControl.Resources>
+        <utils:BooleanToInverseBooleanConverter x:Key="MaterialModeEnabled" />
+        <utils:BooleanToVisibilityConverter x:Key="MaterialModeVisibility" />
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
 
@@ -65,11 +67,11 @@
 
                 <TextBlock Text="输入路径"
                            Style="{StaticResource CyanFormLabelStyle}" />
-                <ui:TextBox Grid.Column="1"
+                <ui:TextBox IsEnabled="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeEnabled}}" Grid.Column="1"
                          Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="{Binding HasInheritedInputPath}"
                          Margin="0,0,8,0" />
-                <ui:Button Grid.Column="2"
+                <ui:Button IsEnabled="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeEnabled}}" Grid.Column="2"
                         Content="..."
                         Command="{Binding BrowseInputCommand}"
                         Style="{StaticResource CyanSmallIconButtonStyle}"
@@ -103,8 +105,12 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="100" />
                         </Grid.ColumnDefinitions>
-                        <CheckBox Content="删除指定高度以下的图片"
-                                  IsChecked="{Binding IsHeightFilterEnabled}" />
+                        <CheckBox IsChecked="{Binding IsHeightFilterEnabled}"><CheckBox.Style><Style TargetType="CheckBox">
+                            <Setter Property="Content" Value="删除指定高度以下的图片" />
+                            <Style.Triggers><Trigger Property="utils:MaterialClassificationNavigation.IsIndexMode" Value="True">
+                                <Setter Property="Content" Value="排除指定高度以下的图片" />
+                            </Trigger></Style.Triggers>
+                        </Style></CheckBox.Style></CheckBox>
                         <TextBlock Grid.Column="1"
                                    Text="最小高度"
                                    Style="{StaticResource CyanFormLabelStyle}"
@@ -123,8 +129,12 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="100" />
                         </Grid.ColumnDefinitions>
-                        <CheckBox Content="删除指定宽度以下的图片"
-                                  IsChecked="{Binding IsWidthFilterEnabled}" />
+                        <CheckBox IsChecked="{Binding IsWidthFilterEnabled}"><CheckBox.Style><Style TargetType="CheckBox">
+                            <Setter Property="Content" Value="删除指定宽度以下的图片" />
+                            <Style.Triggers><Trigger Property="utils:MaterialClassificationNavigation.IsIndexMode" Value="True">
+                                <Setter Property="Content" Value="排除指定宽度以下的图片" />
+                            </Trigger></Style.Triggers>
+                        </Style></CheckBox.Style></CheckBox>
                         <TextBlock Grid.Column="1"
                                    Text="最小宽度"
                                    Style="{StaticResource CyanFormLabelStyle}"
@@ -146,8 +156,12 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="80" />
                         </Grid.ColumnDefinitions>
-                        <CheckBox Content="删除指定分辨率以下的图片"
-                                  IsChecked="{Binding IsResolutionFilterEnabled}" />
+                        <CheckBox IsChecked="{Binding IsResolutionFilterEnabled}"><CheckBox.Style><Style TargetType="CheckBox">
+                            <Setter Property="Content" Value="删除指定分辨率以下的图片" />
+                            <Style.Triggers><Trigger Property="utils:MaterialClassificationNavigation.IsIndexMode" Value="True">
+                                <Setter Property="Content" Value="排除指定分辨率以下的图片" />
+                            </Trigger></Style.Triggers>
+                        </Style></CheckBox.Style></CheckBox>
                         <TextBlock Grid.Column="1"
                                    Text="最小分辨率"
                                    Style="{StaticResource CyanFormLabelStyle}"
@@ -188,7 +202,12 @@
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Filter24"
                                            Margin="0,0,6,0" />
-                            <TextBlock Text="开始筛选" />
+                            <TextBlock><TextBlock.Style><Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="开始筛选" />
+                            <Style.Triggers><Trigger Property="utils:MaterialClassificationNavigation.IsIndexMode" Value="True">
+                                <Setter Property="Text" Value="生成索引" />
+                            </Trigger></Style.Triggers>
+                        </Style></TextBlock.Style></TextBlock>
                         </StackPanel>
                     </ui:Button>
                     <ProgressBar Grid.Column="1"

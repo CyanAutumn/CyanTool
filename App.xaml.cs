@@ -318,7 +318,15 @@ namespace CyanTools
                 return string.Empty;
             }
 
-            return path.Replace('\\', '/').Trim('/');
+            string normalized = path.Replace('\\', '/');
+            if (Path.IsPathRooted(path) || normalized.StartsWith('/') ||
+                normalized.Split('/').Any(segment => segment is "." or ".." ||
+                    segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                    segment.EndsWith(' ') || segment.EndsWith('.')))
+            {
+                throw new InvalidDataException("更新清单包含无效或越界路径。");
+            }
+            return normalized;
         }
 
         private static string EscapeManifestPath(string path)

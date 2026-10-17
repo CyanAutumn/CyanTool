@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/CyanAutumn/CyanTools</RepositoryUrl>
+    <Copyright>Copyright (C) 2026 CyanTools contributors</Copyright>
     <ApplicationIcon>bitbug_favicon.ico</ApplicationIcon>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;.tmp/**;CyanTools.Agent/**;CyanTools.McpServer/**;**/*-DESKTOP-*;**/*-DESKTOP-*.*;**/*_DESKTOP_*;**/*_DESKTOP_*.*</DefaultItemExcludes>
     <CyanToolsRuntimeIdentifiersToCopy>win-x64;win-x86</CyanToolsRuntimeIdentifiersToCopy>
@@ -51,6 +54,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="LICENSE;NOTICE;README.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="realesrgan-ncnn-vulkan-20220424-windows\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -61,6 +68,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="scripts\*.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ThirdParty\DeepGHSImgutils\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="scripts\local_anima_epoch_preview.py">

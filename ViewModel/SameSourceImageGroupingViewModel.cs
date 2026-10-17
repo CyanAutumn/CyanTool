@@ -54,14 +54,14 @@ namespace CyanTools.ViewModel
             }
         }
 
-        private const string DefaultBackend = "auto";
-        private readonly string[] _backendOptions = { "auto", "cpu", "cuda" };
+        private const string DefaultBackend = "cpu";
+        private readonly string[] _backendOptions = { "cpu" };
 
         private string _computeBackend = DefaultBackend;
         public string ComputeBackend
         {
             get => _computeBackend;
-            set => SetField(ref _computeBackend, value);
+            set => SetField(ref _computeBackend, DefaultBackend);
         }
 
         public IReadOnlyList<string> ComputeBackendOptions => _backendOptions;
@@ -160,13 +160,13 @@ namespace CyanTools.ViewModel
         {
             void Update() => Log += $"{DateTime.Now:HH:mm:ss} {message}\n";
 
-            if (Application.Current.Dispatcher.CheckAccess())
+            if (UiDispatch.CheckAccess())
             {
                 Update();
             }
             else
             {
-                Application.Current.Dispatcher.Invoke(Update);
+                UiDispatch.Invoke(Update);
             }
 
             LogToPipeline($"[同源图片归类] {message}");
@@ -202,6 +202,9 @@ namespace CyanTools.ViewModel
 
         private async Task RunGroupingAsync(bool showDialogs, CancellationToken token)
         {
+            if (IsProcessing) return;
+            if (await MaterialClassificationSession.TryRunAsync(this, () => RunGroupingAsync(false, token))) return;
+            if (MaterialClassificationSession.Current is { } materialSession) token = materialSession.Token;
             OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DefaultOutputFolderName);
             if (IsProcessing)
             {
@@ -220,7 +223,8 @@ namespace CyanTools.ViewModel
             }
             finally
             {
-                if (success)
+                if (success) MaterialClassificationSession.MarkSuccessful();
+                if (success && MaterialClassificationSession.Current == null)
                 {
                     TryClearInputDirectoryAfterCompletion();
                 }
@@ -240,7 +244,7 @@ namespace CyanTools.ViewModel
                     AppendLog("输入路径无效。");
                     if (showDialogs)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             MessageBox.Show("输入路径无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
                     return false;
@@ -251,7 +255,7 @@ namespace CyanTools.ViewModel
                     AppendLog("输出路径无效。");
                     if (showDialogs)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             MessageBox.Show("输出路径无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
                     return false;
@@ -266,7 +270,7 @@ namespace CyanTools.ViewModel
                     AppendLog("输出路径不能与输入路径相同，且不能位于输入路径内。请选择独立输出路径，避免修改输入路径。");
                     if (showDialogs)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             MessageBox.Show("输出路径不能与输入路径相同，且不能位于输入路径内。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
                     return false;
@@ -279,7 +283,7 @@ namespace CyanTools.ViewModel
 
                 SameSourceImageGroupingProcessor.Process(InputPath, OutputPath, options, progress, AppendLog, token);
 
-                Application.Current.Dispatcher.Invoke(() =>
+                UiDispatch.Invoke(() =>
                 {
                     Progress = 100;
                     if (showDialogs)
@@ -299,14 +303,14 @@ namespace CyanTools.ViewModel
                 AppendLog($"发生错误: {ex.Message}");
                 if (showDialogs)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    UiDispatch.Invoke(() =>
                         MessageBox.Show($"处理失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
                 }
                 return false;
             }
             finally
             {
-                Application.Current.Dispatcher.Invoke(RefreshCommandStates);
+                UiDispatch.Invoke(RefreshCommandStates);
             }
         }
 
@@ -323,7 +327,7 @@ namespace CyanTools.ViewModel
 
         private IProgress<double> CreateProgressReporter()
         {
-            return new Progress<double>(value =>
+            return new ExecutionProgress<double>(value =>
             {
                 if (Application.Current == null)
                 {
@@ -331,13 +335,13 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
-                if (Application.Current.Dispatcher.CheckAccess())
+                if (UiDispatch.CheckAccess())
                 {
                     Progress = value;
                 }
                 else
                 {
-                    Application.Current.Dispatcher.BeginInvoke(new Action(() => Progress = value));
+                    UiDispatch.Invoke(() => Progress = value);
                 }
             });
         }

@@ -32,7 +32,7 @@ namespace CyanTools.Utils
             ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"
         };
 
-        public static Task ProcessFolderAsync(ImageScalingOptions options, IProgress<double>? progress, Action<string>? logAction)
+        public static Task ProcessFolderAsync(ImageScalingOptions options, IProgress<double>? progress, Action<string>? logAction, CancellationToken token = default)
         {
             if (options == null)
             {
@@ -41,6 +41,7 @@ namespace CyanTools.Utils
 
             return Task.Run(() =>
             {
+                token.ThrowIfCancellationRequested();
                 var imageFiles = Directory.GetFiles(options.InputFolder, "*.*", SearchOption.TopDirectoryOnly)
                     .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
                     .ToList();
@@ -61,14 +62,15 @@ namespace CyanTools.Utils
                 int completed = 0;
                 Parallel.ForEach(
                     imageFiles,
-                    new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                    new ParallelOptions { MaxDegreeOfParallelism = maxParallelism, CancellationToken = token },
                     inputFile =>
                     {
                         ProcessSingleFile(inputFile, options, logAction);
                         int done = Interlocked.Increment(ref completed);
                         progress?.Report(done * 100.0 / imageFiles.Count);
                     });
-            });
+                token.ThrowIfCancellationRequested();
+            }, token);
         }
 
         private static void ProcessSingleFile(string inputFile, ImageScalingOptions options, Action<string>? logAction)
@@ -151,6 +153,7 @@ namespace CyanTools.Utils
             catch (Exception ex)
             {
                 logAction?.Invoke($"处理失败: {fileName}，原因: {ex.Message}");
+                throw;
             }
         }
 

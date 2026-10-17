@@ -34,7 +34,7 @@ namespace CyanTools.ViewModel
         PostId
     }
 
-    public sealed class DatasetDownloaderViewModel : INotifyPropertyChanged, IPipelineRunnableViewModel, IPipelineRuntimeOutputNode
+    public partial class DatasetDownloaderViewModel : INotifyPropertyChanged, IPipelineRunnableViewModel, IPipelineRuntimeOutputNode
     {
         private const string DanbooruBaseUrl = "https://danbooru.donmai.us";
         private const int DanbooruPageSize = 200;
@@ -538,7 +538,7 @@ namespace CyanTools.ViewModel
             }
         }
 
-        public string StartButtonText => "开始下载";
+        public string StartButtonText => IsManualDownloader ? "开始下载" : "添加到素材库";
 
         public ICommand StartStopCommand => _startStopCommand;
         public ICommand ClearLogCommand => _clearLogCommand;
@@ -551,11 +551,7 @@ namespace CyanTools.ViewModel
 
         private bool CanStartOrStop()
         {
-            if (IsDownloading)
-            {
-                return true;
-            }
-
+            if (!IsManualDownloader) return !_addingMaterial && !string.IsNullOrWhiteSpace(InputText) && !string.IsNullOrWhiteSpace(ManagementDirectory);
             return !string.IsNullOrWhiteSpace(InputText)
                 && !string.IsNullOrWhiteSpace(OutputDirectory)
                 && (EnableDanbooru || EnablePixiv || EnableKemono)
@@ -581,12 +577,14 @@ namespace CyanTools.ViewModel
                 return;
             }
 
+            if (!IsManualDownloader) { await AddMaterialAsync(); return; }
             var snapshot = CreateTaskSnapshot();
             var taskItem = new DatasetDownloadTask(
                 snapshot.SelectedMode == DatasetDownloadMode.ArtistId ? "正在解析画师" : snapshot.InputText,
                 snapshot.EnableDanbooru,
                 snapshot.EnablePixiv,
-                snapshot.EnableKemono)
+                snapshot.EnableKemono,
+                task => _downloadTasks.Remove(task))
             {
                 PixivId = snapshot.InputText,
                 SelectedProxyName = snapshot.ProxyNode.DisplayName
@@ -627,6 +625,8 @@ namespace CyanTools.ViewModel
                 {
                     InputText = snapshot.InputText,
                     OutputDirectory = snapshot.OutputDirectory,
+                    OutputFormat = snapshot.OutputFormat,
+                    SkipExisting = snapshot.SkipExisting,
                     DownloadIntervalSeconds = snapshot.DownloadIntervalSeconds,
                     EnableDanbooru = snapshot.EnableDanbooru,
                     EnablePixiv = snapshot.EnablePixiv,
@@ -652,7 +652,7 @@ namespace CyanTools.ViewModel
                     }
                 };
 
-                await worker.ExecuteDownloadAsync(taskCancellation.Token, null, rethrowErrors: false, validateWorkflowOutput: false);
+                await worker.ExecuteDownloadAsync(taskCancellation.Token, null, rethrowErrors: true, validateWorkflowOutput: false);
                 taskItem.StatusText = "已完成";
             }
             catch (OperationCanceledException)
@@ -686,6 +686,7 @@ namespace CyanTools.ViewModel
                 {
                     await proxyLease.DisposeAsync();
                 }
+                worker?.DisposeLibraryTransport();
                 IsDownloading = _downloadTasks.Any(item => item.IsRunning);
                 _startStopCommand.RaiseCanExecuteChanged();
                 _deletePixivTokenCommand.RaiseCanExecuteChanged();
@@ -711,7 +712,7 @@ namespace CyanTools.ViewModel
                 IncludeMeta,
                 SelectedPixivToken,
                 PixivRefreshToken,
-                SelectedProxyNode);
+                SelectedProxyNode, OutputFormat, SkipExisting);
         }
 
         public void ResetRuntimeOutputPath()
@@ -730,7 +731,7 @@ namespace CyanTools.ViewModel
             RefreshCredentialsFromSharedControl();
             return ExecuteDownloadAsync(
                 token,
-                message => context.AppendLog($"[数据集下载器] {message}"),
+                message => context.AppendLog($"[数据集管理器] {message}"),
                 rethrowErrors: true,
                 validateWorkflowOutput: true);
         }
@@ -1030,7 +1031,7 @@ namespace CyanTools.ViewModel
                 {
                     _runtimeOutputPath = PipelineRuntimeOutputDirectoryValidator.ValidateAndGetPublishPath(
                         resolvedOutputRoot,
-                        "数据集下载器");
+                        "数据集管理器");
                 }
                 catch (DirectoryNotFoundException ex)
                 {
@@ -1128,6 +1129,7 @@ namespace CyanTools.ViewModel
             {
                 AppendLog($"[{source}] 任务失败: {ex.Message}");
                 setSummary($"{source}：任务失败（{ex.Message}）");
+                throw;
             }
         }
 
@@ -1363,7 +1365,7 @@ namespace CyanTools.ViewModel
             var imagePath = Path.Combine(outputDirectory, fileName);
             var txtPath = Path.Combine(outputDirectory, Path.ChangeExtension(fileName, ".txt"));
 
-            if (File.Exists(imagePath) && ShouldSkipExistingDownloadedFile(imagePath, "Danbooru", fileName))
+            if (SkipExisting && DatasetLibraryStorage.FindExisting(imagePath) != null)
             {
                 AppendLog($"[Danbooru] 已存在，跳过 {fileName}");
                 if (!File.Exists(txtPath))
@@ -1533,7 +1535,7 @@ namespace CyanTools.ViewModel
 
         private async Task<string?> ResolveDanbooruArtistTagByPixivUserIdAsync(string pixivUserId, CancellationToken token)
         {
-            var pattern = $"*pixiv.net/users/{pixivUserId}*";
+            var artistUrl = $"https://www.pixiv.net/users/{pixivUserId}";
             string lastFailure = "未知错误";
 
             for (int attempt = 1; attempt <= DanbooruArtistLookupRetryCount; attempt++)
@@ -1541,7 +1543,7 @@ namespace CyanTools.ViewModel
                 try
                 {
                     var request = new RestRequest("/artists.json", Method.Get)
-                        .AddQueryParameter("search[url_matches]", pattern)
+                        .AddQueryParameter("search[url_matches]", artistUrl)
                         .AddQueryParameter("limit", 1);
                     await WaitForNextRemoteRequestAsync(_danbooruRequestPacer, token);
                     var response = await _danbooruClient.ExecuteAsync(request, token);
@@ -1633,19 +1635,14 @@ namespace CyanTools.ViewModel
                 {
                     token.ThrowIfCancellationRequested();
                     var targetPath = Path.Combine(outputDirectory, item.FileName);
-                    if (File.Exists(targetPath))
+                    if (SkipExisting && DatasetLibraryStorage.FindExisting(targetPath) != null)
                     {
-                        if (ShouldSkipExistingDownloadedFile(targetPath, "Pixiv", item.FileName))
-                        {
-                            counters.Record(DownloadOutcome.Skipped);
-                            existingPixivFiles.Add(item.FileKey);
-                            continue;
-                        }
-
-                        existingPixivFiles.Remove(item.FileKey);
+                        counters.Record(DownloadOutcome.Skipped);
+                        existingPixivFiles.Add(item.FileKey);
+                        continue;
                     }
 
-                    if (existingPixivFiles.Contains(item.FileKey))
+                    if (SkipExisting && existingPixivFiles.Contains(item.FileKey))
                     {
                         counters.Record(DownloadOutcome.Skipped);
                         continue;
@@ -1916,6 +1913,7 @@ namespace CyanTools.ViewModel
 
             foreach (var path in Directory.EnumerateFiles(outputDirectory))
             {
+                if (!DatasetLibraryStorage.HasSupportedImageExtension(path) || !DatasetLibraryStorage.CanDecodeImage(path)) continue;
                 var key = TryParsePixivFileKey(Path.GetFileNameWithoutExtension(path));
                 if (!string.IsNullOrWhiteSpace(key))
                 {
@@ -2033,7 +2031,7 @@ namespace CyanTools.ViewModel
             try
             {
                 var downloadPlan = await BuildKemonoDownloadPlanAsync(artistId, selectedService, token);
-                int imageTotal = downloadPlan.Count(asset => DownloadedImageValidator.HasSupportedImageExtension(asset.FileName));
+                int imageTotal = downloadPlan.Count(asset => DatasetLibraryStorage.HasSupportedImageExtension(asset.FileName));
                 counters.SetTotal(imageTotal);
                 AppendLog($"[Kemono] 已发现 {imageTotal} 张远端图片（另有 {downloadPlan.Count - imageTotal} 个非图片附件）。");
 
@@ -2046,18 +2044,12 @@ namespace CyanTools.ViewModel
                 {
                     token.ThrowIfCancellationRequested();
                     var targetPath = Path.Combine(outputDirectory, asset.FileName);
-                    bool isImageAsset = DownloadedImageValidator.HasSupportedImageExtension(targetPath);
-                    if (File.Exists(targetPath))
+                    bool isImageAsset = DatasetLibraryStorage.HasSupportedImageExtension(targetPath);
+                    if (SkipExisting && DatasetLibraryStorage.FindExisting(targetPath) != null)
                     {
-                        if (ShouldSkipExistingDownloadedFile(targetPath, "Kemono", asset.FileName))
-                        {
-                            skippedCount++;
-                            if (isImageAsset)
-                            {
-                                counters.Record(DownloadOutcome.Skipped);
-                            }
-                            continue;
-                        }
+                        skippedCount++;
+                        if (isImageAsset) counters.Record(DownloadOutcome.Skipped);
+                        continue;
                     }
 
                     if (await DownloadKemonoAssetAsync(asset, outputDirectory, token))
@@ -2347,8 +2339,8 @@ namespace CyanTools.ViewModel
 
         private bool ShouldSkipExistingDownloadedFile(string filePath, string source, string displayName)
         {
-            if (!DownloadedImageValidator.HasSupportedImageExtension(filePath)
-                || DownloadedImageValidator.CanDecodeImage(filePath))
+            if (!DatasetLibraryStorage.HasSupportedImageExtension(filePath)
+                || DatasetLibraryStorage.CanDecodeImage(filePath))
             {
                 return true;
             }
@@ -2360,9 +2352,10 @@ namespace CyanTools.ViewModel
 
         private bool ValidateDownloadedFileOrDelete(string filePath, string source, string displayName, int attempt, int maxAttempts)
         {
-            if (!DownloadedImageValidator.HasSupportedImageExtension(filePath)
-                || DownloadedImageValidator.CanDecodeImage(filePath))
+            if (!DatasetLibraryStorage.HasSupportedImageExtension(filePath)
+                || DatasetLibraryStorage.CanDecodeImage(filePath))
             {
+                DatasetLibraryStorage.ConvertDownloadedImage(filePath, OutputFormat);
                 return true;
             }
 
@@ -2400,7 +2393,19 @@ namespace CyanTools.ViewModel
         {
             var configuredPattern = string.IsNullOrWhiteSpace(OutputDirectory) ? DefaultOutputDirectory : OutputDirectory.Trim();
             var configured = ApplyOutputDirectoryPlaceholders(configuredPattern);
-            return configured;
+            if (SelectedMode != DatasetDownloadMode.ArtistId)
+            {
+                return configured;
+            }
+
+            var preferred = DatasetArtistOutputDirectoryResolver.PreferExistingDirectory(
+                configuredPattern, configured, _sessionOutputIdSegment);
+            if (!string.Equals(Path.GetFullPath(preferred), Path.GetFullPath(configured), StringComparison.OrdinalIgnoreCase))
+            {
+                AppendLog($"[输出] 同一画师 ID 已有图片，沿用现有目录: {preferred}");
+            }
+
+            return preferred;
         }
 
         private string ResolveSourceOutputDirectory(string source, string key)
@@ -2612,7 +2617,7 @@ namespace CyanTools.ViewModel
             try
             {
                 return Directory.EnumerateFiles(outputDirectory, "*", SearchOption.TopDirectoryOnly)
-                    .Count(DownloadedImageValidator.HasSupportedImageExtension);
+                    .Count(DatasetLibraryStorage.HasSupportedImageExtension);
             }
             catch (IOException)
             {
@@ -2668,7 +2673,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                AppendLog($"加载数据集下载器配置失败: {ex.Message}");
+                AppendLog($"加载数据集管理器配置失败: {ex.Message}");
             }
         }
 
@@ -2696,7 +2701,7 @@ namespace CyanTools.ViewModel
             }
             catch (Exception ex)
             {
-                AppendLog($"保存数据集下载器配置失败: {ex.Message}");
+                AppendLog($"保存数据集管理器配置失败: {ex.Message}");
             }
         }
 
@@ -2964,7 +2969,7 @@ namespace CyanTools.ViewModel
             bool IncludeMeta,
             PixivTokenEntry? PixivToken,
             string PixivRefreshToken,
-            ProxyNode ProxyNode);
+            ProxyNode ProxyNode, string OutputFormat, bool SkipExisting);
 
         private sealed class RemoteRequestPacer
         {

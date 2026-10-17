@@ -54,7 +54,7 @@ namespace CyanTools.Utils
             var filePath = Path.Combine(ConfigDirectory, fileName);
 
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(filePath, json);
+            AtomicFile.WriteAllText(filePath, json);
         }
 
         public void DeleteConfiguration(string configName)

@@ -10,6 +10,8 @@
              d:DesignHeight="620"
              d:DesignWidth="920">
     <UserControl.Resources>
+        <utils:BooleanToInverseBooleanConverter x:Key="MaterialModeEnabled" />
+        <utils:BooleanToVisibilityConverter x:Key="MaterialModeVisibility" />
         <utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
 
@@ -70,7 +72,7 @@
 
                     <TextBlock Text="输入路径"
                                Style="{StaticResource CyanFormLabelStyle}"/>
-                    <ui:TextBox Grid.Column="1"
+                    <ui:TextBox IsEnabled="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeEnabled}}" Grid.Column="1"
                              Text="{Binding InputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              IsReadOnly="{Binding HasInheritedInputPath}"
                              Margin="0,0,8,0"/>
@@ -92,7 +94,7 @@
                     <CheckBox Grid.Row="2"
                               Grid.Column="1"
                               Grid.ColumnSpan="2"
-                              Content="执行完成后清空输入路径文件夹"
+                              Content="执行完成后清空输入路径文件夹" Visibility="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeVisibility}, ConverterParameter=Inverse}"
                               IsChecked="{Binding ShouldClearInputDirectoryAfterCompletion, Mode=TwoWay}"
                               Margin="0,8,0,0"
                               ToolTip="执行成功后会删除输入路径文件夹中的内容，并自动保留输出路径。"/>
@@ -102,12 +104,12 @@
                                Style="{StaticResource CyanFormLabelStyle}"
                                Margin="0,12,10,0"
                                Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <ui:TextBox Grid.Row="3"
+                    <ui:TextBox IsEnabled="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeEnabled}}" Grid.Row="3"
                              Grid.Column="1"
                              Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,12,8,0"
                              Visibility="{Binding IsWorkflowMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
-                    <ui:Button Grid.Row="3"
+                    <ui:Button IsEnabled="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeEnabled}}" Grid.Row="3"
                             Grid.Column="2"
                             Content="..."
                             Width="40"
@@ -444,7 +446,7 @@
                                 <TextBlock Text="初始化参数"/>
                             </StackPanel>
                         </ui:Button>
-                        <ui:Button Grid.Column="1"
+                        <ui:Button IsEnabled="{Binding RelativeSource={RelativeSource Self}, Path=(utils:MaterialClassificationNavigation.IsIndexMode), Converter={StaticResource MaterialModeEnabled}}" Grid.Column="1"
                                 Command="{Binding MoveFilesToTopLevelCommand}">
                             <ui:Button.Style>
                                 <Style TargetType="ui:Button" BasedOn="{StaticResource CyanCommandButtonStyle}">
@@ -468,7 +470,12 @@
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="PlayCircle24"
                                                Margin="0,0,6,0"/>
-                                <TextBlock Text="开始聚类"/>
+                                <TextBlock><TextBlock.Style><Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="开始聚类" />
+                            <Style.Triggers><Trigger Property="utils:MaterialClassificationNavigation.IsIndexMode" Value="True">
+                                <Setter Property="Text" Value="生成索引" />
+                            </Trigger></Style.Triggers>
+                        </Style></TextBlock.Style></TextBlock>
                             </StackPanel>
                         </ui:Button>
                     </Grid>

@@ -38,10 +38,10 @@ public sealed class WorkflowMcpAdapterTests
 
             Assert.Equal("ready", summary.Status);
             Assert.Equal(2, summary.NodeCount);
-            Assert.Equal("数据集下载器", summary.FirstNodeDisplayName);
+            Assert.Equal("数据集管理器", summary.FirstNodeDisplayName);
             Assert.Equal("external_service", summary.Risk);
             Assert.Equal(2, description.Nodes.Count);
-            Assert.Equal("数据集下载器", description.FirstNode.DisplayName);
+            Assert.Equal("数据集管理器", description.FirstNode.DisplayName);
 
             PipelineParameterDescription artistId = Assert.Single(
                 description.FirstNode.Parameters,

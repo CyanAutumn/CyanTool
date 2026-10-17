@@ -40,7 +40,7 @@ namespace CyanTools.ViewModel
 
         private void AddLog(string message)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            UiDispatch.Invoke(() =>
             {
                 LogLines.Add(message);
                 if (LogLines.Count > MaxLogLines)
@@ -64,7 +64,7 @@ namespace CyanTools.ViewModel
             IsIdle = false;
             (ClearLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
             LogLines.Clear();
-            var progress = new Progress<string>(AddLog);
+            var progress = new ExecutionProgress<string>(AddLog);
 
             try
             {

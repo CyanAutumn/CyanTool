@@ -3,6 +3,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/CyanAutumn/CyanTools</RepositoryUrl>
+    <Copyright>Copyright (C) 2026 CyanTools contributors</Copyright>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/*-DESKTOP-*;**/*-DESKTOP-*.*;**/*_DESKTOP_*;**/*_DESKTOP_*.*</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>

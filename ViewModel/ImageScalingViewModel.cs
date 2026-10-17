@@ -233,13 +233,14 @@ namespace CyanTools.ViewModel
                 DownsampleTargetHeight = DownsampleTargetHeight
             };
 
-            var progress = new Progress<double>(value => ProgressValue = value);
+            var progress = new ExecutionProgress<double>(value => ProgressValue = value);
             bool success = false;
 
             try
             {
                 token.ThrowIfCancellationRequested();
-                await ImageScalingProcessor.ProcessFolderAsync(options, progress, AppendLog);
+                await ImageScalingProcessor.ProcessFolderAsync(options, progress, AppendLog, token);
+                token.ThrowIfCancellationRequested();
                 success = true;
                 ProgressValue = 100;
                 AppendLog("处理完成。");
@@ -323,7 +324,7 @@ namespace CyanTools.ViewModel
 
         private void AppendLog(string message)
         {
-            Application.Current.Dispatcher.Invoke(() => Logs.Add(message));
+            UiDispatch.Invoke(() => Logs.Add(message));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

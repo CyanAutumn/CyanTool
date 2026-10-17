@@ -441,8 +441,8 @@ namespace CyanTools.ViewModel
                 Directory.CreateDirectory(SettingsDirectory);
                 var settings = new ImageClusteringSettings
                 {
-                    InputPath = InputPath,
-                    OutputPath = OutputPath,
+                    InputPath = (string?)MaterialClassificationSession.GetPersistedValue(this, GetType().GetProperty(nameof(InputPath))!),
+                    OutputPath = (string?)MaterialClassificationSession.GetPersistedValue(this, GetType().GetProperty(nameof(OutputPath))!),
                     NumClusters = NumClusters,
                     UseBestKBySilhouette = UseBestKBySilhouette,
                     MinClusterSize = MinClusterSize,
@@ -501,13 +501,13 @@ namespace CyanTools.ViewModel
         {
             void Update() => Log += $"{DateTime.Now:HH:mm:ss} {message}\n";
 
-            if (Application.Current.Dispatcher.CheckAccess())
+            if (UiDispatch.CheckAccess())
             {
                 Update();
             }
             else
             {
-                Application.Current.Dispatcher.Invoke(Update);
+                UiDispatch.Invoke(Update);
             }
 
             LogToPipeline($"[图片聚类] {message}");
@@ -515,6 +515,9 @@ namespace CyanTools.ViewModel
 
         private async Task RunClusteringAsync(bool showDialogs, CancellationToken token)
         {
+            if (IsClustering) return;
+            if (await MaterialClassificationSession.TryRunAsync(this, () => RunClusteringAsync(false, token))) return;
+            if (MaterialClassificationSession.Current is { } materialSession) token = materialSession.Token;
             OutputPath = ToolOutputDirectoryDefaults.FillWhenEmpty(OutputPath, InputPath, DisplayName);
             if (IsClustering)
             {
@@ -537,7 +540,8 @@ namespace CyanTools.ViewModel
             }
             finally
             {
-                if (success)
+                if (success) MaterialClassificationSession.MarkSuccessful();
+                if (success && MaterialClassificationSession.Current == null)
                 {
                     TryClearInputDirectoryAfterCompletion();
                 }
@@ -574,7 +578,7 @@ namespace CyanTools.ViewModel
                     AppendLog(samePathMessage);
                     if (showDialogs)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             MessageBox.Show(samePathMessage, "参数错误", MessageBoxButton.OK, MessageBoxImage.Warning));
                     }
                     return false;
@@ -618,13 +622,13 @@ namespace CyanTools.ViewModel
 
                 var processor = new Utils.ImageClusteringProcessor(modelPath, useGpu, AppendLog);
                 var processResult = processor.ProcessFolderWithSummary(InputPath,
-                    p => Application.Current.Dispatcher.Invoke(() => Progress = p * 50),
+                    p => UiDispatch.Invoke(() => Progress = p * 50),
                     error =>
                     {
                         AppendLog(error);
                         if (showDialogs)
                         {
-                            Application.Current.Dispatcher.Invoke(() =>
+                            UiDispatch.Invoke(() =>
                                 MessageBox.Show(error, "处理失败", MessageBoxButton.OK, MessageBoxImage.Warning));
                         }
                     },
@@ -653,7 +657,7 @@ namespace CyanTools.ViewModel
                     AppendLog("未成功处理任何图片");
                     if (showDialogs)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             MessageBox.Show("未成功处理任何图片，请检查图片格式或模型是否正确。", "信息",
                                 MessageBoxButton.OK, MessageBoxImage.Information));
                     }
@@ -766,7 +770,7 @@ namespace CyanTools.ViewModel
                                 clusteringSourcePoints,
                                 umapOptions,
                                 token,
-                                p => Application.Current.Dispatcher.Invoke(() => Progress = 50 + p * 25));
+                                p => UiDispatch.Invoke(() => Progress = 50 + p * 25));
                         }
                         catch (Exception ex)
                         {
@@ -964,7 +968,7 @@ namespace CyanTools.ViewModel
 
                 assignments = RelabelAssignmentsSequentially(assignments);
 
-                Application.Current.Dispatcher.Invoke(() => Progress = 75);
+                UiDispatch.Invoke(() => Progress = 75);
 
                 string featureLower = useTwoStageStyleClustering
                     ? $"{GetFeatureTypeSlug(FeatureTypeGrayStyleDisplay)}2{GetFeatureTypeSlug(effectiveFeatureType)}"
@@ -979,14 +983,17 @@ namespace CyanTools.ViewModel
                 string? distributionImagePath = null;
                 try
                 {
-                    var distributionSpace = BuildDistributionSpace(clusteringSourcePoints, clusteringSpace, useUmapSpace, token);
-                    distributionImagePath = Utils.ClusterDistributionPlotter.SaveScatterPlot(
-                        distributionSpace,
-                        assignments,
-                        outputRoot,
-                        ClusterDistributionFileName,
-                        imageResults.Select(r => r.FilePath).ToList());
-                    AppendLog($"已生成聚类分布图: {distributionImagePath}");
+                    if (MaterialClassificationSession.Current == null)
+                    {
+                        var distributionSpace = BuildDistributionSpace(clusteringSourcePoints, clusteringSpace, useUmapSpace, token);
+                        distributionImagePath = Utils.ClusterDistributionPlotter.SaveScatterPlot(
+                            distributionSpace,
+                            assignments,
+                            outputRoot,
+                            ClusterDistributionFileName,
+                            imageResults.Select(r => r.FilePath).ToList());
+                        AppendLog($"已生成聚类分布图: {distributionImagePath}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1050,7 +1057,7 @@ namespace CyanTools.ViewModel
                         CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
 
                         copiedCount++;
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             Progress = 75 + (double)copiedCount / totalToCopy * 25);
                     }
                 }
@@ -1070,7 +1077,7 @@ namespace CyanTools.ViewModel
                         CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
 
                         copiedCount++;
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             Progress = 75 + (double)copiedCount / totalToCopy * 25);
                     }
                 }
@@ -1090,12 +1097,12 @@ namespace CyanTools.ViewModel
                         CopyCompanionTextFileWithRetry(sourceFilePath, targetFilePath);
 
                         copiedCount++;
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                             Progress = 75 + (double)copiedCount / totalToCopy * 25);
                     }
                 }
 
-                Application.Current.Dispatcher.Invoke(() =>
+                UiDispatch.Invoke(() =>
                 {
                     AppendLog("图片聚类完成");
                     Progress = 100;
@@ -1108,7 +1115,7 @@ namespace CyanTools.ViewModel
             }
             finally
             {
-                Application.Current.Dispatcher.Invoke(() => RefreshCommandStates());
+                UiDispatch.Invoke(() => RefreshCommandStates());
             }
         }
 
@@ -2136,7 +2143,7 @@ namespace CyanTools.ViewModel
             if (showDialogs)
             {
                 MessageBoxResult choice = MessageBoxResult.None;
-                Application.Current.Dispatcher.Invoke(() =>
+                UiDispatch.Invoke(() =>
                 {
                     choice = MessageBox.Show(
                         $"检测到缺少 CSD 模型文件：\n{modelPath}\n\n是否自动下载该模型？",
@@ -2183,7 +2190,7 @@ namespace CyanTools.ViewModel
                 AppendLog($"CSD 模型下载失败: {ex.Message}");
                 if (showDialogs)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    UiDispatch.Invoke(() =>
                         MessageBox.Show(
                             $"CSD 模型下载失败：{ex.Message}\n\n将为你打开模型页面，请手动下载后重试。",
                             "下载失败",
@@ -2271,6 +2278,7 @@ namespace CyanTools.ViewModel
 
         private async Task MoveFilesToTopLevelAsync()
         {
+            if (MaterialClassificationSession.IsAttached(this)) { AppendLog("素材索引模式不移动原图层级。"); return; }
             IsClustering = true;
             Log = "开始移动文件...\n";
             Progress = 0;
@@ -2288,7 +2296,7 @@ namespace CyanTools.ViewModel
 
                     if (filesToMove.Count == 0)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                         {
                             Log += "没有在子文件夹中找到需要移动的文件。\n";
                             MessageBox.Show("没有在子文件夹中找到需要移动的文件。", "操作完成", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2307,7 +2315,7 @@ namespace CyanTools.ViewModel
                         if (File.Exists(destPath))
                         {
                             skippedCount++;
-                            Application.Current.Dispatcher.Invoke(() =>
+                            UiDispatch.Invoke(() =>
                             {
                                 Log += $"警告: 文件 {fileName} 已存在于目标路径，已跳过。\n";
                             });
@@ -2318,13 +2326,13 @@ namespace CyanTools.ViewModel
                             movedCount++;
                         }
 
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                         {
                             Progress = (double)(i + 1) / filesToMove.Count * 100;
                         });
                     }
 
-                    Application.Current.Dispatcher.Invoke(() =>
+                    UiDispatch.Invoke(() =>
                     {
                         Log += "操作完成。成功移动 " + movedCount + " 个文件，跳过 " + skippedCount + " 个重复文件。\n";
                         MessageBox.Show($"操作完成。\n成功移动 {movedCount} 个文件。\n跳过 {skippedCount} 个重复文件。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2333,7 +2341,7 @@ namespace CyanTools.ViewModel
                 }
                 catch (Exception ex)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    UiDispatch.Invoke(() =>
                     {
                         Log += "发生错误: " + ex.Message + "\n";
                         MessageBox.Show($"发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -2350,7 +2358,7 @@ namespace CyanTools.ViewModel
                             if (!Directory.EnumerateFileSystemEntries(dir).Any())
                             {
                                 Directory.Delete(dir);
-                                Application.Current.Dispatcher.Invoke(() =>
+                                UiDispatch.Invoke(() =>
                                 {
                                     Log += $"已删除空目录: {Path.GetFileName(dir)}\n";
                                 });
@@ -2359,7 +2367,7 @@ namespace CyanTools.ViewModel
                     }
                     catch (Exception ex)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        UiDispatch.Invoke(() =>
                         {
                             Log += "清理空目录时发生错误: " + ex.Message + "\n";
                         });
@@ -2390,6 +2398,7 @@ namespace CyanTools.ViewModel
 
         private void CopyFileWithRetry(string source, string destination, int maxRetries = 3)
         {
+            if (MaterialClassificationSession.Current?.Builder is { } index) { index.RecordImage(source, destination); return; }
 
             if (File.Exists(destination))
             {
@@ -2425,6 +2434,7 @@ namespace CyanTools.ViewModel
 
         private void CopyCompanionTextFileWithRetry(string sourceImagePath, string destinationImagePath, int maxRetries = 3)
         {
+            if (MaterialClassificationSession.Current != null) return;
             string sourceTxtPath = Path.ChangeExtension(sourceImagePath, ".txt");
             if (!File.Exists(sourceTxtPath))
             {
@@ -2437,6 +2447,7 @@ namespace CyanTools.ViewModel
 
         private void PrepareOutputRoot(string outputRoot)
         {
+            if (MaterialClassificationSession.Current != null) return;
             if (Directory.Exists(outputRoot))
             {
                 AppendLog($"检测到已有输出路径，先清理旧结果: {outputRoot}");

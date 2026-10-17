@@ -131,6 +131,8 @@ namespace CyanTools.ViewModel
 
         private async Task StartProcessing()
         {
+            if (!IsStartButtonEnabled) return;
+            if (await MaterialClassificationSession.TryRunAsync(this, StartProcessing)) return;
             IsStartButtonEnabled = false;
             ProgressValue = 0;
             Logs.Clear();
@@ -145,12 +147,13 @@ namespace CyanTools.ViewModel
                 MinResolution = this.MinResolutionWidth * this.MinResolutionHeight
             };
 
-            var progress = new Progress<double>(value => ProgressValue = value);
+            var progress = new ExecutionProgress<double>(value => ProgressValue = value);
             Action<string> logAction = (message) => App.Current.Dispatcher.Invoke(() => Logs.Add(message));
 
             try
             {
                 await Task.Run(() => ResolutionFilter.ProcessImages(InputPath, options, progress, logAction));
+                MaterialClassificationSession.MarkSuccessful();
             }
             catch (Exception ex)
             {

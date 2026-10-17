@@ -1,4 +1,7 @@
 using System;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -10,6 +13,7 @@ namespace CyanTools.ViewModel
     public sealed class DatasetDownloadTask : INotifyPropertyChanged
     {
         private readonly RelayCommand _stopCommand;
+        private readonly RelayCommand _removeCommand;
         private CancellationTokenSource? _cancellation;
         private bool _isRunning = true;
         private string _statusText = "排队中";
@@ -24,20 +28,30 @@ namespace CyanTools.ViewModel
         private int _kemonoTotal;
         private string _artistName;
 
-        public DatasetDownloadTask(string artistName, bool enableDanbooru, bool enablePixiv, bool enableKemono)
+        public DatasetDownloadTask(string artistName, bool enableDanbooru, bool enablePixiv, bool enableKemono, Action<DatasetDownloadTask> removeTask)
         {
             _artistName = artistName;
             EnableDanbooru = enableDanbooru;
             EnablePixiv = enablePixiv;
             EnableKemono = enableKemono;
             _stopCommand = new RelayCommand(_ => _cancellation?.Cancel(), _ => IsRunning);
+            _removeCommand = new RelayCommand(_ =>
+            {
+                if (!IsRunning)
+                {
+                    removeTask(this);
+                }
+            }, _ => !IsRunning);
         }
 
         public string ArtistName { get => _artistName; private set => SetField(ref _artistName, value); }
         public string PixivId { get; set; } = string.Empty;
-        public bool EnableDanbooru { get; }
-        public bool EnablePixiv { get; }
-        public bool EnableKemono { get; }
+        public bool EnableDanbooru { get => _enableDanbooru; set => SetField(ref _enableDanbooru, value); }
+        private bool _enableDanbooru;
+        public bool EnablePixiv { get => _enablePixiv; set => SetField(ref _enablePixiv, value); }
+        private bool _enablePixiv;
+        public bool EnableKemono { get => _enableKemono; set => SetField(ref _enableKemono, value); }
+        private bool _enableKemono;
         public string SelectedProxyName { get; set; } = string.Empty;
         public string StatusText
         {
@@ -55,7 +69,9 @@ namespace CyanTools.ViewModel
                     return;
                 }
 
+                (CheckCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 _stopCommand.RaiseCanExecuteChanged();
+                _removeCommand.RaiseCanExecuteChanged();
             }
         }
 
@@ -75,13 +91,44 @@ namespace CyanTools.ViewModel
         public string DanbooruProgressText => FormatProgress(DanbooruCurrent, DanbooruTotal);
         public string PixivProgressText => FormatProgress(PixivCurrent, PixivTotal);
         public string KemonoProgressText => FormatProgress(KemonoCurrent, KemonoTotal);
+        public string MaterialDirectory { get; set; } = string.Empty;
+        public ObservableCollection<string> FolderChoices { get; } = new();
+        private string _selectedFolder = "原图";
+        internal Action<string>? FolderSelectionChanged { get; set; }
+        public string SelectedFolder
+        {
+            get => _selectedFolder;
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value) || !FolderChoices.Contains(value) || !SetField(ref _selectedFolder, value)) return;
+                OnPropertyChanged(nameof(SelectedFolderPath));
+                FolderSelectionChanged?.Invoke(value);
+            }
+        }
+        public string SelectedFolderPath => Path.Combine(MaterialDirectory, SelectedFolder);
+        public void RefreshFolders(string? preferred = null)
+        {
+            var selected = preferred ?? SelectedFolder;
+            FolderChoices.Clear();
+            FolderChoices.Add("原图");
+            if (Directory.Exists(MaterialDirectory))
+                foreach (var directory in Directory.EnumerateDirectories(MaterialDirectory).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                {
+                    var name = Path.GetFileName(directory);
+                    if (!string.Equals(name, "config", StringComparison.OrdinalIgnoreCase) && !FolderChoices.Contains(name)
+                        && (File.GetAttributes(directory) & FileAttributes.ReparsePoint) == 0) FolderChoices.Add(name);
+                }
+            SelectedFolder = FolderChoices.Contains(selected) ? selected : "原图";
+        }
+        public ICommand? CheckCommand { get; set; }
         public ICommand StopCommand => _stopCommand;
+        public ICommand RemoveCommand => _removeCommand;
 
         internal void AttachCancellation(CancellationTokenSource cancellation) => _cancellation = cancellation;
 
         internal void UpdateFrom(DatasetDownloaderViewModel worker)
         {
-            if (!string.IsNullOrWhiteSpace(worker.ResolvedArtistName))
+            if (string.IsNullOrEmpty(MaterialDirectory) && !string.IsNullOrWhiteSpace(worker.ResolvedArtistName))
             {
                 ArtistName = worker.ResolvedArtistName;
             }

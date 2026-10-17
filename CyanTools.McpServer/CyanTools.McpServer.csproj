@@ -4,6 +4,9 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/CyanAutumn/CyanTools</RepositoryUrl>
+    <Copyright>Copyright (C) 2026 CyanTools contributors</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

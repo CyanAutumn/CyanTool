@@ -52,7 +52,7 @@ namespace CyanTools.ViewModel
 
         public ObservableCollection<string> ImageFormats { get; } = new ObservableCollection<string>
         {
-            "PNG", "JPEG", "BMP", "WEBP"
+            "PNG", "JPEG", "JPG", "BMP", "WEBP"
         };
 
         public string SelectedFormat
@@ -98,12 +98,34 @@ namespace CyanTools.ViewModel
         public ICommand SelectInputCommand { get; }
         public ICommand SelectOutputCommand { get; }
         public ICommand StartConversionCommand { get; }
+        private Action? _returnToLibrary;
+        private string? _materialRoot;
+        public bool CanReturnToLibrary => _returnToLibrary != null;
+        public ICommand ReturnToLibraryCommand { get; }
+
+        public void EnterFromLibrary(string path, Action returnToLibrary, string? materialRoot = null)
+        {
+            if (IsConverting) throw new InvalidOperationException("正在转换，请等待当前任务完成。");
+            _returnToLibrary = returnToLibrary;
+            _materialRoot = materialRoot;
+            InputPath = path;
+            OutputPath = path;
+            OnPropertyChanged(nameof(CanReturnToLibrary));
+        }
+
+        public void ClearLibraryNavigation()
+        {
+            _returnToLibrary = null;
+            _materialRoot = null;
+            OnPropertyChanged(nameof(CanReturnToLibrary));
+        }
 
         public ConvertImageFormatViewModel()
         {
             SelectInputCommand = new RelayCommand(SelectInputPath);
             SelectOutputCommand = new RelayCommand(SelectOutputPath);
             StartConversionCommand = new RelayCommand(async () => await StartConversion(), () => !IsConverting);
+            ReturnToLibraryCommand = new RelayCommand(() => _returnToLibrary?.Invoke(), () => CanReturnToLibrary && !IsConverting);
             SelectedFormat = ImageFormats.First();
         }
 
@@ -168,14 +190,17 @@ namespace CyanTools.ViewModel
             ProgressValue = 0;
             pipelineLog?.Invoke("开始格式转换。");
 
-            var progress = new Progress<double>(value => ProgressValue = value);
-            bool success = false;
+            var progress = new ExecutionProgress<double>(value => ProgressValue = value);
+
 
             try
             {
+                using var materialLease = _materialRoot == null ? null : MaterialClassificationStore.Acquire(_materialRoot);
+                if (_materialRoot != null && MaterialClassificationStore.HasActiveView(_materialRoot))
+                    throw new InvalidOperationException("请先还原原图，再执行格式转换。");
                 token.ThrowIfCancellationRequested();
-                await ImageFormatConverter.ConvertAsync(InputPath, OutputPath, SelectedFormat, progress);
-                success = true;
+                await ImageFormatConverter.ConvertAsync(InputPath, OutputPath, SelectedFormat, progress, ShouldClearInputDirectoryAfterCompletion, token);
+
                 pipelineLog?.Invoke("格式转换完成。");
             }
             catch (Exception ex)
@@ -194,25 +219,9 @@ namespace CyanTools.ViewModel
             }
             finally
             {
-                if (success)
-                {
-                    TryClearInputDirectoryAfterCompletion(pipelineLog);
-                }
-
                 IsConverting = false;
                 ProgressValue = 100;
             }
-        }
-
-        private void TryClearInputDirectoryAfterCompletion(Action<string>? logAction)
-        {
-            if (!ShouldClearInputDirectoryAfterCompletion)
-            {
-                return;
-            }
-
-            InputDirectoryCleanupResult result = InputDirectoryCleanupHelper.TryClearContents(InputPath, new[] { OutputPath });
-            logAction?.Invoke(result.Message);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
